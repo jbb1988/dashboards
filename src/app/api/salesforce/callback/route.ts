@@ -8,16 +8,12 @@ const SALESFORCE_CLIENT_SECRET = process.env.SALESFORCE_CLIENT_SECRET!;
 /**
  * Get the base URL for redirects
  */
-function getBaseUrl(request: NextRequest): string {
-  // Use explicit APP_URL if set (recommended for production)
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL;
+function getBaseUrl(): string {
+  // Hardcoded for production - update if domain changes
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://mars-dashboards.vercel.app';
   }
-
-  // Fall back to request host
-  const host = request.headers.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  return `${protocol}://${host}`;
+  return 'http://localhost:3000';
 }
 
 /**
@@ -29,7 +25,7 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
-  const baseUrl = getBaseUrl(request);
+  const baseUrl = getBaseUrl();
   const redirectUri = `${baseUrl}/api/salesforce/callback`;
 
   if (error) {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
@@ -23,25 +23,21 @@ function generatePKCE() {
 /**
  * Get the base URL for redirects
  */
-function getBaseUrl(request: NextRequest): string {
-  // Use explicit APP_URL if set (recommended for production)
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL;
+function getBaseUrl(): string {
+  // Hardcoded for production - update if domain changes
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://mars-dashboards.vercel.app';
   }
-
-  // Fall back to request host
-  const host = request.headers.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  return `${protocol}://${host}`;
+  return 'http://localhost:3000';
 }
 
 /**
  * Initiates OAuth 2.0 Web Server Flow with PKCE
  * Redirects user to Salesforce login page
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   const loginUrl = process.env.SALESFORCE_LOGIN_URL || 'https://login.salesforce.com';
-  const baseUrl = getBaseUrl(request);
+  const baseUrl = getBaseUrl();
   const redirectUri = `${baseUrl}/api/salesforce/callback`;
 
   // Generate PKCE values
