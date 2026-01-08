@@ -9,10 +9,9 @@ const SALESFORCE_CLIENT_SECRET = process.env.SALESFORCE_CLIENT_SECRET!;
  * Get the base URL for redirects
  */
 function getBaseUrl(request: NextRequest): string {
-  // Use NEXT_PUBLIC_VERCEL_URL or VERCEL_URL if available
-  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL || process.env.VERCEL_URL;
-  if (vercelUrl) {
-    return `https://${vercelUrl}`;
+  // Use explicit APP_URL if set (recommended for production)
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
   }
 
   // Fall back to request host
