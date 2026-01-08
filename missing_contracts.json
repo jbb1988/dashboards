@@ -1,0 +1,407 @@
+[
+  {
+    "name": "El Dorado Irrigation District",
+    "name_lower": "el dorado irrigation district",
+    "value": 70960.0,
+    "close_date": "1/20/2026",
+    "stage": "R5- (87%) 90 Day Usage Analysis Completed",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Santa Cruz, City of",
+    "name_lower": "santa cruz, city of",
+    "value": 17220.0,
+    "close_date": "1/26/2026",
+    "stage": "R2- (45%) Renewal Proposal Internal Review: Approved",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 1
+  },
+  {
+    "name": "New York City Department of Environmental Protection (NYC DEP) [NY]",
+    "name_lower": "new york city department of environmental protection (nyc dep) [ny]",
+    "value": 367338.0,
+    "close_date": "1/27/2026",
+    "stage": "R3- (55%) PES - Customer Preliminary review positive",
+    "sales_lead": "Dave Corey",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Los Angeles County Water Division",
+    "name_lower": "los angeles county water division",
+    "value": 95392.0,
+    "close_date": "1/30/2026",
+    "stage": "R5- (97%) Renewal Day Usage Completed",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 4
+  },
+  {
+    "name": "D.C. Water & Sewer",
+    "name_lower": "d.c. water & sewer",
+    "value": 25376.0,
+    "close_date": "1/30/2026",
+    "stage": "R2- (45%) Renewal Proposal Internal Review: Approved",
+    "sales_lead": "Corey Keefer",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Folsom, City of",
+    "name_lower": "folsom, city of",
+    "value": 53353.0,
+    "close_date": "1/30/2026",
+    "stage": "R2- (32%) CPQ Pricing (GM%) Completed (Rejected) & Sent to Sales",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 3
+  },
+  {
+    "name": "Fairfax County Water",
+    "name_lower": "fairfax county water",
+    "value": 149088.0,
+    "close_date": "1/31/2026",
+    "stage": "nan",
+    "sales_lead": "Jeff Butt",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Anne Arundel County Department of Public Works Bureau of Utility Operations",
+    "name_lower": "anne arundel county department of public works bureau of utility operations",
+    "value": 31920.0,
+    "close_date": "2/2/2026",
+    "stage": "R5- (87%) 90 Day Usage Analysis Completed",
+    "sales_lead": "Jonathan Jethro",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Lubbock, City of",
+    "name_lower": "lubbock, city of",
+    "value": 46028.0,
+    "close_date": "2/19/2026",
+    "stage": "R5- (87%) 90 Day Usage Analysis Completed",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Kansas City Missouri Dept",
+    "name_lower": "kansas city missouri dept",
+    "value": 93425.0,
+    "close_date": "2/19/2026",
+    "stage": "R5- (87%) 90 Day Usage Analysis Completed",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Detroit, City of",
+    "name_lower": "detroit, city of",
+    "value": 12624.0,
+    "close_date": "2/28/2026",
+    "stage": "R5- (95%) PO Received",
+    "sales_lead": "Jonathan Jethro",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Regional Water Authority",
+    "name_lower": "regional water authority",
+    "value": 169102.0,
+    "close_date": "3/27/2026",
+    "stage": "R5- (99%) All Cash Collected",
+    "sales_lead": "Jonathan Jethro",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Allen, City of",
+    "name_lower": "allen, city of",
+    "value": 23565.0,
+    "close_date": "3/29/2026",
+    "stage": "nan",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Houston, City of",
+    "name_lower": "houston, city of",
+    "value": 29321.0,
+    "close_date": "4/1/2026",
+    "stage": "R2- (20%) 190 Day Usage Analysis Complete",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Milwaukee, City of",
+    "name_lower": "milwaukee, city of",
+    "value": 234257.0,
+    "close_date": "4/15/2026",
+    "stage": "R2- (36%) Sales Mgmt Pricing Approval (SyEn)",
+    "sales_lead": "Jeff Butt",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Badger Meter",
+    "name_lower": "badger meter",
+    "value": 83390.0,
+    "close_date": "4/24/2026",
+    "stage": "R2- (45%) Renewal Proposal Internal Review: Approved",
+    "sales_lead": "Robbie Smart",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Leesburg Utilities Department, Town of",
+    "name_lower": "leesburg utilities department, town of",
+    "value": 10007.0,
+    "close_date": "5/10/2026",
+    "stage": "R3- (50%) PES - Customer In process of reviewing",
+    "sales_lead": "Stuart Sanderson",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Mesa, City of",
+    "name_lower": "mesa, city of",
+    "value": 46315.0,
+    "close_date": "5/19/2026",
+    "stage": "R2- (20%) 190 Day Usage Analysis Complete",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Newport News Waterworks",
+    "name_lower": "newport news waterworks",
+    "value": 10165.0,
+    "close_date": "6/1/2026",
+    "stage": "R2- (22%) Pricing Year for Proposal",
+    "sales_lead": "Jonathan Jethro",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Cucamonga Valley Water District",
+    "name_lower": "cucamonga valley water district",
+    "value": 14123.0,
+    "close_date": "6/19/2026",
+    "stage": "R5- (87%) 90 Day Usage Analysis Completed",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Waterone",
+    "name_lower": "waterone",
+    "value": 2344.0,
+    "close_date": "6/25/2026",
+    "stage": "nan",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 1
+  },
+  {
+    "name": "St. Paul, City of",
+    "name_lower": "st. paul, city of",
+    "value": 68313.0,
+    "close_date": "6/26/2026",
+    "stage": "R2- (20%) 190 Day Usage Analysis Complete",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Virginia American Water",
+    "name_lower": "virginia american water",
+    "value": 57638.0,
+    "close_date": "6/30/2026",
+    "stage": "R3- (50%) PES - Customer In process of reviewing",
+    "sales_lead": "Stuart Sanderson",
+    "opportunity_count": 2
+  },
+  {
+    "name": "San Diego Public Utility, City of",
+    "name_lower": "san diego public utility, city of",
+    "value": 646795.0,
+    "close_date": "7/1/2026",
+    "stage": "nan",
+    "sales_lead": "Corey Keefer",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Rochester Hills, City of",
+    "name_lower": "rochester hills, city of",
+    "value": 34268.0,
+    "close_date": "7/1/2026",
+    "stage": "R3- (50%) PES - Customer In process of reviewing",
+    "sales_lead": "Jonathan Jethro",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Dallas Water Utilities",
+    "name_lower": "dallas water utilities",
+    "value": 337899.0,
+    "close_date": "7/1/2026",
+    "stage": "R2- (30%) Pricing Request Completed Correctly (SyEn)",
+    "sales_lead": "Jeff Butt",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Fort Smith, City of",
+    "name_lower": "fort smith, city of",
+    "value": 74244.0,
+    "close_date": "7/9/2026",
+    "stage": "R3- (55%) PES - Customer Preliminary review positive",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 2
+  },
+  {
+    "name": "East Bay MUD",
+    "name_lower": "east bay mud",
+    "value": 109437.0,
+    "close_date": "7/22/2026",
+    "stage": "R3- (50%) PES - Customer In process of reviewing",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Metropolitan District, The (MDC)",
+    "name_lower": "metropolitan district, the (mdc)",
+    "value": 41410.0,
+    "close_date": "8/1/2026",
+    "stage": "nan",
+    "sales_lead": "Jonathan Jethro",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Aqua Pennsylvania",
+    "name_lower": "aqua pennsylvania",
+    "value": 145174.0,
+    "close_date": "8/18/2026",
+    "stage": "nan",
+    "sales_lead": "Stuart Sanderson",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Simi Valley, City of",
+    "name_lower": "simi valley, city of",
+    "value": 16932.0,
+    "close_date": "8/20/2026",
+    "stage": "R2- (45%) Renewal Proposal Internal Review: Approved",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Los Angeles Department of Water and Power (LADWP)",
+    "name_lower": "los angeles department of water and power (ladwp)",
+    "value": 286526.57,
+    "close_date": "10/1/2026",
+    "stage": "R2- (15%) Complete number of tests analysis >= 270 days",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Las Vegas Valley Water District",
+    "name_lower": "las vegas valley water district",
+    "value": 27683.0,
+    "close_date": "10/9/2026",
+    "stage": "R2- (15%) Complete number of tests analysis >= 270 days",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Dekalb County Water Department",
+    "name_lower": "dekalb county water department",
+    "value": 64570.0,
+    "close_date": "10/9/2026",
+    "stage": "nan",
+    "sales_lead": "Stuart Sanderson",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Austin, City of",
+    "name_lower": "austin, city of",
+    "value": 87476.0,
+    "close_date": "10/20/2026",
+    "stage": "nan",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Oklahoma Rural Water Association",
+    "name_lower": "oklahoma rural water association",
+    "value": 10007.0,
+    "close_date": "10/23/2026",
+    "stage": "nan",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Coeur d' Alene, City of",
+    "name_lower": "coeur d' alene, city of",
+    "value": 61836.0,
+    "close_date": "11/9/2026",
+    "stage": "nan",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Broward County WWS",
+    "name_lower": "broward county wws",
+    "value": 12294.0,
+    "close_date": "11/15/2026",
+    "stage": "R1- (12%) Contact Customer to understand requirements",
+    "sales_lead": "Stuart Sanderson",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Tucson, City of",
+    "name_lower": "tucson, city of",
+    "value": 34630.0,
+    "close_date": "11/19/2026",
+    "stage": "nan",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Fontana Water Company",
+    "name_lower": "fontana water company",
+    "value": 49421.0,
+    "close_date": "11/22/2026",
+    "stage": "nan",
+    "sales_lead": "Mike Morgan",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Orlando Utilities Commission",
+    "name_lower": "orlando utilities commission",
+    "value": 11174.0,
+    "close_date": "11/28/2026",
+    "stage": "R1- (12%) Contact Customer to understand requirements",
+    "sales_lead": "Stuart Sanderson",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Huntsville Utility",
+    "name_lower": "huntsville utility",
+    "value": 11000.0,
+    "close_date": "12/1/2026",
+    "stage": "R2- (22%) Pricing Year for Proposal",
+    "sales_lead": "Stuart Sanderson",
+    "opportunity_count": 1
+  },
+  {
+    "name": "Greeley, City of",
+    "name_lower": "greeley, city of",
+    "value": 39651.0,
+    "close_date": "12/8/2026",
+    "stage": "nan",
+    "sales_lead": "Joe Delzell",
+    "opportunity_count": 2
+  },
+  {
+    "name": "Emerald Coast Utilities Authority",
+    "name_lower": "emerald coast utilities authority",
+    "value": 31545.0,
+    "close_date": "12/15/2026",
+    "stage": "nan",
+    "sales_lead": "Stuart Sanderson",
+    "opportunity_count": 2
+  },
+  {
+    "name": "San Antonio Water System",
+    "name_lower": "san antonio water system",
+    "value": 317378.0,
+    "close_date": "1/1/2027",
+    "stage": "nan",
+    "sales_lead": "Jonathan Jethro",
+    "opportunity_count": 2
+  }
+]
