@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
       try {
         const pdfBuffer = await getDocumentDownload(envelopeId, 'combined');
-        return new NextResponse(pdfBuffer, {
+        return new NextResponse(new Uint8Array(pdfBuffer), {
           headers: {
             'Content-Type': 'application/pdf',
             'Content-Disposition': `attachment; filename="envelope-${envelopeId}.pdf"`,
