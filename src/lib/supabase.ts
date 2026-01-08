@@ -3,18 +3,32 @@
  * Provides client and server-side Supabase access
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Environment variables
+// Environment variables (NEXT_PUBLIC_ vars are available on client)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Client-side Supabase client (uses anon key, respects RLS)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Server-side Supabase client (uses service role key, bypasses RLS)
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Server-side Supabase client (lazy-loaded, only works on server)
+let _supabaseAdmin: SupabaseClient | null = null;
+export const getSupabaseAdmin = () => {
+  if (!_supabaseAdmin) {
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseServiceKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not available (client-side?)');
+    }
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return _supabaseAdmin;
+};
+
+// Legacy export for compatibility (will error on client-side if used)
+export const supabaseAdmin = typeof window === 'undefined'
+  ? createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY || '')
+  : null as unknown as SupabaseClient;
 
 // Types for our database tables
 export interface OAuthToken {
