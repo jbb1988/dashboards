@@ -401,220 +401,6 @@ const VALID_STATUSES = [
   'PO Received',
 ];
 
-// Notion Link Modal - Search and Link or Add to Notion
-function NotionLinkModal({
-  isOpen,
-  onClose,
-  contract,
-  onLinked
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  contract: Contract;
-  onLinked: () => void;
-}) {
-  const [searchQuery, setSearchQuery] = useState(contract.name);
-  const [searchResults, setSearchResults] = useState<Array<{ id: string; name: string; status: string; value: number; url: string }>>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState('Discussions Not Started');
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Search Notion when query changes
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const searchNotion = async () => {
-      setIsSearching(true);
-      try {
-        const response = await fetch(`/api/contracts/notion?q=${encodeURIComponent(searchQuery)}`);
-        const data = await response.json();
-        if (data.results) {
-          setSearchResults(data.results);
-        }
-      } catch (err) {
-        console.error('Search error:', err);
-      } finally {
-        setIsSearching(false);
-      }
-    };
-
-    const debounce = setTimeout(searchNotion, 300);
-    return () => clearTimeout(debounce);
-  }, [searchQuery, isOpen]);
-
-  // Add new contract to Notion
-  const handleAddToNotion = async () => {
-    setIsAdding(true);
-    setMessage(null);
-    try {
-      const response = await fetch('/api/contracts/notion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: contract.name,
-          value: contract.value,
-          status: selectedStatus,
-          contractDate: contract.contractDate,
-          awardDate: contract.awardDate,
-          salesStage: contract.salesStage, // Pass raw SF stage
-        }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        setMessage({ type: 'success', text: 'Added to Notion!' });
-        setTimeout(() => {
-          onLinked();
-          onClose();
-        }, 1000);
-      } else {
-        setMessage({ type: 'error', text: result.error || 'Failed to add' });
-      }
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Network error' });
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  // Link to existing Notion entry (updates the name in Notion to match)
-  const handleLinkToExisting = async (notionEntry: { id: string; name: string }) => {
-    setMessage({ type: 'success', text: `Linked to "${notionEntry.name}"` });
-    setTimeout(() => {
-      onLinked();
-      onClose();
-    }, 1000);
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-[#151F2E] rounded-xl border border-white/10 shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden"
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="px-5 py-4 border-b border-white/10">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[15px] font-semibold text-[#EAF2FF]">Link to Notion</h3>
-              <button
-                onClick={onClose}
-                className="text-[#64748B] hover:text-white transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-[12px] text-[#64748B] mt-1">
-              Search for existing Notion entry or add new
-            </p>
-          </div>
-
-          {/* Contract Info */}
-          <div className="px-5 py-3 bg-[#0F1722] border-b border-white/10">
-            <div className="text-[13px] font-medium text-[#EAF2FF]">{contract.name}</div>
-            <div className="text-[12px] text-[#64748B] mt-0.5">
-              {formatCurrency(contract.value)} • {contract.opportunityName || 'No opportunity name'}
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="px-5 py-3 border-b border-white/10">
-            <div className="relative">
-              <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search Notion..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-[#0F1722] border border-white/10 text-[#EAF2FF] placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50 text-[13px]"
-                autoFocus
-              />
-            </div>
-          </div>
-
-          {/* Search Results */}
-          <div className="max-h-[200px] overflow-y-auto">
-            {isSearching ? (
-              <div className="px-5 py-6 text-center">
-                <div className="w-5 h-5 border-2 border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin mx-auto" />
-              </div>
-            ) : searchResults.length > 0 ? (
-              <div className="py-2">
-                {searchResults.map(result => (
-                  <button
-                    key={result.id}
-                    onClick={() => handleLinkToExisting(result)}
-                    className="w-full px-5 py-2.5 text-left hover:bg-[#1E293B] transition-colors flex items-center justify-between group"
-                  >
-                    <div>
-                      <div className="text-[13px] text-[#EAF2FF] group-hover:text-[#38BDF8]">{result.name}</div>
-                      <div className="text-[11px] text-[#64748B]">{result.status}</div>
-                    </div>
-                    <span className="text-[11px] text-[#64748B]">{formatCurrency(result.value)}</span>
-                  </button>
-                ))}
-              </div>
-            ) : searchQuery ? (
-              <div className="px-5 py-6 text-center text-[13px] text-[#64748B]">
-                No matching contracts in Notion
-              </div>
-            ) : null}
-          </div>
-
-          {/* Add New Section */}
-          <div className="px-5 py-4 border-t border-white/10 bg-[#0F1722]">
-            {message ? (
-              <div className={`text-center py-2 text-[13px] ${message.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                {message.text}
-              </div>
-            ) : (
-              <>
-                <p className="text-[11px] text-[#64748B] uppercase tracking-wider font-semibold mb-3">
-                  Or add new to Notion
-                </p>
-                <div className="flex items-center gap-3">
-                  <select
-                    value={selectedStatus}
-                    onChange={e => setSelectedStatus(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-lg bg-[#151F2E] border border-white/10 text-[#EAF2FF] text-[12px] focus:outline-none focus:border-[#38BDF8]/50"
-                  >
-                    {VALID_STATUSES.map(s => (
-                      <option key={s} value={s} className="bg-[#151F2E]">{s}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleAddToNotion}
-                    disabled={isAdding}
-                    className="px-4 py-2 rounded-lg bg-[#38BDF8] text-[#0F1722] text-[12px] font-semibold hover:bg-[#38BDF8]/90 transition-colors disabled:opacity-50"
-                  >
-                    {isAdding ? 'Adding...' : 'Add to Notion'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
 // Task interface for Notion tasks
 interface NotionTask {
   id: string;
@@ -648,7 +434,6 @@ function ContractRow({
   const [editedAwardDate, setEditedAwardDate] = useState(contract.awardDate || '');
   const [editedContractDate, setEditedContractDate] = useState(contract.contractDate || '');
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [showNotionModal, setShowNotionModal] = useState(false);
   const [tasks, setTasks] = useState<NotionTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksFetched, setTasksFetched] = useState(false);
@@ -684,7 +469,7 @@ function ContractRow({
 
   // Fetch tasks when expanded
   useEffect(() => {
-    if (isExpanded && !tasksFetched && !contract.notInNotion) {
+    if (isExpanded && !tasksFetched) {
       setTasksLoading(true);
       fetch(`/api/contracts/tasks?contractName=${encodeURIComponent(contract.name)}`)
         .then(res => res.json())
@@ -695,7 +480,7 @@ function ContractRow({
         .catch(err => console.error('Error fetching tasks:', err))
         .finally(() => setTasksLoading(false));
     }
-  }, [isExpanded, tasksFetched, contract.name, contract.notInNotion]);
+  }, [isExpanded, tasksFetched, contract.name]);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—';
@@ -959,7 +744,7 @@ function ContractRow({
       transition={{ delay: 0.02 * Math.min(index, 20) }}
     >
       <div
-        className={`group transition-all duration-150 cursor-pointer ${
+        className={`group transition-all duration-150 ${
           isExpanded
             ? 'bg-[#1E293B] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
             : isEvenRow
@@ -969,9 +754,8 @@ function ContractRow({
         ${focusMode && !isCritical ? 'opacity-40' : ''}
         ${focusMode && isCritical ? 'ring-1 ring-[#F59E0B]/30 bg-[#F59E0B]/5' : ''}
         hover:shadow-[0_0_20px_rgba(56,189,248,0.05)]`}
-        onClick={() => !isEditing && setIsExpanded(!isExpanded)}
       >
-        <div className="grid gap-4 px-6 py-[14px] items-center" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr 0.6fr' }}>
+        <div className="grid gap-4 px-6 py-[14px] items-center" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr 32px' }}>
           {/* Name - Clickable to Salesforce */}
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
             <div
@@ -1023,19 +807,7 @@ function ContractRow({
 
           {/* Status - Editable with Quick Dropdown */}
           <div onClick={e => e.stopPropagation()}>
-            {contract.notInNotion ? (
-              <span
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
-                style={{
-                  background: `${statusColor}14`,
-                  color: statusColor,
-                }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
-                {contract.status}
-              </span>
-            ) : (
-              <div className="relative group/status">
+            <div className="relative group/status">
                 <div
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full pointer-events-none z-10"
                   style={{ background: statusColor }}
@@ -1077,8 +849,7 @@ function ContractRow({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* Sales Stage - from Salesforce - neutral gray */}
@@ -1099,9 +870,13 @@ function ContractRow({
                 type="date"
                 value={editedContractDate}
                 onChange={e => setEditedContractDate(e.target.value)}
-                onClick={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation();
+                  (e.target as HTMLInputElement).showPicker?.();
+                }}
                 onMouseDown={e => e.stopPropagation()}
-                className="w-full px-2 py-1 rounded bg-[#1E293B] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                onFocus={e => (e.target as HTMLInputElement).showPicker?.()}
+                className="w-full px-2 py-1 rounded bg-[#1E293B] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer pointer-events-auto relative z-10"
                 style={{ colorScheme: 'dark' }}
               />
             ) : (
@@ -1149,141 +924,29 @@ function ContractRow({
             )}
           </div>
 
-          {/* Notion Status / Actions */}
-          <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-            {isEditing ? (
-              <>
-                {saveMessage ? (
-                  <span className={`text-[10px] ${saveMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                    {saveMessage.text}
-                  </span>
-                ) : (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={handleCancel}
-                      className="px-1.5 py-0.5 text-[10px] text-gray-400 hover:text-white transition-colors"
-                      disabled={isSaving}
-                    >
-                      ✕
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className="px-2 py-0.5 text-[10px] bg-[#0189CB] text-white rounded hover:bg-[#0189CB]/80 transition-colors disabled:opacity-50"
-                    >
-                      {isSaving ? '...' : 'Save'}
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : contract.notInNotion ? (
-              <button
-                onClick={() => setShowNotionModal(true)}
-                className="text-[10px] text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
-                title="Search & Link to Notion"
+          {/* Expand/Collapse Button */}
+          <div className="flex items-center justify-center">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isEditing) setIsExpanded(!isExpanded);
+              }}
+              className={`p-1.5 rounded-md transition-all ${
+                isExpanded
+                  ? 'text-[#38BDF8] bg-[#38BDF8]/10'
+                  : 'text-[#64748B] hover:text-white hover:bg-white/5'
+              }`}
+              title={isExpanded ? 'Collapse' : 'Expand'}
+            >
+              <svg
+                className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add
-              </button>
-            ) : (
-              <div className="flex items-center gap-1 relative">
-                <span className="text-[10px] text-green-400">✓</span>
-                {/* Quick Add Task Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowQuickAddTask(!showQuickAddTask);
-                  }}
-                  className={`p-0.5 transition-all ${showQuickAddTask ? 'text-[#38BDF8]' : 'opacity-0 group-hover:opacity-100 text-gray-500 hover:text-[#38BDF8]'}`}
-                  title="Quick add task"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                </button>
-                <button
-                  onClick={handleEdit}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-500 hover:text-[#0189CB] transition-all"
-                  title="Edit in Notion"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </button>
-                {/* Quick Add Task Popover */}
-                <AnimatePresence>
-                  {showQuickAddTask && (
-                    <motion.div
-                      ref={quickTaskRef}
-                      initial={{ opacity: 0, scale: 0.95, y: -5 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-full mt-2 z-50 w-72 p-3 rounded-lg bg-[#1E293B] border border-[#38BDF8]/30 shadow-xl shadow-black/50"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="text-[10px] text-[#38BDF8] uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Quick Add Task
-                      </div>
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={quickTaskTitle}
-                          onChange={e => setQuickTaskTitle(e.target.value)}
-                          placeholder="Task title..."
-                          className="w-full px-3 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] placeholder:text-[#475569]"
-                          autoFocus
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' && quickTaskTitle.trim()) {
-                              handleQuickAddTask();
-                            } else if (e.key === 'Escape') {
-                              setShowQuickAddTask(false);
-                              setQuickTaskTitle('');
-                              setQuickTaskDueDate('');
-                            }
-                          }}
-                        />
-                        <div className="flex gap-2">
-                          <input
-                            type="date"
-                            value={quickTaskDueDate}
-                            onChange={e => setQuickTaskDueDate(e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                            onMouseDown={e => e.stopPropagation()}
-                            className="flex-1 px-2 py-1.5 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
-                            style={{ colorScheme: 'dark' }}
-                          />
-                          <button
-                            onClick={handleQuickAddTask}
-                            disabled={!quickTaskTitle.trim() || isCreatingQuickTask}
-                            className="px-3 py-1.5 rounded bg-[#38BDF8] text-white text-xs font-medium hover:bg-[#38BDF8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                          >
-                            {isCreatingQuickTask ? (
-                              <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                              <>
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Add
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mt-2 text-[9px] text-[#64748B]">
-                        For: <span className="text-[#38BDF8]">{contract.name}</span>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -1295,6 +958,7 @@ function ContractRow({
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden bg-[#0F1722] border-b border-white/[0.04]"
+              onClick={e => e.stopPropagation()}
             >
               <div className="px-6 py-4 grid grid-cols-6 gap-4">
                 <div>
@@ -1327,21 +991,6 @@ function ContractRow({
                   <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Probability</span>
                   <div className="mt-1 text-lg font-semibold text-white">
                     {contract.probability || 0}%
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Notion Status</span>
-                  <div className="mt-1">
-                    {contract.notInNotion ? (
-                      <button
-                        onClick={() => setShowNotionModal(true)}
-                        className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
-                      >
-                        Not linked → Link
-                      </button>
-                    ) : (
-                      <span className="text-xs text-green-400">✓ Synced</span>
-                    )}
                   </div>
                 </div>
                 <div>
@@ -1386,15 +1035,14 @@ function ContractRow({
               )}
 
               {/* Tasks Section */}
-              {!contract.notInNotion && (
-                <div className="px-6 py-4 border-t border-white/[0.04]">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                      </svg>
-                      Notion Tasks
-                    </span>
+              <div className="px-6 py-4 border-t border-white/[0.04]">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold flex items-center gap-2">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                    Tasks
+                  </span>
                     <div className="flex items-center gap-2">
                       {tasks.length > 0 && (
                         <span className="text-[10px] text-[#64748B] bg-[#1E293B] px-2 py-0.5 rounded-full">
@@ -1448,9 +1096,13 @@ function ContractRow({
                             type="date"
                             value={newTaskDueDate}
                             onChange={e => setNewTaskDueDate(e.target.value)}
-                            onClick={e => e.stopPropagation()}
+                            onClick={e => {
+                              e.stopPropagation();
+                              (e.target as HTMLInputElement).showPicker?.();
+                            }}
                             onMouseDown={e => e.stopPropagation()}
-                            className="w-full px-2 py-1.5 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                            onFocus={e => (e.target as HTMLInputElement).showPicker?.()}
+                            className="w-full px-2 py-1.5 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer pointer-events-auto relative z-10"
                             style={{ colorScheme: 'dark' }}
                           />
                         </div>
@@ -1591,20 +1243,11 @@ function ContractRow({
                       No tasks linked to this contract
                     </div>
                   )}
-                </div>
-              )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-
-      {/* Notion Link Modal */}
-      <NotionLinkModal
-        isOpen={showNotionModal}
-        onClose={() => setShowNotionModal(false)}
-        contract={contract}
-        onLinked={() => onUpdate?.()}
-      />
     </motion.div>
   );
 }
@@ -1616,7 +1259,7 @@ export default function ContractsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]); // Empty array = all statuses
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<'name' | 'value' | 'contractDate' | 'daysInStage'>('contractDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -1859,7 +1502,7 @@ export default function ContractsDashboard() {
     },
     clearFilters: () => {
       setActiveFilter('all');
-      setStatusFilter('all');
+      setStatusFilter([]);
       setDateFilter('all');
       setSearchQuery('');
     },
@@ -1936,8 +1579,9 @@ export default function ContractsDashboard() {
   const activeFilters = useMemo(() => {
     const filters: { key: string; label: string; onRemove: () => void }[] = [];
 
-    if (statusFilter !== 'all') {
-      filters.push({ key: 'status', label: statusFilter, onRemove: () => setStatusFilter('all') });
+    if (statusFilter.length > 0) {
+      const label = statusFilter.length === 1 ? statusFilter[0] : `${statusFilter.length} statuses`;
+      filters.push({ key: 'status', label, onRemove: () => setStatusFilter([]) });
     }
     if (dateFilter !== 'all') {
       const dateLabels: Record<string, string> = {
@@ -2003,9 +1647,9 @@ export default function ContractsDashboard() {
         }
     }
 
-    // Apply status dropdown filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(c => c.status === statusFilter);
+    // Apply status dropdown filter (multi-select)
+    if (statusFilter.length > 0) {
+      filtered = filtered.filter(c => statusFilter.includes(c.status));
     }
 
     // Apply date filter
@@ -2512,7 +2156,7 @@ export default function ContractsDashboard() {
                         ))}
                         <button
                           onClick={() => {
-                            setStatusFilter('all');
+                            setStatusFilter([]);
                             setDateFilter('all');
                             setYearFilter(new Date().getFullYear().toString());
                             setContractTypeFilter('all');
@@ -2573,17 +2217,60 @@ export default function ContractsDashboard() {
                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                               </span>
                               Status
+                              {statusFilter.length > 0 && (
+                                <button
+                                  onClick={() => setStatusFilter([])}
+                                  className="ml-auto text-[10px] text-[#64748B] hover:text-white"
+                                >
+                                  Clear
+                                </button>
+                              )}
                             </h3>
-                            <select
-                              value={statusFilter}
-                              onChange={e => setStatusFilter(e.target.value)}
-                              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-[#0189CB]/50 text-sm"
-                            >
-                              <option value="all">All Stages</option>
-                              {statuses.map(status => (
-                                <option key={status} value={status}>{status}</option>
-                              ))}
-                            </select>
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                              {statuses.map(status => {
+                                const isSelected = statusFilter.includes(status);
+                                const statusColor = getStatusColor(status);
+                                return (
+                                  <label
+                                    key={status}
+                                    className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                                      isSelected
+                                        ? 'bg-white/10 border border-white/20'
+                                        : 'bg-white/5 border border-transparent hover:bg-white/8'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {
+                                        if (isSelected) {
+                                          setStatusFilter(statusFilter.filter(s => s !== status));
+                                        } else {
+                                          setStatusFilter([...statusFilter, status]);
+                                        }
+                                      }}
+                                      className="sr-only"
+                                    />
+                                    <span
+                                      className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                                        isSelected ? 'bg-[#0189CB] border-[#0189CB]' : 'border-white/30'
+                                      }`}
+                                    >
+                                      {isSelected && (
+                                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      )}
+                                    </span>
+                                    <span
+                                      className="w-2 h-2 rounded-full flex-shrink-0"
+                                      style={{ background: statusColor }}
+                                    />
+                                    <span className="text-sm text-white truncate">{status}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
                           </div>
 
                           {/* Timeline Section */}
@@ -2752,7 +2439,7 @@ export default function ContractsDashboard() {
                         <div className="sticky bottom-0 bg-[#0F1722] px-6 py-4 border-t border-white/10 flex gap-3">
                           <button
                             onClick={() => {
-                              setStatusFilter('all');
+                              setStatusFilter([]);
                               setDateFilter('all');
                               setContractTypeFilter('all');
                               setContractYearFilter([]);
@@ -2777,7 +2464,7 @@ export default function ContractsDashboard() {
                 </AnimatePresence>
 
                 {/* Table Column Headers */}
-                <div className="grid gap-4 px-6 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-[0.05em] border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr 0.6fr' }}>
+                <div className="grid gap-4 px-6 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-[0.05em] border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr 32px' }}>
                   <button
                     className="text-left hover:text-white flex items-center gap-1"
                     onClick={() => { setSortField('name'); setSortDirection(d => d === 'asc' ? 'desc' : 'asc'); }}
@@ -2808,7 +2495,7 @@ export default function ContractsDashboard() {
                     Days Left
                     {sortField === 'daysInStage' && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
                   </button>
-                  <div className="text-center">Notion</div>
+                  <div className="text-center w-6"></div>
                 </div>
 
                 {/* Table Body */}
@@ -3328,9 +3015,13 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                 type="date"
                 value={newTask.dueDate}
                 onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                onClick={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation();
+                  (e.target as HTMLInputElement).showPicker?.();
+                }}
                 onMouseDown={e => e.stopPropagation()}
-                className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm cursor-pointer"
+                onFocus={e => (e.target as HTMLInputElement).showPicker?.()}
+                className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm cursor-pointer pointer-events-auto relative z-10"
                 style={{ colorScheme: 'dark' }}
               />
               <select
@@ -3369,7 +3060,7 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Due Date</label>
-                    <input type="date" value={editingTask.dueDate || ''} onChange={(e) => setEditingTask({ ...editingTask, dueDate: e.target.value })} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm cursor-pointer" style={{ colorScheme: 'dark' }} />
+                    <input type="date" value={editingTask.dueDate || ''} onChange={(e) => setEditingTask({ ...editingTask, dueDate: e.target.value })} onClick={e => { e.stopPropagation(); (e.target as HTMLInputElement).showPicker?.(); }} onMouseDown={e => e.stopPropagation()} onFocus={e => (e.target as HTMLInputElement).showPicker?.()} className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm cursor-pointer pointer-events-auto relative z-10" style={{ colorScheme: 'dark' }} />
                   </div>
                   <div>
                     <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Status</label>

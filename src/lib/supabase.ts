@@ -286,6 +286,7 @@ export async function deleteStaleContracts(activeSalesforceIds: string[]): Promi
 export async function getTasks(filters?: {
   contractId?: string;
   contractSalesforceId?: string;
+  contractName?: string;
   status?: string;
   assigneeEmail?: string;
 }): Promise<Task[]> {
@@ -300,6 +301,9 @@ export async function getTasks(filters?: {
   }
   if (filters?.contractSalesforceId) {
     query = query.eq('contract_salesforce_id', filters.contractSalesforceId);
+  }
+  if (filters?.contractName) {
+    query = query.eq('contract_name', filters.contractName);
   }
   if (filters?.status) {
     query = query.eq('status', filters.status);
