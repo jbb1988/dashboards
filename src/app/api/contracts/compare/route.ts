@@ -52,61 +52,124 @@ interface ComparisonResult {
 // ============================================================================
 
 /**
+ * Clean up PDF extracted text by removing page numbers, headers, footers
+ */
+function cleanPdfText(text: string): string {
+  let cleaned = text;
+
+  // Remove page numbers like "1 of 11", "Page 1 of 11", "1/11", etc.
+  cleaned = cleaned.replace(/\b\d+\s+of\s+\d+\b/gi, ' ');
+  cleaned = cleaned.replace(/\bPage\s+\d+\s*(of\s+\d+)?\b/gi, ' ');
+  cleaned = cleaned.replace(/\b\d+\/\d+\b/g, ' ');
+
+  // Remove standalone page numbers at start of lines
+  cleaned = cleaned.replace(/^\s*\d{1,3}\s*$/gm, '');
+
+  // Normalize multiple spaces and newlines
+  cleaned = cleaned.replace(/[ \t]+/g, ' ');
+  cleaned = cleaned.replace(/\n\s*\n\s*\n+/g, '\n\n');
+
+  return cleaned.trim();
+}
+
+/**
  * Extract sections from a contract document.
  * Handles multiple formats: SECTION I., ARTICLE 1, numbered sections, etc.
  */
 function extractSections(text: string): Section[] {
   const sections: Section[] = [];
 
-  // Normalize line endings
-  const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  // Patterns for section headers (ordered by specificity)
-  const sectionPatterns = [
-    // SECTION I. TITLE or SECTION 1. TITLE
-    /^(SECTION\s+([IVXLCDM]+|\d+)\.?\s*)([A-Z][A-Z\s\/&,]+?)(?:\n|$)/gmi,
-    // ARTICLE I or ARTICLE 1
-    /^(ARTICLE\s+([IVXLCDM]+|\d+)\.?\s*)([A-Z][A-Z\s\/&,]+?)(?:\n|$)/gmi,
-  ];
+  // Clean and normalize text
+  let normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  normalizedText = cleanPdfText(normalizedText);
 
   // Find all section headers and their positions
   const headers: Array<{ index: number; number: string; title: string; fullHeader: string }> = [];
 
-  for (const pattern of sectionPatterns) {
-    let match;
-    while ((match = pattern.exec(normalizedText)) !== null) {
+  // Pattern 1: SECTION I. TITLE or SECTION 1. TITLE (most common in MARS contracts)
+  // More flexible - doesn't require start of line
+  const sectionPattern = /SECTION\s+([IVXLCDM]+|\d+)\.?\s*[:\-]?\s*([A-Z][A-Z\s\/&,\-]+)/gi;
+  let match;
+  while ((match = sectionPattern.exec(normalizedText)) !== null) {
+    const title = match[2].trim().replace(/\s+/g, ' ');
+    // Skip if title is too short or looks like a sentence continuation
+    if (title.length > 2 && title.length < 100) {
       headers.push({
         index: match.index,
-        number: match[2].trim(),
-        title: match[3].trim(),
+        number: match[1].trim().toUpperCase(),
+        title: title,
         fullHeader: match[0].trim()
       });
     }
   }
 
-  // Also look for standalone uppercase headers that look like section titles
-  const standalonePattern = /^([IVXLCDM]+|\d+)\.\s+([A-Z][A-Z\s\/&,]+?)(?:\n|$)/gm;
-  let match;
-  while ((match = standalonePattern.exec(normalizedText)) !== null) {
-    // Only add if not already captured
-    const exists = headers.some(h => Math.abs(h.index - match!.index) < 10);
-    if (!exists) {
+  // Pattern 2: ARTICLE I. TITLE or ARTICLE 1. TITLE
+  const articlePattern = /ARTICLE\s+([IVXLCDM]+|\d+)\.?\s*[:\-]?\s*([A-Z][A-Z\s\/&,\-]+)/gi;
+  while ((match = articlePattern.exec(normalizedText)) !== null) {
+    const title = match[2].trim().replace(/\s+/g, ' ');
+    const exists = headers.some(h => Math.abs(h.index - match!.index) < 20);
+    if (!exists && title.length > 2 && title.length < 100) {
+      headers.push({
+        index: match.index,
+        number: match[1].trim().toUpperCase(),
+        title: title,
+        fullHeader: match[0].trim()
+      });
+    }
+  }
+
+  // Pattern 3: Standalone Roman numeral headers like "I. SERVICES" or "II. TERM"
+  // Must be preceded by newline or start of text
+  const romanPattern = /(?:^|\n)\s*([IVXLCDM]+)\.\s+([A-Z][A-Z\s\/&,\-]+)/gi;
+  while ((match = romanPattern.exec(normalizedText)) !== null) {
+    const title = match[2].trim().replace(/\s+/g, ' ');
+    const exists = headers.some(h => Math.abs(h.index - match!.index) < 20);
+    if (!exists && title.length > 2 && title.length < 100) {
+      headers.push({
+        index: match.index,
+        number: match[1].trim().toUpperCase(),
+        title: title,
+        fullHeader: match[0].trim()
+      });
+    }
+  }
+
+  // Pattern 4: Numbered sections like "1. SERVICES" or "2. TERM"
+  const numberedPattern = /(?:^|\n)\s*(\d{1,2})\.\s+([A-Z][A-Z\s\/&,\-]+)/gi;
+  while ((match = numberedPattern.exec(normalizedText)) !== null) {
+    const title = match[2].trim().replace(/\s+/g, ' ');
+    const num = parseInt(match[1]);
+    const exists = headers.some(h => Math.abs(h.index - match!.index) < 20);
+    // Skip page-like numbers
+    if (!exists && title.length > 2 && title.length < 100 && num <= 30) {
       headers.push({
         index: match.index,
         number: match[1].trim(),
-        title: match[2].trim(),
+        title: title,
         fullHeader: match[0].trim()
       });
     }
   }
 
-  // Sort by position in document
-  headers.sort((a, b) => a.index - b.index);
+  // Remove duplicates and sort by position
+  const uniqueHeaders = headers.filter((header, idx) => {
+    // Check for duplicates by similar position or same number+title
+    return !headers.slice(0, idx).some(h =>
+      Math.abs(h.index - header.index) < 30 ||
+      (normalizeNumber(h.number) === normalizeNumber(header.number) &&
+       h.title.toLowerCase() === header.title.toLowerCase())
+    );
+  });
+
+  uniqueHeaders.sort((a, b) => a.index - b.index);
+
+  console.log(`[Section Extraction] Found ${uniqueHeaders.length} sections:`,
+    uniqueHeaders.map(h => `${h.number}. ${h.title}`));
 
   // Extract content for each section
-  for (let i = 0; i < headers.length; i++) {
-    const current = headers[i];
-    const nextIndex = i + 1 < headers.length ? headers[i + 1].index : normalizedText.length;
+  for (let i = 0; i < uniqueHeaders.length; i++) {
+    const current = uniqueHeaders[i];
+    const nextIndex = i + 1 < uniqueHeaders.length ? uniqueHeaders[i + 1].index : normalizedText.length;
     const content = normalizedText.substring(current.index, nextIndex).trim();
 
     sections.push({
@@ -119,6 +182,8 @@ function extractSections(text: string): Section[] {
 
   // If no sections found, treat entire document as one section
   if (sections.length === 0) {
+    console.log('[Section Extraction] No sections found, using full document');
+    console.log('[Section Extraction] First 500 chars:', normalizedText.substring(0, 500));
     sections.push({
       number: '0',
       title: 'FULL DOCUMENT',
