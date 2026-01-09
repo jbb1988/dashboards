@@ -180,19 +180,137 @@ function extractSections(text: string): Section[] {
     });
   }
 
-  // If no sections found, treat entire document as one section
+  // If no sections found, log for debugging and return empty array (so AI fallback triggers)
   if (sections.length === 0) {
-    console.log('[Section Extraction] No sections found, using full document');
-    console.log('[Section Extraction] First 500 chars:', normalizedText.substring(0, 500));
-    sections.push({
-      number: '0',
-      title: 'FULL DOCUMENT',
-      fullHeader: 'FULL DOCUMENT',
-      content: normalizedText
-    });
+    console.log('[Section Extraction] No sections found with regex');
+    console.log('[Section Extraction] First 1000 chars:', normalizedText.substring(0, 1000));
+    // Return empty array - caller will try AI fallback
+    return [];
   }
 
   return sections;
+}
+
+/**
+ * Use AI to identify sections when regex fails
+ */
+async function extractSectionsWithAI(text: string): Promise<Section[]> {
+  console.log('[AI Section Extraction] Using AI to identify sections...');
+
+  // Take a sample of the document to identify structure
+  const sample = text.substring(0, 8000);
+
+  const prompt = `Analyze this legal contract text and identify ALL section headers.
+Look for patterns like:
+- "SECTION I. SERVICES" or "SECTION 1. SERVICES"
+- "ARTICLE I" or "ARTICLE 1"
+- Roman numerals followed by titles: "I. SERVICES", "II. TERM"
+- Numbered sections: "1. SERVICES", "2. TERM"
+- ALL CAPS headers that indicate new sections
+
+Return a JSON array of section headers found, in order of appearance.
+Format: [{"number": "I", "title": "SERVICES"}, {"number": "II", "title": "TERM"}, ...]
+
+If you can't find clear sections, return an empty array: []
+
+CONTRACT TEXT:
+${sample}`;
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://mars-contracts.vercel.app',
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 2000,
+        temperature: 0,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('[AI Section Extraction] API error:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+
+    // Extract JSON from response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.log('[AI Section Extraction] No JSON found in response');
+      return [];
+    }
+
+    const headers = JSON.parse(jsonMatch[0]) as Array<{number: string; title: string}>;
+    console.log('[AI Section Extraction] Found headers:', headers);
+
+    if (headers.length === 0) {
+      return [];
+    }
+
+    // Now find these sections in the actual text and extract content
+    const sections: Section[] = [];
+    const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    for (let i = 0; i < headers.length; i++) {
+      const header = headers[i];
+      // Build regex to find this section in text
+      const patterns = [
+        new RegExp(`SECTION\\s+${header.number}\\.?\\s*[:\\-]?\\s*${header.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+        new RegExp(`${header.number}\\.\\s*${header.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+        new RegExp(`${header.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+      ];
+
+      let matchIndex = -1;
+      let matchedPattern = '';
+      for (const pattern of patterns) {
+        const match = normalizedText.match(pattern);
+        if (match && match.index !== undefined) {
+          matchIndex = match.index;
+          matchedPattern = match[0];
+          break;
+        }
+      }
+
+      if (matchIndex >= 0) {
+        // Find end of section (next section or end of doc)
+        let endIndex = normalizedText.length;
+        if (i + 1 < headers.length) {
+          const nextHeader = headers[i + 1];
+          for (const pattern of [
+            new RegExp(`SECTION\\s+${nextHeader.number}\\.?\\s*[:\\-]?\\s*${nextHeader.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+            new RegExp(`${nextHeader.number}\\.\\s*${nextHeader.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+          ]) {
+            const nextMatch = normalizedText.substring(matchIndex + 10).match(pattern);
+            if (nextMatch && nextMatch.index !== undefined) {
+              endIndex = matchIndex + 10 + nextMatch.index;
+              break;
+            }
+          }
+        }
+
+        sections.push({
+          number: header.number,
+          title: header.title,
+          fullHeader: matchedPattern,
+          content: normalizedText.substring(matchIndex, endIndex).trim()
+        });
+      }
+    }
+
+    console.log('[AI Section Extraction] Extracted', sections.length, 'sections with content');
+    return sections;
+
+  } catch (error) {
+    console.error('[AI Section Extraction] Error:', error);
+    return [];
+  }
 }
 
 /**
@@ -525,11 +643,41 @@ export async function POST(request: NextRequest) {
     console.log(`[COMPARE] Original: ${originalText.length} chars, Revised: ${revisedText.length} chars`);
 
     // Step 1: Extract sections from both documents
-    const originalSections = extractSections(originalText);
-    const revisedSections = extractSections(revisedText);
+    // Try regex first, then AI fallback if needed
+    let originalSections = extractSections(originalText);
+    let revisedSections = extractSections(revisedText);
 
-    console.log(`[COMPARE] Extracted ${originalSections.length} sections from original`);
-    console.log(`[COMPARE] Extracted ${revisedSections.length} sections from revised`);
+    console.log(`[COMPARE] Regex extraction: ${originalSections.length} from original, ${revisedSections.length} from revised`);
+
+    // Use AI extraction as fallback for documents where regex failed
+    if (originalSections.length === 0) {
+      console.log('[COMPARE] Regex failed on original, trying AI extraction...');
+      const aiSections = await extractSectionsWithAI(originalText);
+      if (aiSections.length > 0) {
+        originalSections = aiSections;
+        console.log('[COMPARE] AI extracted', aiSections.length, 'sections from original');
+      }
+    }
+
+    if (revisedSections.length === 0) {
+      console.log('[COMPARE] Regex failed on revised, trying AI extraction...');
+      const aiSections = await extractSectionsWithAI(revisedText);
+      if (aiSections.length > 0) {
+        revisedSections = aiSections;
+        console.log('[COMPARE] AI extracted', aiSections.length, 'sections from revised');
+      }
+    }
+
+    // Final fallback: if still no sections, create FULL DOCUMENT section
+    if (originalSections.length === 0) {
+      originalSections = [{ number: '0', title: 'FULL DOCUMENT', fullHeader: 'FULL DOCUMENT', content: originalText }];
+    }
+    if (revisedSections.length === 0) {
+      revisedSections = [{ number: '0', title: 'FULL DOCUMENT', fullHeader: 'FULL DOCUMENT', content: revisedText }];
+    }
+
+    console.log(`[COMPARE] Final: ${originalSections.length} sections from original`);
+    console.log(`[COMPARE] Final: ${revisedSections.length} sections from revised`);
 
     // Log section titles for debugging
     console.log('[COMPARE] Original sections:', originalSections.map(s => `${s.number}: ${s.title}`));
