@@ -85,6 +85,7 @@ interface DashboardContract {
   statusChangeDate: string | null;
   progress: number;
   isOverdue: boolean;
+  isRenewal: boolean;
   nextTask: string;
   salesRep: string;
   probability: number;
@@ -108,6 +109,9 @@ function transformToDashboardFormat(contract: Contract): DashboardContract {
   const lastUpdate = contract.updated_at ? new Date(contract.updated_at).getTime() : now;
   const daysInStage = Math.floor((now - lastUpdate) / (1000 * 60 * 60 * 24));
 
+  // Check if renewal based on opportunity name
+  const isRenewal = contract.opportunity_name?.toLowerCase().includes('renewal') || false;
+
   return {
     id: contract.id || contract.salesforce_id,
     salesforceId: contract.salesforce_id,
@@ -126,6 +130,7 @@ function transformToDashboardFormat(contract: Contract): DashboardContract {
     statusChangeDate: contract.updated_at || null,
     progress: contract.probability,
     isOverdue: daysUntilDeadline < 0,
+    isRenewal,
     nextTask: '',
     salesRep: contract.sales_rep,
     probability: contract.probability,
