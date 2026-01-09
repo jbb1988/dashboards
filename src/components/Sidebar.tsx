@@ -293,6 +293,48 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
 
       {/* Navigation by Category */}
       <nav className={`flex-1 px-3 space-y-4 overflow-y-auto ${isCollapsed ? 'px-2' : ''}`}>
+        {/* Home Link */}
+        <div>
+          <Link
+            href="/"
+            className={`
+              flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative
+              ${isCollapsed ? 'justify-center px-0' : ''}
+              ${pathname === '/'
+                ? 'bg-[#15233A] text-[#EAF2FF]'
+                : 'text-[#8FA3BF] hover:bg-[#151F2E] hover:text-[#CBD5E1]'
+              }
+            `}
+            title={isCollapsed ? 'Home' : undefined}
+          >
+            {pathname === '/' && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#38BDF8] rounded-r" />
+            )}
+            <span className={`flex-shrink-0 ${pathname === '/' ? 'text-[#38BDF8]' : 'text-[#64748B] group-hover:text-[#8FA3BF]'}`}>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </span>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="font-medium text-[13px] whitespace-nowrap overflow-hidden"
+                >
+                  Home
+                </motion.span>
+              )}
+            </AnimatePresence>
+            {isCollapsed && (
+              <div className="absolute left-full ml-2 px-2 py-1 bg-[#1E293B] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+                Home
+              </div>
+            )}
+          </Link>
+        </div>
+
         {filteredNavCategories.map((category) => (
           <div key={category.name}>
             <AnimatePresence>
