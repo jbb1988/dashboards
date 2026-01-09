@@ -1511,13 +1511,28 @@ export default function ContractReviewPage() {
 
                 {/* Sections List */}
                 <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                  {sectionCompareResult.sections
-                    .filter(section => {
+                  {(() => {
+                    const filteredSections = sectionCompareResult.sections.filter(section => {
                       const statusMatch = statusFilter === 'all' || section.status === statusFilter;
                       const sigMatch = significanceFilter === 'all' || section.significance === significanceFilter;
                       return statusMatch && sigMatch;
-                    })
-                    .map((section, idx) => (
+                    });
+
+                    if (filteredSections.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-[#64748B]">
+                          <p className="text-sm">No sections match the current filters.</p>
+                          <button
+                            onClick={() => { setStatusFilter('all'); setSignificanceFilter('all'); }}
+                            className="mt-2 text-[#38BDF8] text-sm hover:underline"
+                          >
+                            Reset filters
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return filteredSections.map((section, idx) => (
                     <div
                       key={idx}
                       className={`p-4 rounded-lg border ${
@@ -1593,7 +1608,8 @@ export default function ContractReviewPage() {
                         <p className="text-[#64748B] text-sm italic">No significant changes in this section.</p>
                       )}
                     </div>
-                  ))}
+                  ));
+                  })()}
                 </div>
 
                 {/* Added/Removed Sections Summary */}
