@@ -103,12 +103,8 @@ interface SectionCompareResult {
 }
 
 // Models for contract review via OpenRouter - legal-grade only
-const MODELS = [
-  { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', desc: 'Best quality (Recommended)' },
-  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', desc: 'Proven, slightly faster' },
-  { id: 'openai/gpt-4o', name: 'GPT-4o', desc: 'Reliable alternative' },
-  { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', desc: 'Budget reasoning model' },
-];
+// Using Claude Sonnet 4 for all AI operations (hardcoded for best quality)
+const AI_MODEL = 'anthropic/claude-sonnet-4';
 
 export default function ContractReviewPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -129,7 +125,8 @@ export default function ContractReviewPage() {
   const [originalDocxBuffer, setOriginalDocxBuffer] = useState<string | null>(null);
   const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
   const [isGeneratingOriginal, setIsGeneratingOriginal] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>('anthropic/claude-sonnet-4');
+  // Model is hardcoded - no user selection needed
+  const selectedModel = AI_MODEL;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const contractDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -775,22 +772,6 @@ export default function ContractReviewPage() {
                   className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white text-sm placeholder-[#475569] focus:outline-none focus:ring-2 focus:ring-[#38BDF8]/50"
                 />
               </div>
-            </div>
-
-            {/* Model Selection */}
-            <div className="mb-4">
-              <label className="block text-[#8FA3BF] text-sm mb-2">AI Model</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#38BDF8]/50 cursor-pointer"
-              >
-                {MODELS.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name} - {model.desc}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Tab Navigation */}

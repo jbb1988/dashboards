@@ -1160,7 +1160,7 @@ function ContractRow({
                           <div
                             key={task.id}
                             className={`
-                              flex items-center justify-between p-2.5 rounded-lg
+                              group/task flex items-center justify-between p-2.5 rounded-lg
                               ${isComplete ? 'bg-[#22C55E]/5' : isOverdue ? 'bg-[#EF4444]/5' : 'bg-[#1E293B]/50'}
                             `}
                           >
@@ -1251,10 +1251,10 @@ function ContractRow({
                                   e.stopPropagation();
                                   handleDeleteTask(task.id);
                                 }}
-                                className="opacity-0 group-hover/task:opacity-100 p-1 text-[#64748B] hover:text-[#EF4444] transition-all"
+                                className="p-1 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-all"
                                 title="Delete task"
                               >
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
