@@ -10,8 +10,16 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { StageProgressCompact } from './components/StageProgressDots';
 import TaskBadge from './components/TaskBadge';
 import TasksTabSupabase from './components/TasksTabSupabase';
+import BundleModal from './components/BundleModal';
 
 // Types
+interface BundleInfo {
+  bundleId: string;
+  bundleName: string;
+  isPrimary: boolean;
+  contractCount: number;
+}
+
 interface Contract {
   id: string;
   salesforceId?: string; // Salesforce Opportunity ID (18-char)
@@ -43,6 +51,7 @@ interface Contract {
   manualCloseProbability?: number | null; // Manual Close Probability from Salesforce
   redlines?: string; // AI review summary from Notion
   lastRedlineDate?: string | null; // Date of last AI review
+  bundleInfo?: BundleInfo | null; // Bundle info if contract is part of a bundle
 }
 
 interface KPIs {
@@ -819,6 +828,14 @@ function ContractRow({
                     B
                   </span>
                 )}
+                {contract.bundleInfo && (
+                  <span
+                    className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#8B5CF6] flex-shrink-0 cursor-help"
+                    title={`Part of bundle: ${contract.bundleInfo.bundleName} (${contract.bundleInfo.contractCount} contracts)${contract.bundleInfo.isPrimary ? ' - Primary' : ''}`}
+                  >
+                    {contract.bundleInfo.isPrimary ? '★' : '⚏'}
+                  </span>
+                )}
               </div>
               {contract.opportunityName && contract.opportunityName !== contract.name && (
                 <span className="text-[11px] text-[#64748B] truncate block" title={contract.opportunityName}>
@@ -1019,6 +1036,34 @@ function ContractRow({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                     </button>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Bundle</span>
+                  <div className="mt-1">
+                    {contract.bundleInfo ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-[#8B5CF6]" title={contract.bundleInfo.bundleName}>
+                          {contract.bundleInfo.bundleName.substring(0, 15)}{contract.bundleInfo.bundleName.length > 15 ? '...' : ''}
+                        </span>
+                        <span className="text-[9px] text-[#64748B] bg-[#8B5CF6]/10 px-1.5 py-0.5 rounded">
+                          {contract.bundleInfo.contractCount}
+                        </span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openBundleModal(contract, 'create');
+                        }}
+                        className="text-sm text-[#8B5CF6] hover:text-[#A78BFA] transition-colors flex items-center gap-1"
+                      >
+                        Create
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1309,6 +1354,18 @@ export default function ContractsDashboard() {
   const [selectedContractIndex, setSelectedContractIndex] = useState(0);
   const [taskStats, setTaskStats] = useState<{ pending: number; overdue: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Bundle modal state
+  const [bundleModalOpen, setBundleModalOpen] = useState(false);
+  const [bundleModalMode, setBundleModalMode] = useState<'create' | 'add'>('create');
+  const [selectedContractForBundle, setSelectedContractForBundle] = useState<Contract | null>(null);
+
+  // Open bundle modal for a contract
+  const openBundleModal = useCallback((contract: Contract, mode: 'create' | 'add') => {
+    setSelectedContractForBundle(contract);
+    setBundleModalMode(mode);
+    setBundleModalOpen(true);
+  }, []);
 
   // Batch editing state - track pending status changes
   const [pendingChanges, setPendingChanges] = useState<Record<string, { contractId: string; salesforceId?: string; contractName: string; notionName?: string; newStatus: string; originalStatus: string }>>({});
@@ -2639,6 +2696,36 @@ export default function ContractsDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Bundle Modal */}
+      {selectedContractForBundle && (
+        <BundleModal
+          isOpen={bundleModalOpen}
+          onClose={() => {
+            setBundleModalOpen(false);
+            setSelectedContractForBundle(null);
+          }}
+          onSuccess={() => {
+            fetchData(); // Refresh to show bundle info
+          }}
+          currentContract={{
+            id: selectedContractForBundle.id,
+            name: selectedContractForBundle.name,
+            opportunityName: selectedContractForBundle.opportunityName,
+            value: selectedContractForBundle.value,
+            contractType: selectedContractForBundle.contractType,
+          }}
+          allContracts={data?.contracts.map(c => ({
+            id: c.id,
+            name: c.name,
+            opportunityName: c.opportunityName,
+            value: c.value,
+            contractType: c.contractType,
+          })) || []}
+          mode={bundleModalMode}
+          existingBundleId={selectedContractForBundle.bundleInfo?.bundleId}
+        />
+      )}
     </div>
   );
 }

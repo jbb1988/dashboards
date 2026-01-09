@@ -67,6 +67,13 @@ function validateFieldValue(field: string, value: unknown): { valid: boolean; er
   }
 }
 
+interface BundleInfo {
+  bundleId: string;
+  bundleName: string;
+  isPrimary: boolean;
+  contractCount: number;
+}
+
 interface DashboardContract {
   id: string;
   salesforceId: string;
@@ -91,6 +98,7 @@ interface DashboardContract {
   probability: number;
   budgeted: boolean;
   manualCloseProbability: number | null;
+  bundleInfo?: BundleInfo | null;
 }
 
 /**
@@ -147,8 +155,59 @@ export async function GET() {
     // Filter to only active contracts (not closed)
     const activeContracts = contracts.filter(c => !c.is_closed);
 
-    // Transform to dashboard format
-    const dashboardContracts = activeContracts.map(transformToDashboardFormat);
+    // Fetch bundle info for all contracts
+    const admin = getSupabaseAdmin();
+    let bundleMap: Map<string, BundleInfo> = new Map();
+
+    try {
+      // Get all bundle-contract relationships with bundle details
+      const { data: bundleContracts } = await admin
+        .from('bundle_contracts')
+        .select(`
+          contract_id,
+          is_primary,
+          bundle_id,
+          contract_bundles (
+            id,
+            name
+          )
+        `);
+
+      if (bundleContracts && bundleContracts.length > 0) {
+        // Count contracts per bundle
+        const bundleContractCounts = new Map<string, number>();
+        bundleContracts.forEach(bc => {
+          bundleContractCounts.set(
+            bc.bundle_id,
+            (bundleContractCounts.get(bc.bundle_id) || 0) + 1
+          );
+        });
+
+        // Map contract IDs to bundle info
+        bundleContracts.forEach(bc => {
+          const bundleData = bc.contract_bundles as unknown;
+          const bundle = bundleData as { id: string; name: string } | null;
+          if (bundle && bundle.id) {
+            bundleMap.set(bc.contract_id, {
+              bundleId: bundle.id,
+              bundleName: bundle.name,
+              isPrimary: bc.is_primary,
+              contractCount: bundleContractCounts.get(bc.bundle_id) || 1,
+            });
+          }
+        });
+      }
+    } catch (err) {
+      // Bundle tables may not exist yet - continue without bundle info
+      console.log('Bundle lookup skipped (tables may not exist):', err);
+    }
+
+    // Transform to dashboard format with bundle info
+    const dashboardContracts = activeContracts.map(contract => {
+      const transformed = transformToDashboardFormat(contract);
+      transformed.bundleInfo = bundleMap.get(contract.id) || null;
+      return transformed;
+    });
 
     // Calculate KPIs
     const totalPipeline = dashboardContracts.reduce((sum, c) => sum + c.value, 0);

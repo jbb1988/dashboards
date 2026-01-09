@@ -502,15 +502,28 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
               >
                 <option value="">Link to contract...</option>
                 {contracts.map(c => (
-                  <option key={c.id} value={c.salesforceId}>{c.name}</option>
+                  <option key={c.id} value={c.salesforceId}>
+                    {c.name}{c.contractType?.length ? ` • ${c.contractType.join(', ')}` : ''}
+                  </option>
                 ))}
               </select>
-              <input
-                type="date"
-                value={newTask.dueDate}
-                onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm"
-              />
+              <div
+                className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-sm cursor-pointer relative"
+                onClick={(e) => {
+                  const input = e.currentTarget.querySelector('input');
+                  input?.showPicker?.();
+                }}
+              >
+                <input
+                  type="date"
+                  value={newTask.dueDate}
+                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <span className={newTask.dueDate ? 'text-white' : 'text-[#475569]'}>
+                  {newTask.dueDate ? new Date(newTask.dueDate + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Due date...'}
+                </span>
+              </div>
               <select
                 value={newTask.priority}
                 onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as 'low' | 'medium' | 'high' | 'urgent' })}

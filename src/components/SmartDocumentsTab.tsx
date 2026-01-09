@@ -23,6 +23,13 @@ interface Document {
   uploaded_at: string;
   uploaded_by: string | null;
   notes: string | null;
+  fromBundledContract?: string | null; // Contract ID if from a bundled contract
+}
+
+interface BundleInfo {
+  bundleId: string;
+  bundleName: string;
+  contracts: { id: string; name: string; isPrimary: boolean }[];
 }
 
 interface PriorityScore {
@@ -85,6 +92,8 @@ interface DocumentsData {
   documentTypes: string[];
   requiredTypes: string[];
   optionalTypes: string[];
+  analysisTypes?: string[];
+  bundleInfo?: BundleInfo | null;
 }
 
 interface SavedView {
@@ -109,14 +118,32 @@ const SMART_VIEWS: { id: SmartView; label: string; icon: string; description: st
   { id: 'all', label: 'All Documents', icon: 'list', description: 'Complete document list' },
 ];
 
-const DOCUMENT_TYPES = [
+// Required documents for completeness
+const REQUIRED_DOCUMENT_TYPES = [
   'Original Contract',
   'MARS Redlines',
-  'Client Response',
   'Final Agreement',
   'Executed Contract',
+];
+
+// Optional standard documents
+const OPTIONAL_DOCUMENT_TYPES = [
+  'Client Response',
   'Purchase Order',
   'Amendment',
+];
+
+// Analysis documents (from Compare tab)
+const ANALYSIS_DOCUMENT_TYPES = [
+  'Comparison Report',
+  'AI Recommendations',
+];
+
+// All document types combined
+const DOCUMENT_TYPES = [
+  ...REQUIRED_DOCUMENT_TYPES,
+  ...OPTIONAL_DOCUMENT_TYPES,
+  ...ANALYSIS_DOCUMENT_TYPES,
   'Other',
 ];
 

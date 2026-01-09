@@ -662,6 +662,93 @@ export default function ContractReviewPage() {
     }
   }
 
+  // Download comparison as PDF
+  async function handleDownloadComparisonPDF() {
+    if (!sectionCompareResult) return;
+
+    try {
+      const response = await fetch('/api/contracts/compare/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'comparison',
+          comparisonResult: sectionCompareResult,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      const result = await response.json();
+
+      // Convert base64 to blob and download
+      const byteCharacters = atob(result.pdf);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF export error:', err);
+      setCompareError(err instanceof Error ? err.message : 'PDF export failed');
+    }
+  }
+
+  // Download AI recommendations as PDF
+  async function handleDownloadRecommendationsPDF() {
+    if (!sectionCompareResult || !comparisonAnalysis) return;
+
+    try {
+      const response = await fetch('/api/contracts/compare/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'recommendations',
+          comparisonResult: sectionCompareResult,
+          analysisResult: comparisonAnalysis,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      const result = await response.json();
+
+      // Convert base64 to blob and download
+      const byteCharacters = atob(result.pdf);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF export error:', err);
+      setCompareError(err instanceof Error ? err.message : 'PDF export failed');
+    }
+  }
+
   async function handleCategorizeChanges() {
     if (!compareResult) return;
 
@@ -1859,7 +1946,7 @@ export default function ContractReviewPage() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {/* Save Success Toast */}
                   {saveSuccess && (
                     <div className="flex items-center gap-2 px-4 py-2.5 bg-green-500/20 text-green-400 rounded-lg text-sm">
@@ -1868,6 +1955,32 @@ export default function ContractReviewPage() {
                       </svg>
                       {saveSuccess}
                     </div>
+                  )}
+
+                  {/* Download Comparison PDF Button */}
+                  <button
+                    onClick={handleDownloadComparisonPDF}
+                    className="flex items-center gap-2 px-3 py-2.5 bg-[#8B5CF6]/20 hover:bg-[#8B5CF6]/30 text-[#A855F7] font-medium rounded-lg transition-colors"
+                    title="Download Comparison PDF"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="hidden sm:inline">Comparison PDF</span>
+                  </button>
+
+                  {/* Download AI Recommendations PDF Button - only show if AI analysis was run */}
+                  {comparisonAnalysis && (
+                    <button
+                      onClick={handleDownloadRecommendationsPDF}
+                      className="flex items-center gap-2 px-3 py-2.5 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] font-medium rounded-lg transition-colors"
+                      title="Download AI Recommendations PDF"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="hidden sm:inline">AI Recommendations PDF</span>
+                    </button>
                   )}
 
                   {/* Save to Contract Button */}

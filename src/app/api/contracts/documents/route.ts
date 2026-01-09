@@ -3,13 +3,19 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 // Document types matching the database enum
 const DOCUMENT_TYPES = [
+  // Required for completeness
   'Original Contract',
   'MARS Redlines',
-  'Client Response',
   'Final Agreement',
   'Executed Contract',
+  // Optional standard
+  'Client Response',
   'Purchase Order',
   'Amendment',
+  // Analysis documents
+  'Comparison Report',
+  'AI Recommendations',
+  // Flexible
   'Other',
 ] as const;
 
@@ -34,6 +40,12 @@ const OPTIONAL_DOCUMENT_TYPES = [
   'Client Response',
   'Purchase Order',
   'Amendment',
+];
+
+// Analysis document types (from Compare tab)
+const ANALYSIS_DOCUMENT_TYPES = [
+  'Comparison Report',
+  'AI Recommendations',
 ];
 
 export interface Document {
@@ -224,6 +236,7 @@ export async function GET(request: NextRequest) {
     const documentType = searchParams.get('documentType');
     const status = searchParams.get('status');
     const view = searchParams.get('view'); // 'needs_attention', 'closing_soon', 'recent', 'all'
+    const includeBundled = searchParams.get('includeBundled') === 'true';
 
     const admin = getSupabaseAdmin();
 
@@ -242,6 +255,62 @@ export async function GET(request: NextRequest) {
     // Try to get documents (table might not exist yet)
     let documents: Document[] = [];
     let documentsTableExists = true;
+    let bundleInfo: {
+      bundleId: string;
+      bundleName: string;
+      contracts: { id: string; name: string; isPrimary: boolean }[];
+    } | null = null;
+
+    // Check if contract is part of a bundle
+    let bundledContractIds: string[] = [];
+    if (contractId && includeBundled) {
+      try {
+        // Find if this contract is in a bundle
+        const { data: bundleContract } = await admin
+          .from('bundle_contracts')
+          .select(`
+            bundle_id,
+            is_primary,
+            contract_bundles (
+              id,
+              name
+            )
+          `)
+          .eq('contract_id', contractId)
+          .single();
+
+        if (bundleContract?.bundle_id) {
+          // Get all contracts in this bundle
+          const { data: allBundleContracts } = await admin
+            .from('bundle_contracts')
+            .select(`
+              contract_id,
+              is_primary,
+              contracts (
+                id,
+                name,
+                account_name
+              )
+            `)
+            .eq('bundle_id', bundleContract.bundle_id);
+
+          if (allBundleContracts && allBundleContracts.length > 0) {
+            bundledContractIds = allBundleContracts.map(bc => bc.contract_id);
+            bundleInfo = {
+              bundleId: bundleContract.bundle_id,
+              bundleName: (bundleContract.contract_bundles as any)?.name || 'Bundle',
+              contracts: allBundleContracts.map(bc => ({
+                id: bc.contract_id,
+                name: (bc.contracts as any)?.name || 'Unknown',
+                isPrimary: bc.is_primary,
+              })),
+            };
+          }
+        }
+      } catch (err) {
+        console.log('Bundle lookup skipped (tables may not exist):', err);
+      }
+    }
 
     try {
       let query = admin
@@ -252,7 +321,12 @@ export async function GET(request: NextRequest) {
 
       // Apply filters
       if (contractId) {
-        query = query.eq('contract_id', contractId);
+        // If we have bundled contracts, fetch docs from all of them
+        if (bundledContractIds.length > 0) {
+          query = query.in('contract_id', bundledContractIds);
+        } else {
+          query = query.eq('contract_id', contractId);
+        }
       }
       if (accountName) {
         query = query.eq('account_name', accountName);
@@ -271,7 +345,11 @@ export async function GET(request: NextRequest) {
         console.log('Documents query error (table may not exist):', docsError.message);
         documentsTableExists = false;
       } else {
-        documents = docsData || [];
+        // Mark documents that are from bundled contracts (not the requested contract)
+        documents = (docsData || []).map(doc => ({
+          ...doc,
+          fromBundledContract: contractId && doc.contract_id !== contractId ? doc.contract_id : null,
+        }));
       }
     } catch (err) {
       console.log('Documents table not available:', err);
@@ -407,7 +485,9 @@ export async function GET(request: NextRequest) {
       documentTypes: DOCUMENT_TYPES,
       requiredTypes: REQUIRED_DOCUMENT_TYPES,
       optionalTypes: OPTIONAL_DOCUMENT_TYPES,
+      analysisTypes: ANALYSIS_DOCUMENT_TYPES,
       documentsTableExists,
+      bundleInfo,
     });
   } catch (error) {
     console.error('Error in GET /api/contracts/documents:', error);
