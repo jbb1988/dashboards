@@ -3096,19 +3096,25 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <input
-                type="date"
-                value={newTask.dueDate}
-                onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                onClick={e => {
+              <div
+                className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-sm cursor-pointer relative"
+                onClick={(e) => {
                   e.stopPropagation();
-                  (e.target as HTMLInputElement).showPicker?.();
+                  const input = e.currentTarget.querySelector('input');
+                  input?.showPicker?.();
                 }}
-                onMouseDown={e => e.stopPropagation()}
-                onFocus={e => (e.target as HTMLInputElement).showPicker?.()}
-                className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm cursor-pointer pointer-events-auto relative z-10"
-                style={{ colorScheme: 'dark' }}
-              />
+              >
+                <input
+                  type="date"
+                  value={newTask.dueDate}
+                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  style={{ colorScheme: 'dark' }}
+                />
+                <span className={newTask.dueDate ? 'text-white' : 'text-[#475569]'}>
+                  {newTask.dueDate ? new Date(newTask.dueDate + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Due date...'}
+                </span>
+              </div>
               <select
                 value={newTask.priority}
                 onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
