@@ -47,7 +47,7 @@ interface SectionComparison {
 }
 
 interface ComparisonResult {
-  mode: 'ai-first';
+  mode: 'section-by-section';
   documentInfo: {
     originalTitle: string;
     revisedTitle: string;
@@ -465,7 +465,7 @@ function synthesizeResults(
   }
 
   return {
-    mode: 'ai-first',
+    mode: 'section-by-section',
     documentInfo: mapping.documentInfo,
     summary: {
       totalSections: comparisons.length,
