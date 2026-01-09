@@ -55,75 +55,165 @@ function FloatingParticles() {
   );
 }
 
-// Dashboard card component
-function DashboardCard({
-  title,
-  description,
-  icon,
-  href,
-  color,
-  delay,
-  stats
-}: {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
+// Department data
+interface DashboardItem {
+  name: string;
   href: string;
+  description: string;
+  badge?: string;
+}
+
+interface Department {
+  name: string;
+  icon: React.ReactNode;
   color: string;
-  delay: number;
-  stats?: { label: string; value: string }[];
-}) {
+  dashboards: DashboardItem[];
+}
+
+const departments: Department[] = [
+  {
+    name: 'Contracts',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    color: 'from-[#0189CB] to-[#38BDF8]',
+    dashboards: [
+      { name: 'Contracts Pipeline', href: '/contracts-dashboard', description: 'Track contract status and pipeline', badge: 'Salesforce' },
+      { name: 'Contract Review', href: '/contracts/review', description: 'AI-powered contract analysis', badge: 'Claude' },
+    ],
+  },
+  {
+    name: 'Project Management',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+    color: 'from-[#E16259] to-[#F87171]',
+    dashboards: [
+      { name: 'Project Tracker', href: '/pm-dashboard', description: 'Monitor milestones and tasks', badge: 'Asana' },
+    ],
+  },
+  {
+    name: 'Finance',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    color: 'from-[#22C55E] to-[#4ADE80]',
+    dashboards: [
+      { name: 'MCC Profitability', href: '/mcc-dashboard', description: 'Master cost center analysis', badge: 'Excel' },
+      { name: 'Project Profitability', href: '/closeout-dashboard', description: 'Project closeout metrics', badge: 'Excel' },
+    ],
+  },
+  {
+    name: 'Management',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
+    color: 'from-[#A855F7] to-[#C084FC]',
+    dashboards: [],
+  },
+  {
+    name: 'Operations',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    color: 'from-[#F59E0B] to-[#FBBF24]',
+    dashboards: [],
+  },
+  {
+    name: 'Sales',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+      </svg>
+    ),
+    color: 'from-[#EC4899] to-[#F472B6]',
+    dashboards: [],
+  },
+];
+
+// Badge color mapping
+function getBadgeColor(badge: string): string {
+  switch (badge) {
+    case 'Salesforce': return 'bg-[#38BDF8]';
+    case 'Asana': return 'bg-[#E16259]';
+    case 'Excel': return 'bg-[#22C55E]';
+    case 'Claude': return 'bg-[#D97706]';
+    default: return 'bg-[#64748B]';
+  }
+}
+
+// Department card component
+function DepartmentCard({ department, delay }: { department: Department; delay: number }) {
+  const hasDashboards = department.dashboards.length > 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay }}
+      className="group relative bg-[#151E2C]/80 backdrop-blur-sm border border-[#1E293B] rounded-2xl overflow-hidden"
     >
-      <Link href={href}>
-        <motion.div
-          whileHover={{ y: -8, scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="group relative bg-[#151E2C]/80 backdrop-blur-sm border border-[#1E293B] rounded-2xl p-6 h-full cursor-pointer overflow-hidden"
-        >
-          {/* Hover glow effect */}
-          <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br ${color} rounded-2xl blur-xl -z-10`} />
+      {/* Top accent line */}
+      <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${department.color} opacity-60`} />
 
-          {/* Top accent line */}
-          <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${color} opacity-60`} />
+      {/* Department Header */}
+      <div className="p-5 border-b border-[#1E293B]/50">
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 rounded-xl bg-gradient-to-br ${department.color} shadow-lg`}>
+            <span className="text-white">{department.icon}</span>
+          </div>
+          <h3 className="text-lg font-semibold text-white">{department.name}</h3>
+        </div>
+      </div>
 
-          <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-xl bg-gradient-to-br ${color} shadow-lg`}>
-              {icon}
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-[#38BDF8] transition-colors">
-                {title}
-              </h3>
-              <p className="text-sm text-[#8FA3BF] leading-relaxed">
-                {description}
-              </p>
+      {/* Dashboards List */}
+      <div className="p-3">
+        {hasDashboards ? (
+          <div className="space-y-1">
+            {department.dashboards.map((dashboard, idx) => (
+              <Link key={idx} href={dashboard.href}>
+                <motion.div
+                  whileHover={{ x: 4, backgroundColor: 'rgba(56, 189, 248, 0.1)' }}
+                  className="flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group/item"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-medium text-[#EAF2FF] group-hover/item:text-[#38BDF8] transition-colors">
+                        {dashboard.name}
+                      </span>
+                      {dashboard.badge && (
+                        <span className={`w-1.5 h-1.5 rounded-full ${getBadgeColor(dashboard.badge)}`} title={dashboard.badge} />
+                      )}
+                    </div>
+                    <p className="text-[12px] text-[#64748B] mt-0.5">{dashboard.description}</p>
+                  </div>
+                  <svg className="w-4 h-4 text-[#475569] group-hover/item:text-[#38BDF8] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </motion.div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="p-4 text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1E293B]/50 rounded-full">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#64748B]" />
+              <span className="text-[12px] text-[#64748B]">Coming Soon</span>
             </div>
           </div>
-
-          {stats && (
-            <div className="mt-5 pt-4 border-t border-[#1E293B] grid grid-cols-2 gap-3">
-              {stats.map((stat, i) => (
-                <div key={i}>
-                  <p className="text-xs text-[#64748B] uppercase tracking-wide">{stat.label}</p>
-                  <p className="text-lg font-semibold text-white">{stat.value}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Arrow indicator */}
-          <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-            <svg className="w-5 h-5 text-[#38BDF8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
-          </div>
-        </motion.div>
-      </Link>
+        )}
+      </div>
     </motion.div>
   );
 }
@@ -180,8 +270,8 @@ export default function Home() {
       </motion.header>
 
       {/* Hero Section */}
-      <div className="relative z-10 max-w-7xl mx-auto px-8 pt-12 pb-20">
-        <div className="text-center mb-16">
+      <div className="relative z-10 max-w-7xl mx-auto px-8 pt-8 pb-20">
+        <div className="text-center mb-12">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -196,24 +286,22 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-5xl md:text-6xl font-bold mb-6 leading-tight"
+            className="text-4xl md:text-5xl font-bold mb-4 leading-tight"
           >
             <span className="text-white">Executive </span>
             <span className="bg-gradient-to-r from-[#0189CB] to-[#38BDF8] bg-clip-text text-transparent">
               Intelligence
             </span>
-            <br />
-            <span className="text-white">Platform</span>
+            <span className="text-white"> Platform</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-xl text-[#8FA3BF] max-w-2xl mx-auto mb-10"
+            className="text-lg text-[#8FA3BF] max-w-2xl mx-auto mb-8"
           >
             Real-time insights across contracts, projects, and financial operations.
-            Unified data from Salesforce, Asana, and DocuSign in one powerful platform.
           </motion.p>
 
           {/* Data Sources */}
@@ -221,106 +309,32 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="flex flex-wrap items-center justify-center gap-3 mb-12"
+            className="flex flex-wrap items-center justify-center gap-3"
           >
             <DataSourceBadge name="Salesforce" color="bg-[#38BDF8]" delay={0.5} />
             <DataSourceBadge name="Asana" color="bg-[#E16259]" delay={0.6} />
             <DataSourceBadge name="DocuSign" color="bg-[#FFD700]" delay={0.7} />
-            <DataSourceBadge name="Supabase" color="bg-[#22C55E]" delay={0.8} />
           </motion.div>
         </div>
 
-        {/* Dashboard Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          <DashboardCard
-            title="Contracts Pipeline"
-            description="Track contract status from negotiations through signature and PO receipt."
-            icon={
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            }
-            href="/contracts-dashboard"
-            color="from-[#0189CB]/20 to-[#38BDF8]/10"
-            delay={0.5}
-            stats={[
-              { label: 'Pipeline', value: '$34.9M' },
-              { label: 'Active', value: '200' },
-            ]}
-          />
-
-          <DashboardCard
-            title="Project Tracker"
-            description="Monitor project milestones, tasks, and team deliverables in real-time."
-            icon={
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-            }
-            href="/pm-dashboard"
-            color="from-[#E16259]/20 to-[#F87171]/10"
-            delay={0.6}
-            stats={[
-              { label: 'Projects', value: '24' },
-              { label: 'On Track', value: '92%' },
-            ]}
-          />
-
-          <DashboardCard
-            title="MCC Profitability"
-            description="Analyze master cost center performance and financial metrics."
-            icon={
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            }
-            href="/mcc-dashboard"
-            color="from-[#22C55E]/20 to-[#4ADE80]/10"
-            delay={0.7}
-            stats={[
-              { label: 'Margin', value: '34.2%' },
-              { label: 'Revenue', value: '$12.8M' },
-            ]}
-          />
-
-          <DashboardCard
-            title="Project Closeout"
-            description="Review completed projects and analyze profitability outcomes."
-            icon={
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-            href="/closeout-dashboard"
-            color="from-[#A855F7]/20 to-[#C084FC]/10"
-            delay={0.8}
-            stats={[
-              { label: 'Closed', value: '156' },
-              { label: 'Avg Margin', value: '28.6%' },
-            ]}
-          />
-        </div>
-
-        {/* CTA Section */}
+        {/* Departments Section */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.9 }}
-          className="text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+          className="mb-8"
         >
-          <Link href="/contracts-dashboard">
-            <motion.button
-              whileHover={{ y: -4, scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center gap-3 px-10 py-4 rounded-xl bg-gradient-to-r from-[#0189CB] to-[#38BDF8] text-white font-semibold text-lg shadow-lg shadow-[#0189CB]/30 hover:shadow-[#0189CB]/50 transition-all"
-            >
-              <span>Enter Dashboard</span>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </motion.button>
-          </Link>
+          <h2 className="text-[11px] font-semibold text-[#475569] uppercase tracking-[0.15em] text-center mb-6">
+            Departments
+          </h2>
         </motion.div>
+
+        {/* Department Cards Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 mb-16">
+          {departments.map((dept, idx) => (
+            <DepartmentCard key={dept.name} department={dept} delay={0.5 + idx * 0.1} />
+          ))}
+        </div>
       </div>
 
       {/* Footer */}
@@ -335,9 +349,6 @@ export default function Home() {
             MARS Water Solutions - Business Intelligence Platform
           </p>
           <div className="flex items-center gap-6">
-            <Link href="/contracts/review" className="text-sm text-[#64748B] hover:text-white transition-colors">
-              Contract Review
-            </Link>
             <Link href="/admin" className="text-sm text-[#64748B] hover:text-white transition-colors">
               Admin
             </Link>
