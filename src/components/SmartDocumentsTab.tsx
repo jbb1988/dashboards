@@ -6,57 +6,186 @@ import { DocumentsProgressView, DocumentData, DocumentPreviewPanel } from '@/com
 import { KPICard, KPIIcons } from '@/components/KPICard';
 
 // ============================================================================
-// DESIGN TOKENS - Vercel-grade design system
+// DESIGN TOKENS - Linear/Vercel-grade Light Model
+// Key principle: 4 clear luminance layers, cards that FLOAT, no navy collapse
 // ============================================================================
 const tokens = {
-  // Backgrounds (slate-based, not pure black)
+  // BACKGROUNDS: 4 distinct luminance steps (you must SEE the layers)
+  // Moving away from navy → neutral slate/graphite
   bg: {
-    base: 'bg-[#0C0F14]',        // Page background - dark slate
-    panel: 'bg-[#13171F]',       // Card/panel background
-    panelHover: 'bg-[#1A1F2A]',  // Panel hover state
-    elevated: 'bg-[#1A1F2A]',    // Elevated surfaces
-    input: 'bg-[#0C0F14]',       // Input backgrounds
+    // Layer 1: App background (darkest) - neutral graphite, NOT navy
+    app: 'bg-[#0D0E12]',
+    // Layer 2: Section/Panel surface - clearly lifted
+    section: 'bg-[#16181D]',
+    // Layer 3: Card surface - visibly floats above section
+    card: 'bg-[#1E2028]',
+    // Layer 4: Expanded/Elevated - brightest for focus
+    elevated: 'bg-[#262932]',
+    // Hover states
+    hover: 'bg-[#2E323D]',
+    // Input backgrounds (recessed)
+    input: 'bg-[#121316]',
   },
-  // Borders
+  // BORDERS: Real borders, not decorative
   border: {
-    subtle: 'border-[#1E242F]',  // Subtle borders
-    default: 'border-[#262D3A]', // Default borders
-    focus: 'border-[#3B82F6]',   // Focus state
+    subtle: 'border-[#2A2D37]',
+    default: 'border-[#363A47]',  // Visible, structural
+    strong: 'border-[#464B5A]',   // For expanded/focus states
+    focus: 'border-[#5B8DEF]',
   },
-  // Text colors
+  // TEXT: Secondary text must be READABLE, not dim
   text: {
-    primary: 'text-[#F1F5F9]',   // Primary text - near white
-    secondary: 'text-[#94A3B8]', // Secondary - visible gray
-    muted: 'text-[#64748B]',     // Muted text
-    accent: 'text-[#3B82F6]',    // Accent color
+    primary: 'text-[#F0F2F5]',    // Near white
+    secondary: 'text-[#A8AEBB]',  // MUCH brighter - readable at a glance
+    muted: 'text-[#7C8291]',      // Still readable, not invisible
+    accent: 'text-[#5B8DEF]',
   },
-  // Status colors (reserved usage)
+  // STATUS: Color only where meaning exists
   status: {
-    danger: { dot: 'bg-red-500', text: 'text-red-400', bg: 'bg-red-500/10' },
-    warning: { dot: 'bg-amber-500', text: 'text-amber-400', bg: 'bg-amber-500/10' },
-    info: { dot: 'bg-blue-500', text: 'text-blue-400', bg: 'bg-blue-500/10' },
-    success: { dot: 'bg-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    danger: { dot: 'bg-[#E5484D]', text: 'text-[#E5484D]', bg: 'bg-[#E5484D]/10' },
+    warning: { dot: 'bg-[#D4A72C]', text: 'text-[#D4A72C]', bg: 'bg-[#D4A72C]/10' },
+    info: { dot: 'bg-[#5B8DEF]', text: 'text-[#5B8DEF]', bg: 'bg-[#5B8DEF]/10' },
+    success: { dot: 'bg-[#30A46C]', text: 'text-[#30A46C]', bg: 'bg-[#30A46C]/10' },
   },
-  // Spacing
+  // SPACING
   spacing: {
-    container: 'px-8 py-6',      // Global container
-    card: 'p-5',                 // Card padding
-    section: 'space-y-6',        // Section gaps
+    section: 'space-y-5',
   },
-  // Radius
+  // RADIUS
   radius: {
-    container: 'rounded-2xl',    // Containers: 16px
-    card: 'rounded-xl',          // Cards: 12px
-    control: 'rounded-lg',       // Controls: 8px
-    pill: 'rounded-full',        // Pills
+    card: 'rounded-xl',
+    control: 'rounded-lg',
+    pill: 'rounded-full',
   },
-  // Shadows
+  // SHADOWS: Cards must FLOAT - real ambient shadows
   shadow: {
-    sm: 'shadow-sm shadow-black/20',
-    md: 'shadow-md shadow-black/30',
-    lg: 'shadow-lg shadow-black/40',
+    // Card shadow: visible lift
+    card: 'shadow-[0_2px_8px_rgba(0,0,0,0.35),0_0_1px_rgba(0,0,0,0.2)]',
+    // Elevated shadow: stronger for expanded/focus
+    elevated: 'shadow-[0_4px_16px_rgba(0,0,0,0.45),0_0_1px_rgba(0,0,0,0.25)]',
+    // Inner shadow for expanded states (depth)
+    inner: 'shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
   },
 };
+
+// Priority level metadata for tooltips
+const PRIORITY_META = {
+  critical: {
+    label: 'Critical',
+    description: 'Overdue or missing required documents',
+    color: 'bg-[#E5484D]',
+  },
+  high: {
+    label: 'High Priority',
+    description: 'Due soon or needs attention',
+    color: 'bg-[#D4A72C]',
+  },
+  medium: {
+    label: 'Medium Priority',
+    description: 'On track, some items pending',
+    color: 'bg-[#5B8DEF]',
+  },
+  low: {
+    label: 'Low Priority',
+    description: 'Complete or not urgent',
+    color: 'bg-[#30A46C]',
+  },
+} as const;
+
+// Priority Dot with Tooltip Component
+function PriorityDot({ category }: { category: 'critical' | 'high' | 'medium' | 'low' }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const meta = PRIORITY_META[category];
+
+  return (
+    <div className="relative flex-shrink-0">
+      <span
+        className={`w-2 h-2 rounded-full ${meta.color} cursor-help`}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+      />
+      <AnimatePresence>
+        {showTooltip && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50"
+          >
+            <div className={`${tokens.bg.elevated} border ${tokens.border.default} ${tokens.radius.control} px-3 py-2 ${tokens.shadow.card} whitespace-nowrap`}>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className={`w-2 h-2 rounded-full ${meta.color}`} />
+                <span className={`text-xs font-semibold ${tokens.text.primary}`}>{meta.label}</span>
+              </div>
+              <p className={`text-xs ${tokens.text.muted}`}>{meta.description}</p>
+              {/* Tooltip arrow */}
+              <div className={`absolute left-1/2 -translate-x-1/2 top-full w-2 h-2 ${tokens.bg.elevated} border-r ${tokens.border.default} border-b rotate-45 -mt-1`} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Hero Visual: Risk Distribution Bar
+function RiskDistributionBar({
+  critical,
+  high,
+  medium,
+  low,
+  total,
+}: {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  total: number;
+}) {
+  if (total === 0) return null;
+
+  const segments = [
+    { count: critical, color: 'bg-[#E5484D]', label: 'Critical', pct: (critical / total) * 100 },
+    { count: high, color: 'bg-[#D4A72C]', label: 'High', pct: (high / total) * 100 },
+    { count: medium, color: 'bg-[#5B8DEF]', label: 'Medium', pct: (medium / total) * 100 },
+    { count: low, color: 'bg-[#30A46C]', label: 'Low', pct: (low / total) * 100 },
+  ].filter(s => s.count > 0);
+
+  return (
+    <div className={`${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle} p-4`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className={`text-sm font-semibold ${tokens.text.primary}`}>Contracts by Risk Level</h3>
+        <span className={`text-xs ${tokens.text.muted}`}>{total} total</span>
+      </div>
+
+      {/* Distribution Bar */}
+      <div className="h-3 rounded-full overflow-hidden flex bg-[#0F1318]">
+        {segments.map((seg, i) => (
+          <motion.div
+            key={seg.label}
+            initial={{ width: 0 }}
+            animate={{ width: `${seg.pct}%` }}
+            transition={{ delay: 0.1 * i, duration: 0.4, ease: 'easeOut' }}
+            className={`${seg.color} ${i === 0 ? 'rounded-l-full' : ''} ${i === segments.length - 1 ? 'rounded-r-full' : ''}`}
+          />
+        ))}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-5 mt-3">
+        {segments.map((seg) => (
+          <div key={seg.label} className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${seg.color}`} />
+            <span className={`text-xs ${tokens.text.secondary}`}>
+              {seg.label}: <span className={`font-semibold ${tokens.text.primary}`}>{seg.count}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Types
 interface Document {
@@ -393,11 +522,11 @@ function AccountSection({
   const highPriorityCount = contractList.filter(c => c.priority.category === 'critical' || c.priority.category === 'high').length;
 
   return (
-    <div className={`${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle} overflow-hidden`}>
+    <div className={`${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.default} ${tokens.shadow.card} overflow-hidden`}>
       {/* Account Header */}
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between p-4 hover:${tokens.bg.elevated} transition-colors`}
+        className={`w-full flex items-center justify-between p-4 hover:${tokens.bg.hover} transition-colors`}
       >
         <div className="flex items-center gap-3">
           <motion.div
@@ -536,20 +665,12 @@ function ContractCard({
     // TODO: Implement delete API call
   };
 
-  // Priority dot color (subtle)
-  const priorityDotColor = {
-    critical: 'bg-red-500',
-    high: 'bg-orange-500',
-    medium: 'bg-blue-500',
-    low: 'bg-green-500',
-  }[contract.priority.category];
-
   return (
-    <div className={`border-b ${tokens.border.subtle} last:border-0`}>
-      {/* Contract Header */}
+    <div className={`border-b ${tokens.border.subtle} last:border-0 group`}>
+      {/* Contract Header - Slimmed down */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full flex items-center justify-between p-4 pl-8 hover:${tokens.bg.elevated} transition-colors`}
+        className={`w-full flex items-center justify-between py-3 px-4 pl-8 hover:${tokens.bg.elevated} transition-colors`}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <motion.div
@@ -562,50 +683,53 @@ function ContractCard({
             </svg>
           </motion.div>
 
-          {/* Priority Dot */}
-          <span className={`w-2 h-2 rounded-full ${priorityDotColor} flex-shrink-0`} />
+          {/* Priority Dot with Tooltip */}
+          <PriorityDot category={contract.priority.category} />
 
-          <div className="text-left flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h4 className={`${tokens.text.primary} font-medium truncate`}>{contract.contractName}</h4>
-              {/* Contract Type Tags - subtle */}
-              {contractTypes.map((type) => (
+          {/* Contract info - single line dominant */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <h4 className={`${tokens.text.primary} font-medium truncate text-[15px]`}>{contract.contractName}</h4>
+            {/* Tags inline, more subtle */}
+            <div className="hidden sm:flex items-center gap-1.5">
+              {contractTypes.slice(0, 2).map((type) => (
                 <span
                   key={type}
-                  className={`px-2 py-0.5 ${tokens.bg.elevated} ${tokens.text.secondary} text-xs ${tokens.radius.control}`}
+                  className={`px-1.5 py-0.5 ${tokens.bg.elevated} ${tokens.text.muted} text-[11px] ${tokens.radius.control}`}
                 >
                   {type}
                 </span>
               ))}
               {bundleInfo && (
-                <span className={`px-2 py-0.5 ${tokens.bg.elevated} ${tokens.text.secondary} text-xs ${tokens.radius.control}`}>
+                <span className={`px-1.5 py-0.5 ${tokens.bg.elevated} ${tokens.text.muted} text-[11px] ${tokens.radius.control}`}>
                   Bundled
                 </span>
               )}
             </div>
-            {contract.priority.reasons.length > 0 && (
-              <p className={`${tokens.text.muted} text-sm truncate`}>
-                {contract.priority.reasons[0]}
-              </p>
-            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-          {/* Completeness */}
-          <span className={`${tokens.text.muted} text-sm tabular-nums`}>
-            {contract.completeness.required}/4
-          </span>
-          <div className={`w-16 h-1.5 ${tokens.bg.input} rounded-full overflow-hidden`}>
-            <div
-              className="h-full bg-[#3B82F6] rounded-full transition-all"
-              style={{ width: `${contract.completeness.percentage}%` }}
-            />
+        {/* Right side: progress + due on same line */}
+        <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+          {contract.priority.reasons.length > 0 && (
+            <span className={`${tokens.text.muted} text-xs hidden md:block`}>
+              {contract.priority.reasons[0]}
+            </span>
+          )}
+          <div className="flex items-center gap-2">
+            <span className={`${tokens.text.muted} text-xs tabular-nums`}>
+              {contract.completeness.required}/4
+            </span>
+            <div className={`w-12 h-1 ${tokens.bg.input} rounded-full overflow-hidden`}>
+              <div
+                className="h-full bg-[#5B8DEF] rounded-full transition-all"
+                style={{ width: `${contract.completeness.percentage}%` }}
+              />
+            </div>
           </div>
         </div>
       </button>
 
-      {/* Progress-First Document View */}
+      {/* Progress-First Document View - Elevated for focus */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -615,7 +739,7 @@ function ContractCard({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 pl-12">
+            <div className={`px-4 py-4 pl-12 ${tokens.bg.elevated} border-t ${tokens.border.default} ${tokens.shadow.inner}`}>
               <DocumentsProgressView
                 contractId={contract.contractId}
                 contractName={contract.contractName}
@@ -685,91 +809,71 @@ function PriorityCard({
     console.log('Delete document:', doc.id);
   };
 
-  // Priority dot color (subtle)
-  const priorityDotColor = {
-    critical: 'bg-red-500',
-    high: 'bg-orange-500',
-    medium: 'bg-blue-500',
-    low: 'bg-green-500',
-  }[contract.priority.category];
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle} overflow-hidden`}
+      className={`${tokens.bg.card} ${tokens.radius.card} border ${isExpanded ? tokens.border.strong : tokens.border.default} ${isExpanded ? tokens.shadow.elevated : tokens.shadow.card} overflow-hidden group transition-all duration-200`}
     >
-      {/* Card Header - Clickable to expand */}
+      {/* Card Header - Slimmed down, click to expand */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full p-4 text-left hover:${tokens.bg.elevated} transition-colors`}
+        className={`w-full p-3 text-left hover:${tokens.bg.hover} transition-colors`}
       >
-        <div className="flex items-start justify-between">
+        {/* Row 1: Priority dot + Contract name + Account + Progress */}
+        <div className="flex items-center gap-3">
+          <PriorityDot category={contract.priority.category} />
           <div className="flex-1 min-w-0">
-            {/* Contract Name with Priority Dot */}
-            <div className="flex items-center gap-2 mb-1">
-              <span className={`w-2 h-2 rounded-full ${priorityDotColor} flex-shrink-0`} />
-              <h3 className={`${tokens.text.primary} font-semibold truncate`}>{contract.contractName}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className={`${tokens.text.primary} font-semibold truncate text-[15px]`}>{contract.contractName}</h3>
+              {/* Tags - inline, subtle */}
+              {contractTypes.slice(0, 1).map((type) => (
+                <span
+                  key={type}
+                  className={`px-1.5 py-0.5 ${tokens.bg.elevated} ${tokens.text.muted} text-[11px] ${tokens.radius.control} hidden sm:inline`}
+                >
+                  {type}
+                </span>
+              ))}
             </div>
-
-            {/* Account Name */}
-            <p className={`${tokens.text.muted} text-sm mb-2 pl-4`}>{accountName}</p>
-
-            {/* Contract Types - subtle tags */}
-            {contractTypes.length > 0 && (
-              <div className="flex items-center gap-1.5 pl-4 flex-wrap">
-                {contractTypes.map((type) => (
-                  <span
-                    key={type}
-                    className={`px-2 py-0.5 ${tokens.bg.elevated} ${tokens.text.secondary} text-xs ${tokens.radius.control}`}
-                  >
-                    {type}
-                  </span>
-                ))}
-              </div>
-            )}
+            <p className={`${tokens.text.muted} text-sm truncate`}>{accountName}</p>
           </div>
-
-          {/* Right side - Completeness */}
-          <div className="text-right flex-shrink-0 ml-4">
-            <div className={`${tokens.text.muted} text-sm tabular-nums`}>
-              {contract.completeness.required}/4 docs
-            </div>
-            <div className={`w-20 h-1.5 ${tokens.bg.input} rounded-full mt-1 overflow-hidden`}>
+          {/* Progress on same line */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`${tokens.text.muted} text-xs tabular-nums`}>
+              {contract.completeness.required}/4
+            </span>
+            <div className={`w-12 h-1 ${tokens.bg.input} rounded-full overflow-hidden`}>
               <div
-                className="h-full bg-[#3B82F6] rounded-full transition-all"
+                className="h-full bg-[#5B8DEF] rounded-full transition-all"
                 style={{ width: `${contract.completeness.percentage}%` }}
               />
             </div>
           </div>
         </div>
 
-        {/* Due date / Status - Clean single line */}
-        {contract.priority.reasons.length > 0 && (
-          <div className={`mt-3 pt-3 border-t ${tokens.border.subtle} pl-4`}>
-            <span className={`${tokens.text.muted} text-sm`}>{contract.priority.reasons[0]}</span>
-          </div>
-        )}
-
-        {/* Expand indicator */}
-        <div className={`flex items-center justify-center mt-3 pt-3 border-t ${tokens.border.subtle}`}>
-          <div className={`flex items-center gap-2 ${tokens.text.muted} text-sm hover:${tokens.text.primary} transition-colors`}>
+        {/* Row 2: Status reason + Expand (all on one line) */}
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#252D38]/50">
+          <span className={`${tokens.text.muted} text-xs truncate flex-1`}>
+            {contract.priority.reasons[0] || 'On track'}
+          </span>
+          <div className={`flex items-center gap-1.5 ${tokens.text.muted} text-xs`}>
             <motion.svg
               animate={{ rotate: isExpanded ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-              className="w-4 h-4"
+              transition={{ duration: 0.15 }}
+              className="w-3.5 h-3.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </motion.svg>
-            <span>{isExpanded ? 'Hide' : 'Manage'} Documents</span>
+            <span className="hidden sm:inline">{isExpanded ? 'Hide' : 'Manage'}</span>
           </div>
         </div>
       </button>
 
-      {/* Expanded Document View */}
+      {/* Expanded Document View - Elevated surface for focus */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -779,7 +883,7 @@ function PriorityCard({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className={`px-4 pb-4 border-t ${tokens.border.subtle}`}>
+            <div className={`px-4 py-4 ${tokens.bg.elevated} border-t ${tokens.border.default} ${tokens.shadow.inner}`}>
               <DocumentsProgressView
                 contractId={contract.contractId}
                 contractName={contract.contractName}
@@ -789,7 +893,7 @@ function PriorityCard({
               />
             </div>
 
-            {/* Actions */}
+            {/* Actions - show on hover only for daily users */}
             <div className="flex items-center gap-2 px-4 pb-4">
               <button className={`flex-1 px-3 py-2 ${tokens.bg.elevated} hover:bg-[#262D3A] ${tokens.text.primary} text-sm ${tokens.radius.control} transition-colors`}>
                 View Contract
@@ -1097,6 +1201,23 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
     .filter(([, value]) => value !== null)
     .map(([key, value]) => ({ key, value: value as string }));
 
+  // Risk distribution for hero visual
+  const riskDistribution = useMemo(() => {
+    if (!data) return { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+
+    const allContracts = Object.values(data.byAccount).flatMap(account =>
+      Object.values(account.contracts)
+    );
+
+    return {
+      critical: allContracts.filter(c => c.priority.category === 'critical').length,
+      high: allContracts.filter(c => c.priority.category === 'high').length,
+      medium: allContracts.filter(c => c.priority.category === 'medium').length,
+      low: allContracts.filter(c => c.priority.category === 'low').length,
+      total: allContracts.length,
+    };
+  }, [data]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1123,14 +1244,14 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
 
   return (
     <div className={`${tokens.spacing.section}`}>
-      {/* KPI Strip - 5 tiles in a clean row */}
-      <div className="grid grid-cols-5 gap-3">
+      {/* KPI Strip - 5 tiles, reduced saturation colors */}
+      <div className="grid grid-cols-5 gap-4">
         <KPICard
           title="Total Documents"
           value={data?.stats.totalDocuments || 0}
           subtitle={`${data?.stats.totalContracts || 0} contracts`}
           icon={KPIIcons.document}
-          color="#38BDF8"
+          color="#5B8DEF"
           delay={0.1}
           isActive={activeView === 'all'}
           onClick={handleKPIClick}
@@ -1141,7 +1262,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           value={data?.stats.needsAttention || 0}
           subtitle="Missing docs or overdue"
           icon={KPIIcons.warning}
-          color="#EF4444"
+          color="#E5484D"
           delay={0.2}
           isActive={activeView === 'needs_attention'}
           onClick={handleKPIClick}
@@ -1152,7 +1273,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           value={filteredData.closingSoonContracts?.length || 0}
           subtitle="Within 90 days"
           icon={KPIIcons.calendar}
-          color="#F59E0B"
+          color="#D4A72C"
           delay={0.3}
           isActive={activeView === 'closing_soon'}
           onClick={handleKPIClick}
@@ -1163,7 +1284,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           value={filteredData.budgetedContracts?.length || 0}
           subtitle="Forecasted deals"
           icon={KPIIcons.dollar}
-          color="#8B5CF6"
+          color="#7C6AE8"
           delay={0.4}
           isActive={activeView === 'budgeted'}
           onClick={handleKPIClick}
@@ -1174,7 +1295,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           value={data?.stats.complete || 0}
           subtitle={`${data?.stats.averageCompleteness || 0}% avg completion`}
           icon={KPIIcons.checkCircle}
-          color="#22C55E"
+          color="#30A46C"
           delay={0.5}
           isActive={false}
           onClick={() => {}}
@@ -1182,8 +1303,17 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         />
       </div>
 
-      {/* Segmented Control Tabs */}
-      <div className={`flex items-center p-1 ${tokens.bg.panel} ${tokens.radius.control} border ${tokens.border.subtle}`}>
+      {/* Hero Visual: Risk Distribution */}
+      <RiskDistributionBar
+        critical={riskDistribution.critical}
+        high={riskDistribution.high}
+        medium={riskDistribution.medium}
+        low={riskDistribution.low}
+        total={riskDistribution.total}
+      />
+
+      {/* Segmented Control Tabs - sits on section layer */}
+      <div className={`flex items-center p-1 ${tokens.bg.section} ${tokens.radius.control} border ${tokens.border.default}`}>
         {SMART_VIEWS.map((view, index) => (
           <button
             key={view.id}
@@ -1196,11 +1326,11 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
                 : `${tokens.text.muted} hover:${tokens.text.secondary}`
             }`}
           >
-            {/* Active indicator bar */}
+            {/* Active indicator bar - elevated from section */}
             {activeView === view.id && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute inset-0 bg-[#1A1F2A] rounded-md -z-10"
+                className={`absolute inset-0 ${tokens.bg.card} ${tokens.radius.control} -z-10 ${tokens.shadow.card}`}
                 transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
               />
             )}
@@ -1240,12 +1370,12 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         </div>
 
         {/* Filter Controls Group */}
-        <div className={`flex items-center gap-1 p-1 ${tokens.bg.panel} ${tokens.radius.control} border ${tokens.border.subtle}`}>
+        <div className={`flex items-center gap-1 p-1 ${tokens.bg.card} ${tokens.radius.control} border ${tokens.border.subtle}`}>
           {/* Document Type Filter */}
           <select
             value={filters.documentType || ''}
             onChange={(e) => setFilters(f => ({ ...f, documentType: e.target.value || null }))}
-            className={`px-3 py-2 ${tokens.bg.panel} ${tokens.text.secondary} text-sm ${tokens.radius.control} border-0 focus:outline-none cursor-pointer hover:${tokens.text.primary} transition-colors`}
+            className={`px-3 py-2 ${tokens.bg.card} ${tokens.text.secondary} text-sm ${tokens.radius.control} border-0 focus:outline-none cursor-pointer hover:${tokens.text.primary} transition-colors`}
           >
             <option value="">All Types</option>
             {DOCUMENT_TYPES.map(type => (
@@ -1259,7 +1389,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           <select
             value={sortField}
             onChange={(e) => setSortField(e.target.value as SortField)}
-            className={`px-3 py-2 ${tokens.bg.panel} ${tokens.text.secondary} text-sm ${tokens.radius.control} border-0 focus:outline-none cursor-pointer hover:${tokens.text.primary} transition-colors`}
+            className={`px-3 py-2 ${tokens.bg.card} ${tokens.text.secondary} text-sm ${tokens.radius.control} border-0 focus:outline-none cursor-pointer hover:${tokens.text.primary} transition-colors`}
           >
             <option value="priority">Priority</option>
             <option value="name">Name</option>
@@ -1288,7 +1418,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {/* Save View Button */}
         <button
           onClick={saveCurrentView}
-          className={`px-3 py-2.5 ${tokens.bg.panel} border ${tokens.border.subtle} ${tokens.radius.control} ${tokens.text.muted} hover:${tokens.text.primary} text-sm font-medium transition-colors flex items-center gap-2`}
+          className={`px-3 py-2.5 ${tokens.bg.card} border ${tokens.border.subtle} ${tokens.radius.control} ${tokens.text.muted} hover:${tokens.text.primary} text-sm font-medium transition-colors flex items-center gap-2`}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -1329,7 +1459,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'needs_attention' && (
           <>
             {filteredData.priorityContracts.length === 0 ? (
-              <div className={`text-center py-16 ${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle}`}>
+              <div className={`text-center py-16 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}>
                 <div className={`w-14 h-14 mx-auto mb-4 ${tokens.status.success.bg} rounded-xl flex items-center justify-center`}>
                   <svg className={`w-7 h-7 ${tokens.status.success.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -1359,7 +1489,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'closing_soon' && (
           <>
             {filteredData.closingSoonContracts?.length === 0 ? (
-              <div className={`text-center py-16 ${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle}`}>
+              <div className={`text-center py-16 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}>
                 <div className={`w-14 h-14 mx-auto mb-4 ${tokens.status.info.bg} rounded-xl flex items-center justify-center`}>
                   <svg className={`w-7 h-7 ${tokens.status.info.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1389,7 +1519,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'budgeted' && (
           <>
             {filteredData.budgetedContracts?.length === 0 ? (
-              <div className={`text-center py-16 ${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle}`}>
+              <div className={`text-center py-16 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}>
                 <div className="w-14 h-14 mx-auto mb-4 bg-[#8B5CF6]/10 rounded-xl flex items-center justify-center">
                   <svg className="w-7 h-7 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1422,19 +1552,19 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={expandAll}
-                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.panel} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
+                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.card} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
               >
                 Expand All
               </button>
               <button
                 onClick={collapseAll}
-                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.panel} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
+                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.card} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
               >
                 Collapse All
               </button>
             </div>
             {filteredData.accounts.length === 0 ? (
-              <div className={`text-center py-16 ${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle}`}>
+              <div className={`text-center py-16 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}>
                 <p className={tokens.text.muted}>No accounts found</p>
               </div>
             ) : (
@@ -1456,7 +1586,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         )}
 
         {activeView === 'recent' && (
-          <div className={`${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle} overflow-hidden`}>
+          <div className={`${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle} overflow-hidden`}>
             {filteredData.recentDocs.length === 0 ? (
               <div className="text-center py-16">
                 <p className={tokens.text.muted}>No documents uploaded in the last 7 days</p>
@@ -1512,13 +1642,13 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={expandAll}
-                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.panel} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
+                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.card} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
               >
                 Expand All
               </button>
               <button
                 onClick={collapseAll}
-                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.panel} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
+                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.card} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
               >
                 Collapse All
               </button>
@@ -1543,7 +1673,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
       {/* Saved Views Sidebar (if any) */}
       {savedViews.length > 0 && (
         <div className="fixed bottom-4 right-4 z-50">
-          <div className={`${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle} p-3 ${tokens.shadow.lg}`}>
+          <div className={`${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle} p-3 ${tokens.shadow.elevated}`}>
             <p className={`${tokens.text.muted} text-xs font-medium mb-2`}>Saved Views</p>
             <div className="space-y-1">
               {savedViews.map((view) => (
