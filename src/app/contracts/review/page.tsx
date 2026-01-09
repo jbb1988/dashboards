@@ -29,6 +29,14 @@ interface ReviewHistory {
   status: 'draft' | 'sent_to_boss' | 'sent_to_client' | 'approved';
 }
 
+// Models for contract review via OpenRouter - legal-grade only
+const MODELS = [
+  { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', desc: 'Best quality (Recommended)' },
+  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', desc: 'Proven, slightly faster' },
+  { id: 'openai/gpt-4o', name: 'GPT-4o', desc: 'Reliable alternative' },
+  { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', desc: 'Budget reasoning model' },
+];
+
 export default function ContractReviewPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<string>('');
@@ -48,7 +56,7 @@ export default function ContractReviewPage() {
   const [originalDocxBuffer, setOriginalDocxBuffer] = useState<string | null>(null);
   const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
   const [isGeneratingOriginal, setIsGeneratingOriginal] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<'sonnet' | 'opus' | 'haiku'>('sonnet');
+  const [selectedModel, setSelectedModel] = useState<string>('anthropic/claude-sonnet-4');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const contractDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -422,42 +430,18 @@ export default function ContractReviewPage() {
 
             {/* Model Selection */}
             <div className="mb-4">
-              <label className="block text-[#8FA3BF] text-sm mb-2">Analysis Speed</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedModel('haiku')}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedModel === 'haiku'
-                      ? 'bg-[#22C55E]/20 text-[#22C55E] ring-1 ring-[#22C55E]/50'
-                      : 'bg-[#151F2E] text-[#8FA3BF] hover:bg-[#1E293B]'
-                  }`}
-                >
-                  <div className="font-semibold">Quick</div>
-                  <div className="text-xs opacity-75">30-60 sec</div>
-                </button>
-                <button
-                  onClick={() => setSelectedModel('sonnet')}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedModel === 'sonnet'
-                      ? 'bg-[#38BDF8]/20 text-[#38BDF8] ring-1 ring-[#38BDF8]/50'
-                      : 'bg-[#151F2E] text-[#8FA3BF] hover:bg-[#1E293B]'
-                  }`}
-                >
-                  <div className="font-semibold">Balanced</div>
-                  <div className="text-xs opacity-75">1-3 min</div>
-                </button>
-                <button
-                  onClick={() => setSelectedModel('opus')}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedModel === 'opus'
-                      ? 'bg-[#A855F7]/20 text-[#A855F7] ring-1 ring-[#A855F7]/50'
-                      : 'bg-[#151F2E] text-[#8FA3BF] hover:bg-[#1E293B]'
-                  }`}
-                >
-                  <div className="font-semibold">Thorough</div>
-                  <div className="text-xs opacity-75">3-5 min</div>
-                </button>
-              </div>
+              <label className="block text-[#8FA3BF] text-sm mb-2">AI Model</label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#38BDF8]/50 cursor-pointer"
+              >
+                {MODELS.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name} - {model.desc}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Tab Navigation */}
@@ -641,12 +625,23 @@ export default function ContractReviewPage() {
                   <label className="block text-[#8FA3BF] text-sm mb-2">Summary of Changes</label>
                   <div className="bg-[#0B1220] border border-white/[0.08] rounded-lg p-4">
                     <ul className="space-y-2">
-                      {result.summary.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-[#CBD5E1]">
-                          <span className="text-[#38BDF8] mt-1">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
+                      {result.summary.map((item, idx) => {
+                        // Parse provision label if present: "[Provision] Description"
+                        const match = item.match(/^\[([^\]]+)\]\s*(.*)/);
+                        const provision = match ? match[1] : null;
+                        const text = match ? match[2] : item;
+
+                        return (
+                          <li key={idx} className="flex items-start gap-2 text-sm text-[#CBD5E1]">
+                            <span className="text-[#38BDF8] mt-1">•</span>
+                            <span>
+                              {provision && (
+                                <span className="text-[#F59E0B] font-medium">[{provision}]</span>
+                              )}{provision ? ' ' : ''}{text}
+                            </span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 </div>

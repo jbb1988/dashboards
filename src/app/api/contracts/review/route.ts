@@ -3,12 +3,8 @@ import DiffMatchPatch from 'diff-match-patch';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 
-// OpenRouter model mapping
-const MODEL_MAP: Record<string, string> = {
-  haiku: 'anthropic/claude-3-haiku',
-  sonnet: 'anthropic/claude-sonnet-4',
-  opus: 'anthropic/claude-opus-4',
-};
+// Default model if none specified
+const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 
 /**
  * Normalize Unicode characters to ASCII equivalents.
@@ -132,9 +128,9 @@ OUTPUT FORMAT:
     }
   ],
   "summary": [
-    "Made indemnity proportionate to Contractor fault",
-    "Added pre-existing IP carve-out",
-    "Capped liability at contract value"
+    "[Indemnification] Made indemnity proportionate to Contractor fault",
+    "[IP/Work Product] Added pre-existing IP carve-out",
+    "[Liability] Capped liability at contract value"
   ],
   "modifiedText": "The COMPLETE contract with all revisions applied - CLEAN TEXT ONLY, NO markdown formatting (no ** or ~~)"
 }
@@ -187,8 +183,8 @@ export async function POST(request: NextRequest) {
 
     const fullPrompt = MARS_CONTRACT_PROMPT + normalizedInput;
 
-    // Call OpenRouter API
-    const openRouterModel = MODEL_MAP[model] || MODEL_MAP.sonnet;
+    // Call OpenRouter API - use model ID directly from frontend
+    const openRouterModel = model || DEFAULT_MODEL;
     console.log(`Starting OpenRouter analysis with model: ${openRouterModel}...`);
     const startTime = Date.now();
 
