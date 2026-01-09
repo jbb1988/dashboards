@@ -3334,18 +3334,30 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                               )}
                             </div>
                           )}
-                          <div className="flex items-center gap-2">
-                            {task.dueDate && (
-                              <span className={`text-[10px] flex items-center gap-1 ${isOverdue ? 'text-red-400' : 'text-[#64748B]'}`}>
-                                {isOverdue && <span className="animate-pulse">⚠</span>}
-                                {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </span>
-                            )}
-                            <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-medium ${
-                              task.priority === 'high' ? 'bg-red-500/15 text-red-400' :
-                              task.priority === 'medium' ? 'bg-amber-500/15 text-amber-400' :
-                              'bg-[#475569]/20 text-[#64748B]'
-                            }`}>{task.priority}</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {task.dueDate && (
+                                <span className={`text-[10px] flex items-center gap-1 ${isOverdue ? 'text-red-400' : 'text-[#64748B]'}`}>
+                                  {isOverdue && <span className="animate-pulse">⚠</span>}
+                                  {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                              )}
+                              <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-medium ${
+                                task.priority === 'high' ? 'bg-red-500/15 text-red-400' :
+                                task.priority === 'medium' ? 'bg-amber-500/15 text-amber-400' :
+                                'bg-[#475569]/20 text-[#64748B]'
+                              }`}>{task.priority}</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTask(task.id);
+                              }}
+                              className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium"
+                              title="Delete task"
+                            >
+                              ✕
+                            </button>
                           </div>
                         </motion.div>
                       );
