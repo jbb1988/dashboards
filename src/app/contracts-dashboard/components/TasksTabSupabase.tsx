@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from '@/lib/supabase';
+import { KPICard, KPIIcons } from '@/components/KPICard';
 
 interface Contract {
   id: string;
@@ -320,53 +321,79 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
     );
   };
 
+  // Handle KPI card click to filter tasks
+  const handleKPIClick = (filterKey: string) => {
+    setFilter(filterKey as FilterMode);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Task Summary KPIs */}
+      {/* Interactive KPI Cards - Match Pipeline Styling */}
+      <div className="grid grid-cols-4 gap-4">
+        <KPICard
+          title="Active Tasks"
+          value={taskKpis.totalActive}
+          subtitle={`${taskKpis.total} total tasks`}
+          icon={KPIIcons.clipboard}
+          color="#38BDF8"
+          delay={0.1}
+          isActive={filter === 'all'}
+          onClick={handleKPIClick}
+          filterKey="all"
+        />
+        <KPICard
+          title="Overdue"
+          value={taskKpis.overdue}
+          subtitle="Past due date"
+          icon={KPIIcons.alert}
+          color="#EF4444"
+          delay={0.2}
+          isActive={filter === 'overdue'}
+          onClick={handleKPIClick}
+          filterKey="overdue"
+          badge={taskKpis.overdue > 0 ? taskKpis.overdue : undefined}
+        />
+        <KPICard
+          title="Due Today"
+          value={taskKpis.dueSoon}
+          subtitle="Requires attention"
+          icon={KPIIcons.clock}
+          color="#F59E0B"
+          delay={0.3}
+          isActive={filter === 'pending'}
+          onClick={handleKPIClick}
+          filterKey="pending"
+        />
+        <KPICard
+          title="Completed"
+          value={taskKpis.completed}
+          subtitle={`${taskKpis.progressPercent}% completion rate`}
+          icon={KPIIcons.checkCircle}
+          color="#22C55E"
+          delay={0.4}
+          isActive={filter === 'completed'}
+          onClick={handleKPIClick}
+          filterKey="completed"
+        />
+      </div>
+
+      {/* Progress Bar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-[#111827] rounded-xl border border-white/[0.04] p-6"
+        className="bg-[#111827] rounded-xl border border-white/[0.04] p-4"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-[#64748B] uppercase tracking-wider">Task Overview</h2>
-          <div className="text-xs text-[#64748B]">{taskKpis.total} total tasks</div>
+        <div className="flex items-center justify-between text-xs mb-2">
+          <span className="text-[#64748B]">Overall Completion Progress</span>
+          <span className="text-white font-medium">{taskKpis.progressPercent}%</span>
         </div>
-
-        <div className="grid grid-cols-4 gap-4">
-          {[
-            { label: 'Active', value: taskKpis.totalActive, color: 'text-white', bgColor: 'bg-[#0B1220]', borderColor: 'border-white/[0.04]' },
-            { label: 'Overdue', value: taskKpis.overdue, color: taskKpis.overdue > 0 ? 'text-red-400' : 'text-white', bgColor: taskKpis.overdue > 0 ? 'bg-red-500/10' : 'bg-[#0B1220]', borderColor: taskKpis.overdue > 0 ? 'border-red-500/20' : 'border-white/[0.04]' },
-            { label: 'Due Today', value: taskKpis.dueSoon, color: taskKpis.dueSoon > 0 ? 'text-amber-400' : 'text-white', bgColor: taskKpis.dueSoon > 0 ? 'bg-amber-500/10' : 'bg-[#0B1220]', borderColor: taskKpis.dueSoon > 0 ? 'border-amber-500/20' : 'border-white/[0.04]' },
-            { label: 'Completed', value: taskKpis.completed, color: 'text-[#22C55E]', bgColor: 'bg-[#0B1220]', borderColor: 'border-white/[0.04]' },
-          ].map((kpi, i) => (
-            <motion.div
-              key={kpi.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + i * 0.08, duration: 0.3 }}
-              className={`${kpi.bgColor} rounded-lg p-4 border ${kpi.borderColor}`}
-            >
-              <div className={`text-3xl font-bold mb-1 ${kpi.color}`}>{kpi.value}</div>
-              <div className="text-xs uppercase tracking-wider text-[#64748B]">{kpi.label}</div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Progress Bar */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-xs mb-2">
-            <span className="text-[#64748B]">Completion Progress</span>
-            <span className="text-white font-medium">{taskKpis.progressPercent}%</span>
-          </div>
-          <div className="h-2 bg-[#0B1220] rounded-full overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${taskKpis.progressPercent}%` }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-              className="h-full bg-gradient-to-r from-[#22C55E] to-[#38BDF8] rounded-full"
-            />
-          </div>
+        <div className="h-2 bg-[#0B1220] rounded-full overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${taskKpis.progressPercent}%` }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            className="h-full bg-gradient-to-r from-[#22C55E] to-[#38BDF8] rounded-full"
+          />
         </div>
       </motion.div>
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 
 interface Contract {
@@ -1139,7 +1140,7 @@ export default function ContractReviewPage() {
                   <div className="bg-[#0B1220] border border-white/[0.08] rounded-lg p-4 max-h-64 overflow-y-auto">
                     <div
                       className="text-white text-sm font-mono whitespace-pre-wrap contract-redlines"
-                      dangerouslySetInnerHTML={{ __html: formatRedlines(result.redlinedText) }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatRedlines(result.redlinedText), { ALLOWED_TAGS: ['del', 'ins', 'span', 'br'] }) }}
                     />
                   </div>
                 </div>

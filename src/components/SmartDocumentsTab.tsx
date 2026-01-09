@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { KPICard, KPIIcons } from '@/components/KPICard';
 
 // Types
 interface Document {
@@ -63,6 +64,9 @@ interface Contract {
   status: string;
   closeDate: string | null;
   contractDate: string | null;
+  awardDate?: string | null;
+  budgeted?: boolean;
+  contractType?: string[];
 }
 
 interface DocumentsData {
@@ -94,11 +98,12 @@ interface SavedView {
   };
 }
 
-type SmartView = 'needs_attention' | 'closing_soon' | 'by_account' | 'recent' | 'all';
+type SmartView = 'needs_attention' | 'closing_soon' | 'budgeted' | 'by_account' | 'recent' | 'all';
 
 const SMART_VIEWS: { id: SmartView; label: string; icon: string; description: string }[] = [
   { id: 'needs_attention', label: 'Needs Attention', icon: '!', description: 'Missing docs, overdue, or stalled' },
   { id: 'closing_soon', label: 'Closing Soon', icon: 'calendar', description: 'Due in next 90 days' },
+  { id: 'budgeted', label: 'Budgeted', icon: 'dollar', description: 'Budgeted/forecasted opportunities' },
   { id: 'by_account', label: 'By Account', icon: 'folder', description: 'Organized by account hierarchy' },
   { id: 'recent', label: 'Recently Updated', icon: 'clock', description: 'Last 7 days activity' },
   { id: 'all', label: 'All Documents', icon: 'list', description: 'Complete document list' },
@@ -525,14 +530,21 @@ function PriorityCard({
   onUpload,
   uploadingKey,
   documentTypes,
+  contracts,
 }: {
-  contract: ContractDocuments;
+  contract: ContractDocuments & { accountName?: string };
   accountName: string;
   onUpload: (file: File, type: string, contractId: string, contractName: string, accountName: string) => void;
   uploadingKey: string | null;
   documentTypes: string[];
+  contracts?: Contract[];
 }) {
   const priorityColor = PRIORITY_COLORS[contract.priority.category];
+
+  // Find the matching contract for additional details
+  const matchingContract = contracts?.find(c => c.id === contract.contractId || c.salesforceId === contract.contractId);
+  const contractTypes = matchingContract?.contractType || [];
+  const salesforceId = matchingContract?.salesforceId;
 
   return (
     <motion.div
@@ -543,11 +555,20 @@ function PriorityCard({
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className={`px-2 py-0.5 ${priorityColor.bg} ${priorityColor.text} text-xs font-bold rounded border ${priorityColor.border}`}>
               {contract.priority.category.toUpperCase()}
             </span>
             <span className="text-[#64748B] text-xs">Score: {contract.priority.score}/100</span>
+            {/* Project Type Badges */}
+            {contractTypes.map((type) => (
+              <span
+                key={type}
+                className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#A78BFA] text-xs rounded border border-[#8B5CF6]/20"
+              >
+                {type}
+              </span>
+            ))}
           </div>
           <h3 className="text-white font-semibold">{contract.contractName}</h3>
           <p className="text-[#64748B] text-sm">{accountName}</p>
@@ -618,6 +639,20 @@ function PriorityCard({
         <button className="flex-1 px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-white text-sm rounded-lg transition-colors">
           View Contract
         </button>
+        {salesforceId && (
+          <a
+            href={`https://marswater.lightning.force.com/lightning/r/Opportunity/${salesforceId}/view`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#38BDF8] hover:text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+            title="Open in Salesforce"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            SF
+          </a>
+        )}
         <button className="px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#64748B] hover:text-white text-sm rounded-lg transition-colors">
           Snooze
         </button>
@@ -816,22 +851,33 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
       .filter(c => c.priority.category === 'critical' || c.priority.category === 'high')
       .sort((a, b) => b.priority.score - a.priority.score);
 
-    // Get contracts closing soon
+    // Get contracts closing soon (any date within 90 days)
     const closingSoonContracts = allContracts
       .filter(c => {
-        const contract = contracts.find(ct => ct.id === c.contractId);
-        if (!contract?.contractDate && !contract?.closeDate) return false;
-        const targetDate = new Date(contract.contractDate || contract.closeDate!);
+        const contract = contracts.find(ct => ct.id === c.contractId || ct.salesforceId === c.contractId);
+        if (!contract) return false;
+        // Check any relevant date field
+        const targetDateStr = contract.closeDate || contract.contractDate || contract.awardDate;
+        if (!targetDateStr) return false;
+        const targetDate = new Date(targetDateStr);
         const daysUntil = Math.floor((targetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
         return daysUntil >= 0 && daysUntil <= 90;
       })
       .sort((a, b) => {
-        const contractA = contracts.find(c => c.id === a.contractId);
-        const contractB = contracts.find(c => c.id === b.contractId);
-        const dateA = new Date(contractA?.contractDate || contractA?.closeDate || 0);
-        const dateB = new Date(contractB?.contractDate || contractB?.closeDate || 0);
+        const contractA = contracts.find(c => c.id === a.contractId || c.salesforceId === a.contractId);
+        const contractB = contracts.find(c => c.id === b.contractId || c.salesforceId === b.contractId);
+        const dateA = new Date(contractA?.closeDate || contractA?.contractDate || contractA?.awardDate || 0);
+        const dateB = new Date(contractB?.closeDate || contractB?.contractDate || contractB?.awardDate || 0);
         return dateA.getTime() - dateB.getTime();
       });
+
+    // Get budgeted contracts
+    const budgetedContracts = allContracts
+      .filter(c => {
+        const contract = contracts.find(ct => ct.id === c.contractId || ct.salesforceId === c.contractId);
+        return contract?.budgeted === true;
+      })
+      .sort((a, b) => b.priority.score - a.priority.score);
 
     // Get recent documents
     const recentDocs = data.documents
@@ -847,6 +893,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
       accounts: filtered,
       priorityContracts,
       closingSoonContracts,
+      budgetedContracts,
       recentDocs,
     };
   }, [data, searchQuery, filters, contracts]);
@@ -864,22 +911,81 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
     );
   }
 
+  // Handle KPI card click to switch views
+  const handleKPIClick = (filterKey: string) => {
+    setActiveView(filterKey as SmartView);
+  };
+
+  // Expand/collapse all accounts
+  const expandAll = () => {
+    if (data) {
+      setExpandedAccounts(new Set(Object.keys(data.byAccount)));
+    }
+  };
+
+  const collapseAll = () => {
+    setExpandedAccounts(new Set());
+  };
+
   return (
     <div className="space-y-6">
-      {/* Stats Overview */}
+      {/* Interactive KPI Cards */}
       <div className="grid grid-cols-5 gap-4">
-        {[
-          { label: 'Total Documents', value: data?.stats.totalDocuments || 0, color: 'text-white' },
-          { label: 'Needs Attention', value: data?.stats.needsAttention || 0, color: 'text-red-400' },
-          { label: 'Closing Soon', value: data?.stats.closingSoon || 0, color: 'text-amber-400' },
-          { label: 'Complete', value: data?.stats.complete || 0, color: 'text-green-400' },
-          { label: 'Avg Completeness', value: `${data?.stats.averageCompleteness || 0}%`, color: 'text-[#38BDF8]' },
-        ].map((stat, i) => (
-          <div key={i} className="p-4 bg-[#111827] rounded-xl border border-white/[0.04]">
-            <p className="text-[#64748B] text-sm">{stat.label}</p>
-            <p className={`text-2xl font-semibold ${stat.color}`}>{stat.value}</p>
-          </div>
-        ))}
+        <KPICard
+          title="Total Documents"
+          value={data?.stats.totalDocuments || 0}
+          subtitle={`${data?.stats.totalContracts || 0} contracts`}
+          icon={KPIIcons.document}
+          color="#38BDF8"
+          delay={0.1}
+          isActive={activeView === 'all'}
+          onClick={handleKPIClick}
+          filterKey="all"
+        />
+        <KPICard
+          title="Needs Attention"
+          value={data?.stats.needsAttention || 0}
+          subtitle="Missing docs or overdue"
+          icon={KPIIcons.warning}
+          color="#EF4444"
+          delay={0.2}
+          isActive={activeView === 'needs_attention'}
+          onClick={handleKPIClick}
+          filterKey="needs_attention"
+        />
+        <KPICard
+          title="Closing Soon"
+          value={filteredData.closingSoonContracts?.length || 0}
+          subtitle="Within 90 days"
+          icon={KPIIcons.calendar}
+          color="#F59E0B"
+          delay={0.3}
+          isActive={activeView === 'closing_soon'}
+          onClick={handleKPIClick}
+          filterKey="closing_soon"
+        />
+        <KPICard
+          title="Budgeted"
+          value={filteredData.budgetedContracts?.length || 0}
+          subtitle="Forecasted deals"
+          icon={KPIIcons.dollar}
+          color="#8B5CF6"
+          delay={0.4}
+          isActive={activeView === 'budgeted'}
+          onClick={handleKPIClick}
+          filterKey="budgeted"
+        />
+        <KPICard
+          title="Complete"
+          value={data?.stats.complete || 0}
+          subtitle={`${data?.stats.averageCompleteness || 0}% avg completion`}
+          icon={KPIIcons.checkCircle}
+          color="#22C55E"
+          delay={0.5}
+          isActive={false}
+          onClick={() => {}}
+          filterKey=""
+        />
       </div>
 
       {/* Smart View Tabs */}
@@ -999,6 +1105,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
                     onUpload={handleUpload}
                     uploadingKey={uploadingKey}
                     documentTypes={data?.requiredTypes || []}
+                    contracts={contracts}
                   />
                 ))}
               </div>
@@ -1028,6 +1135,37 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
                     onUpload={handleUpload}
                     uploadingKey={uploadingKey}
                     documentTypes={data?.documentTypes || []}
+                    contracts={contracts}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {activeView === 'budgeted' && (
+          <>
+            {filteredData.budgetedContracts?.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 bg-[#8B5CF6]/10 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-white text-lg font-medium mb-1">No budgeted contracts</h3>
+                <p className="text-[#64748B]">No contracts are marked as budgeted/forecasted</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {filteredData.budgetedContracts?.map((contract) => (
+                  <PriorityCard
+                    key={contract.contractId}
+                    contract={contract}
+                    accountName={contract.accountName}
+                    onUpload={handleUpload}
+                    uploadingKey={uploadingKey}
+                    documentTypes={data?.documentTypes || []}
+                    contracts={contracts}
                   />
                 ))}
               </div>
@@ -1037,6 +1175,21 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
 
         {activeView === 'by_account' && (
           <div className="space-y-4">
+            {/* Expand/Collapse All Buttons */}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={expandAll}
+                className="px-3 py-1.5 text-sm text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+              >
+                Expand All
+              </button>
+              <button
+                onClick={collapseAll}
+                className="px-3 py-1.5 text-sm text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+              >
+                Collapse All
+              </button>
+            </div>
             {filteredData.accounts.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-[#64748B]">No accounts found</p>
@@ -1094,13 +1247,28 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
 
         {activeView === 'all' && (
           <div className="space-y-4">
+            {/* Expand/Collapse All Buttons */}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={expandAll}
+                className="px-3 py-1.5 text-sm text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+              >
+                Expand All
+              </button>
+              <button
+                onClick={collapseAll}
+                className="px-3 py-1.5 text-sm text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+              >
+                Collapse All
+              </button>
+            </div>
             {filteredData.accounts.map(([accountName, account]) => (
               <AccountSection
                 key={accountName}
                 accountName={accountName}
                 contracts={account.contracts}
-                isExpanded={true}
-                onToggle={() => {}}
+                isExpanded={expandedAccounts.has(accountName)}
+                onToggle={() => toggleAccount(accountName)}
                 onUpload={handleUpload}
                 uploadingKey={uploadingKey}
                 documentTypes={data?.documentTypes || []}

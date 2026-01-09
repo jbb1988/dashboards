@@ -137,12 +137,177 @@ function getTaskStatus(task: AsanaTask): 'confirmed' | 'placeholder' | null {
   return null;
 }
 
-// Timeline Tab - Calendar focused view
+// Fortune 500 Tooltip - Solid, sophisticated, no blur
+function TaskTooltip({ task, position, onClose }: {
+  task: AsanaTask;
+  position: { x: number; y: number };
+  onClose: () => void;
+}) {
+  const taskStatus = getTaskStatus(task);
+  const region = getCustomField(task, 'Region');
+  const startDate = task.startOn ? new Date(task.startOn) : null;
+  const endDate = task.dueOn ? new Date(task.dueOn) : null;
+
+  // Calculate duration
+  const duration = startDate && endDate
+    ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    : 1;
+
+  // Calculate progress (days elapsed / total days)
+  const today = new Date();
+  let progress = 0;
+  if (startDate && endDate) {
+    if (today >= endDate) progress = 100;
+    else if (today <= startDate) progress = 0;
+    else {
+      const elapsed = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      progress = Math.round((elapsed / duration) * 100);
+    }
+  }
+
+  const statusColor = taskStatus === 'confirmed' ? ASANA_COLORS.confirmed :
+                      taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : '#64748B';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 4 }}
+      transition={{ duration: 0.1 }}
+      className="fixed z-[100] pointer-events-none"
+      style={{ left: position.x, top: position.y - 8, transform: 'translateX(-50%) translateY(-100%)' }}
+    >
+      <div className="bg-[#1A1F2E] border border-[#2D3748] rounded-lg shadow-lg shadow-black/20 p-4 min-w-[280px] max-w-[320px]">
+        {/* Project Name */}
+        <div className="text-[14px] font-semibold text-white mb-3 leading-tight">
+          {task.name}
+        </div>
+
+        {/* Status + Duration chips */}
+        <div className="flex items-center gap-2 mb-3">
+          {taskStatus && (
+            <span
+              className="text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded"
+              style={{
+                backgroundColor: statusColor,
+                color: taskStatus === 'placeholder' ? '#1A1F2E' : 'white'
+              }}
+            >
+              {taskStatus}
+            </span>
+          )}
+          <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded bg-[#2D3748] text-[#94A3B8]">
+            {duration} {duration === 1 ? 'day' : 'days'}
+          </span>
+        </div>
+
+        {/* Dates */}
+        <div className="text-[11px] text-[#64748B] mb-3">
+          {startDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          {endDate && startDate?.getTime() !== endDate?.getTime() && (
+            <> → {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+          )}
+          {!endDate && startDate && (
+            <>, {startDate.getFullYear()}</>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="h-px bg-[#2D3748] mb-3" />
+
+        {/* Assignee & Region */}
+        <div className="mb-3">
+          <div className="text-[12px] text-white font-medium">
+            {task.assignee?.name || 'Unassigned'}
+          </div>
+          {region && (
+            <div className="text-[11px] text-[#64748B]">{region}</div>
+          )}
+        </div>
+
+        {/* Progress Bar */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-[3px] bg-[#2D3748] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${progress}%`, backgroundColor: statusColor }}
+            />
+          </div>
+          <span className="text-[10px] text-[#64748B] font-medium w-8 text-right">{progress}%</span>
+        </div>
+      </div>
+
+      {/* Arrow pointer */}
+      <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 bg-[#1A1F2E] border-r border-b border-[#2D3748] transform rotate-45" />
+    </motion.div>
+  );
+}
+
+// Gantt Bar Component with urgency styling
+function GanttBar({
+  task,
+  startCol,
+  spanCols,
+  row,
+  onHover,
+  onLeave
+}: {
+  task: AsanaTask;
+  startCol: number;
+  spanCols: number;
+  row: number;
+  onHover: (task: AsanaTask, e: React.MouseEvent) => void;
+  onLeave: () => void;
+}) {
+  const taskStatus = getTaskStatus(task);
+  const bgColor = taskStatus === 'confirmed' ? ASANA_COLORS.confirmed :
+                  taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : '#64748B';
+
+  const overdue = isOverdue(task.dueOn);
+  const dueSoon = isDueSoon(task.dueOn) && !overdue;
+  const dueToday = task.dueOn && new Date(task.dueOn).toDateString() === new Date().toDateString();
+
+  return (
+    <div
+      className={`absolute h-[22px] rounded cursor-pointer transition-all duration-100 flex items-center px-2 overflow-hidden group
+        ${overdue ? 'ring-2 ring-[#EF4444] ring-offset-1 ring-offset-[#151F2E]' : ''}
+        ${dueToday ? 'ring-2 ring-[#F59E0B] ring-offset-1 ring-offset-[#151F2E] animate-pulse' : ''}
+        ${dueSoon && !dueToday ? 'border-l-4 border-l-[#F59E0B]' : ''}
+      `}
+      style={{
+        left: `calc(${(startCol / 7) * 100}% + 4px)`,
+        width: `calc(${(spanCols / 7) * 100}% - 8px)`,
+        top: `${28 + row * 26}px`,
+        backgroundColor: bgColor,
+      }}
+      onMouseEnter={(e) => onHover(task, e)}
+      onMouseLeave={onLeave}
+    >
+      <span className="text-[10px] text-white font-medium truncate">
+        {task.name}
+      </span>
+      {spanCols >= 2 && task.assignee && (
+        <span className="text-[9px] text-white/70 ml-auto truncate hidden group-hover:block">
+          {task.assignee.name.split(' ')[0]}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Timeline Tab - Calendar focused view with Gantt bars
 function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boolean }) {
   const [scheduleFilter, setScheduleFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter' | 'all'>('month');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [hoveredTask, setHoveredTask] = useState<{ task: AsanaTask; position: { x: number; y: number } } | null>(null);
+
+  // Check if viewing current month
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date();
+    return calendarMonth.getMonth() === now.getMonth() && calendarMonth.getFullYear() === now.getFullYear();
+  }, [calendarMonth]);
 
   // Get unique schedule statuses
   const scheduleStatuses = useMemo(() => {
@@ -226,9 +391,9 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
     return groups;
   }, [data, scheduleFilter, dateRange]);
 
-  // Calendar grid data
+  // Calendar grid data with week-based Gantt layout
   const calendarData = useMemo(() => {
-    if (!data) return { days: [], tasksByDate: {} };
+    if (!data) return { weeks: [], allTasks: [] };
 
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
@@ -239,31 +404,157 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
     const daysInMonth = lastDay.getDate();
     const startDayOfWeek = firstDay.getDay();
 
-    // Build days array with padding for calendar grid
-    const days: (Date | null)[] = [];
+    // Build weeks array
+    const weeks: { days: (Date | null)[] }[] = [];
+    let currentWeek: (Date | null)[] = [];
 
     // Add empty slots for days before the 1st
     for (let i = 0; i < startDayOfWeek; i++) {
-      days.push(null);
+      currentWeek.push(null);
     }
 
     // Add all days of the month
     for (let i = 1; i <= daysInMonth; i++) {
-      days.push(new Date(year, month, i));
+      currentWeek.push(new Date(year, month, i));
+      if (currentWeek.length === 7) {
+        weeks.push({ days: currentWeek });
+        currentWeek = [];
+      }
     }
 
-    // Group tasks by date string
-    const tasksByDate: Record<string, AsanaTask[]> = {};
-    data.tasks.filter(t => !t.completed && (t.dueOn || t.startOn)).forEach(task => {
-      const dateStr = task.startOn || task.dueOn;
-      if (dateStr) {
-        if (!tasksByDate[dateStr]) tasksByDate[dateStr] = [];
-        tasksByDate[dateStr].push(task);
+    // Pad last week with nulls
+    if (currentWeek.length > 0) {
+      while (currentWeek.length < 7) {
+        currentWeek.push(null);
+      }
+      weeks.push({ days: currentWeek });
+    }
+
+    // Get all tasks with dates in this month
+    const allTasks = data.tasks.filter(t => {
+      if (t.completed) return false;
+      const startDate = t.startOn ? new Date(t.startOn) : null;
+      const endDate = t.dueOn ? new Date(t.dueOn) : null;
+      const taskDate = startDate || endDate;
+      if (!taskDate) return false;
+
+      // Check if task overlaps with this month
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0);
+
+      const taskStart = startDate || endDate!;
+      const taskEnd = endDate || startDate!;
+
+      return taskStart <= monthEnd && taskEnd >= monthStart;
+    });
+
+    return { weeks, allTasks };
+  }, [data, calendarMonth]);
+
+  // Calculate Gantt bars for each week
+  const getWeekTasks = (weekDays: (Date | null)[]) => {
+    if (!data) return [];
+
+    const weekStart = weekDays.find(d => d !== null);
+    const weekEnd = [...weekDays].reverse().find(d => d !== null);
+    if (!weekStart || !weekEnd) return [];
+
+    const tasks = calendarData.allTasks.filter(task => {
+      const taskStart = task.startOn ? new Date(task.startOn) : task.dueOn ? new Date(task.dueOn) : null;
+      const taskEnd = task.dueOn ? new Date(task.dueOn) : task.startOn ? new Date(task.startOn) : null;
+      if (!taskStart || !taskEnd) return false;
+
+      // Check if task overlaps with this week
+      return taskStart <= weekEnd && taskEnd >= weekStart;
+    });
+
+    // Calculate column positions for each task
+    return tasks.map(task => {
+      const taskStart = new Date(task.startOn || task.dueOn!);
+      const taskEnd = new Date(task.dueOn || task.startOn!);
+
+      // Find start column (0-6)
+      let startCol = 0;
+      for (let i = 0; i < 7; i++) {
+        const day = weekDays[i];
+        if (day && day.toDateString() === taskStart.toDateString()) {
+          startCol = i;
+          break;
+        } else if (day && taskStart < day) {
+          startCol = i;
+          break;
+        }
+      }
+
+      // Find end column (0-6)
+      let endCol = 6;
+      for (let i = 6; i >= 0; i--) {
+        const day = weekDays[i];
+        if (day && day.toDateString() === taskEnd.toDateString()) {
+          endCol = i;
+          break;
+        } else if (day && taskEnd < day) {
+          endCol = Math.max(0, i - 1);
+        }
+      }
+
+      // Clamp to week boundaries
+      if (taskStart < weekStart) startCol = 0;
+      if (taskEnd > weekEnd) endCol = 6;
+
+      const spanCols = Math.max(1, endCol - startCol + 1);
+
+      return { task, startCol, spanCols };
+    });
+  };
+
+  // Assign rows to avoid overlaps
+  const assignRows = (weekTasks: { task: AsanaTask; startCol: number; spanCols: number }[]) => {
+    const rows: { task: AsanaTask; startCol: number; spanCols: number; row: number }[] = [];
+    const occupied: number[][] = []; // occupied[row] = array of occupied columns
+
+    weekTasks.forEach(({ task, startCol, spanCols }) => {
+      // Find first available row
+      let row = 0;
+      while (true) {
+        if (!occupied[row]) occupied[row] = [];
+
+        // Check if this row has space
+        let hasSpace = true;
+        for (let col = startCol; col < startCol + spanCols; col++) {
+          if (occupied[row].includes(col)) {
+            hasSpace = false;
+            break;
+          }
+        }
+
+        if (hasSpace) {
+          // Mark columns as occupied
+          for (let col = startCol; col < startCol + spanCols; col++) {
+            occupied[row].push(col);
+          }
+          rows.push({ task, startCol, spanCols, row });
+          break;
+        }
+        row++;
+        if (row > 10) break; // Safety limit
       }
     });
 
-    return { days, tasksByDate };
-  }, [data, calendarMonth]);
+    return rows;
+  };
+
+  const handleTaskHover = (task: AsanaTask, e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoveredTask({
+      task,
+      position: { x: rect.left + rect.width / 2, y: rect.top }
+    });
+  };
+
+  const handleTaskLeave = () => {
+    setHoveredTask(null);
+  };
 
   if (loading || !data) {
     return <LoadingState />;
@@ -277,6 +568,10 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
       newMonth.setMonth(newMonth.getMonth() + (direction === 'next' ? 1 : -1));
       return newMonth;
     });
+  };
+
+  const jumpToToday = () => {
+    setCalendarMonth(new Date());
   };
 
   return (
@@ -330,11 +625,11 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: ASANA_COLORS.confirmed }} /> Confirmed</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: ASANA_COLORS.placeholder }} /> Placeholder</span>
           </div>
-          <span className="text-[11px] text-[#64748B]">{Object.values(groupedByDate).flat().length} tasks</span>
+          <span className="text-[11px] text-[#64748B]">{calendarData.allTasks.length} tasks</span>
         </div>
       </div>
 
-      {/* Calendar View */}
+      {/* Calendar View with Gantt Bars */}
       {viewMode === 'calendar' && (
         <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
           {/* Calendar Header */}
@@ -342,9 +637,22 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
             <button onClick={() => navigateMonth('prev')} className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <span className="font-semibold text-[#EAF2FF] text-[14px]">
-              {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-[#EAF2FF] text-[14px]">
+                {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </span>
+              {!isCurrentMonth && (
+                <button
+                  onClick={jumpToToday}
+                  className="text-[10px] px-2 py-1 rounded bg-[#E16259]/20 text-[#E16259] hover:bg-[#E16259]/30 transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Today
+                </button>
+              )}
+            </div>
             <button onClick={() => navigateMonth('next')} className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
@@ -359,49 +667,71 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
             ))}
           </div>
 
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7">
-            {calendarData.days.map((day, idx) => {
-              if (!day) {
-                return <div key={`empty-${idx}`} className="min-h-[100px] border-r border-b border-white/[0.04] bg-[#0F1722]/60" />;
-              }
+          {/* Calendar Weeks with Gantt Bars */}
+          {calendarData.weeks.map((week, weekIdx) => {
+            const weekTasks = getWeekTasks(week.days);
+            const tasksWithRows = assignRows(weekTasks);
+            const maxRow = Math.max(0, ...tasksWithRows.map(t => t.row));
+            const rowHeight = Math.max(140, 60 + (maxRow + 1) * 26);
 
-              const dateStr = day.toISOString().split('T')[0];
-              const dayTasks = calendarData.tasksByDate[dateStr] || [];
-              const isToday = new Date().toDateString() === day.toDateString();
-              const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+            return (
+              <div key={weekIdx} className="relative border-b border-white/[0.04]" style={{ minHeight: `${rowHeight}px` }}>
+                {/* Day cells grid */}
+                <div className="grid grid-cols-7 absolute inset-0">
+                  {week.days.map((day, dayIdx) => {
+                    if (!day) {
+                      return <div key={`empty-${weekIdx}-${dayIdx}`} className="border-r border-white/[0.04] bg-[#0F1722]/60" />;
+                    }
 
-              return (
-                <div key={dateStr} className={`min-h-[100px] border-r border-b border-white/[0.04] p-1.5 ${isToday ? 'bg-[#E16259]/5' : isPast ? 'bg-[#0F1722]/30' : 'bg-[#151F2E]'}`}>
-                  <div className={`text-[11px] font-medium mb-1 ${isToday ? 'text-[#E16259]' : isPast ? 'text-[#475569]' : 'text-[#8FA3BF]'}`}>
-                    {day.getDate()}
-                  </div>
-                  <div className="space-y-0.5 max-h-[70px] overflow-y-auto">
-                    {dayTasks.slice(0, 3).map(task => {
-                      const taskStatus = getTaskStatus(task);
-                      const bgColor = taskStatus === 'confirmed' ? ASANA_COLORS.confirmed :
-                                      taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : '#64748B';
-                      return (
-                        <div
-                          key={task.gid}
-                          className="text-[9px] px-1.5 py-0.5 rounded truncate text-white font-medium cursor-pointer hover:opacity-80 transition-opacity"
-                          style={{ backgroundColor: bgColor }}
-                          title={`${task.name}${task.assignee ? ` - ${task.assignee.name}` : ''}`}
-                        >
-                          {task.name}
+                    const isToday = new Date().toDateString() === day.toDateString();
+                    const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        className={`border-r border-white/[0.04] p-1.5 ${isToday ? 'bg-[#E16259]/10' : isPast ? 'bg-[#0F1722]/30' : 'bg-[#151F2E]'}`}
+                      >
+                        <div className={`flex items-center gap-1 ${isToday ? 'text-[#E16259]' : isPast ? 'text-[#475569]' : 'text-[#8FA3BF]'}`}>
+                          <span className={`text-[12px] font-semibold ${isToday ? 'bg-[#E16259] text-white w-6 h-6 rounded-full flex items-center justify-center' : ''}`}>
+                            {day.getDate()}
+                          </span>
+                          {isToday && (
+                            <span className="text-[9px] uppercase font-bold tracking-wider">Today</span>
+                          )}
                         </div>
-                      );
-                    })}
-                    {dayTasks.length > 3 && (
-                      <div className="text-[9px] text-[#64748B] pl-1">+{dayTasks.length - 3} more</div>
-                    )}
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Gantt bars overlay */}
+                {tasksWithRows.map(({ task, startCol, spanCols, row }) => (
+                  <GanttBar
+                    key={task.gid}
+                    task={task}
+                    startCol={startCol}
+                    spanCols={spanCols}
+                    row={row}
+                    onHover={handleTaskHover}
+                    onLeave={handleTaskLeave}
+                  />
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
+
+      {/* Tooltip */}
+      <AnimatePresence>
+        {hoveredTask && (
+          <TaskTooltip
+            task={hoveredTask.task}
+            position={hoveredTask.position}
+            onClose={handleTaskLeave}
+          />
+        )}
+      </AnimatePresence>
 
       {/* List View */}
       {viewMode === 'list' && (
