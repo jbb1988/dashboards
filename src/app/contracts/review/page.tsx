@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { supabase } from '@/lib/supabase';
 
 interface Contract {
   id: string;
@@ -205,19 +204,25 @@ export default function ContractReviewPage() {
         setOriginalDocxBuffer(base64);
       }
 
-      // Upload to Supabase Storage first (bypasses Vercel 4.5MB limit)
-      // Sanitize filename - remove special chars that Supabase doesn't allow
-      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const storagePath = `uploads/${Date.now()}-${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from('data-files')
-        .upload(storagePath, file, { upsert: true });
+      // Step 1: Get signed upload URL from our API (bypasses RLS)
+      const signedUrlRes = await fetch(`/api/storage/upload?filename=${encodeURIComponent(file.name)}`);
+      if (!signedUrlRes.ok) {
+        const errData = await signedUrlRes.json();
+        throw new Error(errData.error || 'Failed to get upload URL');
+      }
+      const { signedUrl, storagePath } = await signedUrlRes.json();
 
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
+      // Step 2: Upload directly to Supabase using signed URL (bypasses Vercel limit)
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload file to storage');
       }
 
-      // Now call API with storage path instead of file
+      // Step 3: Process the file via our API
       const response = await fetch('/api/contracts/review/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -232,8 +237,12 @@ export default function ContractReviewPage() {
       const data = await response.json();
       setExtractedText(data.text);
 
-      // Clean up uploaded file from storage after processing
-      await supabase.storage.from('data-files').remove([storagePath]);
+      // Step 4: Clean up uploaded file from storage
+      await fetch('/api/storage/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath }),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to extract text from file');
       setUploadedFile(null);
@@ -390,19 +399,25 @@ export default function ContractReviewPage() {
     setCompareResult(null);
 
     try {
-      // Upload to Supabase Storage first (bypasses Vercel 4.5MB limit)
-      // Sanitize filename - remove special chars that Supabase doesn't allow
-      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const storagePath = `uploads/${Date.now()}-${side}-${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from('data-files')
-        .upload(storagePath, file, { upsert: true });
+      // Step 1: Get signed upload URL from our API (bypasses RLS)
+      const signedUrlRes = await fetch(`/api/storage/upload?filename=${encodeURIComponent(file.name)}`);
+      if (!signedUrlRes.ok) {
+        const errData = await signedUrlRes.json();
+        throw new Error(errData.error || 'Failed to get upload URL');
+      }
+      const { signedUrl, storagePath } = await signedUrlRes.json();
 
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
+      // Step 2: Upload directly to Supabase using signed URL (bypasses Vercel limit)
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload file to storage');
       }
 
-      // Now call API with storage path instead of file
+      // Step 3: Process the file via our API
       const response = await fetch('/api/contracts/review/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -417,8 +432,12 @@ export default function ContractReviewPage() {
       const data = await response.json();
       setText(data.text);
 
-      // Clean up uploaded file from storage after processing
-      await supabase.storage.from('data-files').remove([storagePath]);
+      // Step 4: Clean up uploaded file from storage
+      await fetch('/api/storage/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath }),
+      });
     } catch (err) {
       setCompareError(err instanceof Error ? err.message : 'Failed to extract text from file');
       setFile(null);
