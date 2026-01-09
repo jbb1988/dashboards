@@ -428,6 +428,7 @@ function ContractRow({
   focusMode = false,
   pendingStatus,
   onPendingStatusChange,
+  openBundleModal,
 }: {
   contract: Contract;
   index: number;
@@ -435,6 +436,7 @@ function ContractRow({
   focusMode?: boolean;
   pendingStatus?: string;
   onPendingStatusChange?: (contractId: string, salesforceId: string | undefined, contractName: string, notionName: string | undefined, newStatus: string, originalStatus: string) => void;
+  openBundleModal?: (contract: Contract, mode: 'create' | 'add') => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -1050,7 +1052,7 @@ function ContractRow({
                           {contract.bundleInfo.contractCount}
                         </span>
                       </div>
-                    ) : (
+                    ) : openBundleModal ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1063,6 +1065,8 @@ function ContractRow({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                       </button>
+                    ) : (
+                      <span className="text-sm text-[#475569]">-</span>
                     )}
                   </div>
                 </div>
@@ -2594,6 +2598,7 @@ export default function ContractsDashboard() {
                         focusMode={focusMode}
                         pendingStatus={pendingChanges[contract.id]?.newStatus}
                         onPendingStatusChange={handlePendingStatusChange}
+                        openBundleModal={openBundleModal}
                       />
                     ))
                   ) : (

@@ -205,7 +205,10 @@ export async function GET() {
     // Transform to dashboard format with bundle info
     const dashboardContracts = activeContracts.map(contract => {
       const transformed = transformToDashboardFormat(contract);
-      transformed.bundleInfo = bundleMap.get(contract.id) || null;
+      const contractId = contract.id || contract.salesforce_id;
+      if (contractId) {
+        transformed.bundleInfo = bundleMap.get(contractId) || null;
+      }
       return transformed;
     });
 
