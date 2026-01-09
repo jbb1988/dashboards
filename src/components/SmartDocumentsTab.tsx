@@ -2,8 +2,61 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { KPICard, KPIIcons } from '@/components/KPICard';
 import { DocumentsProgressView, DocumentData, DocumentPreviewPanel } from '@/components/documents';
+import { KPICard, KPIIcons } from '@/components/KPICard';
+
+// ============================================================================
+// DESIGN TOKENS - Vercel-grade design system
+// ============================================================================
+const tokens = {
+  // Backgrounds (slate-based, not pure black)
+  bg: {
+    base: 'bg-[#0C0F14]',        // Page background - dark slate
+    panel: 'bg-[#13171F]',       // Card/panel background
+    panelHover: 'bg-[#1A1F2A]',  // Panel hover state
+    elevated: 'bg-[#1A1F2A]',    // Elevated surfaces
+    input: 'bg-[#0C0F14]',       // Input backgrounds
+  },
+  // Borders
+  border: {
+    subtle: 'border-[#1E242F]',  // Subtle borders
+    default: 'border-[#262D3A]', // Default borders
+    focus: 'border-[#3B82F6]',   // Focus state
+  },
+  // Text colors
+  text: {
+    primary: 'text-[#F1F5F9]',   // Primary text - near white
+    secondary: 'text-[#94A3B8]', // Secondary - visible gray
+    muted: 'text-[#64748B]',     // Muted text
+    accent: 'text-[#3B82F6]',    // Accent color
+  },
+  // Status colors (reserved usage)
+  status: {
+    danger: { dot: 'bg-red-500', text: 'text-red-400', bg: 'bg-red-500/10' },
+    warning: { dot: 'bg-amber-500', text: 'text-amber-400', bg: 'bg-amber-500/10' },
+    info: { dot: 'bg-blue-500', text: 'text-blue-400', bg: 'bg-blue-500/10' },
+    success: { dot: 'bg-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  },
+  // Spacing
+  spacing: {
+    container: 'px-8 py-6',      // Global container
+    card: 'p-5',                 // Card padding
+    section: 'space-y-6',        // Section gaps
+  },
+  // Radius
+  radius: {
+    container: 'rounded-2xl',    // Containers: 16px
+    card: 'rounded-xl',          // Cards: 12px
+    control: 'rounded-lg',       // Controls: 8px
+    pill: 'rounded-full',        // Pills
+  },
+  // Shadows
+  shadow: {
+    sm: 'shadow-sm shadow-black/20',
+    md: 'shadow-md shadow-black/30',
+    lg: 'shadow-lg shadow-black/40',
+  },
+};
 
 // Types
 interface Document {
@@ -340,25 +393,25 @@ function AccountSection({
   const highPriorityCount = contractList.filter(c => c.priority.category === 'critical' || c.priority.category === 'high').length;
 
   return (
-    <div className="bg-[#111827] rounded-xl border border-white/[0.04] overflow-hidden">
+    <div className={`${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle} overflow-hidden`}>
       {/* Account Header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors"
+        className={`w-full flex items-center justify-between p-4 hover:${tokens.bg.elevated} transition-colors`}
       >
         <div className="flex items-center gap-3">
           <motion.div
             animate={{ rotate: isExpanded ? 90 : 0 }}
             transition={{ duration: 0.2 }}
-            className="text-[#64748B]"
+            className={tokens.text.muted}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </motion.div>
           <div className="text-left">
-            <h3 className="text-white font-medium">{accountName}</h3>
-            <p className="text-[#64748B] text-sm">
+            <h3 className={`${tokens.text.primary} font-semibold`}>{accountName}</h3>
+            <p className={`${tokens.text.muted} text-sm`}>
               {contractList.length} contract{contractList.length !== 1 ? 's' : ''} &bull; {totalDocs} documents
             </p>
           </div>
@@ -366,18 +419,18 @@ function AccountSection({
 
         <div className="flex items-center gap-4">
           {highPriorityCount > 0 && (
-            <span className="px-2 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded-full">
+            <span className={`px-2.5 py-1 ${tokens.status.danger.bg} ${tokens.status.danger.text} text-xs font-medium rounded-md`}>
               {highPriorityCount} need attention
             </span>
           )}
           <div className="flex items-center gap-2">
-            <div className="w-24 h-2 bg-[#151F2E] rounded-full overflow-hidden">
+            <div className={`w-24 h-1.5 ${tokens.bg.input} rounded-full overflow-hidden`}>
               <div
-                className="h-full bg-gradient-to-r from-[#38BDF8] to-[#22C55E] transition-all"
+                className="h-full bg-[#3B82F6] transition-all rounded-full"
                 style={{ width: `${avgCompleteness}%` }}
               />
             </div>
-            <span className="text-[#64748B] text-sm w-10">{avgCompleteness}%</span>
+            <span className={`${tokens.text.muted} text-sm tabular-nums w-10`}>{avgCompleteness}%</span>
           </div>
         </div>
       </button>
@@ -392,7 +445,7 @@ function AccountSection({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-white/[0.04]">
+            <div className={`border-t ${tokens.border.subtle}`}>
               {contractList
                 .sort((a, b) => b.priority.score - a.priority.score)
                 .map((contract) => (
@@ -492,17 +545,17 @@ function ContractCard({
   }[contract.priority.category];
 
   return (
-    <div className="border-b border-white/[0.04] last:border-0">
+    <div className={`border-b ${tokens.border.subtle} last:border-0`}>
       {/* Contract Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 pl-8 hover:bg-white/[0.02] transition-colors"
+        className={`w-full flex items-center justify-between p-4 pl-8 hover:${tokens.bg.elevated} transition-colors`}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <motion.div
             animate={{ rotate: isExpanded ? 90 : 0 }}
             transition={{ duration: 0.2 }}
-            className="text-[#64748B] flex-shrink-0"
+            className={`${tokens.text.muted} flex-shrink-0`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -514,24 +567,24 @@ function ContractCard({
 
           <div className="text-left flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-white font-medium truncate">{contract.contractName}</h4>
+              <h4 className={`${tokens.text.primary} font-medium truncate`}>{contract.contractName}</h4>
               {/* Contract Type Tags - subtle */}
               {contractTypes.map((type) => (
                 <span
                   key={type}
-                  className="px-2 py-0.5 bg-[#1E293B] text-[#94A3B8] text-xs rounded"
+                  className={`px-2 py-0.5 ${tokens.bg.elevated} ${tokens.text.secondary} text-xs ${tokens.radius.control}`}
                 >
                   {type}
                 </span>
               ))}
               {bundleInfo && (
-                <span className="px-2 py-0.5 bg-[#1E293B] text-[#94A3B8] text-xs rounded">
+                <span className={`px-2 py-0.5 ${tokens.bg.elevated} ${tokens.text.secondary} text-xs ${tokens.radius.control}`}>
                   Bundled
                 </span>
               )}
             </div>
             {contract.priority.reasons.length > 0 && (
-              <p className="text-[#64748B] text-sm truncate">
+              <p className={`${tokens.text.muted} text-sm truncate`}>
                 {contract.priority.reasons[0]}
               </p>
             )}
@@ -540,10 +593,10 @@ function ContractCard({
 
         <div className="flex items-center gap-3 flex-shrink-0 ml-4">
           {/* Completeness */}
-          <span className="text-[#64748B] text-sm">
+          <span className={`${tokens.text.muted} text-sm tabular-nums`}>
             {contract.completeness.required}/4
           </span>
-          <div className="w-16 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
+          <div className={`w-16 h-1.5 ${tokens.bg.input} rounded-full overflow-hidden`}>
             <div
               className="h-full bg-[#3B82F6] rounded-full transition-all"
               style={{ width: `${contract.completeness.percentage}%` }}
@@ -644,23 +697,23 @@ function PriorityCard({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-[#111827] rounded-lg border border-white/[0.06] overflow-hidden"
+      className={`${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle} overflow-hidden`}
     >
       {/* Card Header - Clickable to expand */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 text-left hover:bg-white/[0.02] transition-colors"
+        className={`w-full p-4 text-left hover:${tokens.bg.elevated} transition-colors`}
       >
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             {/* Contract Name with Priority Dot */}
             <div className="flex items-center gap-2 mb-1">
               <span className={`w-2 h-2 rounded-full ${priorityDotColor} flex-shrink-0`} />
-              <h3 className="text-white font-medium truncate">{contract.contractName}</h3>
+              <h3 className={`${tokens.text.primary} font-semibold truncate`}>{contract.contractName}</h3>
             </div>
 
             {/* Account Name */}
-            <p className="text-[#64748B] text-sm mb-2 pl-4">{accountName}</p>
+            <p className={`${tokens.text.muted} text-sm mb-2 pl-4`}>{accountName}</p>
 
             {/* Contract Types - subtle tags */}
             {contractTypes.length > 0 && (
@@ -668,7 +721,7 @@ function PriorityCard({
                 {contractTypes.map((type) => (
                   <span
                     key={type}
-                    className="px-2 py-0.5 bg-[#1E293B] text-[#94A3B8] text-xs rounded"
+                    className={`px-2 py-0.5 ${tokens.bg.elevated} ${tokens.text.secondary} text-xs ${tokens.radius.control}`}
                   >
                     {type}
                   </span>
@@ -679,10 +732,10 @@ function PriorityCard({
 
           {/* Right side - Completeness */}
           <div className="text-right flex-shrink-0 ml-4">
-            <div className="text-[#64748B] text-sm">
+            <div className={`${tokens.text.muted} text-sm tabular-nums`}>
               {contract.completeness.required}/4 docs
             </div>
-            <div className="w-20 h-1.5 bg-[#1E293B] rounded-full mt-1 overflow-hidden">
+            <div className={`w-20 h-1.5 ${tokens.bg.input} rounded-full mt-1 overflow-hidden`}>
               <div
                 className="h-full bg-[#3B82F6] rounded-full transition-all"
                 style={{ width: `${contract.completeness.percentage}%` }}
@@ -693,14 +746,14 @@ function PriorityCard({
 
         {/* Due date / Status - Clean single line */}
         {contract.priority.reasons.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-white/[0.04] pl-4">
-            <span className="text-[#64748B] text-sm">{contract.priority.reasons[0]}</span>
+          <div className={`mt-3 pt-3 border-t ${tokens.border.subtle} pl-4`}>
+            <span className={`${tokens.text.muted} text-sm`}>{contract.priority.reasons[0]}</span>
           </div>
         )}
 
         {/* Expand indicator */}
-        <div className="flex items-center justify-center mt-3 pt-3 border-t border-white/[0.04]">
-          <div className="flex items-center gap-2 text-[#64748B] text-sm hover:text-white transition-colors">
+        <div className={`flex items-center justify-center mt-3 pt-3 border-t ${tokens.border.subtle}`}>
+          <div className={`flex items-center gap-2 ${tokens.text.muted} text-sm hover:${tokens.text.primary} transition-colors`}>
             <motion.svg
               animate={{ rotate: isExpanded ? 180 : 0 }}
               transition={{ duration: 0.2 }}
@@ -726,7 +779,7 @@ function PriorityCard({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 border-t border-white/[0.04]">
+            <div className={`px-4 pb-4 border-t ${tokens.border.subtle}`}>
               <DocumentsProgressView
                 contractId={contract.contractId}
                 contractName={contract.contractName}
@@ -738,7 +791,7 @@ function PriorityCard({
 
             {/* Actions */}
             <div className="flex items-center gap-2 px-4 pb-4">
-              <button className="flex-1 px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-white text-sm rounded-lg transition-colors">
+              <button className={`flex-1 px-3 py-2 ${tokens.bg.elevated} hover:bg-[#262D3A] ${tokens.text.primary} text-sm ${tokens.radius.control} transition-colors`}>
                 View Contract
               </button>
               {salesforceId && (
@@ -746,7 +799,7 @@ function PriorityCard({
                   href={`https://marscompany.lightning.force.com/lightning/r/Opportunity/${salesforceId}/view`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#38BDF8] hover:text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+                  className={`px-3 py-2 ${tokens.bg.elevated} hover:bg-[#262D3A] ${tokens.text.accent} hover:${tokens.text.primary} text-sm ${tokens.radius.control} transition-colors flex items-center gap-1`}
                   title="Open in Salesforce"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -775,10 +828,10 @@ function FilterChip({
   onRemove: () => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#38BDF8]/10 text-[#38BDF8] text-xs rounded-full">
-      <span className="font-medium">{label}:</span>
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#3B82F6]/10 text-[#3B82F6] text-xs font-medium rounded-md border border-[#3B82F6]/20">
+      <span className="text-[#94A3B8]">{label}:</span>
       <span>{value}</span>
-      <button onClick={onRemove} className="ml-1 hover:text-white">
+      <button onClick={onRemove} className="ml-0.5 p-0.5 hover:bg-[#3B82F6]/20 rounded transition-colors">
         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
@@ -1047,7 +1100,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-[#38BDF8] border-t-transparent rounded-full animate-spin" />
+        <div className={`w-8 h-8 border-2 ${tokens.border.focus} border-t-transparent rounded-full animate-spin`} />
       </div>
     );
   }
@@ -1069,9 +1122,9 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
   };
 
   return (
-    <div className="space-y-6">
-      {/* Interactive KPI Cards */}
-      <div className="grid grid-cols-5 gap-4">
+    <div className={`${tokens.spacing.section}`}>
+      {/* KPI Strip - 5 tiles in a clean row */}
+      <div className="grid grid-cols-5 gap-3">
         <KPICard
           title="Total Documents"
           value={data?.stats.totalDocuments || 0}
@@ -1129,21 +1182,33 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         />
       </div>
 
-      {/* Smart View Tabs */}
-      <div className="flex items-center gap-2 p-1 bg-[#0B1220] rounded-xl">
-        {SMART_VIEWS.map((view) => (
+      {/* Segmented Control Tabs */}
+      <div className={`flex items-center p-1 ${tokens.bg.panel} ${tokens.radius.control} border ${tokens.border.subtle}`}>
+        {SMART_VIEWS.map((view, index) => (
           <button
             key={view.id}
             onClick={() => setActiveView(view.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
+            className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
+              index === 0 ? 'rounded-l-md' : index === SMART_VIEWS.length - 1 ? 'rounded-r-md' : ''
+            } ${
               activeView === view.id
-                ? 'bg-[#38BDF8]/10 text-[#38BDF8]'
-                : 'text-[#64748B] hover:text-white hover:bg-white/[0.04]'
+                ? `${tokens.bg.elevated} ${tokens.text.primary} shadow-sm`
+                : `${tokens.text.muted} hover:${tokens.text.secondary}`
             }`}
           >
+            {/* Active indicator bar */}
+            {activeView === view.id && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute inset-0 bg-[#1A1F2A] rounded-md -z-10"
+                transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+              />
+            )}
             {view.id === 'needs_attention' && (
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-                activeView === view.id ? 'bg-red-500 text-white' : 'bg-red-500/20 text-red-400'
+              <span className={`min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-xs font-semibold ${
+                activeView === view.id
+                  ? 'bg-red-500 text-white'
+                  : 'bg-red-500/20 text-red-400'
               }`}>
                 {data?.stats.needsAttention || 0}
               </span>
@@ -1153,12 +1218,12 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         ))}
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex items-center gap-4">
+      {/* Search and Filters Row */}
+      <div className="flex items-center gap-3">
         {/* Search */}
         <div className="flex-1 relative">
           <svg
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#64748B]"
+            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${tokens.text.muted}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -1170,37 +1235,42 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
             placeholder="Search accounts, contracts, or documents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[#0B1220] border border-white/[0.08] rounded-lg text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
+            className={`w-full pl-10 pr-4 py-2.5 ${tokens.bg.input} border ${tokens.border.default} ${tokens.radius.control} ${tokens.text.primary} placeholder-[#64748B] text-sm focus:outline-none focus:${tokens.border.focus} transition-colors`}
           />
         </div>
 
-        {/* Document Type Filter */}
-        <select
-          value={filters.documentType || ''}
-          onChange={(e) => setFilters(f => ({ ...f, documentType: e.target.value || null }))}
-          className="px-3 py-2 bg-[#0B1220] border border-white/[0.08] rounded-lg text-white text-sm"
-        >
-          <option value="">All Types</option>
-          {DOCUMENT_TYPES.map(type => (
-            <option key={type} value={type}>{type}</option>
-          ))}
-        </select>
+        {/* Filter Controls Group */}
+        <div className={`flex items-center gap-1 p-1 ${tokens.bg.panel} ${tokens.radius.control} border ${tokens.border.subtle}`}>
+          {/* Document Type Filter */}
+          <select
+            value={filters.documentType || ''}
+            onChange={(e) => setFilters(f => ({ ...f, documentType: e.target.value || null }))}
+            className={`px-3 py-2 ${tokens.bg.panel} ${tokens.text.secondary} text-sm ${tokens.radius.control} border-0 focus:outline-none cursor-pointer hover:${tokens.text.primary} transition-colors`}
+          >
+            <option value="">All Types</option>
+            {DOCUMENT_TYPES.map(type => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
 
-        {/* Sort Controls */}
-        <div className="flex items-center gap-2">
+          <div className="w-px h-6 bg-[#262D3A]" />
+
+          {/* Sort Dropdown */}
           <select
             value={sortField}
             onChange={(e) => setSortField(e.target.value as SortField)}
-            className="px-3 py-2 bg-[#0B1220] border border-white/[0.08] rounded-lg text-white text-sm"
+            className={`px-3 py-2 ${tokens.bg.panel} ${tokens.text.secondary} text-sm ${tokens.radius.control} border-0 focus:outline-none cursor-pointer hover:${tokens.text.primary} transition-colors`}
           >
-            <option value="priority">Sort: Priority</option>
-            <option value="name">Sort: Name</option>
-            <option value="completeness">Sort: Completeness</option>
-            <option value="date">Sort: Date</option>
+            <option value="priority">Priority</option>
+            <option value="name">Name</option>
+            <option value="completeness">Completion</option>
+            <option value="date">Date</option>
           </select>
+
+          {/* Sort Direction Toggle */}
           <button
             onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
-            className="p-2 bg-[#0B1220] border border-white/[0.08] rounded-lg text-[#64748B] hover:text-white transition-colors"
+            className={`p-2 ${tokens.text.muted} hover:${tokens.text.primary} ${tokens.radius.control} hover:${tokens.bg.elevated} transition-colors`}
             title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
           >
             {sortDirection === 'asc' ? (
@@ -1215,12 +1285,15 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           </button>
         </div>
 
-        {/* Save View */}
+        {/* Save View Button */}
         <button
           onClick={saveCurrentView}
-          className="px-3 py-2 bg-[#0B1220] border border-white/[0.08] rounded-lg text-[#64748B] hover:text-white text-sm transition-colors"
+          className={`px-3 py-2.5 ${tokens.bg.panel} border ${tokens.border.subtle} ${tokens.radius.control} ${tokens.text.muted} hover:${tokens.text.primary} text-sm font-medium transition-colors flex items-center gap-2`}
         >
-          Save View
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+          </svg>
+          Save
         </button>
       </div>
 
@@ -1244,7 +1317,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           ))}
           <button
             onClick={clearFilters}
-            className="text-[#64748B] hover:text-white text-xs"
+            className={`${tokens.text.muted} hover:${tokens.text.primary} text-xs font-medium transition-colors`}
           >
             Clear all
           </button>
@@ -1256,17 +1329,17 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'needs_attention' && (
           <>
             {filteredData.priorityContracts.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 bg-green-500/10 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className={`text-center py-16 ${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle}`}>
+                <div className={`w-14 h-14 mx-auto mb-4 ${tokens.status.success.bg} rounded-xl flex items-center justify-center`}>
+                  <svg className={`w-7 h-7 ${tokens.status.success.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className="text-white text-lg font-medium mb-1">All caught up!</h3>
-                <p className="text-[#64748B]">No contracts need immediate attention</p>
+                <h3 className={`${tokens.text.primary} text-lg font-semibold mb-1`}>All caught up!</h3>
+                <p className={`${tokens.text.muted} text-sm`}>No contracts need immediate attention</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 {filteredData.priorityContracts.map((contract) => (
                   <PriorityCard
                     key={contract.contractId}
@@ -1286,17 +1359,17 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'closing_soon' && (
           <>
             {filteredData.closingSoonContracts?.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 bg-[#38BDF8]/10 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-[#38BDF8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className={`text-center py-16 ${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle}`}>
+                <div className={`w-14 h-14 mx-auto mb-4 ${tokens.status.info.bg} rounded-xl flex items-center justify-center`}>
+                  <svg className={`w-7 h-7 ${tokens.status.info.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <h3 className="text-white text-lg font-medium mb-1">No upcoming deadlines</h3>
-                <p className="text-[#64748B]">No contracts closing in the next 90 days</p>
+                <h3 className={`${tokens.text.primary} text-lg font-semibold mb-1`}>No upcoming deadlines</h3>
+                <p className={`${tokens.text.muted} text-sm`}>No contracts closing in the next 90 days</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 {filteredData.closingSoonContracts?.map((contract) => (
                   <PriorityCard
                     key={contract.contractId}
@@ -1316,17 +1389,17 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'budgeted' && (
           <>
             {filteredData.budgetedContracts?.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 bg-[#8B5CF6]/10 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className={`text-center py-16 ${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle}`}>
+                <div className="w-14 h-14 mx-auto mb-4 bg-[#8B5CF6]/10 rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-white text-lg font-medium mb-1">No budgeted contracts</h3>
-                <p className="text-[#64748B]">No contracts are marked as budgeted/forecasted</p>
+                <h3 className={`${tokens.text.primary} text-lg font-semibold mb-1`}>No budgeted contracts</h3>
+                <p className={`${tokens.text.muted} text-sm`}>No contracts are marked as budgeted/forecasted</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 {filteredData.budgetedContracts?.map((contract) => (
                   <PriorityCard
                     key={contract.contractId}
@@ -1344,25 +1417,25 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         )}
 
         {activeView === 'by_account' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Expand/Collapse All Buttons */}
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={expandAll}
-                className="px-3 py-1.5 text-sm text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.panel} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
               >
                 Expand All
               </button>
               <button
                 onClick={collapseAll}
-                className="px-3 py-1.5 text-sm text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.panel} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
               >
                 Collapse All
               </button>
             </div>
             {filteredData.accounts.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-[#64748B]">No accounts found</p>
+              <div className={`text-center py-16 ${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle}`}>
+                <p className={tokens.text.muted}>No accounts found</p>
               </div>
             ) : (
               filteredData.accounts.map(([accountName, account]) => (
@@ -1383,13 +1456,13 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         )}
 
         {activeView === 'recent' && (
-          <div className="bg-[#111827] rounded-xl border border-white/[0.04]">
+          <div className={`${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle} overflow-hidden`}>
             {filteredData.recentDocs.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-[#64748B]">No documents uploaded in the last 7 days</p>
+              <div className="text-center py-16">
+                <p className={tokens.text.muted}>No documents uploaded in the last 7 days</p>
               </div>
             ) : (
-              <div className="divide-y divide-white/[0.04]">
+              <div className={`divide-y ${tokens.border.subtle}`}>
                 {filteredData.recentDocs.map((doc) => (
                   <button
                     key={doc.id}
@@ -1402,27 +1475,27 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
                       uploaded_at: doc.uploaded_at,
                       uploaded_by: doc.uploaded_by || undefined,
                     })}
-                    className="w-full flex items-center justify-between p-4 hover:bg-white/[0.04] transition-colors text-left"
+                    className={`w-full flex items-center justify-between p-4 hover:${tokens.bg.elevated} transition-colors text-left`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#38BDF8]/10 rounded-lg flex items-center justify-center">
-                        <svg className="w-5 h-5 text-[#38BDF8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className={`w-10 h-10 ${tokens.status.info.bg} ${tokens.radius.control} flex items-center justify-center`}>
+                        <svg className={`w-5 h-5 ${tokens.status.info.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
                       <div>
-                        <p className="text-white font-medium">{doc.file_name}</p>
-                        <p className="text-[#64748B] text-sm">
+                        <p className={`${tokens.text.primary} font-medium`}>{doc.file_name}</p>
+                        <p className={`${tokens.text.muted} text-sm`}>
                           {doc.account_name} &bull; {doc.document_type}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-[#64748B] text-sm">{formatRelativeTime(doc.uploaded_at)}</p>
-                        <p className="text-[#64748B] text-xs">{formatFileSize(doc.file_size)}</p>
+                        <p className={`${tokens.text.muted} text-sm`}>{formatRelativeTime(doc.uploaded_at)}</p>
+                        <p className={`${tokens.text.muted} text-xs`}>{formatFileSize(doc.file_size)}</p>
                       </div>
-                      <span className="px-3 py-1.5 text-xs font-medium text-[#8B5CF6] bg-[#8B5CF6]/10 border border-[#8B5CF6]/30 rounded-lg">
+                      <span className={`px-3 py-1.5 text-xs font-medium ${tokens.text.accent} bg-[#3B82F6]/10 border border-[#3B82F6]/20 ${tokens.radius.control}`}>
                         View
                       </span>
                     </div>
@@ -1434,18 +1507,18 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         )}
 
         {activeView === 'all' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Expand/Collapse All Buttons */}
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={expandAll}
-                className="px-3 py-1.5 text-sm text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.panel} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
               >
                 Expand All
               </button>
               <button
                 onClick={collapseAll}
-                className="px-3 py-1.5 text-sm text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+                className={`px-3 py-1.5 text-sm ${tokens.text.secondary} hover:${tokens.text.primary} ${tokens.bg.panel} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
               >
                 Collapse All
               </button>
@@ -1469,9 +1542,9 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
 
       {/* Saved Views Sidebar (if any) */}
       {savedViews.length > 0 && (
-        <div className="fixed bottom-4 right-4">
-          <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-3 shadow-xl">
-            <p className="text-[#64748B] text-xs mb-2">Saved Views</p>
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className={`${tokens.bg.panel} ${tokens.radius.card} border ${tokens.border.subtle} p-3 ${tokens.shadow.lg}`}>
+            <p className={`${tokens.text.muted} text-xs font-medium mb-2`}>Saved Views</p>
             <div className="space-y-1">
               {savedViews.map((view) => (
                 <button
@@ -1484,7 +1557,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
                       accountName: view.filters.accountName || null,
                     });
                   }}
-                  className="block w-full text-left px-2 py-1 text-sm text-white hover:bg-white/[0.04] rounded"
+                  className={`block w-full text-left px-2.5 py-1.5 text-sm ${tokens.text.primary} hover:${tokens.bg.elevated} ${tokens.radius.control} transition-colors`}
                 >
                   {view.name}
                 </button>
