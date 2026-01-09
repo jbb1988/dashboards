@@ -89,13 +89,6 @@ CRITICAL RULES:
 /**
  * Use AI to intelligently compare two contract versions
  */
-// Truncate text to fit within context limits (roughly 100k tokens = ~400k chars)
-function truncateForAI(text: string, maxChars: number = 150000): string {
-  if (text.length <= maxChars) return text;
-  console.log(`[AI COMPARE] Truncating text from ${text.length} to ${maxChars} chars`);
-  return text.substring(0, maxChars) + '\n\n[... Document truncated for processing ...]';
-}
-
 async function aiCompareContracts(originalText: string, revisedText: string): Promise<{
   documentInfo: {
     originalTitle: string;
@@ -122,14 +115,10 @@ async function aiCompareContracts(originalText: string, revisedText: string): Pr
   addedSections: string[];
   removedSections: string[];
 }> {
-  // Truncate if needed to fit context window
-  const truncatedOriginal = truncateForAI(originalText, 120000);
-  const truncatedRevised = truncateForAI(revisedText, 120000);
-
-  const fullPrompt = CONTRACT_COMPARE_PROMPT + truncatedOriginal + '\n\n===== REVISED DOCUMENT =====\n' + truncatedRevised;
+  const fullPrompt = CONTRACT_COMPARE_PROMPT + originalText + '\n\n===== REVISED DOCUMENT =====\n' + revisedText;
 
   console.log('[AI COMPARE] Starting AI contract comparison...');
-  console.log(`[AI COMPARE] Original: ${truncatedOriginal.length} chars, Revised: ${truncatedRevised.length} chars`);
+  console.log(`[AI COMPARE] Original: ${originalText.length} chars, Revised: ${revisedText.length} chars`);
   console.log(`[AI COMPARE] Total prompt length: ${fullPrompt.length} chars`);
   const startTime = Date.now();
 
@@ -149,7 +138,7 @@ async function aiCompareContracts(originalText: string, revisedText: string): Pr
           content: fullPrompt,
         },
       ],
-      max_tokens: 8000,
+      max_tokens: 16000,
       temperature: 0.1,
     }),
   });
@@ -157,11 +146,32 @@ async function aiCompareContracts(originalText: string, revisedText: string): Pr
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[AI COMPARE] OpenRouter error:', errorText);
-    throw new Error(`AI comparison failed: ${response.status}`);
+
+    // Parse error for better message
+    try {
+      const errorJson = JSON.parse(errorText);
+      const errorMsg = errorJson.error?.message || errorJson.message || `Status ${response.status}`;
+      throw new Error(`AI service error: ${errorMsg}`);
+    } catch {
+      throw new Error(`AI comparison failed: ${response.status}`);
+    }
   }
 
   const aiResponse = await response.json();
+
+  // Check for errors in the response
+  if (aiResponse.error) {
+    console.error('[AI COMPARE] API returned error:', aiResponse.error);
+    throw new Error(aiResponse.error.message || 'AI service returned an error');
+  }
+
   const content = aiResponse.choices?.[0]?.message?.content || '';
+
+  // Check if AI returned an error message instead of JSON
+  if (content.toLowerCase().startsWith('an error') || content.toLowerCase().startsWith('i apologize') || content.toLowerCase().startsWith('i cannot')) {
+    console.error('[AI COMPARE] AI returned error message:', content.substring(0, 200));
+    throw new Error('AI could not process the documents. Please try again.');
+  }
 
   console.log(`[AI COMPARE] Completed in ${(Date.now() - startTime) / 1000}s`);
   console.log(`[AI COMPARE] Response length: ${content.length} chars`);

@@ -1095,6 +1095,7 @@ function ContractRow({
                 value={editedContractDate}
                 onChange={e => setEditedContractDate(e.target.value)}
                 className="w-full px-2 py-1 rounded bg-[#1E293B] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8]"
+                style={{ colorScheme: 'dark' }}
               />
             ) : (
               <span className="text-[13px] text-[#8FA3BF]">
@@ -1246,6 +1247,7 @@ function ContractRow({
                             value={quickTaskDueDate}
                             onChange={e => setQuickTaskDueDate(e.target.value)}
                             className="flex-1 px-2 py-1.5 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8]"
+                            style={{ colorScheme: 'dark' }}
                           />
                           <button
                             onClick={handleQuickAddTask}
@@ -1438,6 +1440,7 @@ function ContractRow({
                             value={newTaskDueDate}
                             onChange={e => setNewTaskDueDate(e.target.value)}
                             className="w-full px-2 py-1.5 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8]"
+                            style={{ colorScheme: 'dark' }}
                           />
                         </div>
                         <button
@@ -3315,6 +3318,7 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                 value={newTask.dueDate}
                 onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                 className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm"
+                style={{ colorScheme: 'dark' }}
               />
               <select
                 value={newTask.priority}
@@ -3352,7 +3356,7 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Due Date</label>
-                    <input type="date" value={editingTask.dueDate || ''} onChange={(e) => setEditingTask({ ...editingTask, dueDate: e.target.value })} className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm" />
+                    <input type="date" value={editingTask.dueDate || ''} onChange={(e) => setEditingTask({ ...editingTask, dueDate: e.target.value })} className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm" style={{ colorScheme: 'dark' }} />
                   </div>
                   <div>
                     <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Status</label>
