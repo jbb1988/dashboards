@@ -1661,54 +1661,80 @@ export default function ContractsDashboard() {
     setIsSavingBatch(true);
     setBatchSaveProgress({ current: 0, total: changes.length });
 
-    const results: { success: boolean; contractName: string; error?: string }[] = [];
+    const results: { success: boolean; contractId: string; contractName: string; error?: string }[] = [];
 
     for (let i = 0; i < changes.length; i++) {
       const change = changes[i];
       setBatchSaveProgress({ current: i + 1, total: changes.length });
+
+      // Use salesforceId if available, otherwise fall back to contractId
+      const idToUse = change.salesforceId || change.contractId;
+      console.log(`[BATCH SAVE] Saving ${change.contractName} (${idToUse}) -> ${change.newStatus}`);
 
       try {
         const response = await fetch('/api/contracts/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            salesforceId: change.salesforceId || change.contractId,
+            salesforceId: idToUse,
             contractName: change.notionName || change.contractName,
             updates: { status: change.newStatus },
           }),
         });
 
         const result = await response.json();
+        console.log(`[BATCH SAVE] ${change.contractName}: ${response.ok ? 'SUCCESS' : 'FAILED'} - ${JSON.stringify(result)}`);
+
         results.push({
           success: response.ok,
+          contractId: change.contractId,
           contractName: change.contractName,
-          error: response.ok ? undefined : result.error
+          error: response.ok ? undefined : (result.error || result.details || 'Unknown error')
         });
       } catch (err) {
+        console.error(`[BATCH SAVE] ${change.contractName}: Network error`, err);
         results.push({
           success: false,
+          contractId: change.contractId,
           contractName: change.contractName,
-          error: 'Network error'
+          error: err instanceof Error ? err.message : 'Network error'
         });
       }
     }
 
-    // Clear pending changes and refresh data
-    setPendingChanges({});
     setIsSavingBatch(false);
     setBatchSaveProgress(null);
 
     // Show summary
-    const succeeded = results.filter(r => r.success).length;
+    const succeeded = results.filter(r => r.success);
     const failed = results.filter(r => !r.success);
 
-    if (failed.length > 0) {
-      const failedNames = failed.map(f => `${f.contractName}: ${f.error}`).join('\n');
-      alert(`Saved ${succeeded}/${results.length} contracts.\n\nFailed:\n${failedNames}`);
+    // Only clear changes that succeeded - keep failed ones for retry
+    if (succeeded.length > 0) {
+      setPendingChanges(prev => {
+        const updated = { ...prev };
+        succeeded.forEach(r => {
+          delete updated[r.contractId];
+        });
+        return updated;
+      });
+      // Refresh data only if some succeeded
+      fetchData();
     }
 
-    // Refresh data
-    fetchData();
+    // Show appropriate message
+    if (failed.length > 0 && succeeded.length === 0) {
+      // All failed
+      const failedNames = failed.map(f => `• ${f.contractName}: ${f.error}`).join('\n');
+      alert(`Failed to save all ${failed.length} changes:\n\n${failedNames}\n\nYour changes are preserved - try again or contact support.`);
+    } else if (failed.length > 0) {
+      // Some failed
+      const failedNames = failed.map(f => `• ${f.contractName}: ${f.error}`).join('\n');
+      alert(`Saved ${succeeded.length}/${results.length} contracts.\n\nFailed (still pending):\n${failedNames}`);
+    } else if (succeeded.length > 0) {
+      // All succeeded - no alert needed, just refresh
+      console.log(`[BATCH SAVE] All ${succeeded.length} contracts saved successfully`);
+    }
   }, [pendingChanges]);
 
   // Fetch task stats for KPI display
