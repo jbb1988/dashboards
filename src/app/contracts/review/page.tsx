@@ -661,40 +661,48 @@ export default function ContractReviewPage() {
                       Word Track Changes Workflow
                     </h4>
 
-                    {/* Download Revised Button - Primary Action */}
+                    {/* Download Both Documents Button - PRIMARY */}
                     <button
-                      onClick={handleDownloadRevised}
-                      disabled={isGeneratingDocx}
+                      onClick={handleDownloadBothForCompare}
+                      disabled={isGeneratingDocx || isGeneratingOriginal}
                       className="w-full py-3 bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-3"
                     >
-                      {isGeneratingDocx ? (
+                      {(isGeneratingDocx || isGeneratingOriginal) ? (
                         <>
                           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Generating...
+                          Generating Documents...
                         </>
                       ) : (
                         <>
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
-                          Download Revised DOCX
+                          Download Both for Word Compare
                         </>
                       )}
                     </button>
 
-                    {/* Instructions */}
+                    {/* Instructions - UPDATED */}
                     <div className="text-sm text-[#8FA3BF] space-y-1.5">
                       <p className="font-medium text-white">To get Track Changes in Word:</p>
                       <ol className="list-decimal list-inside space-y-1.5 ml-2">
                         <li><span className="text-white">Review</span> → <span className="text-white">Compare</span> → <span className="text-white">Compare Documents</span></li>
-                        <li>Original document: <span className="text-[#F59E0B]">Your uploaded file</span></li>
+                        <li>Original document: <span className="text-[#F59E0B]">*-ORIGINAL-PLAIN.docx</span></li>
                         <li>Revised document: <span className="text-[#22C55E]">*-REVISED.docx</span></li>
                         <li>Click <span className="text-white">More ▾</span> → <span className="text-[#38BDF8]">UNCHECK "Formatting"</span></li>
                         <li>Click OK</li>
                       </ol>
 
-                      {/* Important callout */}
-                      <div className="mt-3 p-2.5 bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-lg">
+                      {/* Important callout - encoding consistency */}
+                      <div className="mt-3 p-2.5 bg-[#38BDF8]/10 border border-[#38BDF8]/30 rounded-lg">
+                        <p className="text-[#38BDF8] font-medium text-xs">
+                          Compare the two downloaded files together - do NOT use your original upload.
+                          This ensures encoding consistency for clean track changes.
+                        </p>
+                      </div>
+
+                      {/* Deliverable reminder */}
+                      <div className="mt-2 p-2.5 bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-lg">
                         <p className="text-[#F59E0B] font-medium text-xs flex items-start gap-1.5">
                           <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -702,7 +710,6 @@ export default function ContractReviewPage() {
                           <span>
                             The combined document Word creates IS your deliverable!
                             <br />Save it as "Contract-REDLINED.docx" and send to client WITH track changes visible.
-                            <br />Do NOT "Accept All" - let the client review and accept/reject changes.
                           </span>
                         </p>
                       </div>
