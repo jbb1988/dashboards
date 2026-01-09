@@ -379,39 +379,25 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (filename.endsWith('.docx') || filename.endsWith('.doc')) {
-      // Word document extraction - prioritize methods that preserve auto-numbering
-      // Order: 1) Aspose Cloud (best quality), 2) Custom OOXML parser (preserves numbering), 3) mammoth (basic fallback)
+      // Word document extraction - use custom OOXML parser (preserves numbering)
+      // Aspose disabled due to API limits - custom parser works well for most docs
       try {
-        if (ASPOSE_CLIENT_ID && ASPOSE_CLIENT_SECRET) {
-          // Use Aspose for best structure preservation
-          console.log('Extracting DOCX with Aspose...');
-          extractedText = await extractDocxTextWithAspose(buffer);
-        } else {
-          // Use custom parser that renders auto-numbering
-          console.log('Extracting DOCX with custom numbering parser...');
-          extractedText = await extractDocxWithNumbering(buffer);
-        }
-      } catch (docError) {
-        console.error('Word document parsing error:', docError);
-        // Try custom numbering parser as first fallback
+        console.log('Extracting DOCX with custom numbering parser...');
+        extractedText = await extractDocxWithNumbering(buffer);
+      } catch (customError) {
+        console.error('Custom parser failed:', customError);
+        // Fallback to mammoth (loses numbering but at least gets text)
         try {
-          console.log('Trying custom numbering parser as fallback...');
-          extractedText = await extractDocxWithNumbering(buffer);
-        } catch (customError) {
-          console.error('Custom parser failed:', customError);
-          // Final fallback to mammoth (loses numbering but at least gets text)
-          try {
-            console.log('Falling back to mammoth (numbering will be lost)...');
-            const mammoth = require('mammoth');
-            const result = await mammoth.extractRawText({ buffer });
-            extractedText = result.value;
-          } catch (mammothError) {
-            console.error('Mammoth fallback also failed:', mammothError);
-            return NextResponse.json(
-              { error: 'Failed to parse Word document. Please ensure it is a valid .docx file.' },
-              { status: 400 }
-            );
-          }
+          console.log('Falling back to mammoth (numbering will be lost)...');
+          const mammoth = require('mammoth');
+          const result = await mammoth.extractRawText({ buffer });
+          extractedText = result.value;
+        } catch (mammothError) {
+          console.error('Mammoth fallback also failed:', mammothError);
+          return NextResponse.json(
+            { error: 'Failed to parse Word document. Please ensure it is a valid .docx file.' },
+            { status: 400 }
+          );
         }
       }
     } else {
