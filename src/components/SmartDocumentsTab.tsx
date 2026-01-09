@@ -536,11 +536,6 @@ function ContractCard({
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Priority Badge */}
-          <span className={`px-2 py-1 ${priorityColor.bg} ${priorityColor.text} text-xs font-medium rounded-full border ${priorityColor.border}`}>
-            {contract.priority.score}/100
-          </span>
-
           {/* Completeness */}
           <div className="flex items-center gap-2">
             <span className="text-[#64748B] text-sm">
@@ -660,7 +655,6 @@ function PriorityCard({
               <span className={`px-2 py-0.5 ${priorityColor.bg} ${priorityColor.text} text-xs font-bold rounded border ${priorityColor.border}`}>
                 {contract.priority.category.toUpperCase()}
               </span>
-              <span className="text-[#64748B] text-xs">Score: {contract.priority.score}/100</span>
               {/* Project Type Badges */}
               {contractTypes.map((type) => (
                 <span

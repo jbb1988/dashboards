@@ -31,13 +31,6 @@ interface ProjectData {
 
 type SmartView = 'needs_attention' | 'this_week' | 'by_status' | 'all' | 'confirmed' | 'placeholder';
 
-interface PriorityScore {
-  taskId: string;
-  score: number;
-  reasons: string[];
-  category: 'critical' | 'high' | 'medium' | 'low';
-}
-
 // Helper functions
 function getCustomField(task: AsanaTask, fieldName: string): string | null {
   const field = task.customFields.find(f => f.name.toLowerCase() === fieldName.toLowerCase());
@@ -60,79 +53,216 @@ function formatShortDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// Priority Scoring Algorithm
-function calculatePriorityScore(task: AsanaTask, now: Date): PriorityScore {
-  let score = 0;
-  const reasons: string[] = [];
+function formatFullDate(dateStr: string | null): string {
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
 
-  const taskDate = task.startOn || task.dueOn;
-  const taskStatus = getTaskStatus(task);
-  const modifiedDate = new Date(task.modifiedAt);
+function isOverdue(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  return new Date(dateStr) < new Date();
+}
 
-  // Time-based urgency (up to 40 points)
-  if (taskDate) {
-    const date = new Date(taskDate);
-    const daysUntil = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (daysUntil < 0) {
-      score += 40;
-      reasons.push(`Overdue by ${Math.abs(daysUntil)} days`);
-    } else if (daysUntil <= 3) {
-      score += 35;
-      reasons.push(`Due in ${daysUntil} days`);
-    } else if (daysUntil <= 7) {
-      score += 30;
-      reasons.push('Due this week');
-    } else if (daysUntil <= 14) {
-      score += 15;
-      reasons.push('Due in 2 weeks');
-    }
-  }
-
-  // Status-based (up to 25 points)
-  if (taskStatus === 'placeholder') {
-    score += 20;
-    reasons.push('Needs confirmation');
-  }
-
-  // Unassigned penalty (up to 15 points)
-  if (!task.assignee) {
-    score += 15;
-    reasons.push('No assignee');
-  }
-
-  // Staleness penalty (up to 20 points)
-  const daysSinceUpdate = Math.floor((now.getTime() - modifiedDate.getTime()) / (1000 * 60 * 60 * 24));
-  if (daysSinceUpdate > 14) {
-    score += 15;
-    reasons.push(`Not updated in ${daysSinceUpdate} days`);
-  } else if (daysSinceUpdate > 7) {
-    score += 10;
-    reasons.push('Stale (>7 days)');
-  }
-
-  // Cap at 100
-  score = Math.min(score, 100);
-
-  // Categorize
-  let category: 'critical' | 'high' | 'medium' | 'low';
-  if (score >= 70) category = 'critical';
-  else if (score >= 50) category = 'high';
-  else if (score >= 30) category = 'medium';
-  else category = 'low';
-
-  return { taskId: task.gid, score, reasons, category };
+function isDueThisWeek(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  const now = new Date();
+  const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  return date >= now && date <= weekFromNow;
 }
 
 // Colors
 const COLORS = {
   confirmed: '#7FBA7A',
   placeholder: '#F1BD6C',
-  critical: '#EF4444',
-  high: '#F59E0B',
-  medium: '#38BDF8',
-  low: '#22C55E',
 };
+
+// Task Detail Drawer
+function TaskDetailDrawer({
+  task,
+  onClose,
+  onComplete,
+  isCompleting,
+}: {
+  task: AsanaTask;
+  onClose: () => void;
+  onComplete: (taskId: string) => void;
+  isCompleting: boolean;
+}) {
+  const taskStatus = getTaskStatus(task);
+  const statusColor = taskStatus === 'confirmed' ? COLORS.confirmed : taskStatus === 'placeholder' ? COLORS.placeholder : '#64748B';
+  const region = getCustomField(task, 'Region');
+  const salesLead = getCustomField(task, 'Sales Lead');
+  const scheduleStatus = getCustomField(task, 'Schedule Status');
+  const overdue = isOverdue(task.dueOn || task.startOn);
+  const dueThisWeek = isDueThisWeek(task.dueOn || task.startOn);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-black/60 z-50"
+      />
+
+      {/* Drawer */}
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        className="fixed right-0 top-0 bottom-0 w-[480px] bg-[#151F2E] border-l border-white/[0.06] shadow-2xl z-50 overflow-y-auto"
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-[#0F1722] border-b border-white/[0.06] px-6 py-4 flex items-center justify-between">
+          <h2 className="text-[16px] font-semibold text-white">Project Details</h2>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Title & Status */}
+          <div>
+            <h3 className="text-[18px] font-semibold text-white mb-3">{task.name}</h3>
+            <div className="flex flex-wrap gap-2">
+              {taskStatus && (
+                <span
+                  className="text-[11px] px-3 py-1.5 rounded-full font-medium"
+                  style={{
+                    backgroundColor: statusColor,
+                    color: taskStatus === 'placeholder' ? '#1A1F2E' : 'white'
+                  }}
+                >
+                  {taskStatus === 'confirmed' ? 'Confirmed' : 'Placeholder'}
+                </span>
+              )}
+              {overdue && (
+                <span className="text-[11px] px-3 py-1.5 rounded-full font-medium bg-[#EF4444] text-white">
+                  Overdue
+                </span>
+              )}
+              {dueThisWeek && !overdue && (
+                <span className="text-[11px] px-3 py-1.5 rounded-full font-medium bg-[#F59E0B] text-white">
+                  Due This Week
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Dates */}
+          <div className="bg-[#0F1722] rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] text-[#64748B]">Start Date</span>
+              <span className={`text-[13px] font-medium ${task.startOn && isOverdue(task.startOn) ? 'text-[#EF4444]' : 'text-white'}`}>
+                {formatFullDate(task.startOn)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] text-[#64748B]">Due Date</span>
+              <span className={`text-[13px] font-medium ${task.dueOn && isOverdue(task.dueOn) ? 'text-[#EF4444]' : 'text-white'}`}>
+                {formatFullDate(task.dueOn)}
+              </span>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
+              <span className="text-[12px] text-[#64748B]">Assignee</span>
+              <span className="text-[13px] text-white">{task.assignee?.name || 'Unassigned'}</span>
+            </div>
+            {region && (
+              <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
+                <span className="text-[12px] text-[#64748B]">Region</span>
+                <span className="text-[13px] text-white">{region}</span>
+              </div>
+            )}
+            {salesLead && (
+              <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
+                <span className="text-[12px] text-[#64748B]">Sales Lead</span>
+                <span className="text-[13px] text-white">{salesLead}</span>
+              </div>
+            )}
+            {scheduleStatus && (
+              <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
+                <span className="text-[12px] text-[#64748B]">Schedule Status</span>
+                <span className="text-[13px] text-white">{scheduleStatus}</span>
+              </div>
+            )}
+            {task.section && (
+              <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
+                <span className="text-[12px] text-[#64748B]">Section</span>
+                <span className="text-[13px] text-white">{task.section}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Notes */}
+          {task.notes && (
+            <div>
+              <h4 className="text-[12px] font-medium text-[#64748B] mb-2">Notes</h4>
+              <div className="bg-[#0F1722] rounded-xl p-4 text-[13px] text-[#8FA3BF] whitespace-pre-wrap">
+                {task.notes}
+              </div>
+            </div>
+          )}
+
+          {/* Custom Fields */}
+          {task.customFields && task.customFields.length > 0 && (
+            <div>
+              <h4 className="text-[12px] font-medium text-[#64748B] mb-3">Additional Fields</h4>
+              <div className="bg-[#0F1722] rounded-xl p-4 space-y-2">
+                {task.customFields.filter(cf => cf.value).map((cf, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-[12px]">
+                    <span className="text-[#64748B]">{cf.name}</span>
+                    <span className="text-[#8FA3BF]">{String(cf.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="pt-4 border-t border-white/[0.06]">
+            <button
+              onClick={() => onComplete(task.gid)}
+              disabled={isCompleting}
+              className={`w-full py-3 px-4 rounded-xl font-medium text-[14px] flex items-center justify-center gap-2 transition-all ${
+                isCompleting
+                  ? 'bg-[#22C55E]/20 text-[#22C55E] cursor-not-allowed'
+                  : 'bg-[#22C55E] text-white hover:bg-[#22C55E]/90'
+              }`}
+            >
+              {isCompleting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Completing...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Mark as Complete
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </>
+  );
+}
 
 // Smart View Tab Button
 function ViewTab({ view, activeView, onClick, label, count, icon }: {
@@ -164,72 +294,66 @@ function ViewTab({ view, activeView, onClick, label, count, icon }: {
   );
 }
 
-// Priority Card Component
-function PriorityCard({ task, priority, onClick }: {
+// Task Row Component - Clickable
+function TaskRow({
+  task,
+  onClick,
+  showStatus = true,
+}: {
   task: AsanaTask;
-  priority: PriorityScore;
-  onClick?: () => void;
+  onClick: () => void;
+  showStatus?: boolean;
 }) {
   const taskStatus = getTaskStatus(task);
-  const statusColor = taskStatus === 'confirmed' ? COLORS.confirmed : taskStatus === 'placeholder' ? COLORS.placeholder : '#64748B';
-  const categoryColor = COLORS[priority.category];
+  const statusColor = taskStatus === 'confirmed' ? COLORS.confirmed : taskStatus === 'placeholder' ? COLORS.placeholder : null;
+  const region = getCustomField(task, 'Region');
+  const overdue = isOverdue(task.dueOn || task.startOn);
+  const dueThisWeek = isDueThisWeek(task.dueOn || task.startOn);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2, boxShadow: `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${categoryColor}20` }}
-      transition={{ duration: 0.2 }}
+    <div
       onClick={onClick}
-      className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden cursor-pointer"
+      className="px-5 py-3.5 flex items-center gap-4 hover:bg-[#1E293B] transition-colors cursor-pointer group"
     >
-      {/* Priority Header */}
-      <div className="px-4 py-2.5 border-b border-white/[0.04] flex items-center justify-between" style={{ backgroundColor: `${categoryColor}10` }}>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: categoryColor }} />
-          <span className="text-[11px] font-semibold uppercase" style={{ color: categoryColor }}>
-            {priority.category} Priority
-          </span>
-        </div>
-        <span className="text-[11px] font-medium text-[#8FA3BF]">Score: {priority.score}/100</span>
-      </div>
+      {/* Status Indicator */}
+      {statusColor && (
+        <div className="w-1 h-10 rounded-full" style={{ backgroundColor: statusColor }} />
+      )}
 
-      {/* Content */}
-      <div className="p-4">
-        <div className="text-[14px] font-medium text-white mb-2">{task.name}</div>
-
-        <div className="flex items-center gap-3 mb-3 flex-wrap">
-          {taskStatus && (
-            <span className="text-[10px] px-2 py-1 rounded font-medium text-white" style={{ backgroundColor: statusColor }}>
-              {taskStatus === 'confirmed' ? 'Confirmed' : 'Placeholder'}
-            </span>
-          )}
-          {task.startOn && (
-            <span className="text-[11px] text-[#8FA3BF] flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              {formatShortDate(task.startOn)}
-            </span>
-          )}
-          {task.assignee && (
-            <span className="text-[11px] text-[#8FA3BF]">{task.assignee.name}</span>
-          )}
-        </div>
-
-        {/* Reasons */}
-        <div className="space-y-1">
-          {priority.reasons.slice(0, 3).map((reason, idx) => (
-            <div key={idx} className="flex items-center gap-2 text-[11px] text-[#64748B]">
-              <svg className="w-3 h-3" style={{ color: categoryColor }} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              {reason}
-            </div>
-          ))}
+      {/* Date */}
+      <div className="w-20 text-center">
+        <div className={`text-[13px] font-semibold ${overdue ? 'text-[#EF4444]' : dueThisWeek ? 'text-[#F59E0B]' : 'text-white'}`}>
+          {formatShortDate(task.startOn || task.dueOn)}
         </div>
       </div>
-    </motion.div>
+
+      {/* Task Name */}
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] text-white truncate group-hover:text-[#E16259] transition-colors">{task.name}</div>
+        <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
+      </div>
+
+      {/* Status Badge */}
+      {showStatus && taskStatus && (
+        <span
+          className="text-[9px] px-2 py-1 rounded font-medium"
+          style={{
+            backgroundColor: statusColor || '#64748B',
+            color: taskStatus === 'placeholder' ? '#1A1F2E' : 'white'
+          }}
+        >
+          {taskStatus === 'confirmed' ? 'Confirmed' : 'Placeholder'}
+        </span>
+      )}
+
+      {/* Region */}
+      {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
+
+      {/* Arrow */}
+      <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </div>
   );
 }
 
@@ -237,12 +361,12 @@ function PriorityCard({ task, priority, onClick }: {
 function StatusGroup({
   title,
   tasks,
-  priorities,
+  onTaskClick,
   defaultExpanded = true
 }: {
   title: string;
   tasks: AsanaTask[];
-  priorities: Map<string, PriorityScore>;
+  onTaskClick: (task: AsanaTask) => void;
   defaultExpanded?: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
@@ -279,54 +403,9 @@ function StatusGroup({
             transition={{ duration: 0.2 }}
           >
             <div className="divide-y divide-white/[0.04]">
-              {tasks.map((task, idx) => {
-                const priority = priorities.get(task.gid);
-                const taskStatus = getTaskStatus(task);
-
-                return (
-                  <div
-                    key={task.gid}
-                    className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
-                  >
-                    {/* Priority Indicator */}
-                    {priority && (
-                      <div
-                        className="w-1 h-8 rounded-full"
-                        style={{ backgroundColor: COLORS[priority.category] }}
-                        title={`Priority: ${priority.score}`}
-                      />
-                    )}
-
-                    {/* Date */}
-                    <div className="w-20 text-center">
-                      <div className={`text-[13px] font-semibold ${task.startOn && new Date(task.startOn) < new Date() ? 'text-[#EF4444]' : 'text-white'}`}>
-                        {formatShortDate(task.startOn || task.dueOn)}
-                      </div>
-                    </div>
-
-                    {/* Task Name */}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] text-white truncate">{task.name}</div>
-                      <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
-                    </div>
-
-                    {/* Status Badge */}
-                    {taskStatus && (
-                      <span
-                        className="text-[9px] px-2 py-1 rounded font-medium text-white"
-                        style={{ backgroundColor: taskStatus === 'confirmed' ? COLORS.confirmed : COLORS.placeholder }}
-                      >
-                        {taskStatus === 'confirmed' ? 'Confirmed' : 'Placeholder'}
-                      </span>
-                    )}
-
-                    {/* Region */}
-                    {getCustomField(task, 'Region') && (
-                      <span className="text-[10px] text-[#8FA3BF]">{getCustomField(task, 'Region')}</span>
-                    )}
-                  </div>
-                );
-              })}
+              {tasks.map((task) => (
+                <TaskRow key={task.gid} task={task} onClick={() => onTaskClick(task)} showStatus={false} />
+              ))}
             </div>
           </motion.div>
         )}
@@ -347,29 +426,25 @@ export default function SmartProjectsTab({
 }) {
   const [activeView, setActiveView] = useState<SmartView>('needs_attention');
   const [searchQuery, setSearchQuery] = useState('');
-  const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
+  const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
   // Handle task completion
-  const handleComplete = useCallback(async (taskId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!onTaskComplete || completingTasks.has(taskId)) return;
+  const handleComplete = useCallback(async (taskId: string) => {
+    if (!onTaskComplete || completingTaskId) return;
 
-    setCompletingTasks(prev => new Set(prev).add(taskId));
+    setCompletingTaskId(taskId);
     try {
       await onTaskComplete(taskId, true);
+      setSelectedTask(null);
     } finally {
-      setCompletingTasks(prev => {
-        const next = new Set(prev);
-        next.delete(taskId);
-        return next;
-      });
+      setCompletingTaskId(null);
     }
-  }, [onTaskComplete, completingTasks]);
+  }, [onTaskComplete, completingTaskId]);
 
-  // Calculate priorities for all tasks
-  const { priorities, needsAttentionTasks, thisWeekTasks, byStatusGroups, allTasks, confirmedTasks, placeholderTasks, stats } = useMemo(() => {
+  // Calculate filtered task lists
+  const { needsAttentionTasks, thisWeekTasks, byStatusGroups, allTasks, confirmedTasks, placeholderTasks, stats } = useMemo(() => {
     if (!data) return {
-      priorities: new Map<string, PriorityScore>(),
       needsAttentionTasks: [],
       thisWeekTasks: [],
       byStatusGroups: {},
@@ -380,13 +455,7 @@ export default function SmartProjectsTab({
     };
 
     const now = new Date();
-    const priorities = new Map<string, PriorityScore>();
     const incompleteTasks = data.tasks.filter(t => !t.completed);
-
-    // Calculate priorities
-    incompleteTasks.forEach(task => {
-      priorities.set(task.gid, calculatePriorityScore(task, now));
-    });
 
     // Filter by search
     const filteredTasks = searchQuery
@@ -396,10 +465,18 @@ export default function SmartProjectsTab({
         )
       : incompleteTasks;
 
-    // Needs Attention: High priority tasks (score >= 50)
+    // Needs Attention: Overdue or due this week or placeholder
     const needsAttentionTasks = filteredTasks
-      .filter(t => (priorities.get(t.gid)?.score || 0) >= 50)
-      .sort((a, b) => (priorities.get(b.gid)?.score || 0) - (priorities.get(a.gid)?.score || 0));
+      .filter(t => {
+        const taskDate = t.startOn || t.dueOn;
+        if (!taskDate) return getTaskStatus(t) === 'placeholder';
+        return isOverdue(taskDate) || isDueThisWeek(taskDate) || getTaskStatus(t) === 'placeholder';
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.startOn || a.dueOn || '9999');
+        const dateB = new Date(b.startOn || b.dueOn || '9999');
+        return dateA.getTime() - dateB.getTime();
+      });
 
     // This Week: Tasks due within 7 days
     const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -434,35 +511,20 @@ export default function SmartProjectsTab({
       'Other / Unclassified': other.length > 0 ? other : undefined,
     };
 
-    // All tasks sorted by date
-    const allTasks = [...filteredTasks].sort((a, b) => {
-      const dateA = new Date(a.startOn || a.dueOn || '9999');
-      const dateB = new Date(b.startOn || b.dueOn || '9999');
-      return dateA.getTime() - dateB.getTime();
-    });
-
-    // Confirmed tasks sorted by date
-    const confirmedTasks = [...confirmed].sort((a, b) => {
-      const dateA = new Date(a.startOn || a.dueOn || '9999');
-      const dateB = new Date(b.startOn || b.dueOn || '9999');
-      return dateA.getTime() - dateB.getTime();
-    });
-
-    // Placeholder tasks sorted by date
-    const placeholderTasks = [...placeholder].sort((a, b) => {
+    // Sort all lists by date
+    const sortByDate = (tasks: AsanaTask[]) => [...tasks].sort((a, b) => {
       const dateA = new Date(a.startOn || a.dueOn || '9999');
       const dateB = new Date(b.startOn || b.dueOn || '9999');
       return dateA.getTime() - dateB.getTime();
     });
 
     return {
-      priorities,
       needsAttentionTasks,
       thisWeekTasks,
       byStatusGroups,
-      allTasks,
-      confirmedTasks,
-      placeholderTasks,
+      allTasks: sortByDate(filteredTasks),
+      confirmedTasks: sortByDate(confirmed),
+      placeholderTasks: sortByDate(placeholder),
       stats: {
         needsAttention: needsAttentionTasks.length,
         thisWeek: thisWeekTasks.length,
@@ -511,7 +573,7 @@ export default function SmartProjectsTab({
           <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[#EF4444]" />
           <div className="text-[11px] font-medium text-[#64748B] mb-2">Needs Attention</div>
           <div className="text-[28px] font-semibold text-white">{stats.needsAttention}</div>
-          <div className="text-[12px] text-[#8FA3BF] mt-1">High priority</div>
+          <div className="text-[12px] text-[#8FA3BF] mt-1">Action required</div>
         </motion.div>
 
         <motion.div
@@ -643,20 +705,20 @@ export default function SmartProjectsTab({
                   </svg>
                 </div>
                 <div className="text-[16px] font-medium text-white mb-1">All caught up!</div>
-                <div className="text-[13px] text-[#8FA3BF]">No high-priority projects need immediate attention</div>
+                <div className="text-[13px] text-[#8FA3BF]">No projects need immediate attention</div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {needsAttentionTasks.map((task, idx) => (
-                  <motion.div
-                    key={task.gid}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                  >
-                    <PriorityCard task={task} priority={priorities.get(task.gid)!} />
-                  </motion.div>
-                ))}
+              <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
+                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
+                  <span className="w-3 h-3 rounded bg-[#EF4444]" />
+                  <span className="font-semibold text-[14px] text-white">Projects Needing Attention</span>
+                  <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{needsAttentionTasks.length} projects</span>
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {needsAttentionTasks.map((task) => (
+                    <TaskRow key={task.gid} task={task} onClick={() => setSelectedTask(task)} />
+                  ))}
+                </div>
               </div>
             )}
           </motion.div>
@@ -678,62 +740,15 @@ export default function SmartProjectsTab({
               </div>
             ) : (
               <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06]">
+                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
+                  <span className="w-3 h-3 rounded bg-[#38BDF8]" />
                   <span className="font-semibold text-[14px] text-white">Projects Due This Week</span>
+                  <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{thisWeekTasks.length} projects</span>
                 </div>
                 <div className="divide-y divide-white/[0.04]">
-                  {thisWeekTasks.map((task, idx) => {
-                    const priority = priorities.get(task.gid);
-                    const taskStatus = getTaskStatus(task);
-                    const isCompleting = completingTasks.has(task.gid);
-
-                    return (
-                      <div
-                        key={task.gid}
-                        className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
-                      >
-                        {/* Complete Checkbox */}
-                        {onTaskComplete && (
-                          <button
-                            onClick={(e) => handleComplete(task.gid, e)}
-                            disabled={isCompleting}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              isCompleting
-                                ? 'border-[#22C55E] bg-[#22C55E]/20'
-                                : 'border-[#475569] hover:border-[#22C55E] hover:bg-[#22C55E]/10'
-                            }`}
-                            title="Mark as complete"
-                          >
-                            {isCompleting ? (
-                              <div className="w-3 h-3 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <svg className="w-3 h-3 text-[#475569] opacity-0 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </button>
-                        )}
-                        {priority && (
-                          <div className="w-1 h-8 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
-                        )}
-                        <div className="w-20 text-center">
-                          <div className="text-[13px] font-semibold text-white">{formatShortDate(task.startOn || task.dueOn)}</div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] text-white truncate">{task.name}</div>
-                          <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
-                        </div>
-                        {taskStatus && (
-                          <span
-                            className="text-[9px] px-2 py-1 rounded font-medium text-white"
-                            style={{ backgroundColor: taskStatus === 'confirmed' ? COLORS.confirmed : COLORS.placeholder }}
-                          >
-                            {taskStatus === 'confirmed' ? 'Confirmed' : 'Placeholder'}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {thisWeekTasks.map((task) => (
+                    <TaskRow key={task.gid} task={task} onClick={() => setSelectedTask(task)} />
+                  ))}
                 </div>
               </div>
             )}
@@ -757,7 +772,7 @@ export default function SmartProjectsTab({
                   key={title}
                   title={title}
                   tasks={tasks}
-                  priorities={priorities}
+                  onTaskClick={setSelectedTask}
                   defaultExpanded={title !== 'Other / Unclassified'}
                 />
               );
@@ -775,84 +790,15 @@ export default function SmartProjectsTab({
             transition={{ duration: 0.15 }}
           >
             <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-              <div className="grid gap-4 px-5 py-2.5 text-[10px] font-medium text-[#64748B] uppercase border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: onTaskComplete ? '32px 60px 100px 2fr 100px 100px 80px' : '60px 100px 2fr 100px 100px 80px' }}>
-                {onTaskComplete && <div></div>}
-                <div>Priority</div>
-                <div>Date</div>
-                <div>Project Name</div>
-                <div>Status</div>
-                <div>Assignee</div>
-                <div>Region</div>
+              <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
+                <span className="w-3 h-3 rounded bg-[#E16259]" />
+                <span className="font-semibold text-[14px] text-white">All Active Projects</span>
+                <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{allTasks.length} projects</span>
               </div>
-              <div className="max-h-[600px] overflow-y-auto">
-                {allTasks.map((task, idx) => {
-                  const priority = priorities.get(task.gid);
-                  const taskStatus = getTaskStatus(task);
-                  const region = getCustomField(task, 'Region');
-                  const isCompleting = completingTasks.has(task.gid);
-
-                  return (
-                    <div
-                      key={task.gid}
-                      className={`grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
-                      style={{ gridTemplateColumns: onTaskComplete ? '32px 60px 100px 2fr 100px 100px 80px' : '60px 100px 2fr 100px 100px 80px' }}
-                    >
-                      {/* Complete Checkbox */}
-                      {onTaskComplete && (
-                        <button
-                          onClick={(e) => handleComplete(task.gid, e)}
-                          disabled={isCompleting}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                            isCompleting
-                              ? 'border-[#22C55E] bg-[#22C55E]/20'
-                              : 'border-[#475569] hover:border-[#22C55E] hover:bg-[#22C55E]/10'
-                          }`}
-                          title="Mark as complete"
-                        >
-                          {isCompleting && (
-                            <div className="w-3 h-3 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
-                          )}
-                        </button>
-                      )}
-
-                      {/* Priority */}
-                      <div className="flex items-center gap-2">
-                        {priority && (
-                          <>
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
-                            <span className="text-[10px] text-[#8FA3BF]">{priority.score}</span>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Date */}
-                      <div className={`text-[12px] font-medium ${task.startOn && new Date(task.startOn) < new Date() ? 'text-[#EF4444]' : 'text-white'}`}>
-                        {formatShortDate(task.startOn || task.dueOn)}
-                      </div>
-
-                      {/* Name */}
-                      <div className="text-[13px] text-white truncate">{task.name}</div>
-
-                      {/* Status */}
-                      <div>
-                        {taskStatus && (
-                          <span
-                            className="text-[9px] px-2 py-1 rounded font-medium text-white"
-                            style={{ backgroundColor: taskStatus === 'confirmed' ? COLORS.confirmed : COLORS.placeholder }}
-                          >
-                            {taskStatus === 'confirmed' ? 'Confirmed' : 'Placeholder'}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Assignee */}
-                      <div className="text-[11px] text-[#8FA3BF] truncate">{task.assignee?.name || '-'}</div>
-
-                      {/* Region */}
-                      <div className="text-[10px] text-[#64748B]">{region || '-'}</div>
-                    </div>
-                  );
-                })}
+              <div className="max-h-[600px] overflow-y-auto divide-y divide-white/[0.04]">
+                {allTasks.map((task) => (
+                  <TaskRow key={task.gid} task={task} onClick={() => setSelectedTask(task)} />
+                ))}
               </div>
             </div>
           </motion.div>
@@ -880,53 +826,9 @@ export default function SmartProjectsTab({
                   <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{confirmedTasks.length} projects</span>
                 </div>
                 <div className="divide-y divide-white/[0.04]">
-                  {confirmedTasks.map((task, idx) => {
-                    const priority = priorities.get(task.gid);
-                    const region = getCustomField(task, 'Region');
-                    const isCompleting = completingTasks.has(task.gid);
-
-                    return (
-                      <div
-                        key={task.gid}
-                        className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
-                      >
-                        {/* Complete Checkbox */}
-                        {onTaskComplete && (
-                          <button
-                            onClick={(e) => handleComplete(task.gid, e)}
-                            disabled={isCompleting}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              isCompleting
-                                ? 'border-[#22C55E] bg-[#22C55E]/20'
-                                : 'border-[#475569] hover:border-[#22C55E] hover:bg-[#22C55E]/10'
-                            }`}
-                            title="Mark as complete"
-                          >
-                            {isCompleting && (
-                              <div className="w-3 h-3 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
-                            )}
-                          </button>
-                        )}
-                        {priority && (
-                          <div className="w-1 h-8 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
-                        )}
-                        <div className="w-20 text-center">
-                          <div className="text-[13px] font-semibold text-white">{formatShortDate(task.startOn || task.dueOn)}</div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] text-white truncate">{task.name}</div>
-                          <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
-                        </div>
-                        <span
-                          className="text-[9px] px-2 py-1 rounded font-medium text-white"
-                          style={{ backgroundColor: COLORS.confirmed }}
-                        >
-                          Confirmed
-                        </span>
-                        {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
-                      </div>
-                    );
-                  })}
+                  {confirmedTasks.map((task) => (
+                    <TaskRow key={task.gid} task={task} onClick={() => setSelectedTask(task)} showStatus={false} />
+                  ))}
                 </div>
               </div>
             )}
@@ -955,57 +857,25 @@ export default function SmartProjectsTab({
                   <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{placeholderTasks.length} projects</span>
                 </div>
                 <div className="divide-y divide-white/[0.04]">
-                  {placeholderTasks.map((task, idx) => {
-                    const priority = priorities.get(task.gid);
-                    const region = getCustomField(task, 'Region');
-                    const isCompleting = completingTasks.has(task.gid);
-
-                    return (
-                      <div
-                        key={task.gid}
-                        className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
-                      >
-                        {/* Complete Checkbox */}
-                        {onTaskComplete && (
-                          <button
-                            onClick={(e) => handleComplete(task.gid, e)}
-                            disabled={isCompleting}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              isCompleting
-                                ? 'border-[#22C55E] bg-[#22C55E]/20'
-                                : 'border-[#475569] hover:border-[#22C55E] hover:bg-[#22C55E]/10'
-                            }`}
-                            title="Mark as complete"
-                          >
-                            {isCompleting && (
-                              <div className="w-3 h-3 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
-                            )}
-                          </button>
-                        )}
-                        {priority && (
-                          <div className="w-1 h-8 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
-                        )}
-                        <div className="w-20 text-center">
-                          <div className="text-[13px] font-semibold text-white">{formatShortDate(task.startOn || task.dueOn)}</div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] text-white truncate">{task.name}</div>
-                          <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
-                        </div>
-                        <span
-                          className="text-[9px] px-2 py-1 rounded font-medium"
-                          style={{ backgroundColor: COLORS.placeholder, color: '#1A1F2E' }}
-                        >
-                          Placeholder
-                        </span>
-                        {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
-                      </div>
-                    );
-                  })}
+                  {placeholderTasks.map((task) => (
+                    <TaskRow key={task.gid} task={task} onClick={() => setSelectedTask(task)} showStatus={false} />
+                  ))}
                 </div>
               </div>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Task Detail Drawer */}
+      <AnimatePresence>
+        {selectedTask && (
+          <TaskDetailDrawer
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onComplete={handleComplete}
+            isCompleting={completingTaskId === selectedTask.gid}
+          />
         )}
       </AnimatePresence>
     </div>
