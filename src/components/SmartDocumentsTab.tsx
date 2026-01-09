@@ -437,7 +437,6 @@ function ContractCard({
   allContracts?: Contract[];
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const priorityColor = PRIORITY_COLORS[contract.priority.category];
 
   // Find the matching contract for contract type
   const matchingContract = allContracts?.find(c => c.id === contract.contractId || c.salesforceId === contract.contractId);
@@ -484,75 +483,71 @@ function ContractCard({
     // TODO: Implement delete API call
   };
 
+  // Priority dot color (subtle)
+  const priorityDotColor = {
+    critical: 'bg-red-500',
+    high: 'bg-orange-500',
+    medium: 'bg-blue-500',
+    low: 'bg-green-500',
+  }[contract.priority.category];
+
   return (
-    <div className={`border-b border-white/[0.02] last:border-0 ${priorityColor.bg}`}>
+    <div className="border-b border-white/[0.04] last:border-0">
       {/* Contract Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 pl-12 hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center justify-between p-4 pl-8 hover:bg-white/[0.02] transition-colors"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <motion.div
             animate={{ rotate: isExpanded ? 90 : 0 }}
             transition={{ duration: 0.2 }}
-            className="text-[#64748B]"
+            className="text-[#64748B] flex-shrink-0"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </motion.div>
-          <div className="text-left">
+
+          {/* Priority Dot */}
+          <span className={`w-2 h-2 rounded-full ${priorityDotColor} flex-shrink-0`} />
+
+          <div className="text-left flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-white font-medium">{contract.contractName}</h4>
-              {contract.opportunityYear && (
-                <span className="px-2 py-0.5 bg-[#151F2E] text-[#64748B] text-xs rounded">
-                  Year {contract.opportunityYear}
-                </span>
-              )}
-              {/* Contract Type Badges */}
+              <h4 className="text-white font-medium truncate">{contract.contractName}</h4>
+              {/* Contract Type Tags - subtle */}
               {contractTypes.map((type) => (
                 <span
                   key={type}
-                  className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#A78BFA] text-xs rounded border border-[#8B5CF6]/20"
+                  className="px-2 py-0.5 bg-[#1E293B] text-[#94A3B8] text-xs rounded"
                 >
                   {type}
                 </span>
               ))}
               {bundleInfo && (
-                <span className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#8B5CF6] text-xs rounded flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
+                <span className="px-2 py-0.5 bg-[#1E293B] text-[#94A3B8] text-xs rounded">
                   Bundled
                 </span>
               )}
             </div>
             {contract.priority.reasons.length > 0 && (
-              <p className={`text-sm ${priorityColor.text}`}>
+              <p className="text-[#64748B] text-sm truncate">
                 {contract.priority.reasons[0]}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
           {/* Completeness */}
-          <div className="flex items-center gap-2">
-            <span className="text-[#64748B] text-sm">
-              {contract.completeness.required}/{4} required
-            </span>
-            <div className="w-16 h-2 bg-[#151F2E] rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all ${
-                  contract.completeness.percentage === 100
-                    ? 'bg-[#22C55E]'
-                    : contract.completeness.percentage >= 50
-                      ? 'bg-[#38BDF8]'
-                      : 'bg-orange-500'
-                }`}
-                style={{ width: `${contract.completeness.percentage}%` }}
-              />
-            </div>
+          <span className="text-[#64748B] text-sm">
+            {contract.completeness.required}/4
+          </span>
+          <div className="w-16 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#3B82F6] rounded-full transition-all"
+              style={{ width: `${contract.completeness.percentage}%` }}
+            />
           </div>
         </div>
       </button>
@@ -602,7 +597,6 @@ function PriorityCard({
   contracts?: Contract[];
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const priorityColor = PRIORITY_COLORS[contract.priority.category];
 
   // Find the matching contract for additional details
   const matchingContract = contracts?.find(c => c.id === contract.contractId || c.salesforceId === contract.contractId);
@@ -638,80 +632,75 @@ function PriorityCard({
     console.log('Delete document:', doc.id);
   };
 
+  // Priority dot color (subtle)
+  const priorityDotColor = {
+    critical: 'bg-red-500',
+    high: 'bg-orange-500',
+    medium: 'bg-blue-500',
+    low: 'bg-green-500',
+  }[contract.priority.category];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-xl border ${priorityColor.border} ${priorityColor.bg} shadow-lg ${priorityColor.glow} overflow-hidden`}
+      className="bg-[#111827] rounded-lg border border-white/[0.06] overflow-hidden"
     >
       {/* Card Header - Clickable to expand */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full p-4 text-left hover:bg-white/[0.02] transition-colors"
       >
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className={`px-2 py-0.5 ${priorityColor.bg} ${priorityColor.text} text-xs font-bold rounded border ${priorityColor.border}`}>
-                {contract.priority.category.toUpperCase()}
-              </span>
-              {/* Project Type Badges */}
-              {contractTypes.map((type) => (
-                <span
-                  key={type}
-                  className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#A78BFA] text-xs rounded border border-[#8B5CF6]/20"
-                >
-                  {type}
-                </span>
-              ))}
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            {/* Contract Name with Priority Dot */}
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`w-2 h-2 rounded-full ${priorityDotColor} flex-shrink-0`} />
+              <h3 className="text-white font-medium truncate">{contract.contractName}</h3>
             </div>
-            <h3 className="text-white font-semibold">{contract.contractName}</h3>
-            <p className="text-[#64748B] text-sm">{accountName}</p>
+
+            {/* Account Name */}
+            <p className="text-[#64748B] text-sm mb-2 pl-4">{accountName}</p>
+
+            {/* Contract Types - subtle tags */}
+            {contractTypes.length > 0 && (
+              <div className="flex items-center gap-1.5 pl-4 flex-wrap">
+                {contractTypes.map((type) => (
+                  <span
+                    key={type}
+                    className="px-2 py-0.5 bg-[#1E293B] text-[#94A3B8] text-xs rounded"
+                  >
+                    {type}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Completeness Ring */}
-          <div className="relative w-14 h-14">
-            <svg className="w-14 h-14 transform -rotate-90">
-              <circle
-                cx="28"
-                cy="28"
-                r="24"
-                fill="none"
-                stroke="#151F2E"
-                strokeWidth="4"
+          {/* Right side - Completeness */}
+          <div className="text-right flex-shrink-0 ml-4">
+            <div className="text-[#64748B] text-sm">
+              {contract.completeness.required}/4 docs
+            </div>
+            <div className="w-20 h-1.5 bg-[#1E293B] rounded-full mt-1 overflow-hidden">
+              <div
+                className="h-full bg-[#3B82F6] rounded-full transition-all"
+                style={{ width: `${contract.completeness.percentage}%` }}
               />
-              <circle
-                cx="28"
-                cy="28"
-                r="24"
-                fill="none"
-                stroke={contract.completeness.percentage === 100 ? '#22C55E' : '#38BDF8'}
-                strokeWidth="4"
-                strokeDasharray={`${contract.completeness.percentage * 1.51} 151`}
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-white text-sm font-medium">
-              {contract.completeness.percentage}%
-            </span>
+            </div>
           </div>
         </div>
 
-        {/* Reasons */}
-        <div className="space-y-1">
-          {contract.priority.reasons.slice(0, 2).map((reason, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm">
-              <svg className={`w-4 h-4 ${priorityColor.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span className="text-[#94A3B8]">{reason}</span>
-            </div>
-          ))}
-        </div>
+        {/* Due date / Status - Clean single line */}
+        {contract.priority.reasons.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/[0.04] pl-4">
+            <span className="text-[#64748B] text-sm">{contract.priority.reasons[0]}</span>
+          </div>
+        )}
 
         {/* Expand indicator */}
         <div className="flex items-center justify-center mt-3 pt-3 border-t border-white/[0.04]">
-          <div className="flex items-center gap-2 text-[#64748B] text-sm">
+          <div className="flex items-center gap-2 text-[#64748B] text-sm hover:text-white transition-colors">
             <motion.svg
               animate={{ rotate: isExpanded ? 180 : 0 }}
               transition={{ duration: 0.2 }}
