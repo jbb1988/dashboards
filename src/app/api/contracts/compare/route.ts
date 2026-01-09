@@ -1,355 +1,453 @@
 import { NextRequest, NextResponse } from 'next/server';
-import DiffMatchPatch from 'diff-match-patch';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 
-/**
- * Normalize Unicode characters to ASCII equivalents.
- *
- * CRITICAL: This must match normalizeToASCII in review/route.ts
- * to ensure consistent encoding across all document operations.
- */
-function normalizeToASCII(text: string): string {
-  return text
-    // Smart double quotes → straight double quote
-    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036\u00AB\u00BB]/g, '"')
-    // Smart single quotes, apostrophes → straight single quote
-    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\u2039\u203A]/g, "'")
-    // En dash, em dash, horizontal bar, minus sign → hyphen
-    .replace(/[\u2013\u2014\u2015\u2212]/g, '-')
-    // Non-breaking space, various Unicode spaces → regular space
-    .replace(/[\u00A0\u2000-\u200B\u202F\u205F\u3000]/g, ' ')
-    // Ellipsis → three dots
-    .replace(/\u2026/g, '...')
-    // Bullet point variants → asterisk
-    .replace(/[\u2022\u2023\u2043]/g, '*')
-    // Fraction characters → spelled out
-    .replace(/\u00BD/g, '1/2')
-    .replace(/\u00BC/g, '1/4')
-    .replace(/\u00BE/g, '3/4');
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface Section {
+  number: string;      // "I", "II", "III", "1", "2", etc.
+  title: string;       // "PAYMENTS", "TERM", "INDEMNIFICATION"
+  fullHeader: string;  // "SECTION III. PAYMENTS"
+  content: string;     // The full text of the section
 }
 
-/**
- * AI prompt for intelligent contract comparison
- */
-const CONTRACT_COMPARE_PROMPT = `You are an expert contract attorney comparing two versions of a legal agreement. Your task is to identify ALL meaningful differences between the ORIGINAL and REVISED versions.
-
-ANALYSIS REQUIREMENTS:
-1. Identify every substantive change (terms, amounts, dates, obligations, rights, liabilities)
-2. Note structural changes (added/removed sections, reorganization)
-3. Flag any changes that affect legal rights or obligations
-4. Ignore minor formatting, whitespace, page numbers, and OCR artifacts
-
-OUTPUT FORMAT (JSON only):
-{
-  "documentInfo": {
-    "originalTitle": "Brief title/description of original document",
-    "revisedTitle": "Brief title/description of revised document",
-    "originalDate": "Date if found (e.g., '2024')",
-    "revisedDate": "Date if found (e.g., '2026')"
-  },
-  "changes": [
-    {
-      "category": "TERM|PAYMENT|LIABILITY|INDEMNIFICATION|INSURANCE|TERMINATION|SCOPE|PARTIES|DATES|OTHER",
-      "section": "Section name or number if applicable",
-      "description": "Clear description of what changed",
-      "originalText": "Relevant excerpt from original (keep brief)",
-      "revisedText": "Relevant excerpt from revised (keep brief)",
-      "significance": "high|medium|low",
-      "impact": "Brief explanation of legal/business impact"
-    }
-  ],
-  "summary": {
-    "totalChanges": 0,
-    "highSignificance": 0,
-    "mediumSignificance": 0,
-    "lowSignificance": 0,
-    "keyTakeaways": [
-      "Bullet point summary of most important changes"
-    ]
-  },
-  "addedSections": ["List of new sections in revised"],
-  "removedSections": ["List of sections removed from original"]
+interface SectionComparison {
+  sectionNumber: string;
+  sectionTitle: string;
+  status: 'unchanged' | 'changed' | 'added' | 'removed';
+  significance: 'high' | 'medium' | 'low' | 'none';
+  changes: Array<{
+    description: string;
+    original: string;
+    revised: string;
+    impact: string;
+  }>;
 }
 
-SIGNIFICANCE LEVELS:
-- "high": Changes affecting liability, payment amounts >10%, term length, indemnification, IP rights
-- "medium": Changes to notice periods, insurance amounts, procedural requirements
-- "low": Administrative changes, contact info, minor clarifications
-
-CRITICAL RULES:
-- Return ONLY valid JSON, no explanations before or after
-- Be thorough - identify ALL meaningful changes, not just the obvious ones
-- Keep originalText and revisedText excerpts concise (1-3 sentences max)
-- If documents are completely different contracts (not versions), note this in summary
-
-===== ORIGINAL DOCUMENT =====
-`;
-
-/**
- * Use AI to intelligently compare two contract versions
- */
-async function aiCompareContracts(originalText: string, revisedText: string): Promise<{
+interface ComparisonResult {
+  mode: 'section-by-section';
   documentInfo: {
     originalTitle: string;
     revisedTitle: string;
     originalDate: string;
     revisedDate: string;
   };
-  changes: Array<{
-    category: string;
-    section: string;
-    description: string;
-    originalText: string;
-    revisedText: string;
-    significance: 'high' | 'medium' | 'low';
-    impact: string;
-  }>;
   summary: {
-    totalChanges: number;
-    highSignificance: number;
-    mediumSignificance: number;
-    lowSignificance: number;
+    totalSections: number;
+    sectionsChanged: number;
+    sectionsAdded: number;
+    sectionsRemoved: number;
+    sectionsUnchanged: number;
     keyTakeaways: string[];
   };
+  sections: SectionComparison[];
   addedSections: string[];
   removedSections: string[];
-}> {
-  const fullPrompt = CONTRACT_COMPARE_PROMPT + originalText + '\n\n===== REVISED DOCUMENT =====\n' + revisedText;
-
-  console.log('[AI COMPARE] Starting AI contract comparison...');
-  console.log(`[AI COMPARE] Original: ${originalText.length} chars, Revised: ${revisedText.length} chars`);
-  console.log(`[AI COMPARE] Total prompt length: ${fullPrompt.length} chars`);
-  const startTime = Date.now();
-
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://mars-contracts.vercel.app',
-      'X-Title': 'MARS Contract Compare',
-    },
-    body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4',
-      messages: [
-        {
-          role: 'user',
-          content: fullPrompt,
-        },
-      ],
-      max_tokens: 16000,
-      temperature: 0.1,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[AI COMPARE] OpenRouter error:', errorText);
-
-    // Parse error for better message
-    try {
-      const errorJson = JSON.parse(errorText);
-      const errorMsg = errorJson.error?.message || errorJson.message || `Status ${response.status}`;
-      throw new Error(`AI service error: ${errorMsg}`);
-    } catch {
-      throw new Error(`AI comparison failed: ${response.status}`);
-    }
-  }
-
-  const aiResponse = await response.json();
-
-  // Check for errors in the response
-  if (aiResponse.error) {
-    console.error('[AI COMPARE] API returned error:', aiResponse.error);
-    throw new Error(aiResponse.error.message || 'AI service returned an error');
-  }
-
-  const content = aiResponse.choices?.[0]?.message?.content || '';
-
-  // Check if AI returned an error message instead of JSON
-  if (content.toLowerCase().startsWith('an error') || content.toLowerCase().startsWith('i apologize') || content.toLowerCase().startsWith('i cannot')) {
-    console.error('[AI COMPARE] AI returned error message:', content.substring(0, 200));
-    throw new Error('AI could not process the documents. Please try again.');
-  }
-
-  console.log(`[AI COMPARE] Completed in ${(Date.now() - startTime) / 1000}s`);
-  console.log(`[AI COMPARE] Response length: ${content.length} chars`);
-  console.log(`[AI COMPARE] Response preview: ${content.substring(0, 200)}...`);
-
-  if (!content || content.length < 50) {
-    console.error('[AI COMPARE] Empty or too short response from AI');
-    throw new Error('AI returned empty response');
-  }
-
-  // Parse JSON response
-  let jsonStr = content.trim();
-
-  // Strip markdown code blocks if present
-  jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-
-  const firstBrace = jsonStr.indexOf('{');
-  const lastBrace = jsonStr.lastIndexOf('}');
-
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
-
-    try {
-      const parsed = JSON.parse(jsonStr);
-
-      // Validate the expected structure
-      if (!parsed.changes || !Array.isArray(parsed.changes)) {
-        console.error('[AI COMPARE] Invalid structure - missing changes array');
-        throw new Error('Invalid response structure');
-      }
-
-      // Ensure summary has required fields
-      if (!parsed.summary) {
-        parsed.summary = {
-          totalChanges: parsed.changes.length,
-          highSignificance: parsed.changes.filter((c: { significance: string }) => c.significance === 'high').length,
-          mediumSignificance: parsed.changes.filter((c: { significance: string }) => c.significance === 'medium').length,
-          lowSignificance: parsed.changes.filter((c: { significance: string }) => c.significance === 'low').length,
-          keyTakeaways: []
-        };
-      }
-
-      // Ensure documentInfo exists
-      if (!parsed.documentInfo) {
-        parsed.documentInfo = {
-          originalTitle: 'Original Document',
-          revisedTitle: 'Revised Document',
-          originalDate: '',
-          revisedDate: ''
-        };
-      }
-
-      return parsed;
-    } catch (parseError) {
-      console.error('[AI COMPARE] JSON parse error:', parseError);
-      console.error('[AI COMPARE] Attempted to parse:', jsonStr.substring(0, 500));
-      throw new Error('Failed to parse AI response as JSON');
-    }
-  }
-
-  console.error('[AI COMPARE] No JSON object found in response');
-  console.error('[AI COMPARE] Full response:', content);
-  throw new Error('AI did not return valid JSON');
 }
 
-/**
- * Detect section headers in contract text.
- * Returns the section number/title if line is a section header, null otherwise.
- */
-function detectSectionHeader(line: string): string | null {
-  const trimmed = line.trim();
-
-  // Pattern: "SECTION 1", "ARTICLE 2", "EXHIBIT A"
-  const sectionMatch = trimmed.match(/^(SECTION|ARTICLE|EXHIBIT)\s+(\d+|[A-Z])/i);
-  if (sectionMatch) return sectionMatch[0];
-
-  // Pattern: "1. TITLE" or "1.1 Title" (numbered sections)
-  const numberedMatch = trimmed.match(/^(\d+\.?\d*\.?)\s+[A-Z]/);
-  if (numberedMatch) return trimmed.split(/\s{2,}/)[0];
-
-  // All caps line that's reasonably short (likely a header)
-  if (/^[A-Z\s]{10,60}$/.test(trimmed) && !trimmed.includes('  ')) {
-    return trimmed;
-  }
-
-  return null;
-}
-
-// Note: CompareChange interface is defined below
+// ============================================================================
+// SECTION EXTRACTION
+// ============================================================================
 
 /**
- * Group changes by contract section for easier navigation.
+ * Extract sections from a contract document.
+ * Handles multiple formats: SECTION I., ARTICLE 1, numbered sections, etc.
  */
-function groupChangesBySection(
-  originalText: string,
-  changes: Array<{ id: number; type: 'equal' | 'delete' | 'insert'; text: string }>
-): Array<{ section: string; changes: Array<{ id: number; type: 'equal' | 'delete' | 'insert'; text: string }> }> {
-  const sections: Array<{ section: string; changes: Array<{ id: number; type: 'equal' | 'delete' | 'insert'; text: string }> }> = [];
-  let currentSection = 'Document Start';
-  let currentChanges: Array<{ id: number; type: 'equal' | 'delete' | 'insert'; text: string }> = [];
+function extractSections(text: string): Section[] {
+  const sections: Section[] = [];
 
-  // Reconstruct text with change tracking
-  let position = 0;
-  const originalLines = originalText.split('\n');
-  let lineIndex = 0;
+  // Normalize line endings
+  const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  for (const change of changes) {
-    // Check if we're entering a new section based on position in original text
-    if (change.type === 'equal' || change.type === 'delete') {
-      const text = change.text;
-      const lines = text.split('\n');
+  // Patterns for section headers (ordered by specificity)
+  const sectionPatterns = [
+    // SECTION I. TITLE or SECTION 1. TITLE
+    /^(SECTION\s+([IVXLCDM]+|\d+)\.?\s*)([A-Z][A-Z\s\/&,]+?)(?:\n|$)/gmi,
+    // ARTICLE I or ARTICLE 1
+    /^(ARTICLE\s+([IVXLCDM]+|\d+)\.?\s*)([A-Z][A-Z\s\/&,]+?)(?:\n|$)/gmi,
+  ];
 
-      for (const line of lines) {
-        const header = detectSectionHeader(line);
-        if (header && currentChanges.length > 0) {
-          // Save current section if it has changes
-          const changesInSection = currentChanges.filter(c => c.type !== 'equal');
-          if (changesInSection.length > 0) {
-            sections.push({ section: currentSection, changes: [...currentChanges] });
-          }
-          currentSection = header;
-          currentChanges = [];
-        }
-      }
+  // Find all section headers and their positions
+  const headers: Array<{ index: number; number: string; title: string; fullHeader: string }> = [];
+
+  for (const pattern of sectionPatterns) {
+    let match;
+    while ((match = pattern.exec(normalizedText)) !== null) {
+      headers.push({
+        index: match.index,
+        number: match[2].trim(),
+        title: match[3].trim(),
+        fullHeader: match[0].trim()
+      });
     }
-
-    currentChanges.push(change);
   }
 
-  // Don't forget the last section
-  const changesInSection = currentChanges.filter(c => c.type !== 'equal');
-  if (changesInSection.length > 0) {
-    sections.push({ section: currentSection, changes: [...currentChanges] });
+  // Also look for standalone uppercase headers that look like section titles
+  const standalonePattern = /^([IVXLCDM]+|\d+)\.\s+([A-Z][A-Z\s\/&,]+?)(?:\n|$)/gm;
+  let match;
+  while ((match = standalonePattern.exec(normalizedText)) !== null) {
+    // Only add if not already captured
+    const exists = headers.some(h => Math.abs(h.index - match!.index) < 10);
+    if (!exists) {
+      headers.push({
+        index: match.index,
+        number: match[1].trim(),
+        title: match[2].trim(),
+        fullHeader: match[0].trim()
+      });
+    }
+  }
+
+  // Sort by position in document
+  headers.sort((a, b) => a.index - b.index);
+
+  // Extract content for each section
+  for (let i = 0; i < headers.length; i++) {
+    const current = headers[i];
+    const nextIndex = i + 1 < headers.length ? headers[i + 1].index : normalizedText.length;
+    const content = normalizedText.substring(current.index, nextIndex).trim();
+
+    sections.push({
+      number: current.number,
+      title: current.title,
+      fullHeader: current.fullHeader,
+      content: content
+    });
+  }
+
+  // If no sections found, treat entire document as one section
+  if (sections.length === 0) {
+    sections.push({
+      number: '0',
+      title: 'FULL DOCUMENT',
+      fullHeader: 'FULL DOCUMENT',
+      content: normalizedText
+    });
   }
 
   return sections;
 }
 
-export interface CompareChange {
-  id: number;
-  type: 'equal' | 'delete' | 'insert';
-  text: string;
-}
+/**
+ * Normalize section number for matching (handle Roman numerals vs Arabic)
+ */
+function normalizeNumber(num: string): string {
+  const romanToArabic: Record<string, number> = {
+    'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5,
+    'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10,
+    'XI': 11, 'XII': 12, 'XIII': 13, 'XIV': 14, 'XV': 15,
+    'XVI': 16, 'XVII': 17, 'XVIII': 18, 'XIX': 19, 'XX': 20
+  };
 
-export interface CompareStats {
-  totalChanges: number;
-  deletions: number;
-  insertions: number;
-  originalLength: number;
-  revisedLength: number;
-  characterChanges: number;
-}
-
-export interface CompareResult {
-  mode?: 'ai' | 'diff';
-  changes: CompareChange[];
-  stats: CompareStats;
-  sections: Array<{ section: string; changes: CompareChange[] }>;
-  normalizedOriginal: string;
-  normalizedRevised: string;
+  const upper = num.toUpperCase();
+  if (romanToArabic[upper]) {
+    return String(romanToArabic[upper]);
+  }
+  return num;
 }
 
 /**
- * POST - Compare two documents using AI-powered intelligent analysis.
- *
- * Default mode: AI comparison (useAI=true)
- * - Uses Claude to identify meaningful legal/business changes
- * - Filters out OCR noise, formatting differences
- * - Categorizes changes by significance
- *
- * Legacy mode: Character-level diff (useAI=false)
- * - Uses diff-match-patch for exact character comparison
- * - Good for comparing minor edits to same document
+ * Normalize title for fuzzy matching
  */
+function normalizeTitle(title: string): string {
+  return title
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .trim();
+}
+
+// ============================================================================
+// SECTION MATCHING
+// ============================================================================
+
+interface MatchedPair {
+  original: Section | null;
+  revised: Section | null;
+  matchType: 'exact' | 'fuzzy' | 'number' | 'added' | 'removed';
+}
+
+/**
+ * Match sections between two documents
+ */
+function matchSections(originalSections: Section[], revisedSections: Section[]): MatchedPair[] {
+  const pairs: MatchedPair[] = [];
+  const matchedOriginal = new Set<number>();
+  const matchedRevised = new Set<number>();
+
+  // Pass 1: Exact title match
+  for (let i = 0; i < originalSections.length; i++) {
+    const orig = originalSections[i];
+    for (let j = 0; j < revisedSections.length; j++) {
+      if (matchedRevised.has(j)) continue;
+      const rev = revisedSections[j];
+
+      if (normalizeTitle(orig.title) === normalizeTitle(rev.title)) {
+        pairs.push({ original: orig, revised: rev, matchType: 'exact' });
+        matchedOriginal.add(i);
+        matchedRevised.add(j);
+        break;
+      }
+    }
+  }
+
+  // Pass 2: Number match for unmatched sections
+  for (let i = 0; i < originalSections.length; i++) {
+    if (matchedOriginal.has(i)) continue;
+    const orig = originalSections[i];
+
+    for (let j = 0; j < revisedSections.length; j++) {
+      if (matchedRevised.has(j)) continue;
+      const rev = revisedSections[j];
+
+      if (normalizeNumber(orig.number) === normalizeNumber(rev.number)) {
+        pairs.push({ original: orig, revised: rev, matchType: 'number' });
+        matchedOriginal.add(i);
+        matchedRevised.add(j);
+        break;
+      }
+    }
+  }
+
+  // Pass 3: Fuzzy title match (contains)
+  for (let i = 0; i < originalSections.length; i++) {
+    if (matchedOriginal.has(i)) continue;
+    const orig = originalSections[i];
+    const origNorm = normalizeTitle(orig.title);
+
+    for (let j = 0; j < revisedSections.length; j++) {
+      if (matchedRevised.has(j)) continue;
+      const rev = revisedSections[j];
+      const revNorm = normalizeTitle(rev.title);
+
+      // Check if one contains the other (for slight variations)
+      if (origNorm.includes(revNorm) || revNorm.includes(origNorm)) {
+        pairs.push({ original: orig, revised: rev, matchType: 'fuzzy' });
+        matchedOriginal.add(i);
+        matchedRevised.add(j);
+        break;
+      }
+    }
+  }
+
+  // Remaining original sections = removed
+  for (let i = 0; i < originalSections.length; i++) {
+    if (!matchedOriginal.has(i)) {
+      pairs.push({ original: originalSections[i], revised: null, matchType: 'removed' });
+    }
+  }
+
+  // Remaining revised sections = added
+  for (let j = 0; j < revisedSections.length; j++) {
+    if (!matchedRevised.has(j)) {
+      pairs.push({ original: null, revised: revisedSections[j], matchType: 'added' });
+    }
+  }
+
+  return pairs;
+}
+
+// ============================================================================
+// AI COMPARISON (Per Section)
+// ============================================================================
+
+const SECTION_COMPARE_PROMPT = `Compare these two versions of a contract section. Identify what changed.
+
+RULES:
+- Return ONLY valid JSON, no other text
+- Be specific about what changed
+- Keep excerpts brief (1-2 sentences max)
+- If sections are identical or nearly identical, return empty changes array
+
+OUTPUT FORMAT:
+{
+  "hasChanges": true/false,
+  "significance": "high" | "medium" | "low" | "none",
+  "changes": [
+    {
+      "description": "What changed in plain English",
+      "original": "Brief excerpt from original",
+      "revised": "Brief excerpt from revised",
+      "impact": "Business/legal impact of this change"
+    }
+  ]
+}
+
+SIGNIFICANCE GUIDE:
+- "high": Payment amounts, term length, liability caps, indemnification scope
+- "medium": Notice periods, insurance amounts, procedural requirements
+- "low": Formatting, contact info, minor clarifications
+- "none": No meaningful changes
+
+ORIGINAL SECTION:
+`;
+
+/**
+ * Compare a single section pair using AI
+ */
+async function compareSectionPair(
+  original: Section | null,
+  revised: Section | null
+): Promise<{ hasChanges: boolean; significance: string; changes: Array<{ description: string; original: string; revised: string; impact: string }> }> {
+
+  // Handle added/removed sections without AI
+  if (!original) {
+    return {
+      hasChanges: true,
+      significance: 'medium',
+      changes: [{
+        description: `New section added: ${revised?.title || 'Unknown'}`,
+        original: '(Section not present in original)',
+        revised: revised?.content.substring(0, 200) + '...' || '',
+        impact: 'New provisions added to agreement'
+      }]
+    };
+  }
+
+  if (!revised) {
+    return {
+      hasChanges: true,
+      significance: 'medium',
+      changes: [{
+        description: `Section removed: ${original.title}`,
+        original: original.content.substring(0, 200) + '...',
+        revised: '(Section not present in revised)',
+        impact: 'Provisions removed from agreement'
+      }]
+    };
+  }
+
+  // Quick check: if content is identical, skip AI
+  if (original.content.trim() === revised.content.trim()) {
+    return { hasChanges: false, significance: 'none', changes: [] };
+  }
+
+  // Use AI to compare
+  const prompt = SECTION_COMPARE_PROMPT +
+    original.content.substring(0, 8000) +
+    '\n\nREVISED SECTION:\n' +
+    revised.content.substring(0, 8000);
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://mars-contracts.vercel.app',
+        'X-Title': 'MARS Contract Compare',
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`[SECTION COMPARE] API error for section ${original.number}: ${response.status}`);
+      // Fallback: report as changed but unknown details
+      return {
+        hasChanges: true,
+        significance: 'medium',
+        changes: [{
+          description: 'Section has changes (analysis unavailable)',
+          original: original.content.substring(0, 100) + '...',
+          revised: revised.content.substring(0, 100) + '...',
+          impact: 'Review manually'
+        }]
+      };
+    }
+
+    const aiResponse = await response.json();
+    const content = aiResponse.choices?.[0]?.message?.content || '';
+
+    // Parse JSON
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        hasChanges: parsed.hasChanges ?? parsed.changes?.length > 0,
+        significance: parsed.significance || 'medium',
+        changes: parsed.changes || []
+      };
+    }
+
+    // Fallback if no JSON
+    return {
+      hasChanges: true,
+      significance: 'medium',
+      changes: [{
+        description: 'Section modified',
+        original: original.content.substring(0, 100) + '...',
+        revised: revised.content.substring(0, 100) + '...',
+        impact: 'Review manually'
+      }]
+    };
+
+  } catch (error) {
+    console.error(`[SECTION COMPARE] Error comparing section ${original.number}:`, error);
+    return {
+      hasChanges: true,
+      significance: 'medium',
+      changes: [{
+        description: 'Section has changes (analysis failed)',
+        original: original.content.substring(0, 100) + '...',
+        revised: revised.content.substring(0, 100) + '...',
+        impact: 'Review manually'
+      }]
+    };
+  }
+}
+
+// ============================================================================
+// DOCUMENT INFO EXTRACTION
+// ============================================================================
+
+function extractDocumentInfo(text: string): { title: string; date: string } {
+  // Try to find document title
+  let title = 'Contract Document';
+  const titleMatch = text.match(/(?:AGREEMENT|CONTRACT)[\s\S]{0,100}?(?:for|between)[\s\S]{0,200}?(?=\n\n|THIS)/i);
+  if (titleMatch) {
+    title = titleMatch[0].replace(/\n/g, ' ').trim().substring(0, 100);
+  }
+
+  // Try to find date
+  let date = '';
+  const datePatterns = [
+    /effective\s+(?:as\s+of\s+)?(\w+\s+\d{1,2},?\s+\d{4})/i,
+    /dated?\s+(?:as\s+of\s+)?(\w+\s+\d{1,2},?\s+\d{4})/i,
+    /January\s+1(?:st)?,\s+(\d{4})/i,
+    /(\d{4})\s+(?:agreement|contract)/i,
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      date = match[1] || match[0];
+      break;
+    }
+  }
+
+  // Extract year as fallback
+  if (!date) {
+    const yearMatch = text.match(/20\d{2}/);
+    if (yearMatch) date = yearMatch[0];
+  }
+
+  return { title, date };
+}
+
+// ============================================================================
+// MAIN API HANDLER
+// ============================================================================
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { originalText, revisedText, useAI = true } = body;
+    const { originalText, revisedText } = body;
 
     if (!originalText || !revisedText) {
       return NextResponse.json(
@@ -358,74 +456,98 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[COMPARE] Starting comparison (AI mode: ${useAI})...`);
+    console.log('[COMPARE] Starting section-by-section comparison...');
     console.log(`[COMPARE] Original: ${originalText.length} chars, Revised: ${revisedText.length} chars`);
 
-    // Normalize both texts
-    const normalizedOriginal = normalizeToASCII(originalText);
-    const normalizedRevised = normalizeToASCII(revisedText);
+    // Step 1: Extract sections from both documents
+    const originalSections = extractSections(originalText);
+    const revisedSections = extractSections(revisedText);
 
-    // AI-powered comparison (default)
-    if (useAI && OPENROUTER_API_KEY) {
-      try {
-        const aiResult = await aiCompareContracts(normalizedOriginal, normalizedRevised);
+    console.log(`[COMPARE] Extracted ${originalSections.length} sections from original`);
+    console.log(`[COMPARE] Extracted ${revisedSections.length} sections from revised`);
 
-        console.log(`[COMPARE] AI found ${aiResult.changes.length} meaningful changes`);
-        console.log(`[COMPARE] High: ${aiResult.summary.highSignificance}, Medium: ${aiResult.summary.mediumSignificance}, Low: ${aiResult.summary.lowSignificance}`);
+    // Log section titles for debugging
+    console.log('[COMPARE] Original sections:', originalSections.map(s => `${s.number}: ${s.title}`));
+    console.log('[COMPARE] Revised sections:', revisedSections.map(s => `${s.number}: ${s.title}`));
 
-        return NextResponse.json({
-          mode: 'ai',
-          ...aiResult,
-          normalizedOriginal,
-          normalizedRevised,
-        });
-      } catch (aiError) {
-        console.error('[COMPARE] AI comparison failed, falling back to diff:', aiError);
-        // Fall through to character-level diff
+    // Step 2: Match sections
+    const pairs = matchSections(originalSections, revisedSections);
+    console.log(`[COMPARE] Matched ${pairs.length} section pairs`);
+
+    // Step 3: Compare each section pair (in parallel for speed)
+    const comparisonPromises = pairs.map(async (pair): Promise<SectionComparison> => {
+      const result = await compareSectionPair(pair.original, pair.revised);
+
+      let status: 'unchanged' | 'changed' | 'added' | 'removed' = 'unchanged';
+      if (pair.matchType === 'added') status = 'added';
+      else if (pair.matchType === 'removed') status = 'removed';
+      else if (result.hasChanges) status = 'changed';
+
+      return {
+        sectionNumber: pair.original?.number || pair.revised?.number || '?',
+        sectionTitle: pair.original?.title || pair.revised?.title || 'Unknown Section',
+        status,
+        significance: result.significance as 'high' | 'medium' | 'low' | 'none',
+        changes: result.changes
+      };
+    });
+
+    const sectionComparisons = await Promise.all(comparisonPromises);
+
+    // Step 4: Extract document info
+    const originalInfo = extractDocumentInfo(originalText);
+    const revisedInfo = extractDocumentInfo(revisedText);
+
+    // Step 5: Generate summary
+    const sectionsChanged = sectionComparisons.filter(s => s.status === 'changed').length;
+    const sectionsAdded = sectionComparisons.filter(s => s.status === 'added').length;
+    const sectionsRemoved = sectionComparisons.filter(s => s.status === 'removed').length;
+    const sectionsUnchanged = sectionComparisons.filter(s => s.status === 'unchanged').length;
+
+    // Generate key takeaways from high-significance changes
+    const keyTakeaways: string[] = [];
+    const highChanges = sectionComparisons.filter(s => s.significance === 'high' && s.changes.length > 0);
+    for (const section of highChanges) {
+      for (const change of section.changes.slice(0, 2)) {
+        keyTakeaways.push(`[${section.sectionTitle}] ${change.description}`);
       }
     }
 
-    // Fallback: Character-level diff using diff-match-patch
-    const dmp = new DiffMatchPatch();
-    const diffs = dmp.diff_main(normalizedOriginal, normalizedRevised);
-    dmp.diff_cleanupSemantic(diffs);
-
-    const changes: CompareChange[] = diffs.map(([op, text], index) => ({
-      id: index,
-      type: op === 0 ? 'equal' : op === -1 ? 'delete' : 'insert',
-      text,
-    }));
-
-    let characterChanges = 0;
-    for (const change of changes) {
-      if (change.type !== 'equal') {
-        characterChanges += change.text.length;
-      }
+    // Add summary of added/removed sections
+    if (sectionsAdded > 0) {
+      const addedTitles = sectionComparisons.filter(s => s.status === 'added').map(s => s.sectionTitle);
+      keyTakeaways.push(`New sections added: ${addedTitles.join(', ')}`);
+    }
+    if (sectionsRemoved > 0) {
+      const removedTitles = sectionComparisons.filter(s => s.status === 'removed').map(s => s.sectionTitle);
+      keyTakeaways.push(`Sections removed: ${removedTitles.join(', ')}`);
     }
 
-    const stats: CompareStats = {
-      totalChanges: changes.filter(c => c.type !== 'equal').length,
-      deletions: changes.filter(c => c.type === 'delete').length,
-      insertions: changes.filter(c => c.type === 'insert').length,
-      originalLength: normalizedOriginal.length,
-      revisedLength: normalizedRevised.length,
-      characterChanges,
+    const result: ComparisonResult = {
+      mode: 'section-by-section',
+      documentInfo: {
+        originalTitle: originalInfo.title,
+        revisedTitle: revisedInfo.title,
+        originalDate: originalInfo.date,
+        revisedDate: revisedInfo.date
+      },
+      summary: {
+        totalSections: sectionComparisons.length,
+        sectionsChanged,
+        sectionsAdded,
+        sectionsRemoved,
+        sectionsUnchanged,
+        keyTakeaways: keyTakeaways.slice(0, 10) // Limit to 10 takeaways
+      },
+      sections: sectionComparisons,
+      addedSections: sectionComparisons.filter(s => s.status === 'added').map(s => s.sectionTitle),
+      removedSections: sectionComparisons.filter(s => s.status === 'removed').map(s => s.sectionTitle)
     };
 
-    const sections = groupChangesBySection(normalizedOriginal, changes);
-
-    console.log(`[COMPARE] Diff found ${stats.totalChanges} changes`);
-
-    const result: CompareResult = {
-      mode: 'diff',
-      changes,
-      stats,
-      sections,
-      normalizedOriginal,
-      normalizedRevised,
-    };
+    console.log(`[COMPARE] Complete: ${sectionsChanged} changed, ${sectionsAdded} added, ${sectionsRemoved} removed, ${sectionsUnchanged} unchanged`);
 
     return NextResponse.json(result);
+
   } catch (error) {
     console.error('[COMPARE] Error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
