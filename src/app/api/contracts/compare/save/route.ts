@@ -326,8 +326,7 @@ function generateComparisonDoc(
     } else if (section.status === 'unchanged') {
       children.push(
         new Paragraph({
-          text: 'No changes in this section.',
-          italics: true,
+          children: [new TextRun({ text: 'No changes in this section.', italics: true })],
           spacing: { after: 100 },
         })
       );

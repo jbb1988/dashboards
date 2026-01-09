@@ -1787,6 +1787,47 @@ export default function ContractReviewPage() {
                         </div>
                       )}
 
+                      {/* AI Recommendation (when available and viewing recommendations) */}
+                      {comparisonAnalysis && compareViewMode === 'recommendations' && (() => {
+                        const recommendation = comparisonAnalysis.recommendations.find(
+                          r => r.sectionNumber === section.sectionNumber && r.sectionTitle === section.sectionTitle
+                        );
+                        if (!recommendation || recommendation.verdict === 'accept') return null;
+
+                        const verdictColors = {
+                          accept: { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-400', icon: '✓' },
+                          negotiate: { bg: 'bg-[#F59E0B]/10', border: 'border-[#F59E0B]/30', text: 'text-[#F59E0B]', icon: '⚠' },
+                          push_back: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', icon: '✗' },
+                        };
+                        const colors = verdictColors[recommendation.verdict];
+
+                        return (
+                          <div className={`mt-4 p-3 ${colors.bg} border ${colors.border} rounded-lg`}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`${colors.text} font-medium text-sm`}>
+                                {colors.icon} AI Recommendation: {recommendation.verdict.replace('_', ' ').toUpperCase()}
+                              </span>
+                              <span className={`ml-auto px-2 py-0.5 rounded text-xs ${
+                                recommendation.riskLevel === 'high' ? 'bg-red-500/20 text-red-400' :
+                                recommendation.riskLevel === 'medium' ? 'bg-[#F59E0B]/20 text-[#F59E0B]' :
+                                'bg-[#64748B]/20 text-[#64748B]'
+                              }`}>
+                                {recommendation.riskLevel.toUpperCase()} RISK
+                              </span>
+                            </div>
+                            <p className="text-[#CBD5E1] text-sm">{recommendation.reasoning}</p>
+                            {recommendation.suggestedLanguage && (
+                              <div className="mt-3 pt-3 border-t border-white/[0.08]">
+                                <span className="text-[#A855F7] text-xs font-medium block mb-1">Suggested Counter-Language:</span>
+                                <div className="p-2 bg-[#0B1220] border border-[#A855F7]/20 rounded text-sm text-[#CBD5E1] whitespace-pre-wrap">
+                                  {recommendation.suggestedLanguage}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       {/* No changes message for unchanged sections */}
                       {section.status === 'unchanged' && (
                         <p className="text-[#64748B] text-sm italic">No significant changes in this section.</p>
