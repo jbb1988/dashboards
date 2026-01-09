@@ -10,6 +10,7 @@ interface Contract {
   salesforceId?: string;
   name: string;
   status: string;
+  contractType?: string[];
 }
 
 type ViewMode = 'byContract' | 'list' | 'board';
@@ -629,7 +630,12 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         {viewMode === 'byContract' && (
           <div className="divide-y divide-white/[0.04]">
             {tasksByContract.length > 0 ? (
-              tasksByContract.map(({ contractName, tasks: contractTasks, overdueCount, activeCount, totalCount }) => (
+              tasksByContract.map(({ contractName, tasks: contractTasks, overdueCount, activeCount, totalCount }) => {
+                // Look up contract to get type
+                const linkedContract = contracts.find(c => c.name === contractName);
+                const contractType = linkedContract?.contractType?.join(', ') || '';
+
+                return (
                 <div key={contractName}>
                   <button
                     onClick={() => toggleContractExpanded(contractName)}
@@ -643,7 +649,12 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
-                    <span className="font-medium text-white flex-1 text-left">{contractName}</span>
+                    <div className="flex-1 text-left">
+                      <span className="font-medium text-white">{contractName}</span>
+                      {contractType && (
+                        <span className="text-[#64748B] text-sm ml-2">• {contractType}</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3">
                       {overdueCount > 0 && (
                         <span className="flex items-center gap-1 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
@@ -673,7 +684,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                     )}
                   </AnimatePresence>
                 </div>
-              ))
+              );})
             ) : (
               <div className="text-center py-16 text-[#475569]">
                 <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
