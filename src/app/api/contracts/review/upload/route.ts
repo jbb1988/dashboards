@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Route segment config for App Router
+export const maxDuration = 60; // Allow longer execution for OCR
+export const dynamic = 'force-dynamic';
+
 const ASPOSE_CLIENT_ID = process.env.ASPOSE_CLIENT_ID;
 const ASPOSE_CLIENT_SECRET = process.env.ASPOSE_CLIENT_SECRET;
 

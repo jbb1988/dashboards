@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "src/app/api/contracts/review/upload/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
