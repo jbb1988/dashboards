@@ -835,7 +835,7 @@ export default function ContractReviewPage() {
                     {contracts
                       .filter(c =>
                         c.name.toLowerCase().includes(contractSearch.toLowerCase()) ||
-                        c.status.toLowerCase().includes(contractSearch.toLowerCase())
+                        c.contractType?.some(t => t.toLowerCase().includes(contractSearch.toLowerCase()))
                       )
                       .map((contract) => (
                         <button
@@ -851,13 +851,8 @@ export default function ContractReviewPage() {
                         >
                           <div className="text-white text-sm font-medium truncate">{contract.name}</div>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${
-                              contract.status === 'PO Received' ? 'bg-[#22C55E]/20 text-[#22C55E]' :
-                              contract.status === 'Approval & Signature' ? 'bg-[#38BDF8]/20 text-[#38BDF8]' :
-                              contract.status === 'Review & Redlines' ? 'bg-[#F59E0B]/20 text-[#F59E0B]' :
-                              'bg-white/10 text-[#8FA3BF]'
-                            }`}>
-                              {contract.status}
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-[#8B5CF6]/20 text-[#8B5CF6]">
+                              {contract.contractType?.length > 0 ? contract.contractType.join(', ') : 'No Type'}
                             </span>
                             {contract.value > 0 && (
                               <span className="text-[#64748B] text-xs">
@@ -869,7 +864,7 @@ export default function ContractReviewPage() {
                       ))}
                     {contracts.filter(c =>
                       c.name.toLowerCase().includes(contractSearch.toLowerCase()) ||
-                      c.status.toLowerCase().includes(contractSearch.toLowerCase())
+                      c.contractType?.some(t => t.toLowerCase().includes(contractSearch.toLowerCase()))
                     ).length === 0 && (
                       <div className="px-3 py-4 text-[#64748B] text-sm text-center">
                         No contracts found
@@ -2236,7 +2231,7 @@ export default function ContractReviewPage() {
                 {contracts
                   .filter(c =>
                     c.name.toLowerCase().includes(saveModalSearch.toLowerCase()) ||
-                    c.status?.toLowerCase().includes(saveModalSearch.toLowerCase())
+                    c.contractType?.some(t => t.toLowerCase().includes(saveModalSearch.toLowerCase()))
                   )
                   .slice(0, 10)
                   .map(contract => (
@@ -2258,12 +2253,8 @@ export default function ContractReviewPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          contract.status === 'Closed Won' ? 'bg-green-500/20 text-green-400' :
-                          contract.status === 'Negotiation' ? 'bg-[#F59E0B]/20 text-[#F59E0B]' :
-                          'bg-[#64748B]/20 text-[#64748B]'
-                        }`}>
-                          {contract.status || 'Unknown'}
+                        <span className="text-xs px-2 py-0.5 rounded bg-[#8B5CF6]/20 text-[#8B5CF6]">
+                          {contract.contractType?.length > 0 ? contract.contractType.join(', ') : 'No Type'}
                         </span>
                         {contract.value && (
                           <span className="text-xs text-[#8FA3BF]">
@@ -2276,7 +2267,7 @@ export default function ContractReviewPage() {
                 }
                 {contracts.filter(c =>
                   c.name.toLowerCase().includes(saveModalSearch.toLowerCase()) ||
-                  c.status?.toLowerCase().includes(saveModalSearch.toLowerCase())
+                  c.contractType?.some(t => t.toLowerCase().includes(saveModalSearch.toLowerCase()))
                 ).length === 0 && (
                   <p className="text-[#475569] text-sm text-center py-4">No contracts found</p>
                 )}

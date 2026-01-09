@@ -350,38 +350,221 @@ const guideContent: Record<string, GuideData> = {
     color: '#22C55E',
     topics: [
       {
-        id: 'compare',
-        title: 'Document Comparison',
+        id: 'why-traditional-fails',
+        title: 'Why Word & Acrobat Fall Short',
         content: (
           <div className="space-y-4">
             <p className="text-[#8FA3BF]">
-              Compare two versions of a contract to see what changed:
+              Traditional tools like Microsoft Word Track Changes and Adobe Acrobat Compare treat documents as raw text, not structured legal content. This creates several problems:
             </p>
-            <ol className="space-y-2 text-sm list-decimal list-inside text-[#8FA3BF]">
-              <li>Upload the original document</li>
-              <li>Upload the revised document</li>
-              <li>Click "Compare" to see side-by-side differences</li>
-              <li>Changes are highlighted: <span className="text-green-400">additions</span> and <span className="text-red-400 line-through">deletions</span></li>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-red-500/20">
+                <h4 className="text-red-400 font-medium mb-2">Character-Level Comparison</h4>
+                <p className="text-[#64748B] text-sm">
+                  These tools compare character-by-character, flagging formatting changes, whitespace differences, and paragraph reflows as "changes." A simple font change can generate hundreds of false positives, burying the actual legal modifications.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-red-500/20">
+                <h4 className="text-red-400 font-medium mb-2">PDF Text Extraction Issues</h4>
+                <p className="text-[#64748B] text-sm">
+                  PDFs store visual rendering instructions, not semantic text. Multi-column layouts, headers, footers, and tables often extract incorrectly—words merge, break mid-word, or appear out of order. What looks perfect on screen becomes garbled text.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-red-500/20">
+                <h4 className="text-red-400 font-medium mb-2">No Legal Understanding</h4>
+                <p className="text-[#64748B] text-sm">
+                  Word and Acrobat cannot distinguish between trivial changes ("will" → "shall") and material ones (liability cap removed). They show everything with equal weight, requiring manual review of every difference.
+                </p>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'legal-software-approach',
+        title: 'How Professional Legal Software Works',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Professional contract software (Litera, Draftable, LexCheck) uses a fundamentally different approach: <strong className="text-white">parse first, then compare</strong>.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-[#38BDF8] font-medium mb-3">The Parse → Structure → Compare Pipeline</h4>
+              <ol className="space-y-3 text-sm">
+                <li className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">1</span>
+                  <div>
+                    <span className="text-white font-medium">Parse Document Structure</span>
+                    <p className="text-[#64748B]">Identify sections, headings, and clause boundaries using AI/NLP—not regex patterns that break on formatting variations.</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">2</span>
+                  <div>
+                    <span className="text-white font-medium">Match Sections Semantically</span>
+                    <p className="text-[#64748B]">Match "Section 5: Indemnification" to "Article V - Indemnification" even with different numbering or naming conventions.</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">3</span>
+                  <div>
+                    <span className="text-white font-medium">Compare Matched Sections</span>
+                    <p className="text-[#64748B]">Compare content within each matched section, filtering noise and highlighting substantive changes.</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">4</span>
+                  <div>
+                    <span className="text-white font-medium">Assess Significance</span>
+                    <p className="text-[#64748B]">Rate each change (High/Medium/Low) based on legal impact, not just text difference.</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'mars-approach',
+        title: 'The MARS AI-First Approach',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              MARS uses an <strong className="text-white">AI-first methodology</strong> that goes beyond even professional legal software:
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#22C55E]/20">
+                <h4 className="text-[#22C55E] font-medium mb-2">Section-by-Section Analysis</h4>
+                <p className="text-[#64748B] text-sm">
+                  AI reads both documents and extracts sections with full understanding of legal structure—handling variations in numbering, titles, and organization.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#22C55E]/20">
+                <h4 className="text-[#22C55E] font-medium mb-2">Semantic Matching</h4>
+                <p className="text-[#64748B] text-sm">
+                  Matches sections by meaning, not just headings. "Payment Terms" and "Compensation Schedule" are recognized as the same section.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#22C55E]/20">
+                <h4 className="text-[#22C55E] font-medium mb-2">Legal Impact Assessment</h4>
+                <p className="text-[#64748B] text-sm">
+                  Each change is rated High/Medium/Low based on actual legal significance—liability changes rank high, formatting changes rank none.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#22C55E]/20">
+                <h4 className="text-[#22C55E] font-medium mb-2">Key Takeaways</h4>
+                <p className="text-[#64748B] text-sm">
+                  Automatically generates executive summary of material changes—no need to read through hundreds of diffs.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#22C55E]/10 to-[#38BDF8]/10 rounded-lg p-4 border border-white/[0.06]">
+              <p className="text-[#8FA3BF] text-sm">
+                <strong className="text-white">Result:</strong> Instead of 200+ false positives, you see 14 meaningful section changes with clear explanations of what changed and why it matters.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'ai-recommendations',
+        title: 'AI Recommendations',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              After comparing documents, MARS can analyze changes against your standard negotiating positions:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Verdict System</h4>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="px-2 py-1 bg-[#22C55E]/20 text-[#22C55E] rounded text-xs font-medium">ACCEPT</span>
+                  <span className="text-[#64748B] text-sm">Change is favorable or industry standard—no action needed</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="px-2 py-1 bg-[#F59E0B]/20 text-[#F59E0B] rounded text-xs font-medium">NEGOTIATE</span>
+                  <span className="text-[#64748B] text-sm">Change has some risk—AI provides suggested counter-language</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="px-2 py-1 bg-[#EF4444]/20 text-[#EF4444] rounded text-xs font-medium">PUSH BACK</span>
+                  <span className="text-[#64748B] text-sm">Materially unfavorable—reject or significantly revise with provided alternative</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-[#64748B] text-sm">
+              Each recommendation includes reasoning and specific counter-language you can use in negotiations, aligned with MARS standard positions on liability, indemnification, IP, termination, and more.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: 'compare-workflow',
+        title: 'Using Document Compare',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Compare Documents workflow:
+            </p>
+            <ol className="space-y-3 text-sm">
+              <li className="flex items-start gap-3 p-3 bg-[#0B1220] rounded-lg">
+                <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">1</span>
+                <div>
+                  <span className="text-white font-medium">Upload Documents</span>
+                  <p className="text-[#64748B]">Upload the original contract and the revised version (PDF format)</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3 p-3 bg-[#0B1220] rounded-lg">
+                <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">2</span>
+                <div>
+                  <span className="text-white font-medium">AI Comparison</span>
+                  <p className="text-[#64748B]">AI extracts sections, matches them, and identifies changes with significance ratings</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3 p-3 bg-[#0B1220] rounded-lg">
+                <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">3</span>
+                <div>
+                  <span className="text-white font-medium">Review Results</span>
+                  <p className="text-[#64748B]">Filter by status (Changed/Added/Removed) or significance (High/Medium/Low)</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3 p-3 bg-[#0B1220] rounded-lg">
+                <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">4</span>
+                <div>
+                  <span className="text-white font-medium">Get AI Recommendations</span>
+                  <p className="text-[#64748B]">Click "Get AI Recommendations" for Accept/Negotiate/Push Back guidance with counter-language</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3 p-3 bg-[#0B1220] rounded-lg">
+                <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">5</span>
+                <div>
+                  <span className="text-white font-medium">Save to Contract</span>
+                  <p className="text-[#64748B]">Save the comparison report to a contract record (generates Word doc automatically)</p>
+                </div>
+              </li>
             </ol>
           </div>
         ),
       },
       {
         id: 'ai-redlines',
-        title: 'AI Redlines',
+        title: 'AI Redlines (Upload Tab)',
         content: (
           <div className="space-y-4">
             <p className="text-[#8FA3BF]">
-              Let Claude AI suggest redlines based on MARS standard provisions:
+              The Upload tab provides AI-powered redlining of a single contract against MARS standard provisions:
             </p>
             <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
               <ol className="space-y-2 text-sm list-decimal list-inside text-[#8FA3BF]">
-                <li>Select a contract provision type</li>
-                <li>Review the suggested changes</li>
+                <li>Upload a contract document (PDF, Word, or paste text)</li>
+                <li>AI analyzes each section against MARS negotiating positions</li>
+                <li>Review suggested redlines with strikethrough and insertions</li>
                 <li>Accept, modify, or reject each suggestion</li>
-                <li>Export the final redlined document</li>
+                <li>Save to contract record for tracking</li>
               </ol>
             </div>
+            <p className="text-[#64748B] text-sm">
+              MARS positions cover liability caps, indemnification, IP ownership, termination rights, warranties, payment terms, audit rights, dispute resolution, and insurance requirements.
+            </p>
           </div>
         ),
       },
