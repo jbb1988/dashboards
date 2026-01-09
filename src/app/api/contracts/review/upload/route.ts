@@ -369,7 +369,7 @@ async function extractPdfWithVisionOCR(uint8Array: Uint8Array): Promise<string> 
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 16000,
+          max_tokens: 64000,
           messages: [
             {
               role: 'user',
@@ -430,7 +430,7 @@ async function extractPdfWithVisionOCR(uint8Array: Uint8Array): Promise<string> 
               ],
             },
           ],
-          max_tokens: 16000,
+          max_tokens: 64000,
         }),
       });
 
