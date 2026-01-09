@@ -106,10 +106,35 @@ function KPICard({ title, value, subtitle, color }: { title: string; value: Reac
   );
 }
 
+// Asana-style colors
+const ASANA_COLORS = {
+  placeholder: '#F1BD6C', // Yellow
+  confirmed: '#7FBA7A',   // Green
+};
+
+// Helper to get task status (Confirmed/Placeholder)
+function getTaskStatus(task: AsanaTask): 'confirmed' | 'placeholder' | null {
+  // Check tags first
+  const hasConfirmedTag = task.tags?.some(t => t?.name?.toLowerCase() === 'confirmed');
+  if (hasConfirmedTag) return 'confirmed';
+
+  const hasPlaceholderTag = task.tags?.some(t => t?.name?.toLowerCase() === 'placeholder');
+  if (hasPlaceholderTag) return 'placeholder';
+
+  // Check Schedule Status custom field
+  const scheduleStatus = getCustomField(task, 'Schedule Status')?.toLowerCase();
+  if (scheduleStatus?.includes('confirmed')) return 'confirmed';
+  if (scheduleStatus?.includes('placeholder')) return 'placeholder';
+
+  return null;
+}
+
 // Timeline Tab - Calendar focused view
 function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boolean }) {
   const [scheduleFilter, setScheduleFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter' | 'all'>('month');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
 
   // Get unique schedule statuses
   const scheduleStatuses = useMemo(() => {
@@ -120,6 +145,19 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
       if (status) statuses.add(status);
     });
     return Array.from(statuses).sort();
+  }, [data]);
+
+  // Count confirmed and placeholder tasks
+  const { confirmedCount, placeholderCount } = useMemo(() => {
+    if (!data) return { confirmedCount: 0, placeholderCount: 0 };
+    let confirmed = 0;
+    let placeholder = 0;
+    data.tasks.filter(t => !t.completed).forEach(task => {
+      const status = getTaskStatus(task);
+      if (status === 'confirmed') confirmed++;
+      else if (status === 'placeholder') placeholder++;
+    });
+    return { confirmedCount: confirmed, placeholderCount: placeholder };
   }, [data]);
 
   // Filter and group tasks by date
@@ -180,33 +218,97 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
     return groups;
   }, [data, scheduleFilter, dateRange]);
 
+  // Calendar grid data
+  const calendarData = useMemo(() => {
+    if (!data) return { days: [], tasksByDate: {} };
+
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+
+    // Get first day of month and how many days
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+
+    // Build days array with padding for calendar grid
+    const days: (Date | null)[] = [];
+
+    // Add empty slots for days before the 1st
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push(null);
+    }
+
+    // Add all days of the month
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i));
+    }
+
+    // Group tasks by date string
+    const tasksByDate: Record<string, AsanaTask[]> = {};
+    data.tasks.filter(t => !t.completed && (t.dueOn || t.startOn)).forEach(task => {
+      const dateStr = task.startOn || task.dueOn;
+      if (dateStr) {
+        if (!tasksByDate[dateStr]) tasksByDate[dateStr] = [];
+        tasksByDate[dateStr].push(task);
+      }
+    });
+
+    return { days, tasksByDate };
+  }, [data, calendarMonth]);
+
   if (loading || !data) {
     return <LoadingState />;
   }
 
   const tasksWithDates = data.tasks.filter(t => t.dueOn || t.startOn).length;
 
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCalendarMonth(prev => {
+      const newMonth = new Date(prev);
+      newMonth.setMonth(newMonth.getMonth() + (direction === 'next' ? 1 : -1));
+      return newMonth;
+    });
+  };
+
   return (
     <div>
-      {/* Stats */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      {/* Stats with Confirmed and Placeholder */}
+      <div className="grid grid-cols-6 gap-4 mb-6">
         <KPICard title="Total Projects" value={data.stats.total} subtitle={`${tasksWithDates} scheduled`} color="#E16259" />
-        <KPICard title="This Week" value={Object.values(groupedByDate)[0]?.length || 0} subtitle="Upcoming" color="#38BDF8" />
+        <KPICard title="Confirmed" value={confirmedCount} subtitle="Ready to go" color={ASANA_COLORS.confirmed} />
+        <KPICard title="Placeholder" value={placeholderCount} subtitle="Tentative" color={ASANA_COLORS.placeholder} />
         <KPICard title="Overdue" value={data.stats.overdue} subtitle="Need attention" color="#EF4444" />
-        <KPICard title="Next 7 Days" value={data.stats.dueSoon} subtitle="Due soon" color="#F59E0B" />
+        <KPICard title="Next 7 Days" value={data.stats.dueSoon} subtitle="Due soon" color="#38BDF8" />
         <KPICard title="Unassigned" value={data.stats.unassigned} subtitle="Need owner" color="#8B5CF6" />
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-4 mb-6 p-4 rounded-xl bg-[#111827] border border-white/[0.04]">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-[#475569] uppercase">Date Range:</span>
-          {(['week', 'month', 'quarter', 'all'] as const).map(range => (
-            <button key={range} onClick={() => setDateRange(range)} className={`text-[11px] px-3 py-1.5 rounded-lg capitalize ${dateRange === range ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
-              {range === 'all' ? 'All Time' : range}
-            </button>
-          ))}
+          <span className="text-[11px] font-semibold text-[#475569] uppercase">View:</span>
+          <button onClick={() => setViewMode('calendar')} className={`text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${viewMode === 'calendar' ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            Calendar
+          </button>
+          <button onClick={() => setViewMode('list')} className={`text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${viewMode === 'list' ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+            List
+          </button>
         </div>
+        {viewMode === 'list' && (
+          <>
+            <div className="h-4 w-px bg-white/10" />
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-[#475569] uppercase">Date Range:</span>
+              {(['week', 'month', 'quarter', 'all'] as const).map(range => (
+                <button key={range} onClick={() => setDateRange(range)} className={`text-[11px] px-3 py-1.5 rounded-lg capitalize ${dateRange === range ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
+                  {range === 'all' ? 'All Time' : range}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <div className="h-4 w-px bg-white/10" />
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold text-[#475569] uppercase">Type:</span>
@@ -215,58 +317,155 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
             {scheduleStatuses.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
-        <span className="ml-auto text-[11px] text-[#64748B]">{Object.values(groupedByDate).flat().length} tasks</span>
+        <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-2 text-[10px]">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: ASANA_COLORS.confirmed }} /> Confirmed</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: ASANA_COLORS.placeholder }} /> Placeholder</span>
+          </div>
+          <span className="text-[11px] text-[#64748B]">{Object.values(groupedByDate).flat().length} tasks</span>
+        </div>
       </div>
 
-      {/* Calendar View by Week */}
-      {Object.entries(groupedByDate).length === 0 ? (
-        <div className="text-center py-12 text-[#64748B]">No scheduled tasks in this date range</div>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedByDate).map(([week, tasks]) => (
-            <div key={week} className="rounded-xl bg-[#111827] border border-white/[0.04] overflow-hidden">
-              <div className="px-5 py-3 bg-[#0B1220] border-b border-white/[0.04] flex items-center justify-between">
-                <span className="font-semibold text-[#EAF2FF] text-[13px]">Week of {week}</span>
-                <span className="text-[10px] text-[#64748B]">{tasks.length} tasks</span>
-              </div>
-              <div className="divide-y divide-white/[0.03]">
-                {tasks.map((task, idx) => {
-                  const scheduleStatus = getCustomField(task, 'Schedule Status');
-                  const region = getCustomField(task, 'Region');
-                  const overdue = isOverdue(task.dueOn);
+      {/* Calendar View */}
+      {viewMode === 'calendar' && (
+        <div className="rounded-xl bg-[#111827] border border-white/[0.04] overflow-hidden">
+          {/* Calendar Header */}
+          <div className="px-5 py-3 bg-[#0B1220] border-b border-white/[0.04] flex items-center justify-between">
+            <button onClick={() => navigateMonth('prev')} className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <span className="font-semibold text-[#EAF2FF] text-[14px]">
+              {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </span>
+            <button onClick={() => navigateMonth('next')} className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
 
-                  return (
-                    <div key={task.gid} className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#131B28]' : 'bg-[#111827]'} hover:bg-[#1a2740] transition-colors`}>
-                      {/* Date */}
-                      <div className="w-20 text-center">
-                        <div className={`text-[13px] font-semibold ${overdue ? 'text-[#EF4444]' : 'text-[#EAF2FF]'}`}>
-                          {formatShortDate(task.startOn || task.dueOn)}
+          {/* Weekday Headers */}
+          <div className="grid grid-cols-7 border-b border-white/[0.04]">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="px-2 py-2 text-center text-[10px] font-semibold text-[#475569] uppercase">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7">
+            {calendarData.days.map((day, idx) => {
+              if (!day) {
+                return <div key={`empty-${idx}`} className="min-h-[100px] border-r border-b border-white/[0.03] bg-[#0B1220]/50" />;
+              }
+
+              const dateStr = day.toISOString().split('T')[0];
+              const dayTasks = calendarData.tasksByDate[dateStr] || [];
+              const isToday = new Date().toDateString() === day.toDateString();
+              const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+
+              return (
+                <div key={dateStr} className={`min-h-[100px] border-r border-b border-white/[0.03] p-1.5 ${isToday ? 'bg-[#E16259]/5' : isPast ? 'bg-[#0B1220]/30' : 'bg-[#111827]'}`}>
+                  <div className={`text-[11px] font-medium mb-1 ${isToday ? 'text-[#E16259]' : isPast ? 'text-[#475569]' : 'text-[#8FA3BF]'}`}>
+                    {day.getDate()}
+                  </div>
+                  <div className="space-y-0.5 max-h-[70px] overflow-y-auto">
+                    {dayTasks.slice(0, 3).map(task => {
+                      const taskStatus = getTaskStatus(task);
+                      const bgColor = taskStatus === 'confirmed' ? ASANA_COLORS.confirmed :
+                                      taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : '#64748B';
+                      return (
+                        <div
+                          key={task.gid}
+                          className="text-[9px] px-1.5 py-0.5 rounded truncate text-white font-medium cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{ backgroundColor: bgColor }}
+                          title={`${task.name}${task.assignee ? ` - ${task.assignee.name}` : ''}`}
+                        >
+                          {task.name}
                         </div>
-                        {task.startOn && task.dueOn && task.startOn !== task.dueOn && (
-                          <div className="text-[9px] text-[#64748B]">to {formatShortDate(task.dueOn)}</div>
-                        )}
-                      </div>
-
-                      {/* Task Name */}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] text-[#EAF2FF] truncate">{task.name}</div>
-                        <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
-                      </div>
-
-                      {/* Schedule Status Badge */}
-                      {scheduleStatus && (
-                        <span className="text-[9px] px-2 py-1 rounded bg-[#E16259]/20 text-[#E16259]">{scheduleStatus}</span>
-                      )}
-
-                      {/* Region */}
-                      {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+                      );
+                    })}
+                    {dayTasks.length > 3 && (
+                      <div className="text-[9px] text-[#64748B] pl-1">+{dayTasks.length - 3} more</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <>
+          {Object.entries(groupedByDate).length === 0 ? (
+            <div className="text-center py-12 text-[#64748B]">No scheduled tasks in this date range</div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(groupedByDate).map(([week, tasks]) => (
+                <div key={week} className="rounded-xl bg-[#111827] border border-white/[0.04] overflow-hidden">
+                  <div className="px-5 py-3 bg-[#0B1220] border-b border-white/[0.04] flex items-center justify-between">
+                    <span className="font-semibold text-[#EAF2FF] text-[13px]">Week of {week}</span>
+                    <span className="text-[10px] text-[#64748B]">{tasks.length} tasks</span>
+                  </div>
+                  <div className="divide-y divide-white/[0.03]">
+                    {tasks.map((task, idx) => {
+                      const scheduleStatus = getCustomField(task, 'Schedule Status');
+                      const region = getCustomField(task, 'Region');
+                      const overdue = isOverdue(task.dueOn);
+                      const taskStatus = getTaskStatus(task);
+                      const statusColor = taskStatus === 'confirmed' ? ASANA_COLORS.confirmed :
+                                          taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : null;
+
+                      return (
+                        <div key={task.gid} className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#131B28]' : 'bg-[#111827]'} hover:bg-[#1a2740] transition-colors`}>
+                          {/* Status Indicator */}
+                          {statusColor && (
+                            <div className="w-1 h-8 rounded-full" style={{ backgroundColor: statusColor }} />
+                          )}
+
+                          {/* Date */}
+                          <div className="w-20 text-center">
+                            <div className={`text-[13px] font-semibold ${overdue ? 'text-[#EF4444]' : 'text-[#EAF2FF]'}`}>
+                              {formatShortDate(task.startOn || task.dueOn)}
+                            </div>
+                            {task.startOn && task.dueOn && task.startOn !== task.dueOn && (
+                              <div className="text-[9px] text-[#64748B]">to {formatShortDate(task.dueOn)}</div>
+                            )}
+                          </div>
+
+                          {/* Task Name */}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] text-[#EAF2FF] truncate">{task.name}</div>
+                            <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
+                          </div>
+
+                          {/* Status Badge with Asana colors */}
+                          {taskStatus && (
+                            <span
+                              className="text-[9px] px-2 py-1 rounded font-medium text-white"
+                              style={{ backgroundColor: statusColor || '#64748B' }}
+                            >
+                              {taskStatus === 'confirmed' ? 'Confirmed' : 'Placeholder'}
+                            </span>
+                          )}
+
+                          {/* Schedule Status Badge */}
+                          {scheduleStatus && !taskStatus && (
+                            <span className="text-[9px] px-2 py-1 rounded bg-[#64748B]/20 text-[#8FA3BF]">{scheduleStatus}</span>
+                          )}
+
+                          {/* Region */}
+                          {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
