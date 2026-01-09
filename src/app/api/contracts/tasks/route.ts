@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTasks, createTask, Task } from '@/lib/supabase';
+import { getTasks, createTask, deleteTask, Task } from '@/lib/supabase';
 
 /**
  * GET - Fetch tasks, optionally filtered by contract name
@@ -78,5 +78,30 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating task:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE - Delete a task
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const taskId = searchParams.get('taskId');
+
+    if (!taskId) {
+      return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
+    }
+
+    const success = await deleteTask(taskId);
+
+    if (!success) {
+      return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, taskId });
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }
 }

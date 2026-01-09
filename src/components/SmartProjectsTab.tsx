@@ -29,7 +29,7 @@ interface ProjectData {
   lastUpdated: string;
 }
 
-type SmartView = 'needs_attention' | 'this_week' | 'by_status' | 'all';
+type SmartView = 'needs_attention' | 'this_week' | 'by_status' | 'all' | 'confirmed' | 'placeholder';
 
 interface PriorityScore {
   taskId: string;
@@ -347,13 +347,15 @@ export default function SmartProjectsTab({
   const [searchQuery, setSearchQuery] = useState('');
 
   // Calculate priorities for all tasks
-  const { priorities, needsAttentionTasks, thisWeekTasks, byStatusGroups, allTasks, stats } = useMemo(() => {
+  const { priorities, needsAttentionTasks, thisWeekTasks, byStatusGroups, allTasks, confirmedTasks, placeholderTasks, stats } = useMemo(() => {
     if (!data) return {
       priorities: new Map<string, PriorityScore>(),
       needsAttentionTasks: [],
       thisWeekTasks: [],
       byStatusGroups: {},
       allTasks: [],
+      confirmedTasks: [],
+      placeholderTasks: [],
       stats: { needsAttention: 0, thisWeek: 0, confirmed: 0, placeholder: 0 }
     };
 
@@ -419,12 +421,28 @@ export default function SmartProjectsTab({
       return dateA.getTime() - dateB.getTime();
     });
 
+    // Confirmed tasks sorted by date
+    const confirmedTasks = [...confirmed].sort((a, b) => {
+      const dateA = new Date(a.startOn || a.dueOn || '9999');
+      const dateB = new Date(b.startOn || b.dueOn || '9999');
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    // Placeholder tasks sorted by date
+    const placeholderTasks = [...placeholder].sort((a, b) => {
+      const dateA = new Date(a.startOn || a.dueOn || '9999');
+      const dateB = new Date(b.startOn || b.dueOn || '9999');
+      return dateA.getTime() - dateB.getTime();
+    });
+
     return {
       priorities,
       needsAttentionTasks,
       thisWeekTasks,
       byStatusGroups,
       allTasks,
+      confirmedTasks,
+      placeholderTasks,
       stats: {
         needsAttention: needsAttentionTasks.length,
         thisWeek: thisWeekTasks.length,
@@ -453,7 +471,8 @@ export default function SmartProjectsTab({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           whileHover={{ y: -2, boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(225,98,89,0.1)' }}
-          className="relative overflow-hidden rounded-xl p-5 bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+          onClick={() => setActiveView('all')}
+          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'all' ? 'border-2 border-[#E16259] ring-2 ring-[#E16259]/20' : 'border border-white/[0.06]'}`}
         >
           <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[#E16259]" />
           <div className="text-[11px] font-medium text-[#64748B] mb-2">Active Projects</div>
@@ -467,7 +486,7 @@ export default function SmartProjectsTab({
           transition={{ delay: 0.05 }}
           whileHover={{ y: -2, boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)' }}
           onClick={() => setActiveView('needs_attention')}
-          className="relative overflow-hidden rounded-xl p-5 bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer"
+          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'needs_attention' ? 'border-2 border-[#EF4444] ring-2 ring-[#EF4444]/20' : 'border border-white/[0.06]'}`}
         >
           <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[#EF4444]" />
           <div className="text-[11px] font-medium text-[#64748B] mb-2">Needs Attention</div>
@@ -481,7 +500,7 @@ export default function SmartProjectsTab({
           transition={{ delay: 0.1 }}
           whileHover={{ y: -2, boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(56,189,248,0.1)' }}
           onClick={() => setActiveView('this_week')}
-          className="relative overflow-hidden rounded-xl p-5 bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer"
+          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'this_week' ? 'border-2 border-[#38BDF8] ring-2 ring-[#38BDF8]/20' : 'border border-white/[0.06]'}`}
         >
           <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[#38BDF8]" />
           <div className="text-[11px] font-medium text-[#64748B] mb-2">This Week</div>
@@ -494,7 +513,8 @@ export default function SmartProjectsTab({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
           whileHover={{ y: -2, boxShadow: `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${COLORS.confirmed}20` }}
-          className="relative overflow-hidden rounded-xl p-5 bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+          onClick={() => setActiveView('confirmed')}
+          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'confirmed' ? 'border-2 border-[#7FBA7A] ring-2 ring-[#7FBA7A]/20' : 'border border-white/[0.06]'}`}
         >
           <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl" style={{ backgroundColor: COLORS.confirmed }} />
           <div className="text-[11px] font-medium text-[#64748B] mb-2">Confirmed</div>
@@ -507,7 +527,8 @@ export default function SmartProjectsTab({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           whileHover={{ y: -2, boxShadow: `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${COLORS.placeholder}20` }}
-          className="relative overflow-hidden rounded-xl p-5 bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+          onClick={() => setActiveView('placeholder')}
+          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'placeholder' ? 'border-2 border-[#F1BD6C] ring-2 ring-[#F1BD6C]/20' : 'border border-white/[0.06]'}`}
         >
           <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl" style={{ backgroundColor: COLORS.placeholder }} />
           <div className="text-[11px] font-medium text-[#64748B] mb-2">Placeholder</div>
@@ -772,6 +793,120 @@ export default function SmartProjectsTab({
                 })}
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* Confirmed Projects View */}
+        {activeView === 'confirmed' && (
+          <motion.div
+            key="confirmed"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+          >
+            {confirmedTasks.length === 0 ? (
+              <div className="text-center py-16 rounded-xl bg-[#151F2E] border border-white/[0.06]">
+                <div className="text-[16px] font-medium text-white mb-1">No confirmed projects</div>
+                <div className="text-[13px] text-[#8FA3BF]">No projects have been confirmed yet</div>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
+                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
+                  <span className="w-3 h-3 rounded" style={{ backgroundColor: COLORS.confirmed }} />
+                  <span className="font-semibold text-[14px] text-white">Confirmed Projects</span>
+                  <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{confirmedTasks.length} projects</span>
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {confirmedTasks.map((task, idx) => {
+                    const priority = priorities.get(task.gid);
+                    const region = getCustomField(task, 'Region');
+
+                    return (
+                      <div
+                        key={task.gid}
+                        className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
+                      >
+                        {priority && (
+                          <div className="w-1 h-8 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
+                        )}
+                        <div className="w-20 text-center">
+                          <div className="text-[13px] font-semibold text-white">{formatShortDate(task.startOn || task.dueOn)}</div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] text-white truncate">{task.name}</div>
+                          <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
+                        </div>
+                        <span
+                          className="text-[9px] px-2 py-1 rounded font-medium text-white"
+                          style={{ backgroundColor: COLORS.confirmed }}
+                        >
+                          Confirmed
+                        </span>
+                        {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Placeholder Projects View */}
+        {activeView === 'placeholder' && (
+          <motion.div
+            key="placeholder"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+          >
+            {placeholderTasks.length === 0 ? (
+              <div className="text-center py-16 rounded-xl bg-[#151F2E] border border-white/[0.06]">
+                <div className="text-[16px] font-medium text-white mb-1">No placeholder projects</div>
+                <div className="text-[13px] text-[#8FA3BF]">No tentative projects found</div>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
+                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
+                  <span className="w-3 h-3 rounded" style={{ backgroundColor: COLORS.placeholder }} />
+                  <span className="font-semibold text-[14px] text-white">Placeholder Projects</span>
+                  <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{placeholderTasks.length} projects</span>
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {placeholderTasks.map((task, idx) => {
+                    const priority = priorities.get(task.gid);
+                    const region = getCustomField(task, 'Region');
+
+                    return (
+                      <div
+                        key={task.gid}
+                        className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
+                      >
+                        {priority && (
+                          <div className="w-1 h-8 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
+                        )}
+                        <div className="w-20 text-center">
+                          <div className="text-[13px] font-semibold text-white">{formatShortDate(task.startOn || task.dueOn)}</div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] text-white truncate">{task.name}</div>
+                          <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
+                        </div>
+                        <span
+                          className="text-[9px] px-2 py-1 rounded font-medium"
+                          style={{ backgroundColor: COLORS.placeholder, color: '#1A1F2E' }}
+                        >
+                          Placeholder
+                        </span>
+                        {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -685,6 +685,25 @@ function ContractRow({
     }
   };
 
+  // Delete task
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('Delete this task?')) return;
+
+    try {
+      const response = await fetch(`/api/contracts/tasks?taskId=${taskId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setTasks(prev => prev.filter(t => t.id !== taskId));
+      } else {
+        console.error('Failed to delete task');
+      }
+    } catch (err) {
+      console.error('Error deleting task:', err);
+    }
+  };
+
   // Quick add task (from row action)
   const handleQuickAddTask = async () => {
     if (!quickTaskTitle.trim()) return;
@@ -755,22 +774,41 @@ function ContractRow({
         ${focusMode && isCritical ? 'ring-1 ring-[#F59E0B]/30 bg-[#F59E0B]/5' : ''}
         hover:shadow-[0_0_20px_rgba(56,189,248,0.05)]`}
       >
-        <div className="grid gap-4 px-6 py-[14px] items-center" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr 32px' }}>
-          {/* Name - Clickable to Salesforce */}
+        <div className="grid gap-4 px-6 py-[14px] items-center" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
+          {/* Name with Expand Chevron */}
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+            {/* Expand/Collapse Chevron */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isEditing) setIsExpanded(!isExpanded);
+              }}
+              className={`p-1 -ml-1 rounded hover:bg-white/10 transition-all flex-shrink-0 ${
+                isExpanded ? 'text-[#38BDF8]' : 'text-[#64748B] hover:text-white'
+              }`}
+              title={isExpanded ? 'Collapse' : 'Expand'}
+            >
+              <svg
+                className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
             <div
               className={`w-1.5 h-1.5 rounded-full flex-shrink-0`}
               style={{ background: contract.isOverdue ? '#ef4444' : statusColor }}
             />
             <div className="min-w-0 flex-1 overflow-hidden">
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSalesforceClick}
-                  className="font-semibold text-[#EAF2FF] hover:text-[#38BDF8] text-left transition-colors cursor-pointer truncate"
+                <span
+                  className="font-semibold text-[#EAF2FF] truncate"
                   title={contract.name}
                 >
                   {contract.name}
-                </button>
+                </span>
                 {contract.isRenewal && (
                   <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#A78BFA]/15 text-[#A78BFA] flex-shrink-0">
                     R
@@ -924,31 +962,7 @@ function ContractRow({
             )}
           </div>
 
-          {/* Expand/Collapse Button */}
-          <div className="flex items-center justify-center">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isEditing) setIsExpanded(!isExpanded);
-              }}
-              className={`p-1.5 rounded-md transition-all ${
-                isExpanded
-                  ? 'text-[#38BDF8] bg-[#38BDF8]/10'
-                  : 'text-[#64748B] hover:text-white hover:bg-white/5'
-              }`}
-              title={isExpanded ? 'Collapse' : 'Expand'}
-            >
-              <svg
-                className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
           </div>
-        </div>
 
         {/* Expanded Details */}
         <AnimatePresence>
@@ -1230,6 +1244,20 @@ function ContractRow({
                               `}>
                                 {task.status}
                               </span>
+
+                              {/* Delete button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTask(task.id);
+                                }}
+                                className="opacity-0 group-hover/task:opacity-100 p-1 text-[#64748B] hover:text-[#EF4444] transition-all"
+                                title="Delete task"
+                              >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
                             </div>
                           </div>
                         );
@@ -2464,7 +2492,7 @@ export default function ContractsDashboard() {
                 </AnimatePresence>
 
                 {/* Table Column Headers */}
-                <div className="grid gap-4 px-6 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-[0.05em] border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr 32px' }}>
+                <div className="grid gap-4 px-6 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-[0.05em] border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
                   <button
                     className="text-left hover:text-white flex items-center gap-1"
                     onClick={() => { setSortField('name'); setSortDirection(d => d === 'asc' ? 'desc' : 'asc'); }}
@@ -2495,7 +2523,6 @@ export default function ContractsDashboard() {
                     Days Left
                     {sortField === 'daysInStage' && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
                   </button>
-                  <div className="text-center w-6"></div>
                 </div>
 
                 {/* Table Body */}
@@ -2620,7 +2647,7 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'board' | 'byContract'>('byContract');
-  const [filter, setFilter] = useState<'all' | 'overdue' | 'pending' | 'completed'>('all');
+  const [filter, setFilter] = useState<'all' | 'overdue' | 'pending' | 'completed' | 'dueToday'>('all');
   const [showAddTask, setShowAddTask] = useState(false);
   const [editingTask, setEditingTask] = useState<any | null>(null);
   const [newTask, setNewTask] = useState({ title: '', contractId: '', dueDate: '', priority: 'medium' });
@@ -2725,6 +2752,20 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
     }
   }
 
+  async function handleDeleteTask(taskId: string) {
+    if (!confirm('Delete this task?')) return;
+    try {
+      const response = await fetch(`/api/contracts/tasks?taskId=${taskId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setTasks(prev => prev.filter(t => t.id !== taskId));
+      }
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
+  }
+
   // Task KPIs
   const taskKpis = useMemo(() => {
     const today = new Date();
@@ -2782,6 +2823,15 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
     if (filter === 'overdue') return task.dueDate && new Date(task.dueDate) < new Date() && !task.completed;
     if (filter === 'pending') return !task.completed;
     if (filter === 'completed') return task.completed;
+    if (filter === 'dueToday') {
+      if (task.completed || !task.dueDate) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const due = new Date(task.dueDate);
+      return due >= today && due < tomorrow;
+    }
     return true;
   });
 
@@ -2806,6 +2856,12 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
   // Task Row Component - with polish animations
   const TaskRow = ({ task, showContract = false, index = 0 }: { task: any; showContract?: boolean; index?: number }) => {
     const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !task.completed;
+    // Look up contract to get type
+    const linkedContract = task.contractName
+      ? contracts.find(c => c.name === task.contractName)
+      : null;
+    const contractType = linkedContract?.contractType?.join(', ') || '';
+
     return (
       <motion.div
         initial={{ opacity: 0, x: -10 }}
@@ -2842,7 +2898,17 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
         </motion.button>
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-medium transition-all ${task.completed ? 'text-[#64748B] line-through' : 'text-white'}`}>{task.title}</p>
-          {showContract && task.contractName && <p className="text-[#38BDF8] text-xs truncate">{task.contractName}</p>}
+          {showContract && task.contractName && (
+            <div className="flex items-center gap-2 text-xs mt-0.5">
+              <span className="text-[#38BDF8] truncate">{task.contractName}</span>
+              {contractType && (
+                <>
+                  <span className="text-[#475569]">•</span>
+                  <span className="text-[#64748B]">{contractType}</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
         {task.dueDate && (
           <div className={`text-xs flex-shrink-0 flex items-center gap-1 ${isOverdue ? 'text-red-400 font-medium' : 'text-[#64748B]'}`}>
@@ -2869,8 +2935,18 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           className="p-1.5 rounded-lg hover:bg-white/10 text-[#64748B] hover:text-white transition-colors flex-shrink-0"
+          title="Edit task"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+        </motion.button>
+        <motion.button
+          onClick={() => handleDeleteTask(task.id)}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          className="p-1.5 rounded-lg hover:bg-red-500/20 text-[#64748B] hover:text-red-400 transition-colors flex-shrink-0"
+          title="Delete task"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
         </motion.button>
       </motion.div>
     );
@@ -2890,18 +2966,26 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
         </div>
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: 'Active', value: taskKpis.totalActive, color: 'white', bgColor: 'bg-[#0B1220]', borderColor: 'border-white/[0.04]' },
-            { label: 'Overdue', value: taskKpis.overdue, color: taskKpis.overdue > 0 ? 'text-red-400' : 'text-white', bgColor: taskKpis.overdue > 0 ? 'bg-red-500/10' : 'bg-[#0B1220]', borderColor: taskKpis.overdue > 0 ? 'border-red-500/20' : 'border-white/[0.04]', labelColor: taskKpis.overdue > 0 ? 'text-red-400/70' : 'text-[#64748B]' },
-            { label: 'Due Today', value: taskKpis.dueSoon, color: taskKpis.dueSoon > 0 ? 'text-amber-400' : 'text-white', bgColor: taskKpis.dueSoon > 0 ? 'bg-amber-500/10' : 'bg-[#0B1220]', borderColor: taskKpis.dueSoon > 0 ? 'border-amber-500/20' : 'border-white/[0.04]', labelColor: taskKpis.dueSoon > 0 ? 'text-amber-400/70' : 'text-[#64748B]' },
-            { label: 'Completed', value: taskKpis.completedRecent, color: 'text-[#22C55E]', bgColor: 'bg-[#0B1220]', borderColor: 'border-white/[0.04]' },
+            { label: 'Active', value: taskKpis.totalActive, color: 'white', bgColor: 'bg-[#0B1220]', borderColor: 'border-white/[0.04]', filterKey: 'pending' as const },
+            { label: 'Overdue', value: taskKpis.overdue, color: taskKpis.overdue > 0 ? 'text-red-400' : 'text-white', bgColor: taskKpis.overdue > 0 ? 'bg-red-500/10' : 'bg-[#0B1220]', borderColor: taskKpis.overdue > 0 ? 'border-red-500/20' : 'border-white/[0.04]', labelColor: taskKpis.overdue > 0 ? 'text-red-400/70' : 'text-[#64748B]', filterKey: 'overdue' as const },
+            { label: 'Due Today', value: taskKpis.dueSoon, color: taskKpis.dueSoon > 0 ? 'text-amber-400' : 'text-white', bgColor: taskKpis.dueSoon > 0 ? 'bg-amber-500/10' : 'bg-[#0B1220]', borderColor: taskKpis.dueSoon > 0 ? 'border-amber-500/20' : 'border-white/[0.04]', labelColor: taskKpis.dueSoon > 0 ? 'text-amber-400/70' : 'text-[#64748B]', filterKey: 'dueToday' as const },
+            { label: 'Completed', value: taskKpis.completedRecent, color: 'text-[#22C55E]', bgColor: 'bg-[#0B1220]', borderColor: 'border-white/[0.04]', filterKey: 'completed' as const },
           ].map((kpi, i) => (
-            <motion.div
+            <motion.button
               key={kpi.label}
+              onClick={() => {
+                const newFilter = filter === kpi.filterKey ? 'all' : kpi.filterKey;
+                setFilter(newFilter);
+                if (newFilter !== 'all') setViewMode('list'); // Switch to list view to show filtered results
+              }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 + i * 0.08, duration: 0.3 }}
               whileHover={{ scale: 1.02, transition: { duration: 0.15 } }}
-              className={`${kpi.bgColor} rounded-lg p-4 border ${kpi.borderColor} cursor-default transition-shadow hover:shadow-lg hover:shadow-black/20`}
+              whileTap={{ scale: 0.98 }}
+              className={`${kpi.bgColor} rounded-lg p-4 border ${kpi.borderColor} cursor-pointer transition-all hover:shadow-lg hover:shadow-black/20 text-left ${
+                filter === kpi.filterKey ? 'ring-2 ring-[#38BDF8] ring-offset-2 ring-offset-[#111827]' : ''
+              }`}
             >
               <motion.div
                 initial={{ opacity: 0 }}
@@ -2912,7 +2996,7 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                 {kpi.value}
               </motion.div>
               <div className={`text-xs uppercase tracking-wider ${kpi.labelColor || 'text-[#64748B]'}`}>{kpi.label}</div>
-            </motion.div>
+            </motion.button>
           ))}
         </div>
         {/* Progress Bar */}
@@ -2965,8 +3049,9 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
               className="bg-[#0B1220] border border-white/[0.04] rounded-lg px-3 py-2 text-sm text-white"
             >
               <option value="all">All Tasks</option>
+              <option value="pending">Active</option>
               <option value="overdue">Overdue</option>
-              <option value="pending">Pending</option>
+              <option value="dueToday">Due Today</option>
               <option value="completed">Completed</option>
             </select>
           )}
@@ -3091,7 +3176,10 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
         {viewMode === 'byContract' && (
           <div className="divide-y divide-white/[0.04]">
             {tasksByContract.length > 0 ? (
-              tasksByContract.map(({ contractName, tasks: contractTasks, overdueCount, activeCount, totalCount }) => (
+              tasksByContract.map(({ contractName, tasks: contractTasks, overdueCount, activeCount, totalCount }) => {
+                const linkedContract = contracts.find(c => c.name === contractName);
+                const contractType = linkedContract?.contractType?.join(', ') || '';
+                return (
                 <div key={contractName}>
                   <button
                     onClick={() => toggleContractExpanded(contractName)}
@@ -3100,7 +3188,12 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                     <svg className={`w-4 h-4 text-[#64748B] transition-transform ${expandedContracts.has(contractName) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
-                    <span className="font-medium text-white flex-1 text-left">{contractName}</span>
+                    <div className="flex-1 text-left">
+                      <span className="font-medium text-white">{contractName}</span>
+                      {contractType && (
+                        <span className="text-[#64748B] text-sm ml-2">• {contractType}</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3">
                       {overdueCount > 0 && (
                         <span className="flex items-center gap-1 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
@@ -3131,7 +3224,7 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                     )}
                   </AnimatePresence>
                 </div>
-              ))
+              );})
             ) : (
               <div className="text-center py-16 text-[#475569]">
                 <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
@@ -3197,6 +3290,10 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                   <AnimatePresence>
                     {column.tasks.map((task, idx) => {
                       const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !task.completed;
+                      const linkedContract = task.contractName
+                        ? contracts.find(c => c.name === task.contractName)
+                        : null;
+                      const contractType = linkedContract?.contractType?.join(', ') || '';
                       return (
                         <motion.div
                           key={task.id}
@@ -3217,10 +3314,16 @@ function TasksTab({ contracts }: { contracts: Contract[] }) {
                         >
                           <p className="text-sm text-white font-medium mb-2">{task.title}</p>
                           {task.contractName && (
-                            <p className="text-xs text-[#38BDF8] mb-2 truncate flex items-center gap-1">
+                            <div className="text-xs mb-2 truncate flex items-center gap-1.5">
                               <span className="w-1 h-1 rounded-full bg-[#38BDF8]" />
-                              {task.contractName}
-                            </p>
+                              <span className="text-[#38BDF8]">{task.contractName}</span>
+                              {contractType && (
+                                <>
+                                  <span className="text-[#475569]">•</span>
+                                  <span className="text-[#64748B]">{contractType}</span>
+                                </>
+                              )}
+                            </div>
                           )}
                           <div className="flex items-center gap-2">
                             {task.dueDate && (
