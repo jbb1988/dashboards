@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import SmartDocumentsTab from '@/components/SmartDocumentsTab';
 import GlobalSearch from '@/components/GlobalSearch';
+import CommandPalette, { getDefaultCommands } from './components/CommandPalette';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { StageProgressCompact } from './components/StageProgressDots';
+import TaskBadge from './components/TaskBadge';
+import TasksTabSupabase from './components/TasksTabSupabase';
 
 // Types
 interface Contract {
@@ -1576,6 +1581,26 @@ export default function ContractsDashboard() {
   const [salesforceStatus, setSalesforceStatus] = useState<'connected' | 'needs_auth' | 'not_configured'>('connected');
   const [activeTab, setActiveTab] = useState<'pipeline' | 'tasks' | 'documents'>('pipeline');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [selectedContractIndex, setSelectedContractIndex] = useState(0);
+  const [taskStats, setTaskStats] = useState<{ pending: number; overdue: number } | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch task stats for KPI display
+  useEffect(() => {
+    async function fetchTaskStats() {
+      try {
+        const response = await fetch('/api/tasks?stats=true');
+        if (response.ok) {
+          const stats = await response.json();
+          setTaskStats({ pending: stats.pending + stats.inProgress, overdue: stats.overdue });
+        }
+      } catch (err) {
+        console.error('Failed to fetch task stats:', err);
+      }
+    }
+    fetchTaskStats();
+  }, [activeTab]); // Refresh when switching tabs
 
   // Check Salesforce status
   useEffect(() => {
@@ -1643,6 +1668,65 @@ export default function ContractsDashboard() {
   const handleFilterChange = (filter: ActiveFilter) => {
     setActiveFilter(filter === activeFilter ? 'all' : filter);
   };
+
+  // Command palette commands
+  const commandPaletteCommands = useMemo(() => getDefaultCommands({
+    createTask: () => {
+      setActiveTab('tasks');
+      // TasksTab will handle showing the add task form
+    },
+    filterOverdue: () => {
+      setDateFilter('overdue');
+      setActiveFilter('overdue');
+    },
+    filterDue30: () => {
+      setDateFilter('this-month');
+      setActiveFilter('due30');
+    },
+    filterHighValue: () => {
+      setActiveFilter('highValue');
+    },
+    clearFilters: () => {
+      setActiveFilter('all');
+      setStatusFilter('all');
+      setDateFilter('all');
+      setSearchQuery('');
+    },
+    goToPipeline: () => setActiveTab('pipeline'),
+    goToTasks: () => setActiveTab('tasks'),
+    goToDocuments: () => setActiveTab('documents'),
+    refresh: () => fetchData(),
+    exportData: () => {
+      // Simple CSV export
+      if (!data) return;
+      const csv = [
+        ['Name', 'Value', 'Status', 'Close Date', 'Sales Rep'].join(','),
+        ...data.contracts.map(c =>
+          [c.name, c.value, c.status, c.closeDate || '', c.salesRep || ''].join(',')
+        )
+      ].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'contracts-export.csv';
+      a.click();
+    },
+  }), [data, fetchData]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts(
+    [
+      { key: 't', description: 'Create task', action: () => setActiveTab('tasks') },
+      { key: '/', description: 'Focus search', action: () => searchInputRef.current?.focus() },
+      { key: 'f', description: 'Toggle filters', action: () => setFilterPanelOpen(p => !p) },
+      { key: 'r', description: 'Refresh', action: () => fetchData() },
+      { key: 'p', sequence: ['g', 'p'], description: 'Go to Pipeline', action: () => setActiveTab('pipeline') },
+      { key: 't', sequence: ['g', 't'], description: 'Go to Tasks', action: () => setActiveTab('tasks') },
+      { key: 'd', sequence: ['g', 'd'], description: 'Go to Documents', action: () => setActiveTab('documents') },
+    ],
+    { enabled: !commandPaletteOpen, onCommandPalette: () => setCommandPaletteOpen(true) }
+  );
 
   // Get unique statuses for filter dropdown
   const statuses = useMemo(() => {
@@ -1951,6 +2035,26 @@ export default function ContractsDashboard() {
 
   return (
     <div className="min-h-screen bg-[#0F1722]">
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        commands={commandPaletteCommands}
+        contracts={data?.contracts.map(c => ({
+          id: c.id,
+          salesforceId: c.salesforceId,
+          name: c.name,
+          status: c.status,
+          value: c.value,
+        })) || []}
+        onContractSelect={(contractId) => {
+          // Scroll to and highlight the contract
+          setSearchQuery(data?.contracts.find(c => c.id === contractId)?.name || '');
+          setActiveTab('pipeline');
+        }}
+        placeholder="Type a command or search contracts..."
+      />
+
       {/* Sidebar */}
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
@@ -1978,6 +2082,20 @@ export default function ContractsDashboard() {
                 <p className="text-gray-500 mt-1">Real-time Salesforce data • Click cards to filter</p>
               </div>
               <div className="flex items-center gap-6">
+                {/* Command Palette Trigger */}
+                <button
+                  onClick={() => setCommandPaletteOpen(true)}
+                  className="flex items-center gap-3 px-4 py-2 bg-[#0B1220] border border-white/[0.08] rounded-lg text-[#64748B] hover:text-white hover:border-[#38BDF8]/30 transition-all group"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <span className="text-sm">Search or command...</span>
+                  <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-[#64748B] bg-[#151F2E] rounded border border-white/[0.06] group-hover:border-[#38BDF8]/20">
+                    <span className="text-[11px]">⌘</span>K
+                  </kbd>
+                </button>
+
                 {/* Global Search */}
                 <GlobalSearch />
 
@@ -2547,7 +2665,12 @@ export default function ContractsDashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
-              <TasksTab contracts={data.contracts} />
+              <TasksTabSupabase contracts={data.contracts.map(c => ({
+                id: c.id,
+                salesforceId: c.salesforceId,
+                name: c.name,
+                status: c.status,
+              }))} />
             </motion.div>
           )}
 

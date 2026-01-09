@@ -151,6 +151,26 @@ export async function getExcelFromStorage(filename: string): Promise<Buffer | nu
   return Buffer.from(arrayBuffer);
 }
 
+// Task type for Supabase tasks table
+export interface Task {
+  id?: string;
+  title: string;
+  description?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  contract_id?: string;
+  contract_salesforce_id?: string;
+  contract_name?: string;
+  contract_stage?: string;
+  is_auto_generated: boolean;
+  task_template_id?: string;
+  due_date?: string;
+  completed_at?: string;
+  assignee_email?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Contract type for Supabase contracts table
 export interface Contract {
   id?: string;
@@ -254,4 +274,228 @@ export async function deleteStaleContracts(activeSalesforceIds: string[]): Promi
   }
 
   return staleIds.length;
+}
+
+// ============================================
+// TASK CRUD FUNCTIONS
+// ============================================
+
+/**
+ * Get all tasks from Supabase
+ */
+export async function getTasks(filters?: {
+  contractId?: string;
+  contractSalesforceId?: string;
+  status?: string;
+  assigneeEmail?: string;
+}): Promise<Task[]> {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from('tasks')
+    .select('*')
+    .order('due_date', { ascending: true, nullsFirst: false });
+
+  if (filters?.contractId) {
+    query = query.eq('contract_id', filters.contractId);
+  }
+  if (filters?.contractSalesforceId) {
+    query = query.eq('contract_salesforce_id', filters.contractSalesforceId);
+  }
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+  if (filters?.assigneeEmail) {
+    query = query.eq('assignee_email', filters.assigneeEmail);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching tasks:', error);
+    return [];
+  }
+
+  return data as Task[];
+}
+
+/**
+ * Get tasks for a specific contract
+ */
+export async function getTasksForContract(contractSalesforceId: string): Promise<Task[]> {
+  return getTasks({ contractSalesforceId });
+}
+
+/**
+ * Create a new task
+ */
+export async function createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('tasks')
+    .insert({
+      ...task,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating task:', error);
+    return null;
+  }
+
+  return data as Task;
+}
+
+/**
+ * Create multiple tasks at once (for auto-generation)
+ */
+export async function createTasks(tasks: Array<Omit<Task, 'id' | 'created_at' | 'updated_at'>>): Promise<Task[]> {
+  const admin = getSupabaseAdmin();
+
+  const tasksWithTimestamps = tasks.map(task => ({
+    ...task,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { data, error } = await admin
+    .from('tasks')
+    .insert(tasksWithTimestamps)
+    .select();
+
+  if (error) {
+    console.error('Error creating tasks:', error);
+    return [];
+  }
+
+  return data as Task[];
+}
+
+/**
+ * Update a task
+ */
+export async function updateTask(
+  taskId: string,
+  updates: Partial<Omit<Task, 'id' | 'created_at'>>
+): Promise<Task | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('tasks')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+      // Set completed_at if task is being marked complete
+      ...(updates.status === 'completed' && !updates.completed_at
+        ? { completed_at: new Date().toISOString() }
+        : {}),
+    })
+    .eq('id', taskId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating task:', error);
+    return null;
+  }
+
+  return data as Task;
+}
+
+/**
+ * Delete a task
+ */
+export async function deleteTask(taskId: string): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+
+  const { error } = await admin
+    .from('tasks')
+    .delete()
+    .eq('id', taskId);
+
+  if (error) {
+    console.error('Error deleting task:', error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Delete all auto-generated tasks for a contract stage
+ * (Used when contract moves to a new stage to clean up old stage tasks)
+ */
+export async function deleteAutoTasksForContractStage(
+  contractSalesforceId: string,
+  stage: string
+): Promise<number> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('tasks')
+    .delete()
+    .eq('contract_salesforce_id', contractSalesforceId)
+    .eq('contract_stage', stage)
+    .eq('is_auto_generated', true)
+    .eq('status', 'pending') // Only delete uncompleted auto-tasks
+    .select();
+
+  if (error) {
+    console.error('Error deleting auto tasks:', error);
+    return 0;
+  }
+
+  return data?.length || 0;
+}
+
+/**
+ * Get task statistics for dashboard
+ */
+export async function getTaskStats(): Promise<{
+  total: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  overdue: number;
+  dueThisWeek: number;
+}> {
+  const admin = getSupabaseAdmin();
+
+  const today = new Date();
+  const weekFromNow = new Date();
+  weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+  const { data, error } = await admin
+    .from('tasks')
+    .select('id, status, due_date');
+
+  if (error || !data) {
+    console.error('Error fetching task stats:', error);
+    return { total: 0, pending: 0, inProgress: 0, completed: 0, overdue: 0, dueThisWeek: 0 };
+  }
+
+  const stats = {
+    total: data.length,
+    pending: data.filter(t => t.status === 'pending').length,
+    inProgress: data.filter(t => t.status === 'in_progress').length,
+    completed: data.filter(t => t.status === 'completed').length,
+    overdue: data.filter(t =>
+      t.status !== 'completed' &&
+      t.status !== 'cancelled' &&
+      t.due_date &&
+      new Date(t.due_date) < today
+    ).length,
+    dueThisWeek: data.filter(t =>
+      t.status !== 'completed' &&
+      t.status !== 'cancelled' &&
+      t.due_date &&
+      new Date(t.due_date) >= today &&
+      new Date(t.due_date) <= weekFromNow
+    ).length,
+  };
+
+  return stats;
 }

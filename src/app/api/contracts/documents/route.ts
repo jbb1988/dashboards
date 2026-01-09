@@ -227,39 +227,56 @@ export async function GET(request: NextRequest) {
 
     const admin = getSupabaseAdmin();
 
-    // Build query
-    let query = admin
-      .from('documents')
-      .select('*')
-      .eq('is_current_version', true)
-      .order('uploaded_at', { ascending: false });
-
-    // Apply filters
-    if (contractId) {
-      query = query.eq('contract_id', contractId);
-    }
-    if (accountName) {
-      query = query.eq('account_name', accountName);
-    }
-    if (documentType && DOCUMENT_TYPES.includes(documentType as any)) {
-      query = query.eq('document_type', documentType);
-    }
-    if (status && DOCUMENT_STATUSES.includes(status as any)) {
-      query = query.eq('status', status);
-    }
-
-    const { data: documents, error } = await query;
-
-    if (error) {
-      console.error('Error fetching documents:', error);
-      return NextResponse.json({ error: 'Failed to fetch documents' }, { status: 500 });
-    }
-
-    // Get contracts for priority calculation
-    const { data: contracts } = await admin
+    // First, get contracts (always needed)
+    // Include contracts where is_closed is false OR null (not explicitly closed)
+    const { data: contracts, error: contractsError } = await admin
       .from('contracts')
       .select('*')
-      .eq('is_closed', false);
+      .or('is_closed.eq.false,is_closed.is.null');
+
+    if (contractsError) {
+      console.error('Error fetching contracts:', contractsError);
+      return NextResponse.json({ error: 'Failed to fetch contracts' }, { status: 500 });
+    }
+
+    // Try to get documents (table might not exist yet)
+    let documents: Document[] = [];
+    let documentsTableExists = true;
+
+    try {
+      let query = admin
+        .from('documents')
+        .select('*')
+        .eq('is_current_version', true)
+        .order('uploaded_at', { ascending: false });
+
+      // Apply filters
+      if (contractId) {
+        query = query.eq('contract_id', contractId);
+      }
+      if (accountName) {
+        query = query.eq('account_name', accountName);
+      }
+      if (documentType && DOCUMENT_TYPES.includes(documentType as any)) {
+        query = query.eq('document_type', documentType);
+      }
+      if (status && DOCUMENT_STATUSES.includes(status as any)) {
+        query = query.eq('status', status);
+      }
+
+      const { data: docsData, error: docsError } = await query;
+
+      if (docsError) {
+        // Table might not exist - log but continue with empty documents
+        console.log('Documents query error (table may not exist):', docsError.message);
+        documentsTableExists = false;
+      } else {
+        documents = docsData || [];
+      }
+    } catch (err) {
+      console.log('Documents table not available:', err);
+      documentsTableExists = false;
+    }
 
     // Calculate priority scores for each contract
     const priorityScores: Record<string, PriorityScore> = {};
@@ -360,11 +377,12 @@ export async function GET(request: NextRequest) {
 
     // Calculate summary stats
     const allPriorities = Object.values(priorityScores);
+    const contractsList = contracts || [];
     const stats = {
-      totalDocuments: (documents || []).length,
-      totalContracts: (contracts || []).length,
+      totalDocuments: documents.length,
+      totalContracts: contractsList.length,
       needsAttention: allPriorities.filter(p => p.category === 'critical' || p.category === 'high').length,
-      closingSoon: (contracts || []).filter(c => {
+      closingSoon: contractsList.filter(c => {
         if (!c.contract_date && !c.close_date) return false;
         const targetDate = new Date(c.contract_date || c.close_date);
         const daysUntil = Math.floor((targetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -381,7 +399,7 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json({
-      documents: documents || [],
+      documents,
       byAccount,
       priorityScores,
       completenessScores,
@@ -389,6 +407,7 @@ export async function GET(request: NextRequest) {
       documentTypes: DOCUMENT_TYPES,
       requiredTypes: REQUIRED_DOCUMENT_TYPES,
       optionalTypes: OPTIONAL_DOCUMENT_TYPES,
+      documentsTableExists,
     });
   } catch (error) {
     console.error('Error in GET /api/contracts/documents:', error);
