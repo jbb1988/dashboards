@@ -1616,7 +1616,7 @@ export default function ContractsDashboard() {
   const [budgetedFilter, setBudgetedFilter] = useState(false); // Show only budgeted/forecasted
   const [probabilityMin, setProbabilityMin] = useState<number>(0); // Min probability filter
   const [probabilityMax, setProbabilityMax] = useState<number>(100); // Max probability filter
-  const [dataSource, setDataSource] = useState<DataSource>('salesforce');
+  const [dataSource, setDataSource] = useState<DataSource>('supabase');
   const [salesforceStatus, setSalesforceStatus] = useState<'connected' | 'needs_auth' | 'not_configured'>('connected');
   const [activeTab, setActiveTab] = useState<'pipeline' | 'tasks' | 'documents'>('pipeline');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1792,7 +1792,12 @@ export default function ContractsDashboard() {
     setError(null);
     try {
       const endpoint = dataSource === 'salesforce' ? '/api/salesforce' : '/api/contracts';
-      const response = await fetch(endpoint);
+      // Add cache-busting timestamp to force fresh data
+      const cacheBuster = `?t=${Date.now()}`;
+      const response = await fetch(endpoint + cacheBuster, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       if (!response.ok) throw new Error('Failed to fetch contracts');
       const result = await response.json();
       if (result.error) {
