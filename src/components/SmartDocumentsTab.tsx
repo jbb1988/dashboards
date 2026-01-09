@@ -668,7 +668,7 @@ function PriorityCard({
         </button>
         {salesforceId && (
           <a
-            href={`https://marswater.lightning.force.com/lightning/r/Opportunity/${salesforceId}/view`}
+            href={`https://marscompany.lightning.force.com/lightning/r/Opportunity/${salesforceId}/view`}
             target="_blank"
             rel="noopener noreferrer"
             className="px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#38BDF8] hover:text-white text-sm rounded-lg transition-colors flex items-center gap-1"
