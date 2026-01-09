@@ -316,19 +316,20 @@ function decodeXmlEntities(text: string): string {
     .replace(/&apos;/g, "'");
 }
 
-// Extract text from PDF using pdf-parse (server-side friendly)
+// Extract text from PDF using unpdf (Node.js compatible, no browser APIs required)
 async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
-    // Use require for pdf-parse as it has CommonJS-style exports
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse');
+    // unpdf works in both Node.js and browser without requiring DOMMatrix/canvas
+    const { extractText, getDocumentProxy } = await import('unpdf');
 
-    const data = await pdfParse(buffer, {
-      // Limit to reasonable page count for performance
-      max: 100,
-    });
+    // Convert Buffer to Uint8Array for unpdf
+    const uint8Array = new Uint8Array(buffer);
 
-    return data.text || '';
+    // Get document proxy and extract text
+    const pdf = await getDocumentProxy(uint8Array);
+    const { text } = await extractText(pdf, { mergePages: true });
+
+    return text || '';
   } catch (error) {
     console.error('PDF parse error:', error);
     throw new Error(`PDF parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
