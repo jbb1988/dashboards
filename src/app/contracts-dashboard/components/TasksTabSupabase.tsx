@@ -205,6 +205,20 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
     }
   };
 
+  const deleteTask = async (taskId: string) => {
+    if (!confirm('Delete this task?')) return;
+    try {
+      const response = await fetch(`/api/tasks?id=${taskId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setTasks(prev => prev.filter(t => t.id !== taskId));
+      }
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
+  };
+
   const toggleContractExpanded = (contractName: string) => {
     const newExpanded = new Set(expandedContracts);
     if (newExpanded.has(contractName)) {
@@ -316,6 +330,20 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
           </svg>
+        </motion.button>
+
+        {/* Delete button */}
+        <motion.button
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteTask(task.id!);
+          }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium flex-shrink-0"
+          title="Delete task"
+        >
+          ✕
         </motion.button>
       </motion.div>
     );
@@ -716,21 +744,33 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                         {task.contract_name && (
                           <p className="text-xs text-[#38BDF8] mt-1 truncate">{task.contract_name}</p>
                         )}
-                        <div className="flex items-center gap-2 mt-2">
-                          {task.due_date && (
-                            <span className={`text-[10px] ${isOverdue ? 'text-red-400' : 'text-[#64748B]'}`}>
-                              {isOverdue && '⚠ '}
-                              {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        <div className="flex items-center justify-between gap-2 mt-2">
+                          <div className="flex items-center gap-2">
+                            {task.due_date && (
+                              <span className={`text-[10px] ${isOverdue ? 'text-red-400' : 'text-[#64748B]'}`}>
+                                {isOverdue && '⚠ '}
+                                {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                            )}
+                            <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-medium ${
+                              task.priority === 'urgent' ? 'bg-red-500/15 text-red-400' :
+                              task.priority === 'high' ? 'bg-orange-500/15 text-orange-400' :
+                              task.priority === 'medium' ? 'bg-amber-500/15 text-amber-400' :
+                              'bg-[#475569]/20 text-[#64748B]'
+                            }`}>
+                              {task.priority}
                             </span>
-                          )}
-                          <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-medium ${
-                            task.priority === 'urgent' ? 'bg-red-500/15 text-red-400' :
-                            task.priority === 'high' ? 'bg-orange-500/15 text-orange-400' :
-                            task.priority === 'medium' ? 'bg-amber-500/15 text-amber-400' :
-                            'bg-[#475569]/20 text-[#64748B]'
-                          }`}>
-                            {task.priority}
-                          </span>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteTask(task.id!);
+                            }}
+                            className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium"
+                            title="Delete task"
+                          >
+                            ✕
+                          </button>
                         </div>
                       </motion.div>
                     );
