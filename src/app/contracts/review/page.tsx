@@ -300,8 +300,10 @@ export default function ContractReviewPage() {
   }
 
   async function handleDownloadBothForCompare() {
-    // Download both documents sequentially for Word Compare
+    // Download both documents with a delay to prevent browser blocking second download
     await handleDownloadOriginalPlain();
+    // Wait 1 second before second download to avoid browser blocking
+    await new Promise(resolve => setTimeout(resolve, 1000));
     await handleDownloadRevised();
   }
 
@@ -660,7 +662,7 @@ export default function ContractReviewPage() {
                     <button
                       onClick={handleDownloadBothForCompare}
                       disabled={isGeneratingDocx || isGeneratingOriginal}
-                      className="w-full py-3 bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-3"
+                      className="w-full py-3 bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-2"
                     >
                       {(isGeneratingDocx || isGeneratingOriginal) ? (
                         <>
@@ -676,6 +678,30 @@ export default function ContractReviewPage() {
                         </>
                       )}
                     </button>
+
+                    {/* Individual download buttons as fallback */}
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        onClick={handleDownloadOriginalPlain}
+                        disabled={isGeneratingOriginal}
+                        className="flex-1 py-2 bg-[#F59E0B]/10 border border-[#F59E0B]/30 text-[#F59E0B] text-sm font-medium rounded-lg hover:bg-[#F59E0B]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Original
+                      </button>
+                      <button
+                        onClick={handleDownloadRevised}
+                        disabled={isGeneratingDocx}
+                        className="flex-1 py-2 bg-[#22C55E]/10 border border-[#22C55E]/30 text-[#22C55E] text-sm font-medium rounded-lg hover:bg-[#22C55E]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Revised
+                      </button>
+                    </div>
 
                     {/* Instructions - UPDATED */}
                     <div className="text-sm text-[#8FA3BF] space-y-1.5">
