@@ -150,3 +150,108 @@ export async function getExcelFromStorage(filename: string): Promise<Buffer | nu
   const arrayBuffer = await data.arrayBuffer();
   return Buffer.from(arrayBuffer);
 }
+
+// Contract type for Supabase contracts table
+export interface Contract {
+  id?: string;
+  salesforce_id: string;
+  name: string;
+  opportunity_name: string;
+  account_name: string;
+  value: number;
+  status: string;
+  status_group: string;
+  sales_stage: string;
+  contract_type: string[];
+  close_date: string | null;
+  award_date: string | null;
+  contract_date: string | null;
+  install_date: string | null;
+  sales_rep: string;
+  probability: number;
+  budgeted: boolean;
+  manual_close_probability: number | null;
+  is_closed: boolean;
+  is_won: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Get all contracts from Supabase
+ */
+export async function getContracts(): Promise<Contract[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from('contracts')
+    .select('*')
+    .order('close_date', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching contracts:', error);
+    return [];
+  }
+
+  return data as Contract[];
+}
+
+/**
+ * Upsert contracts to Supabase (insert or update based on salesforce_id)
+ */
+export async function upsertContracts(contracts: Contract[]): Promise<{ success: boolean; count: number; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  // Add updated_at timestamp
+  const contractsWithTimestamp = contracts.map(c => ({
+    ...c,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { data, error } = await admin
+    .from('contracts')
+    .upsert(contractsWithTimestamp, {
+      onConflict: 'salesforce_id',
+      ignoreDuplicates: false
+    });
+
+  if (error) {
+    console.error('Error upserting contracts:', error);
+    return { success: false, count: 0, error: error.message };
+  }
+
+  return { success: true, count: contracts.length };
+}
+
+/**
+ * Delete contracts that are no longer in Salesforce
+ */
+export async function deleteStaleContracts(activeSalesforceIds: string[]): Promise<number> {
+  const admin = getSupabaseAdmin();
+
+  // Get all current contract IDs in Supabase
+  const { data: existing } = await admin
+    .from('contracts')
+    .select('salesforce_id');
+
+  if (!existing) return 0;
+
+  // Find IDs that are in Supabase but not in the active Salesforce list
+  const staleIds = existing
+    .map(c => c.salesforce_id)
+    .filter(id => !activeSalesforceIds.includes(id));
+
+  if (staleIds.length === 0) return 0;
+
+  // Mark stale contracts as closed (or delete them)
+  const { error } = await admin
+    .from('contracts')
+    .update({ is_closed: true, status: 'Closed', updated_at: new Date().toISOString() })
+    .in('salesforce_id', staleIds);
+
+  if (error) {
+    console.error('Error updating stale contracts:', error);
+    return 0;
+  }
+
+  return staleIds.length;
+}

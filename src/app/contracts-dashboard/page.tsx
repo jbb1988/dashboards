@@ -52,10 +52,10 @@ interface ContractData {
   kpis: KPIs;
   statusBreakdown: Record<string, { count: number; value: number }>;
   lastUpdated: string;
-  source?: 'salesforce' | 'notion';
+  source?: 'salesforce' | 'supabase';
 }
 
-type DataSource = 'salesforce' | 'notion';
+type DataSource = 'salesforce' | 'supabase';
 type ActiveFilter = 'all' | 'overdue' | 'due30' | 'highValue' | string;
 
 // Animated Counter Component
@@ -1584,17 +1584,17 @@ export default function ContractsDashboard() {
 
         if (result.configured === false) {
           setSalesforceStatus('not_configured');
-          setDataSource('notion');
+          setDataSource('supabase');
         } else if (result.needsAuth) {
           setSalesforceStatus('needs_auth');
-          setDataSource('notion');
+          setDataSource('supabase');
         } else if (!result.error) {
           setSalesforceStatus('connected');
           setDataSource('salesforce');
         }
       } catch {
         setSalesforceStatus('not_configured');
-        setDataSource('notion');
+        setDataSource('supabase');
       }
     }
     checkSalesforce();

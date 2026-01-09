@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getContracts, getSupabaseAdmin, Contract } from '@/lib/supabase';
 
-const NOTION_TOKEN = process.env.NOTION_API_KEY || '';
-const DATABASE_ID = '206736c0-e519-4948-ad03-0786df66e7fc';
-
-// Valid contract statuses in Notion
+// Valid contract statuses
 const VALID_STATUSES = [
   'Discussions Not Started',
   'Initial Agreement Development',
@@ -13,119 +11,93 @@ const VALID_STATUSES = [
   'PO Received',
 ];
 
-interface NotionContract {
+interface DashboardContract {
   id: string;
+  salesforceId: string;
   name: string;
+  opportunityName: string;
   value: number;
   status: string;
   statusGroup: string;
+  salesStage: string;
   contractType: string[];
   daysInStage: number;
   daysUntilDeadline: number;
   closeDate: string | null;
+  awardDate: string | null;
+  contractDate: string | null;
   statusChangeDate: string | null;
   progress: number;
   isOverdue: boolean;
   nextTask: string;
-  redlines: string;
-  lastRedlineDate: string | null;
+  salesRep: string;
+  probability: number;
+  budgeted: boolean;
+  manualCloseProbability: number | null;
+}
+
+/**
+ * Transform Supabase contract to dashboard format
+ */
+function transformToDashboardFormat(contract: Contract): DashboardContract {
+  const closeDate = contract.close_date;
+  const now = Date.now();
+
+  // Calculate days until deadline
+  const daysUntilDeadline = closeDate
+    ? Math.floor((new Date(closeDate).getTime() - now) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  // Calculate days in stage (using updated_at as proxy for last status change)
+  const lastUpdate = contract.updated_at ? new Date(contract.updated_at).getTime() : now;
+  const daysInStage = Math.floor((now - lastUpdate) / (1000 * 60 * 60 * 24));
+
+  return {
+    id: contract.id || contract.salesforce_id,
+    salesforceId: contract.salesforce_id,
+    name: contract.account_name || contract.name,
+    opportunityName: contract.opportunity_name,
+    value: contract.value,
+    status: contract.status,
+    statusGroup: contract.status_group,
+    salesStage: contract.sales_stage,
+    contractType: contract.contract_type || [],
+    daysInStage,
+    daysUntilDeadline,
+    closeDate: contract.close_date,
+    awardDate: contract.award_date,
+    contractDate: contract.contract_date,
+    statusChangeDate: contract.updated_at || null,
+    progress: contract.probability,
+    isOverdue: daysUntilDeadline < 0,
+    nextTask: '',
+    salesRep: contract.sales_rep,
+    probability: contract.probability,
+    budgeted: contract.budgeted,
+    manualCloseProbability: contract.manual_close_probability,
+  };
 }
 
 export async function GET() {
   try {
-    // Query all contracts from Notion
-    const response = await fetch(
-      `https://api.notion.com/v1/databases/${DATABASE_ID}/query`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${NOTION_TOKEN}`,
-          'Notion-Version': '2022-06-28',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          page_size: 100,
-          filter: {
-            property: 'Archive',
-            checkbox: {
-              equals: false,
-            },
-          },
-          sorts: [
-            {
-              property: 'Name',
-              direction: 'ascending',
-            },
-          ],
-        }),
-        next: { revalidate: 60 }, // Cache for 60 seconds
-      }
-    );
+    // Fetch contracts from Supabase
+    const contracts = await getContracts();
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('Notion API error:', error);
-      return NextResponse.json({ error: 'Failed to fetch contracts' }, { status: 500 });
-    }
+    // Filter to only active contracts (not closed)
+    const activeContracts = contracts.filter(c => !c.is_closed);
 
-    const data = await response.json();
-
-    // Transform Notion data to our format
-    const contracts: NotionContract[] = data.results.map((page: any) => {
-      const props = page.properties;
-
-      // Extract status from status property
-      const statusObj = props['Contract Status']?.status;
-      const status = statusObj?.name || 'Unknown';
-      const statusGroup = statusObj?.color || 'default';
-
-      // Extract contract types
-      const contractTypes = props['Contract Type']?.multi_select?.map((t: any) => t.name) || [];
-
-      // Extract dates
-      const closeDate = props['Contract Date']?.date?.start || null;
-      const statusChangeDate = props['Status Change Date']?.date?.start || null;
-
-      // Extract formula values
-      const daysInStage = props['Days In Stage']?.formula?.number || 0;
-      const daysUntilDeadline = props['Days Until Deadline']?.formula?.number || 0;
-      const progressStr = props['Progress Indicator']?.formula?.string || '0%';
-      const progress = parseInt(progressStr.replace('%', '')) || 0;
-      const isOverdue = props['Red Flag Overdue']?.formula?.boolean || false;
-      const nextTask = props['Next Task']?.formula?.string || '';
-
-      // Extract redlines
-      const redlines = props['Redlines']?.rich_text?.[0]?.plain_text || '';
-      const lastRedlineDate = props['Last Redline Date']?.date?.start || null;
-
-      return {
-        id: page.id,
-        name: props.Name?.title?.[0]?.plain_text || 'Unnamed',
-        value: props['Contract Value']?.number || 0,
-        status,
-        statusGroup,
-        contractType: contractTypes,
-        daysInStage,
-        daysUntilDeadline,
-        closeDate,
-        statusChangeDate,
-        progress,
-        isOverdue,
-        nextTask,
-        redlines,
-        lastRedlineDate,
-      };
-    });
+    // Transform to dashboard format
+    const dashboardContracts = activeContracts.map(transformToDashboardFormat);
 
     // Calculate KPIs
-    const totalPipeline = contracts.reduce((sum, c) => sum + c.value, 0);
-    const overdueContracts = contracts.filter(c => c.isOverdue);
+    const totalPipeline = dashboardContracts.reduce((sum, c) => sum + c.value, 0);
+    const overdueContracts = dashboardContracts.filter(c => c.isOverdue);
     const overdueValue = overdueContracts.reduce((sum, c) => sum + c.value, 0);
 
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-    const dueNext30 = contracts.filter(c => {
+    const dueNext30 = dashboardContracts.filter(c => {
       if (!c.closeDate) return false;
       const closeDate = new Date(c.closeDate);
       return closeDate <= thirtyDaysFromNow && closeDate >= new Date();
@@ -134,7 +106,7 @@ export async function GET() {
 
     // Group by status for funnel
     const statusCounts: Record<string, { count: number; value: number }> = {};
-    contracts.forEach(c => {
+    dashboardContracts.forEach(c => {
       if (!statusCounts[c.status]) {
         statusCounts[c.status] = { count: 0, value: 0 };
       }
@@ -143,10 +115,10 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      contracts,
+      contracts: dashboardContracts,
       kpis: {
         totalPipeline,
-        totalCount: contracts.length,
+        totalCount: dashboardContracts.length,
         overdueValue,
         overdueCount: overdueContracts.length,
         dueNext30Value,
@@ -154,6 +126,7 @@ export async function GET() {
       },
       statusBreakdown: statusCounts,
       lastUpdated: new Date().toISOString(),
+      source: 'supabase',
     });
   } catch (error) {
     console.error('Error fetching contracts:', error);
@@ -162,20 +135,26 @@ export async function GET() {
 }
 
 /**
- * Update a contract in Notion
- * Supports updating: status, value, contractDate
+ * Update a contract in Supabase
+ * Supports updating: status, value, contractDate, awardDate
  */
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { pageId, field, value } = body;
+    const { contractId, salesforceId, field, value } = body;
 
-    if (!pageId || !field) {
-      return NextResponse.json({ error: 'Missing pageId or field' }, { status: 400 });
+    // Need either contractId or salesforceId
+    const id = contractId || salesforceId;
+    if (!id || !field) {
+      return NextResponse.json({ error: 'Missing contractId/salesforceId or field' }, { status: 400 });
     }
 
-    // Build the properties update based on field
-    let properties: Record<string, any> = {};
+    const admin = getSupabaseAdmin();
+
+    // Build the update object based on field
+    let updateData: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
 
     switch (field) {
       case 'status':
@@ -185,13 +164,7 @@ export async function PATCH(request: NextRequest) {
             validStatuses: VALID_STATUSES
           }, { status: 400 });
         }
-        properties['Contract Status'] = {
-          status: { name: value }
-        };
-        // Also update Status Change Date to now
-        properties['Status Change Date'] = {
-          date: { start: new Date().toISOString().split('T')[0] }
-        };
+        updateData.status = value;
         break;
 
       case 'value':
@@ -199,20 +172,15 @@ export async function PATCH(request: NextRequest) {
         if (isNaN(numValue)) {
           return NextResponse.json({ error: 'Invalid value - must be a number' }, { status: 400 });
         }
-        properties['Contract Value'] = {
-          number: numValue
-        };
+        updateData.value = numValue;
         break;
 
       case 'contractDate':
-        // Validate date format
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         if (!dateRegex.test(value)) {
           return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });
         }
-        properties['Contract Date'] = {
-          date: { start: value }
-        };
+        updateData.contract_date = value;
         break;
 
       case 'awardDate':
@@ -220,43 +188,30 @@ export async function PATCH(request: NextRequest) {
         if (!awardDateRegex.test(value)) {
           return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });
         }
-        properties['Award Date'] = {
-          date: { start: value }
-        };
+        updateData.award_date = value;
         break;
 
       default:
         return NextResponse.json({ error: `Unknown field: ${field}` }, { status: 400 });
     }
 
-    // Update the Notion page
-    const response = await fetch(
-      `https://api.notion.com/v1/pages/${pageId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${NOTION_TOKEN}`,
-          'Notion-Version': '2022-06-28',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ properties }),
-      }
-    );
+    // Update using salesforce_id as the primary identifier
+    const { error } = await admin
+      .from('contracts')
+      .update(updateData)
+      .eq('salesforce_id', id);
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('Notion update error:', error);
+    if (error) {
+      console.error('Supabase update error:', error);
       return NextResponse.json({
-        error: 'Failed to update contract in Notion',
-        details: error
+        error: 'Failed to update contract',
+        details: error.message
       }, { status: 500 });
     }
 
-    const updatedPage = await response.json();
-
     return NextResponse.json({
       success: true,
-      pageId,
+      contractId: id,
       field,
       value,
       updatedAt: new Date().toISOString(),
