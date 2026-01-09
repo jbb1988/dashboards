@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { KPICard, KPIIcons } from '@/components/KPICard';
+import { DocumentsProgressView, DocumentData } from '@/components/documents';
 
 // Types
 interface Document {
@@ -316,6 +317,8 @@ function AccountSection({
   onUpload,
   uploadingKey,
   documentTypes,
+  bundleInfoMap,
+  onManageBundle,
 }: {
   accountName: string;
   contracts: Record<string, ContractDocuments>;
@@ -324,6 +327,8 @@ function AccountSection({
   onUpload: (file: File, type: string, contractId: string, contractName: string, accountName: string) => void;
   uploadingKey: string | null;
   documentTypes: string[];
+  bundleInfoMap?: Record<string, BundleInfo>;
+  onManageBundle?: (contractId: string) => void;
 }) {
   const contractList = Object.values(contracts);
   const totalDocs = contractList.reduce((sum, c) => sum + c.documents.length, 0);
@@ -396,6 +401,8 @@ function AccountSection({
                     accountName={accountName}
                     uploadingKey={uploadingKey}
                     documentTypes={documentTypes}
+                    bundleInfo={bundleInfoMap?.[contract.contractId]}
+                    onManageBundle={onManageBundle ? () => onManageBundle(contract.contractId) : undefined}
                   />
                 ))}
             </div>
@@ -406,22 +413,67 @@ function AccountSection({
   );
 }
 
-// Contract Card Component
+// Contract Card Component with Progress-First Document View
 function ContractCard({
   contract,
   onUpload,
   accountName,
   uploadingKey,
   documentTypes,
+  bundleInfo,
+  onManageBundle,
 }: {
   contract: ContractDocuments;
   onUpload: (file: File, type: string, contractId: string, contractName: string, accountName: string) => void;
   accountName: string;
   uploadingKey: string | null;
   documentTypes: string[];
+  bundleInfo?: BundleInfo | null;
+  onManageBundle?: () => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const priorityColor = PRIORITY_COLORS[contract.priority.category];
+
+  // Convert documents to DocumentData format for DocumentsProgressView
+  const documentData: DocumentData[] = useMemo(() => {
+    return contract.documents
+      .filter(d => d.is_current_version)
+      .map(d => ({
+        id: d.id,
+        document_type: d.document_type,
+        file_name: d.file_name,
+        file_url: d.file_url,
+        file_size: d.file_size || undefined,
+        uploaded_at: d.uploaded_at,
+        uploaded_by: d.uploaded_by || undefined,
+        source_contract: d.fromBundledContract ? {
+          id: d.fromBundledContract,
+          name: d.opportunity_name || 'Bundled Contract',
+        } : undefined,
+      }));
+  }, [contract.documents]);
+
+  // Convert BundleInfo to format expected by DocumentsProgressView
+  const bundleForView = bundleInfo ? {
+    id: bundleInfo.bundleId,
+    name: bundleInfo.bundleName,
+    contracts: bundleInfo.contracts.map(c => ({
+      id: c.id,
+      name: c.name,
+      is_primary: c.isPrimary,
+    })),
+  } : null;
+
+  // Handle upload from DocumentsProgressView
+  const handleProgressUpload = async (file: File, type: string) => {
+    onUpload(file, type, contract.contractId, contract.contractName, accountName);
+  };
+
+  // Handle delete (placeholder - needs API implementation)
+  const handleDelete = async (doc: DocumentData) => {
+    console.log('Delete document:', doc.id);
+    // TODO: Implement delete API call
+  };
 
   return (
     <div className={`border-b border-white/[0.02] last:border-0 ${priorityColor.bg}`}>
@@ -446,6 +498,14 @@ function ContractCard({
               {contract.opportunityYear && (
                 <span className="px-2 py-0.5 bg-[#151F2E] text-[#64748B] text-xs rounded">
                   Year {contract.opportunityYear}
+                </span>
+              )}
+              {bundleInfo && (
+                <span className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#8B5CF6] text-xs rounded flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Bundled
                 </span>
               )}
             </div>
@@ -484,7 +544,7 @@ function ContractCard({
         </div>
       </button>
 
-      {/* Document Grid */}
+      {/* Progress-First Document View */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -494,54 +554,16 @@ function ContractCard({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 pl-16">
-              {/* Missing Required Documents Alert */}
-              {contract.completeness.missingRequired.length > 0 && (
-                <div className="mb-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                  <p className="text-amber-400 text-sm">
-                    <span className="font-medium">Missing required:</span> {contract.completeness.missingRequired.join(', ')}
-                  </p>
-                </div>
-              )}
-
-              {/* Document Type Grid */}
-              <div className="grid grid-cols-3 gap-2">
-                {documentTypes.map((docType) => {
-                  const doc = contract.documents.find(d => d.document_type === docType && d.is_current_version);
-                  const isUploading = uploadingKey === `${contract.contractId}-${docType}`;
-
-                  return (
-                    <DropZone
-                      key={docType}
-                      documentType={docType}
-                      contractId={contract.contractId}
-                      contractName={contract.contractName}
-                      accountName={accountName}
-                      onUpload={onUpload}
-                      existingDoc={doc}
-                      isUploading={isUploading}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Recent Documents List */}
-              {contract.documents.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-white/[0.04]">
-                  <p className="text-[#64748B] text-xs mb-2">Recent uploads</p>
-                  <div className="space-y-1">
-                    {contract.documents
-                      .filter(d => d.is_current_version)
-                      .slice(0, 3)
-                      .map(doc => (
-                        <div key={doc.id} className="flex items-center justify-between text-xs">
-                          <span className="text-white truncate flex-1">{doc.file_name}</span>
-                          <span className="text-[#64748B] ml-2">{formatRelativeTime(doc.uploaded_at)}</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
+            <div className="px-4 pb-4 pl-12">
+              <DocumentsProgressView
+                contractId={contract.contractId}
+                contractName={contract.contractName}
+                documents={documentData}
+                bundle={bundleForView}
+                onUpload={handleProgressUpload}
+                onDelete={handleDelete}
+                onManageBundle={onManageBundle}
+              />
             </div>
           </motion.div>
         )}
