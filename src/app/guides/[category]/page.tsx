@@ -182,21 +182,50 @@ const guideContent: Record<string, GuideData> = {
             <p className="text-[#8FA3BF]">
               MARS tracks several document types for each contract:
             </p>
+            <h4 className="text-white font-medium mt-4">Required Documents</h4>
             <div className="grid grid-cols-2 gap-3">
               {[
                 { type: 'Original Contract', desc: 'Initial contract from customer', required: true },
                 { type: 'MARS Redlines', desc: 'Our tracked changes version', required: true },
-                { type: 'Client Response', desc: 'Customer\'s response to redlines', required: false },
                 { type: 'Final Agreement', desc: 'Agreed final version', required: true },
                 { type: 'Executed Contract', desc: 'Signed contract', required: true },
-                { type: 'Purchase Order', desc: 'Customer PO document', required: true },
               ].map((doc) => (
                 <div key={doc.type} className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-white font-medium text-sm">{doc.type}</span>
-                    {doc.required && (
-                      <span className="px-2 py-0.5 bg-red-500/10 text-red-400 text-xs rounded">Required</span>
-                    )}
+                    <span className="px-2 py-0.5 bg-red-500/10 text-red-400 text-xs rounded">Required</span>
+                  </div>
+                  <p className="text-[#64748B] text-xs">{doc.desc}</p>
+                </div>
+              ))}
+            </div>
+            <h4 className="text-white font-medium mt-4">Analysis Documents</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { type: 'Comparison Report', desc: 'Section-by-section comparison of document versions', color: '#8B5CF6' },
+                { type: 'AI Recommendations', desc: 'AI analysis with accept/negotiate/push back verdicts', color: '#38BDF8' },
+              ].map((doc) => (
+                <div key={doc.type} className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-white font-medium text-sm">{doc.type}</span>
+                    <span className="px-2 py-0.5 text-xs rounded" style={{ backgroundColor: `${doc.color}20`, color: doc.color }}>Analysis</span>
+                  </div>
+                  <p className="text-[#64748B] text-xs">{doc.desc}</p>
+                </div>
+              ))}
+            </div>
+            <h4 className="text-white font-medium mt-4">Optional Documents</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { type: 'Client Response', desc: 'Customer\'s response to redlines' },
+                { type: 'Purchase Order', desc: 'Customer PO document' },
+                { type: 'Amendment', desc: 'Contract amendments or modifications' },
+                { type: 'Other', desc: 'Any additional relevant documents' },
+              ].map((doc) => (
+                <div key={doc.type} className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-white font-medium text-sm">{doc.type}</span>
+                    <span className="px-2 py-0.5 bg-[#64748B]/10 text-[#64748B] text-xs rounded">Optional</span>
                   </div>
                   <p className="text-[#64748B] text-xs">{doc.desc}</p>
                 </div>
@@ -256,6 +285,50 @@ const guideContent: Record<string, GuideData> = {
                 </li>
               ))}
             </ul>
+          </div>
+        ),
+      },
+      {
+        id: 'bundles',
+        title: 'Contract Bundles',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Contract Bundles group related Salesforce opportunities that share documents. Common example: M3 software renewal + MCC renewal that share the same master agreement.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-[#8B5CF6]/30">
+              <h4 className="text-[#8B5CF6] font-medium mb-3 flex items-center gap-2">
+                <span className="text-lg">★</span> Why Bundle Contracts?
+              </h4>
+              <ul className="space-y-2 text-sm text-[#8FA3BF]">
+                <li>• <strong className="text-white">Shared Documents:</strong> Upload once, see from all bundled contracts</li>
+                <li>• <strong className="text-white">No Duplication:</strong> Avoid uploading the same master agreement multiple times</li>
+                <li>• <strong className="text-white">Clear Attribution:</strong> See which contract a document came from</li>
+                <li>• <strong className="text-white">Flexible:</strong> Add/remove contracts from bundles anytime</li>
+              </ul>
+            </div>
+            <h4 className="text-white font-medium mt-4">Creating a Bundle</h4>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <ol className="space-y-2 text-sm text-[#8FA3BF]">
+                <li>1. Expand any contract card in the Pipeline view</li>
+                <li>2. Find the <strong className="text-white">Bundle</strong> field</li>
+                <li>3. Click <strong className="text-[#8B5CF6]">Create</strong> to start a new bundle</li>
+                <li>4. Name the bundle (e.g., "Cleveland 2025 Renewal")</li>
+                <li>5. Select related contracts to include</li>
+                <li>6. Choose a primary contract (source of truth)</li>
+              </ol>
+            </div>
+            <h4 className="text-white font-medium mt-4">Bundle Indicators</h4>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2 p-3 bg-[#0B1220] rounded-lg">
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#8B5CF6]">★</span>
+                <span className="text-white text-sm">Primary contract in bundle</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-[#0B1220] rounded-lg">
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#8B5CF6]">⚏</span>
+                <span className="text-white text-sm">Secondary contract in bundle</span>
+              </div>
+            </div>
           </div>
         ),
       },
@@ -537,11 +610,34 @@ const guideContent: Record<string, GuideData> = {
               <li className="flex items-start gap-3 p-3 bg-[#0B1220] rounded-lg">
                 <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">5</span>
                 <div>
-                  <span className="text-white font-medium">Save to Contract</span>
-                  <p className="text-[#64748B]">Save the comparison report to a contract record (generates Word doc automatically)</p>
+                  <span className="text-white font-medium">Download or Save</span>
+                  <p className="text-[#64748B]">Download PDFs to share, or save to contract record for tracking</p>
                 </div>
               </li>
             </ol>
+            <div className="bg-gradient-to-r from-[#8B5CF6]/10 to-[#38BDF8]/10 rounded-lg p-4 border border-white/[0.06] mt-4">
+              <h4 className="text-white font-medium mb-3">Export Options</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-[#0B1220] rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg className="w-4 h-4 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-white text-sm font-medium">Comparison PDF</span>
+                  </div>
+                  <p className="text-[#64748B] text-xs">Section-by-section changes with original vs. revised text</p>
+                </div>
+                <div className="p-3 bg-[#0B1220] rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg className="w-4 h-4 text-[#38BDF8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-white text-sm font-medium">AI Recommendations PDF</span>
+                  </div>
+                  <p className="text-[#64748B] text-xs">Verdicts, reasoning, and suggested counter-language</p>
+                </div>
+              </div>
+            </div>
           </div>
         ),
       },

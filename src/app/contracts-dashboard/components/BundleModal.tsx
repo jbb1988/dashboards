@@ -126,7 +126,10 @@ export default function BundleModal({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create bundle');
+        const errorMsg = result.details
+          ? `${result.error}: ${result.details}`
+          : result.error || 'Failed to create bundle';
+        throw new Error(errorMsg);
       }
 
       onSuccess();

@@ -209,7 +209,17 @@ export async function POST(request: NextRequest) {
 
     if (bundleError || !bundle) {
       console.error('[BUNDLES] Error creating bundle:', bundleError);
-      return NextResponse.json({ error: 'Failed to create bundle' }, { status: 500 });
+      // Check if it's a table not found error
+      if (bundleError?.code === '42P01' || bundleError?.message?.includes('does not exist')) {
+        return NextResponse.json({
+          error: 'Bundle tables not set up. Run the migration: supabase/migrations/004_create_bundles_table.sql',
+          details: bundleError?.message
+        }, { status: 500 });
+      }
+      return NextResponse.json({
+        error: 'Failed to create bundle',
+        details: bundleError?.message || 'Unknown error'
+      }, { status: 500 });
     }
 
     // Add contracts to the bundle

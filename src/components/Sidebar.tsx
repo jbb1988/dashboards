@@ -258,30 +258,16 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className="fixed left-0 top-0 h-full bg-[#0B1220] z-50 overflow-hidden flex flex-col"
     >
-      {/* Collapse Toggle Button */}
-      <button
-        onClick={toggleCollapsed}
-        className="absolute top-4 right-2 z-10 p-1.5 rounded-lg bg-[#1E293B] hover:bg-[#2D3B4F] text-[#64748B] hover:text-white transition-all group"
-        title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        <motion.svg
-          animate={{ rotate: isCollapsed ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-          className="w-4 h-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-        </motion.svg>
-      </button>
-
       {/* Logo */}
-      <div className={`flex-shrink-0 p-6 ${isCollapsed ? 'px-3' : ''}`}>
+      <div className={`flex-shrink-0 p-6 ${isCollapsed ? 'px-3 pt-4' : ''}`}>
         <Link href="/" className="block">
           {isCollapsed ? (
-            <div className="w-10 h-10 rounded-lg bg-[#1E293B] flex items-center justify-center">
-              <span className="text-[#38BDF8] font-bold text-lg">M</span>
+            <div className="w-11 h-11 rounded-full overflow-hidden flex items-center justify-center">
+              <img
+                src="/mars-logo.png"
+                alt="MARS"
+                className="w-full h-full object-cover"
+              />
             </div>
           ) : (
             <img
@@ -303,6 +289,27 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
             </motion.p>
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Collapse Toggle Button - Below logo */}
+      <div className={`px-3 mb-2 ${isCollapsed ? 'px-2' : ''}`}>
+        <button
+          onClick={toggleCollapsed}
+          className={`w-full p-2 rounded-lg bg-[#1E293B] hover:bg-[#2D3B4F] text-[#64748B] hover:text-white transition-all flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-3'}`}
+          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {!isCollapsed && <span className="text-xs">Collapse</span>}
+          <motion.svg
+            animate={{ rotate: isCollapsed ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </motion.svg>
+        </button>
       </div>
 
       {/* Navigation by Category */}
