@@ -572,7 +572,7 @@ function ContractCard({
   );
 }
 
-// Priority Contract Card (for Needs Attention view)
+// Priority Contract Card (for Needs Attention view) - with Progress-First Document View
 function PriorityCard({
   contract,
   accountName,
@@ -588,6 +588,7 @@ function PriorityCard({
   documentTypes: string[];
   contracts?: Contract[];
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const priorityColor = PRIORITY_COLORS[contract.priority.category];
 
   // Find the matching contract for additional details
@@ -595,117 +596,169 @@ function PriorityCard({
   const contractTypes = matchingContract?.contractType || [];
   const salesforceId = matchingContract?.salesforceId;
 
+  // Convert documents to DocumentData format for DocumentsProgressView
+  const documentData: DocumentData[] = useMemo(() => {
+    return contract.documents
+      .filter(d => d.is_current_version)
+      .map(d => ({
+        id: d.id,
+        document_type: d.document_type,
+        file_name: d.file_name,
+        file_url: d.file_url,
+        file_size: d.file_size || undefined,
+        uploaded_at: d.uploaded_at,
+        uploaded_by: d.uploaded_by || undefined,
+        source_contract: d.fromBundledContract ? {
+          id: d.fromBundledContract,
+          name: d.opportunity_name || 'Bundled Contract',
+        } : undefined,
+      }));
+  }, [contract.documents]);
+
+  // Handle upload from DocumentsProgressView
+  const handleProgressUpload = async (file: File, type: string) => {
+    onUpload(file, type, contract.contractId, contract.contractName, accountName);
+  };
+
+  // Handle delete (placeholder - needs API implementation)
+  const handleDelete = async (doc: DocumentData) => {
+    console.log('Delete document:', doc.id);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`p-4 rounded-xl border ${priorityColor.border} ${priorityColor.bg} shadow-lg ${priorityColor.glow}`}
+      className={`rounded-xl border ${priorityColor.border} ${priorityColor.bg} shadow-lg ${priorityColor.glow} overflow-hidden`}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={`px-2 py-0.5 ${priorityColor.bg} ${priorityColor.text} text-xs font-bold rounded border ${priorityColor.border}`}>
-              {contract.priority.category.toUpperCase()}
-            </span>
-            <span className="text-[#64748B] text-xs">Score: {contract.priority.score}/100</span>
-            {/* Project Type Badges */}
-            {contractTypes.map((type) => (
-              <span
-                key={type}
-                className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#A78BFA] text-xs rounded border border-[#8B5CF6]/20"
-              >
-                {type}
+      {/* Card Header - Clickable to expand */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full p-4 text-left hover:bg-white/[0.02] transition-colors"
+      >
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className={`px-2 py-0.5 ${priorityColor.bg} ${priorityColor.text} text-xs font-bold rounded border ${priorityColor.border}`}>
+                {contract.priority.category.toUpperCase()}
               </span>
-            ))}
+              <span className="text-[#64748B] text-xs">Score: {contract.priority.score}/100</span>
+              {/* Project Type Badges */}
+              {contractTypes.map((type) => (
+                <span
+                  key={type}
+                  className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#A78BFA] text-xs rounded border border-[#8B5CF6]/20"
+                >
+                  {type}
+                </span>
+              ))}
+            </div>
+            <h3 className="text-white font-semibold">{contract.contractName}</h3>
+            <p className="text-[#64748B] text-sm">{accountName}</p>
           </div>
-          <h3 className="text-white font-semibold">{contract.contractName}</h3>
-          <p className="text-[#64748B] text-sm">{accountName}</p>
-        </div>
 
-        {/* Completeness Ring */}
-        <div className="relative w-14 h-14">
-          <svg className="w-14 h-14 transform -rotate-90">
-            <circle
-              cx="28"
-              cy="28"
-              r="24"
-              fill="none"
-              stroke="#151F2E"
-              strokeWidth="4"
-            />
-            <circle
-              cx="28"
-              cy="28"
-              r="24"
-              fill="none"
-              stroke={contract.completeness.percentage === 100 ? '#22C55E' : '#38BDF8'}
-              strokeWidth="4"
-              strokeDasharray={`${contract.completeness.percentage * 1.51} 151`}
-              strokeLinecap="round"
-            />
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-white text-sm font-medium">
-            {contract.completeness.percentage}%
-          </span>
-        </div>
-      </div>
-
-      {/* Reasons */}
-      <div className="mb-3 space-y-1">
-        {contract.priority.reasons.map((reason, i) => (
-          <div key={i} className="flex items-center gap-2 text-sm">
-            <svg className={`w-4 h-4 ${priorityColor.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          {/* Completeness Ring */}
+          <div className="relative w-14 h-14">
+            <svg className="w-14 h-14 transform -rotate-90">
+              <circle
+                cx="28"
+                cy="28"
+                r="24"
+                fill="none"
+                stroke="#151F2E"
+                strokeWidth="4"
+              />
+              <circle
+                cx="28"
+                cy="28"
+                r="24"
+                fill="none"
+                stroke={contract.completeness.percentage === 100 ? '#22C55E' : '#38BDF8'}
+                strokeWidth="4"
+                strokeDasharray={`${contract.completeness.percentage * 1.51} 151`}
+                strokeLinecap="round"
+              />
             </svg>
-            <span className="text-[#94A3B8]">{reason}</span>
+            <span className="absolute inset-0 flex items-center justify-center text-white text-sm font-medium">
+              {contract.completeness.percentage}%
+            </span>
           </div>
-        ))}
-      </div>
+        </div>
 
-      {/* Missing Documents */}
-      {contract.completeness.missingRequired.length > 0 && (
-        <div className="mb-3">
-          <p className="text-amber-400 text-xs font-medium mb-2">Upload missing documents:</p>
-          <div className="grid grid-cols-2 gap-2">
-            {contract.completeness.missingRequired.map(docType => (
-              <DropZone
-                key={docType}
-                documentType={docType}
+        {/* Reasons */}
+        <div className="space-y-1">
+          {contract.priority.reasons.slice(0, 2).map((reason, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <svg className={`w-4 h-4 ${priorityColor.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="text-[#94A3B8]">{reason}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Expand indicator */}
+        <div className="flex items-center justify-center mt-3 pt-3 border-t border-white/[0.04]">
+          <div className="flex items-center gap-2 text-[#64748B] text-sm">
+            <motion.svg
+              animate={{ rotate: isExpanded ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </motion.svg>
+            <span>{isExpanded ? 'Hide' : 'Manage'} Documents</span>
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded Document View */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 border-t border-white/[0.04]">
+              <DocumentsProgressView
                 contractId={contract.contractId}
                 contractName={contract.contractName}
-                accountName={accountName}
-                onUpload={onUpload}
-                isUploading={uploadingKey === `${contract.contractId}-${docType}`}
+                documents={documentData}
+                onUpload={handleProgressUpload}
+                onDelete={handleDelete}
               />
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-2 pt-3 border-t border-white/[0.04]">
-        <button className="flex-1 px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-white text-sm rounded-lg transition-colors">
-          View Contract
-        </button>
-        {salesforceId && (
-          <a
-            href={`https://marscompany.lightning.force.com/lightning/r/Opportunity/${salesforceId}/view`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#38BDF8] hover:text-white text-sm rounded-lg transition-colors flex items-center gap-1"
-            title="Open in Salesforce"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-            SF
-          </a>
+            {/* Actions */}
+            <div className="flex items-center gap-2 px-4 pb-4">
+              <button className="flex-1 px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-white text-sm rounded-lg transition-colors">
+                View Contract
+              </button>
+              {salesforceId && (
+                <a
+                  href={`https://marscompany.lightning.force.com/lightning/r/Opportunity/${salesforceId}/view`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#38BDF8] hover:text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+                  title="Open in Salesforce"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  SF
+                </a>
+              )}
+            </div>
+          </motion.div>
         )}
-        <button className="px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#64748B] hover:text-white text-sm rounded-lg transition-colors">
-          Snooze
-        </button>
-      </div>
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -20,10 +20,12 @@ export default function DocumentPreviewPanel({
   onDelete,
 }: DocumentPreviewPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
+  const [previewError, setPreviewError] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setIsLoading(true);
+      setPreviewError(false);
     }
   }, [isOpen, document?.id]);
 
@@ -46,6 +48,47 @@ export default function DocumentPreviewPanel({
   };
 
   const isPDF = document?.file_name?.toLowerCase().endsWith('.pdf');
+  const isValidUrl = document?.file_url &&
+    !document.file_url.startsWith('#local:') &&
+    (document.file_url.startsWith('http') || document.file_url.startsWith('/'));
+  const canPreview = isPDF && isValidUrl && !previewError;
+
+  // Determine why preview isn't available
+  const getPreviewMessage = () => {
+    if (!isValidUrl) {
+      return {
+        title: 'File not yet synced',
+        subtitle: 'This document was uploaded locally and needs to be synced to cloud storage for preview.',
+        icon: (
+          <svg className="w-10 h-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        ),
+      };
+    }
+    if (previewError) {
+      return {
+        title: 'Preview failed to load',
+        subtitle: 'Click "Open in New Tab" to view the document directly.',
+        icon: (
+          <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+      };
+    }
+    return {
+      title: 'Preview not available',
+      subtitle: `${document?.file_name?.split('.').pop()?.toUpperCase() || 'This file type'} files cannot be previewed. Click "Open in New Tab" to view.`,
+      icon: (
+        <svg className="w-10 h-10 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+    };
+  };
+
+  const previewMessage = getPreviewMessage();
 
   return (
     <AnimatePresence>
@@ -90,7 +133,7 @@ export default function DocumentPreviewPanel({
 
             {/* Preview Area */}
             <div className="flex-1 overflow-hidden bg-[#1E293B]">
-              {isPDF ? (
+              {canPreview ? (
                 <div className="w-full h-full relative">
                   {isLoading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-[#1E293B]">
@@ -104,19 +147,32 @@ export default function DocumentPreviewPanel({
                     src={`${document.file_url}#toolbar=0&navpanes=0`}
                     className="w-full h-full border-0"
                     onLoad={() => setIsLoading(false)}
+                    onError={() => {
+                      setIsLoading(false);
+                      setPreviewError(true);
+                    }}
                     title={document.file_name}
                   />
                 </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center">
+                  <div className="text-center px-6">
                     <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[#0B1220] flex items-center justify-center">
-                      <svg className="w-10 h-10 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+                      {previewMessage.icon}
                     </div>
-                    <p className="text-[#8FA3BF] text-sm mb-1">Preview not available</p>
-                    <p className="text-[#64748B] text-xs">Download the file to view it</p>
+                    <p className="text-[#8FA3BF] text-sm mb-1">{previewMessage.title}</p>
+                    <p className="text-[#64748B] text-xs max-w-xs mx-auto">{previewMessage.subtitle}</p>
+                    {isValidUrl && (
+                      <button
+                        onClick={() => window.open(document.file_url, '_blank')}
+                        className="mt-4 px-4 py-2 bg-[#8B5CF6] text-white text-sm font-medium rounded-lg hover:bg-[#8B5CF6]/90 transition-colors inline-flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Open in New Tab
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
