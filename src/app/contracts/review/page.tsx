@@ -102,6 +102,22 @@ interface SectionCompareResult {
   removedSections: string[];
 }
 
+// Types for AI recommendations
+interface ComparisonRecommendation {
+  sectionNumber: string;
+  sectionTitle: string;
+  verdict: 'accept' | 'negotiate' | 'push_back';
+  reasoning: string;
+  suggestedLanguage?: string;
+  riskLevel: 'low' | 'medium' | 'high';
+}
+
+interface ComparisonAnalysisResult {
+  recommendations: ComparisonRecommendation[];
+  overallAssessment: string;
+  criticalIssues: string[];
+}
+
 // Models for contract review via OpenRouter - legal-grade only
 // Using Claude Sonnet 4 for all AI operations (hardcoded for best quality)
 const AI_MODEL = 'anthropic/claude-sonnet-4';
@@ -152,6 +168,18 @@ export default function ContractReviewPage() {
   const [showAnalysisComparison, setShowAnalysisComparison] = useState(false);
   const [analysisCompareResult, setAnalysisCompareResult] = useState<CompareResult | null>(null);
   const [isComparingAnalysis, setIsComparingAnalysis] = useState(false);
+
+  // AI Recommendations state (for Compare tab)
+  const [comparisonAnalysis, setComparisonAnalysis] = useState<ComparisonAnalysisResult | null>(null);
+  const [isAnalyzingComparison, setIsAnalyzingComparison] = useState(false);
+  const [compareViewMode, setCompareViewMode] = useState<'comparison' | 'recommendations'>('comparison');
+
+  // Save to Contract modal state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveModalContract, setSaveModalContract] = useState<string>('');
+  const [saveModalSearch, setSaveModalSearch] = useState('');
+  const [isSavingComparison, setIsSavingComparison] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -544,6 +572,94 @@ export default function ContractReviewPage() {
     setCategoryFilter('all');
     setStatusFilter('all');
     setSignificanceFilter('all');
+    // Reset AI recommendations state
+    setComparisonAnalysis(null);
+    setCompareViewMode('comparison');
+    setSaveSuccess(null);
+  }
+
+  // Get AI Recommendations for comparison
+  async function handleGetAIRecommendations() {
+    if (!sectionCompareResult) return;
+
+    setIsAnalyzingComparison(true);
+    setCompareError(null);
+
+    try {
+      const response = await fetch('/api/contracts/compare/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          comparisonResult: sectionCompareResult,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Analysis failed');
+      }
+
+      const result = await response.json() as ComparisonAnalysisResult;
+      setComparisonAnalysis(result);
+      setCompareViewMode('recommendations');
+    } catch (err) {
+      console.error('AI Analysis error:', err);
+      setCompareError(err instanceof Error ? err.message : 'AI Analysis failed');
+    } finally {
+      setIsAnalyzingComparison(false);
+    }
+  }
+
+  // Save comparison to contract
+  async function handleSaveComparison(contractId: string) {
+    if (!sectionCompareResult) return;
+
+    setIsSavingComparison(true);
+    setCompareError(null);
+
+    try {
+      const response = await fetch('/api/contracts/compare/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId,
+          comparisonResult: sectionCompareResult,
+          analysisResult: comparisonAnalysis,
+          originalFileName: compareOriginalFile?.name || 'original.pdf',
+          revisedFileName: compareRevisedFile?.name || 'revised.pdf',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Save failed');
+      }
+
+      const result = await response.json();
+      setSaveSuccess(`Saved to ${result.contractName}`);
+      setShowSaveModal(false);
+      setSaveModalContract('');
+      setSaveModalSearch('');
+
+      // Clear success message after 5 seconds
+      setTimeout(() => setSaveSuccess(null), 5000);
+    } catch (err) {
+      console.error('Save error:', err);
+      setCompareError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setIsSavingComparison(false);
+    }
+  }
+
+  // Handle save button click
+  function handleSaveClick() {
+    // If contract already selected, save directly
+    if (selectedContract) {
+      handleSaveComparison(selectedContract);
+    } else {
+      // Show modal to select contract
+      setShowSaveModal(true);
+    }
   }
 
   async function handleCategorizeChanges() {
@@ -1432,6 +1548,74 @@ export default function ContractReviewPage() {
                   </div>
                 )}
 
+                {/* AI Recommendations Section */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Get AI Recommendations Button */}
+                  {!comparisonAnalysis && (
+                    <button
+                      onClick={handleGetAIRecommendations}
+                      disabled={isAnalyzingComparison}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#A855F7] to-[#6366F1] hover:from-[#9333EA] hover:to-[#4F46E5] text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isAnalyzingComparison ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          <span>Analyzing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                          </svg>
+                          <span>Get AI Recommendations</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {/* View Toggle (when AI recommendations exist) */}
+                  {comparisonAnalysis && (
+                    <div className="flex items-center bg-[#0B1220] rounded-lg p-1">
+                      <button
+                        onClick={() => setCompareViewMode('comparison')}
+                        className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                          compareViewMode === 'comparison'
+                            ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                            : 'text-[#8FA3BF] hover:text-white'
+                        }`}
+                      >
+                        Comparison
+                      </button>
+                      <button
+                        onClick={() => setCompareViewMode('recommendations')}
+                        className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                          compareViewMode === 'recommendations'
+                            ? 'bg-[#A855F7]/20 text-[#A855F7]'
+                            : 'text-[#8FA3BF] hover:text-white'
+                        }`}
+                      >
+                        AI Recommendations
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Overall Assessment (when viewing recommendations) */}
+                  {comparisonAnalysis && compareViewMode === 'recommendations' && (
+                    <div className="w-full mt-2 p-3 bg-[#A855F7]/10 border border-[#A855F7]/30 rounded-lg">
+                      <p className="text-sm text-[#CBD5E1]">{comparisonAnalysis.overallAssessment}</p>
+                      {comparisonAnalysis.criticalIssues.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-[#A855F7]/20">
+                          <span className="text-red-400 text-xs font-medium">Critical Issues: </span>
+                          <span className="text-xs text-[#8FA3BF]">{comparisonAnalysis.criticalIssues.length} sections require attention</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Filters Row */}
                 <div className="flex flex-wrap items-center gap-4 p-3 bg-[#0B1220] rounded-lg">
                   {/* Status Filter */}
@@ -1640,6 +1824,40 @@ export default function ContractReviewPage() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
+                  {/* Save Success Toast */}
+                  {saveSuccess && (
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-green-500/20 text-green-400 rounded-lg text-sm">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {saveSuccess}
+                    </div>
+                  )}
+
+                  {/* Save to Contract Button */}
+                  <button
+                    onClick={handleSaveClick}
+                    disabled={isSavingComparison}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-[#22C55E] hover:bg-[#16A34A] text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {isSavingComparison ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        <span>Save to Contract</span>
+                      </>
+                    )}
+                  </button>
+
                   <button
                     onClick={handleResetCompare}
                     className="flex-1 py-2.5 bg-[#151F2E] text-[#8FA3BF] font-medium rounded-lg hover:bg-[#1E293B] hover:text-white transition-colors"
@@ -1934,6 +2152,125 @@ export default function ContractReviewPage() {
         </AnimatePresence>
       </motion.main>
       <style dangerouslySetInnerHTML={{ __html: `.contract-redlines del { background-color: rgba(239, 68, 68, 0.2); color: #f87171; text-decoration: line-through; } .contract-redlines ins { background-color: rgba(34, 197, 94, 0.2); color: #4ade80; text-decoration: underline; }` }} />
+
+      {/* Contract Selector Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-[#0F172A] border border-white/[0.08] rounded-xl w-full max-w-lg mx-4 shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/[0.08]">
+              <h3 className="text-white font-semibold">Save Comparison to Contract</h3>
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="text-[#8FA3BF] hover:text-white transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 space-y-4">
+              <p className="text-[#8FA3BF] text-sm">
+                No contract was selected. Please select a contract to save this comparison to:
+              </p>
+
+              {/* Search Input */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={saveModalSearch}
+                  onChange={(e) => setSaveModalSearch(e.target.value)}
+                  placeholder="Search contracts..."
+                  className="w-full bg-[#151F2E] border border-white/[0.08] rounded-lg px-4 py-2.5 pl-10 text-white text-sm placeholder-[#475569] focus:outline-none focus:ring-2 focus:ring-[#38BDF8]/50"
+                />
+                <svg className="w-4 h-4 text-[#475569] absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
+              {/* Contract List */}
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {contracts
+                  .filter(c =>
+                    c.name.toLowerCase().includes(saveModalSearch.toLowerCase()) ||
+                    c.status?.toLowerCase().includes(saveModalSearch.toLowerCase())
+                  )
+                  .slice(0, 10)
+                  .map(contract => (
+                    <div
+                      key={contract.id}
+                      onClick={() => setSaveModalContract(contract.id)}
+                      className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                        saveModalContract === contract.id
+                          ? 'bg-[#38BDF8]/20 border border-[#38BDF8]/50'
+                          : 'bg-[#151F2E] hover:bg-[#1E293B] border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-white text-sm font-medium">{contract.name}</span>
+                        {saveModalContract === contract.id && (
+                          <svg className="w-5 h-5 text-[#38BDF8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          contract.status === 'Closed Won' ? 'bg-green-500/20 text-green-400' :
+                          contract.status === 'Negotiation' ? 'bg-[#F59E0B]/20 text-[#F59E0B]' :
+                          'bg-[#64748B]/20 text-[#64748B]'
+                        }`}>
+                          {contract.status || 'Unknown'}
+                        </span>
+                        {contract.value && (
+                          <span className="text-xs text-[#8FA3BF]">
+                            ${contract.value.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                }
+                {contracts.filter(c =>
+                  c.name.toLowerCase().includes(saveModalSearch.toLowerCase()) ||
+                  c.status?.toLowerCase().includes(saveModalSearch.toLowerCase())
+                ).length === 0 && (
+                  <p className="text-[#475569] text-sm text-center py-4">No contracts found</p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end gap-2 p-4 border-t border-white/[0.08]">
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="px-4 py-2 text-[#8FA3BF] hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => saveModalContract && handleSaveComparison(saveModalContract)}
+                disabled={!saveModalContract || isSavingComparison}
+                className="flex items-center gap-2 px-4 py-2 bg-[#22C55E] hover:bg-[#16A34A] text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingComparison ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>Save to Selected Contract</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

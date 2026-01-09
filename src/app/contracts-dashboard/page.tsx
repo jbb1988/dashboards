@@ -2563,6 +2563,7 @@ export default function ContractsDashboard() {
                 salesforceId: c.salesforceId,
                 name: c.name,
                 status: c.status,
+                contractType: c.contractType,
               }))} />
             </motion.div>
           )}
