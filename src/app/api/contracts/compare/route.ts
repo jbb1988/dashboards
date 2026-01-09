@@ -89,6 +89,13 @@ CRITICAL RULES:
 /**
  * Use AI to intelligently compare two contract versions
  */
+// Truncate text to fit within context limits (roughly 100k tokens = ~400k chars)
+function truncateForAI(text: string, maxChars: number = 150000): string {
+  if (text.length <= maxChars) return text;
+  console.log(`[AI COMPARE] Truncating text from ${text.length} to ${maxChars} chars`);
+  return text.substring(0, maxChars) + '\n\n[... Document truncated for processing ...]';
+}
+
 async function aiCompareContracts(originalText: string, revisedText: string): Promise<{
   documentInfo: {
     originalTitle: string;
@@ -115,9 +122,15 @@ async function aiCompareContracts(originalText: string, revisedText: string): Pr
   addedSections: string[];
   removedSections: string[];
 }> {
-  const fullPrompt = CONTRACT_COMPARE_PROMPT + originalText + '\n\n===== REVISED DOCUMENT =====\n' + revisedText;
+  // Truncate if needed to fit context window
+  const truncatedOriginal = truncateForAI(originalText, 120000);
+  const truncatedRevised = truncateForAI(revisedText, 120000);
+
+  const fullPrompt = CONTRACT_COMPARE_PROMPT + truncatedOriginal + '\n\n===== REVISED DOCUMENT =====\n' + truncatedRevised;
 
   console.log('[AI COMPARE] Starting AI contract comparison...');
+  console.log(`[AI COMPARE] Original: ${truncatedOriginal.length} chars, Revised: ${truncatedRevised.length} chars`);
+  console.log(`[AI COMPARE] Total prompt length: ${fullPrompt.length} chars`);
   const startTime = Date.now();
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -151,9 +164,18 @@ async function aiCompareContracts(originalText: string, revisedText: string): Pr
   const content = aiResponse.choices?.[0]?.message?.content || '';
 
   console.log(`[AI COMPARE] Completed in ${(Date.now() - startTime) / 1000}s`);
+  console.log(`[AI COMPARE] Response length: ${content.length} chars`);
+  console.log(`[AI COMPARE] Response preview: ${content.substring(0, 200)}...`);
+
+  if (!content || content.length < 50) {
+    console.error('[AI COMPARE] Empty or too short response from AI');
+    throw new Error('AI returned empty response');
+  }
 
   // Parse JSON response
   let jsonStr = content.trim();
+
+  // Strip markdown code blocks if present
   jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
 
   const firstBrace = jsonStr.indexOf('{');
@@ -161,9 +183,47 @@ async function aiCompareContracts(originalText: string, revisedText: string): Pr
 
   if (firstBrace !== -1 && lastBrace > firstBrace) {
     jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
-    return JSON.parse(jsonStr);
+
+    try {
+      const parsed = JSON.parse(jsonStr);
+
+      // Validate the expected structure
+      if (!parsed.changes || !Array.isArray(parsed.changes)) {
+        console.error('[AI COMPARE] Invalid structure - missing changes array');
+        throw new Error('Invalid response structure');
+      }
+
+      // Ensure summary has required fields
+      if (!parsed.summary) {
+        parsed.summary = {
+          totalChanges: parsed.changes.length,
+          highSignificance: parsed.changes.filter((c: { significance: string }) => c.significance === 'high').length,
+          mediumSignificance: parsed.changes.filter((c: { significance: string }) => c.significance === 'medium').length,
+          lowSignificance: parsed.changes.filter((c: { significance: string }) => c.significance === 'low').length,
+          keyTakeaways: []
+        };
+      }
+
+      // Ensure documentInfo exists
+      if (!parsed.documentInfo) {
+        parsed.documentInfo = {
+          originalTitle: 'Original Document',
+          revisedTitle: 'Revised Document',
+          originalDate: '',
+          revisedDate: ''
+        };
+      }
+
+      return parsed;
+    } catch (parseError) {
+      console.error('[AI COMPARE] JSON parse error:', parseError);
+      console.error('[AI COMPARE] Attempted to parse:', jsonStr.substring(0, 500));
+      throw new Error('Failed to parse AI response as JSON');
+    }
   }
 
+  console.error('[AI COMPARE] No JSON object found in response');
+  console.error('[AI COMPARE] Full response:', content);
   throw new Error('AI did not return valid JSON');
 }
 

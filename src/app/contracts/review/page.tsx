@@ -511,6 +511,11 @@ export default function ContractReviewPage() {
 
       const result = await response.json();
 
+      // Check for error in response
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
       // Handle AI mode vs diff mode
       if (result.mode === 'ai') {
         setAiCompareResult(result as AICompareResult);
@@ -518,7 +523,9 @@ export default function ContractReviewPage() {
         setCompareResult(result as CompareResult);
       }
     } catch (err) {
-      setCompareError(err instanceof Error ? err.message : 'Comparison failed');
+      console.error('Compare error:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Comparison failed';
+      setCompareError(`${errorMsg}. Try uploading smaller documents or try again.`);
     } finally {
       setIsComparing(false);
     }
