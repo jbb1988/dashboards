@@ -3,94 +3,44 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DocumentsProgressView, DocumentData, DocumentPreviewPanel } from '@/components/documents';
-import { KPICard, KPIIcons } from '@/components/KPICard';
-
-// ============================================================================
-// DESIGN TOKENS - Linear/Vercel-grade Light Model
-// Key principle: 4 clear luminance layers, cards that FLOAT, no navy collapse
-// ============================================================================
-const tokens = {
-  // BACKGROUNDS: 4 distinct luminance steps (you must SEE the layers)
-  // Moving away from navy → neutral slate/graphite
-  bg: {
-    // Layer 1: App background (darkest) - neutral graphite, NOT navy
-    app: 'bg-[#0D0E12]',
-    // Layer 2: Section/Panel surface - clearly lifted
-    section: 'bg-[#16181D]',
-    // Layer 3: Card surface - visibly floats above section
-    card: 'bg-[#1E2028]',
-    // Layer 4: Expanded/Elevated - brightest for focus
-    elevated: 'bg-[#262932]',
-    // Hover states
-    hover: 'bg-[#2E323D]',
-    // Input backgrounds (recessed)
-    input: 'bg-[#121316]',
-  },
-  // BORDERS: Real borders, not decorative
-  border: {
-    subtle: 'border-[#2A2D37]',
-    default: 'border-[#363A47]',  // Visible, structural
-    strong: 'border-[#464B5A]',   // For expanded/focus states
-    focus: 'border-[#5B8DEF]',
-  },
-  // TEXT: Secondary text must be READABLE, not dim
-  text: {
-    primary: 'text-[#F0F2F5]',    // Near white
-    secondary: 'text-[#A8AEBB]',  // MUCH brighter - readable at a glance
-    muted: 'text-[#7C8291]',      // Still readable, not invisible
-    accent: 'text-[#5B8DEF]',
-  },
-  // STATUS: Color only where meaning exists
-  status: {
-    danger: { dot: 'bg-[#E5484D]', text: 'text-[#E5484D]', bg: 'bg-[#E5484D]/10' },
-    warning: { dot: 'bg-[#D4A72C]', text: 'text-[#D4A72C]', bg: 'bg-[#D4A72C]/10' },
-    info: { dot: 'bg-[#5B8DEF]', text: 'text-[#5B8DEF]', bg: 'bg-[#5B8DEF]/10' },
-    success: { dot: 'bg-[#30A46C]', text: 'text-[#30A46C]', bg: 'bg-[#30A46C]/10' },
-  },
-  // SPACING
-  spacing: {
-    section: 'space-y-5',
-  },
-  // RADIUS
-  radius: {
-    card: 'rounded-xl',
-    control: 'rounded-lg',
-    pill: 'rounded-full',
-  },
-  // SHADOWS: Cards must FLOAT - real ambient shadows
-  shadow: {
-    // Card shadow: visible lift
-    card: 'shadow-[0_2px_8px_rgba(0,0,0,0.35),0_0_1px_rgba(0,0,0,0.2)]',
-    // Elevated shadow: stronger for expanded/focus
-    elevated: 'shadow-[0_4px_16px_rgba(0,0,0,0.45),0_0_1px_rgba(0,0,0,0.25)]',
-    // Inner shadow for expanded states (depth)
-    inner: 'shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
-  },
-};
+import {
+  tokens,
+  colors,
+  KPICard,
+  KPIIcons,
+  DistributionBar,
+  ProgressBar,
+  Badge,
+  StatusDot,
+} from '@/components/mars-ui';
 
 // Priority level metadata for tooltips
 const PRIORITY_META = {
   critical: {
     label: 'Critical',
     description: 'Overdue or missing required documents',
-    color: 'bg-[#E5484D]',
+    color: 'red' as const,
+    bgClass: 'bg-[#E5484D]',
   },
   high: {
     label: 'High Priority',
     description: 'Due soon or needs attention',
-    color: 'bg-[#D4A72C]',
+    color: 'amber' as const,
+    bgClass: 'bg-[#D4A72C]',
   },
   medium: {
     label: 'Medium Priority',
     description: 'On track, some items pending',
-    color: 'bg-[#5B8DEF]',
+    color: 'blue' as const,
+    bgClass: 'bg-[#5B8DEF]',
   },
   low: {
     label: 'Low Priority',
     description: 'Complete or not urgent',
-    color: 'bg-[#30A46C]',
+    color: 'green' as const,
+    bgClass: 'bg-[#30A46C]',
   },
-} as const;
+};
 
 // Priority Dot with Tooltip Component
 function PriorityDot({ category }: { category: 'critical' | 'high' | 'medium' | 'low' }) {
@@ -99,11 +49,13 @@ function PriorityDot({ category }: { category: 'critical' | 'high' | 'medium' | 
 
   return (
     <div className="relative flex-shrink-0">
-      <span
-        className={`w-2 h-2 rounded-full ${meta.color} cursor-help`}
+      <div
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
-      />
+        className="cursor-help"
+      >
+        <StatusDot color={meta.color} size="md" pulse={category === 'critical'} />
+      </div>
       <AnimatePresence>
         {showTooltip && (
           <motion.div
@@ -113,9 +65,9 @@ function PriorityDot({ category }: { category: 'critical' | 'high' | 'medium' | 
             transition={{ duration: 0.15 }}
             className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50"
           >
-            <div className={`${tokens.bg.elevated} border ${tokens.border.default} ${tokens.radius.control} px-3 py-2 ${tokens.shadow.card} whitespace-nowrap`}>
+            <div className={`${tokens.bg.elevated} border ${tokens.border.default} ${tokens.radius.lg} px-3 py-2 ${tokens.shadow.card} whitespace-nowrap`}>
               <div className="flex items-center gap-2 mb-0.5">
-                <span className={`w-2 h-2 rounded-full ${meta.color}`} />
+                <StatusDot color={meta.color} size="sm" />
                 <span className={`text-xs font-semibold ${tokens.text.primary}`}>{meta.label}</span>
               </div>
               <p className={`text-xs ${tokens.text.muted}`}>{meta.description}</p>
@@ -129,7 +81,7 @@ function PriorityDot({ category }: { category: 'critical' | 'high' | 'medium' | 
   );
 }
 
-// Hero Visual: Risk Distribution Bar
+// Hero Visual: Risk Distribution Bar (using mars-ui DistributionBar)
 function RiskDistributionBar({
   critical,
   high,
@@ -146,43 +98,26 @@ function RiskDistributionBar({
   if (total === 0) return null;
 
   const segments = [
-    { count: critical, color: 'bg-[#E5484D]', label: 'Critical', pct: (critical / total) * 100 },
-    { count: high, color: 'bg-[#D4A72C]', label: 'High', pct: (high / total) * 100 },
-    { count: medium, color: 'bg-[#5B8DEF]', label: 'Medium', pct: (medium / total) * 100 },
-    { count: low, color: 'bg-[#30A46C]', label: 'Low', pct: (low / total) * 100 },
-  ].filter(s => s.count > 0);
+    { value: critical, color: colors.accent.red, label: 'Critical' },
+    { value: high, color: colors.accent.amber, label: 'High' },
+    { value: medium, color: colors.accent.blue, label: 'Medium' },
+    { value: low, color: colors.accent.green, label: 'Low' },
+  ];
 
   return (
-    <div className={`${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle} p-4`}>
+    <div className={`${tokens.bg.card} ${tokens.radius.lg} border ${tokens.border.subtle} p-4 ${tokens.shadow.card}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className={`text-sm font-semibold ${tokens.text.primary}`}>Contracts by Risk Level</h3>
         <span className={`text-xs ${tokens.text.muted}`}>{total} total</span>
       </div>
 
-      {/* Distribution Bar */}
-      <div className="h-3 rounded-full overflow-hidden flex bg-[#0F1318]">
-        {segments.map((seg, i) => (
-          <motion.div
-            key={seg.label}
-            initial={{ width: 0 }}
-            animate={{ width: `${seg.pct}%` }}
-            transition={{ delay: 0.1 * i, duration: 0.4, ease: 'easeOut' }}
-            className={`${seg.color} ${i === 0 ? 'rounded-l-full' : ''} ${i === segments.length - 1 ? 'rounded-r-full' : ''}`}
-          />
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-5 mt-3">
-        {segments.map((seg) => (
-          <div key={seg.label} className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${seg.color}`} />
-            <span className={`text-xs ${tokens.text.secondary}`}>
-              {seg.label}: <span className={`font-semibold ${tokens.text.primary}`}>{seg.count}</span>
-            </span>
-          </div>
-        ))}
-      </div>
+      <DistributionBar
+        segments={segments}
+        total={total}
+        size="md"
+        animated
+        showLegend
+      />
     </div>
   );
 }
@@ -1226,11 +1161,6 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
     );
   }
 
-  // Handle KPI card click to switch views
-  const handleKPIClick = (filterKey: string) => {
-    setActiveView(filterKey as SmartView);
-  };
-
   // Expand/collapse all accounts
   const expandAll = () => {
     if (data) {
@@ -1251,55 +1181,49 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           value={data?.stats.totalDocuments || 0}
           subtitle={`${data?.stats.totalContracts || 0} contracts`}
           icon={KPIIcons.document}
-          color="#5B8DEF"
+          color={colors.accent.blue}
           delay={0.1}
           isActive={activeView === 'all'}
-          onClick={handleKPIClick}
-          filterKey="all"
+          onClick={() => setActiveView('all')}
         />
         <KPICard
           title="Needs Attention"
           value={data?.stats.needsAttention || 0}
           subtitle="Missing docs or overdue"
           icon={KPIIcons.warning}
-          color="#E5484D"
+          color={colors.accent.red}
           delay={0.2}
           isActive={activeView === 'needs_attention'}
-          onClick={handleKPIClick}
-          filterKey="needs_attention"
+          onClick={() => setActiveView('needs_attention')}
+          badge={data?.stats.needsAttention}
         />
         <KPICard
           title="Closing Soon"
           value={filteredData.closingSoonContracts?.length || 0}
           subtitle="Within 90 days"
           icon={KPIIcons.calendar}
-          color="#D4A72C"
+          color={colors.accent.amber}
           delay={0.3}
           isActive={activeView === 'closing_soon'}
-          onClick={handleKPIClick}
-          filterKey="closing_soon"
+          onClick={() => setActiveView('closing_soon')}
         />
         <KPICard
           title="Budgeted"
           value={filteredData.budgetedContracts?.length || 0}
           subtitle="Forecasted deals"
           icon={KPIIcons.dollar}
-          color="#7C6AE8"
+          color={colors.accent.purple}
           delay={0.4}
           isActive={activeView === 'budgeted'}
-          onClick={handleKPIClick}
-          filterKey="budgeted"
+          onClick={() => setActiveView('budgeted')}
         />
         <KPICard
           title="Complete"
           value={data?.stats.complete || 0}
           subtitle={`${data?.stats.averageCompleteness || 0}% avg completion`}
           icon={KPIIcons.checkCircle}
-          color="#30A46C"
+          color={colors.accent.green}
           delay={0.5}
-          isActive={false}
-          onClick={() => {}}
-          filterKey=""
         />
       </div>
 
