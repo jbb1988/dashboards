@@ -194,39 +194,107 @@ Respond ONLY with the JSON, no other text.`;
 // PHASE 2: EXTRACT SECTION CONTENT
 // ============================================================================
 
+function findSectionStart(text: string, section: SectionInfo): number {
+  // Try multiple search strategies to find section start
+  const strategies = [
+    // Strategy 1: Exact startPhrase match
+    () => text.indexOf(section.startPhrase.substring(0, 30)),
+
+    // Strategy 2: Case-insensitive startPhrase
+    () => text.toLowerCase().indexOf(section.startPhrase.substring(0, 30).toLowerCase()),
+
+    // Strategy 3: Search for "SECTION {number}." pattern
+    () => {
+      const pattern = new RegExp(`SECTION\\s+${section.number}\\.`, 'i');
+      const match = text.match(pattern);
+      return match ? text.indexOf(match[0]) : -1;
+    },
+
+    // Strategy 4: Search for "{number}. {TITLE}" pattern (e.g., "I. SERVICES")
+    () => {
+      const escapedTitle = section.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`${section.number}\\.\\s*${escapedTitle}`, 'i');
+      const match = text.match(pattern);
+      return match ? text.indexOf(match[0]) : -1;
+    },
+
+    // Strategy 5: Search for just the title (case-insensitive)
+    () => {
+      const titleWords = section.title.split(/\s+/).slice(0, 3).join('\\s+');
+      const pattern = new RegExp(titleWords, 'i');
+      const match = text.match(pattern);
+      return match ? text.indexOf(match[0]) : -1;
+    },
+
+    // Strategy 6: Normalize whitespace and search
+    () => {
+      const normalizedText = text.replace(/\s+/g, ' ');
+      const normalizedPhrase = section.startPhrase.substring(0, 30).replace(/\s+/g, ' ');
+      const idx = normalizedText.toLowerCase().indexOf(normalizedPhrase.toLowerCase());
+      if (idx === -1) return -1;
+      // Map back to original text position (approximate)
+      let origPos = 0, normPos = 0;
+      while (normPos < idx && origPos < text.length) {
+        if (/\s/.test(text[origPos])) {
+          while (origPos < text.length && /\s/.test(text[origPos])) origPos++;
+          normPos++;
+        } else {
+          origPos++;
+          normPos++;
+        }
+      }
+      return origPos;
+    }
+  ];
+
+  for (let i = 0; i < strategies.length; i++) {
+    const index = strategies[i]();
+    if (index !== -1) {
+      console.log(`[EXTRACT] Found section ${section.number}. ${section.title} using strategy ${i + 1} at index ${index}`);
+      return index;
+    }
+  }
+
+  return -1;
+}
+
 function extractSectionContent(text: string, sections: SectionInfo[]): Map<number, string> {
   const contents = new Map<number, string>();
+  const sectionStarts: Array<{index: number; sectionIdx: number}> = [];
 
+  // First pass: find all section start positions
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i];
-    const searchPhrase = section.startPhrase.substring(0, 30);
+    const startIndex = findSectionStart(text, section);
 
-    // Find where this section starts
-    const startIndex = text.indexOf(searchPhrase);
     if (startIndex === -1) {
-      // Try case-insensitive search
-      const lowerText = text.toLowerCase();
-      const lowerPhrase = searchPhrase.toLowerCase();
-      const altIndex = lowerText.indexOf(lowerPhrase);
-      if (altIndex === -1) {
-        console.log(`[EXTRACT] Could not find section ${section.number}. ${section.title}`);
-        contents.set(i, `[Section ${section.number}. ${section.title} - content not found]`);
-        continue;
-      }
+      console.log(`[EXTRACT] Could not find section ${section.number}. ${section.title}`);
+    } else {
+      sectionStarts.push({ index: startIndex, sectionIdx: i });
     }
+  }
 
-    // Find where next section starts (or end of document)
-    let endIndex = text.length;
-    if (i + 1 < sections.length) {
-      const nextPhrase = sections[i + 1].startPhrase.substring(0, 30);
-      const nextIndex = text.indexOf(nextPhrase, startIndex + 50);
-      if (nextIndex > startIndex) {
-        endIndex = nextIndex;
-      }
+  // Sort by position in document
+  sectionStarts.sort((a, b) => a.index - b.index);
+
+  // Second pass: extract content between sections
+  for (let i = 0; i < sectionStarts.length; i++) {
+    const current = sectionStarts[i];
+    const next = sectionStarts[i + 1];
+
+    const startIdx = current.index;
+    const endIdx = next ? next.index : text.length;
+
+    const content = text.substring(startIdx, endIdx).trim();
+    contents.set(current.sectionIdx, content);
+    console.log(`[EXTRACT] Section ${sections[current.sectionIdx].number}: ${content.length} chars`);
+  }
+
+  // Fill in any sections that weren't found
+  for (let i = 0; i < sections.length; i++) {
+    if (!contents.has(i)) {
+      contents.set(i, `[Section ${sections[i].number}. ${sections[i].title} - content not found]`);
     }
-
-    const content = text.substring(startIndex === -1 ? 0 : startIndex, endIndex).trim();
-    contents.set(i, content);
   }
 
   return contents;
