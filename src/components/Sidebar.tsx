@@ -262,11 +262,11 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
       <div className={`flex-shrink-0 p-6 ${isCollapsed ? 'px-3 pt-4' : ''}`}>
         <Link href="/" className="block">
           {isCollapsed ? (
-            <div className="w-11 h-11 rounded-full overflow-hidden flex items-center justify-center">
+            <div className="w-11 h-11 flex items-center justify-center">
               <img
-                src="/mars-logo.png"
+                src="/mars-icon-collapsed.png"
                 alt="MARS"
-                className="w-full h-full object-cover"
+                className="w-10 h-10 object-contain"
               />
             </div>
           ) : (
