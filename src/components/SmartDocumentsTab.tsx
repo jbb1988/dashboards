@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { KPICard, KPIIcons } from '@/components/KPICard';
-import { DocumentsProgressView, DocumentData } from '@/components/documents';
+import { DocumentsProgressView, DocumentData, DocumentPreviewPanel } from '@/components/documents';
 
 // Types
 interface Document {
@@ -151,7 +151,7 @@ const DOCUMENT_TYPES = [
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   draft: { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20' },
   under_review: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-  awaiting_signature: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' },
+  awaiting_signature: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20' },
   executed: { bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/20' },
   expired: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20' },
   superseded: { bg: 'bg-gray-500/10', text: 'text-gray-500', border: 'border-gray-500/20' },
@@ -159,8 +159,8 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }
 
 const PRIORITY_COLORS: Record<string, { bg: string; text: string; border: string; glow: string }> = {
   critical: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', glow: 'shadow-red-500/20' },
-  high: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', glow: 'shadow-amber-500/20' },
-  medium: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', glow: 'shadow-blue-500/20' },
+  high: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', glow: 'shadow-orange-500/20' },
+  medium: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/30', glow: 'shadow-cyan-500/20' },
   low: { bg: 'bg-green-500/10', text: 'text-green-400', border: 'border-green-500/30', glow: 'shadow-green-500/20' },
 };
 
@@ -319,6 +319,7 @@ function AccountSection({
   documentTypes,
   bundleInfoMap,
   onManageBundle,
+  allContracts,
 }: {
   accountName: string;
   contracts: Record<string, ContractDocuments>;
@@ -329,6 +330,7 @@ function AccountSection({
   documentTypes: string[];
   bundleInfoMap?: Record<string, BundleInfo>;
   onManageBundle?: (contractId: string) => void;
+  allContracts?: Contract[];
 }) {
   const contractList = Object.values(contracts);
   const totalDocs = contractList.reduce((sum, c) => sum + c.documents.length, 0);
@@ -403,6 +405,7 @@ function AccountSection({
                     documentTypes={documentTypes}
                     bundleInfo={bundleInfoMap?.[contract.contractId]}
                     onManageBundle={onManageBundle ? () => onManageBundle(contract.contractId) : undefined}
+                    allContracts={allContracts}
                   />
                 ))}
             </div>
@@ -422,6 +425,7 @@ function ContractCard({
   documentTypes,
   bundleInfo,
   onManageBundle,
+  allContracts,
 }: {
   contract: ContractDocuments;
   onUpload: (file: File, type: string, contractId: string, contractName: string, accountName: string) => void;
@@ -430,9 +434,14 @@ function ContractCard({
   documentTypes: string[];
   bundleInfo?: BundleInfo | null;
   onManageBundle?: () => void;
+  allContracts?: Contract[];
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const priorityColor = PRIORITY_COLORS[contract.priority.category];
+
+  // Find the matching contract for contract type
+  const matchingContract = allContracts?.find(c => c.id === contract.contractId || c.salesforceId === contract.contractId);
+  const contractTypes = matchingContract?.contractType || [];
 
   // Convert documents to DocumentData format for DocumentsProgressView
   const documentData: DocumentData[] = useMemo(() => {
@@ -493,13 +502,22 @@ function ContractCard({
             </svg>
           </motion.div>
           <div className="text-left">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h4 className="text-white font-medium">{contract.contractName}</h4>
               {contract.opportunityYear && (
                 <span className="px-2 py-0.5 bg-[#151F2E] text-[#64748B] text-xs rounded">
                   Year {contract.opportunityYear}
                 </span>
               )}
+              {/* Contract Type Badges */}
+              {contractTypes.map((type) => (
+                <span
+                  key={type}
+                  className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#A78BFA] text-xs rounded border border-[#8B5CF6]/20"
+                >
+                  {type}
+                </span>
+              ))}
               {bundleInfo && (
                 <span className="px-2 py-0.5 bg-[#8B5CF6]/10 text-[#8B5CF6] text-xs rounded flex items-center gap-1">
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -535,7 +553,7 @@ function ContractCard({
                     ? 'bg-[#22C55E]'
                     : contract.completeness.percentage >= 50
                       ? 'bg-[#38BDF8]'
-                      : 'bg-amber-500'
+                      : 'bg-orange-500'
                 }`}
                 style={{ width: `${contract.completeness.percentage}%` }}
               />
@@ -786,6 +804,10 @@ function FilterChip({
   );
 }
 
+// Sort options
+type SortField = 'name' | 'date' | 'priority' | 'completeness';
+type SortDirection = 'asc' | 'desc';
+
 // Main Smart Documents Tab Component
 export default function SmartDocumentsTab({ contracts }: { contracts: Contract[] }) {
   // State
@@ -796,6 +818,9 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [sortField, setSortField] = useState<SortField>('priority');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [previewDoc, setPreviewDoc] = useState<DocumentData | null>(null);
 
   // Filters
   const [filters, setFilters] = useState<{
@@ -920,6 +945,31 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
     localStorage.setItem('documentSavedViews', JSON.stringify(updated));
   };
 
+  // Sort contracts helper
+  const sortContracts = useCallback((contractList: (ContractDocuments & { accountName: string })[]) => {
+    return [...contractList].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'name':
+          comparison = a.contractName.localeCompare(b.contractName);
+          break;
+        case 'priority':
+          comparison = b.priority.score - a.priority.score;
+          break;
+        case 'completeness':
+          comparison = b.completeness.percentage - a.completeness.percentage;
+          break;
+        case 'date':
+          // Use contract close date or uploaded_at from latest document
+          const dateA = a.documents[0]?.uploaded_at || '';
+          const dateB = b.documents[0]?.uploaded_at || '';
+          comparison = new Date(dateB).getTime() - new Date(dateA).getTime();
+          break;
+      }
+      return sortDirection === 'asc' ? -comparison : comparison;
+    });
+  }, [sortField, sortDirection]);
+
   // Filter and sort data based on active view
   const filteredData = useMemo(() => {
     if (!data) return { accounts: [], priorityContracts: [], recentDocs: [] };
@@ -944,14 +994,20 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
       filtered = filtered.filter(([name]) => name === filters.accountName);
     }
 
+    // Sort accounts alphabetically
+    filtered = [...filtered].sort(([nameA], [nameB]) => {
+      const comparison = nameA.localeCompare(nameB);
+      return sortField === 'name' ? (sortDirection === 'asc' ? comparison : -comparison) : comparison;
+    });
+
     // Get priority contracts for needs attention view
     const allContracts = filtered.flatMap(([accountName, account]) =>
       Object.values(account.contracts).map(c => ({ ...c, accountName }))
     );
 
-    const priorityContracts = allContracts
-      .filter(c => c.priority.category === 'critical' || c.priority.category === 'high')
-      .sort((a, b) => b.priority.score - a.priority.score);
+    const priorityContracts = sortContracts(
+      allContracts.filter(c => c.priority.category === 'critical' || c.priority.category === 'high')
+    );
 
     // Get contracts closing soon (any date within 90 days)
     const closingSoonContracts = allContracts
@@ -974,12 +1030,12 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
       });
 
     // Get budgeted contracts
-    const budgetedContracts = allContracts
-      .filter(c => {
+    const budgetedContracts = sortContracts(
+      allContracts.filter(c => {
         const contract = contracts.find(ct => ct.id === c.contractId || ct.salesforceId === c.contractId);
         return contract?.budgeted === true;
       })
-      .sort((a, b) => b.priority.score - a.priority.score);
+    );
 
     // Get recent documents
     const recentDocs = data.documents
@@ -998,7 +1054,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
       budgetedContracts,
       recentDocs,
     };
-  }, [data, searchQuery, filters, contracts]);
+  }, [data, searchQuery, filters, contracts, sortContracts]);
 
   // Active filter chips
   const activeFilters = Object.entries(filters)
@@ -1146,6 +1202,35 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
             <option key={type} value={type}>{type}</option>
           ))}
         </select>
+
+        {/* Sort Controls */}
+        <div className="flex items-center gap-2">
+          <select
+            value={sortField}
+            onChange={(e) => setSortField(e.target.value as SortField)}
+            className="px-3 py-2 bg-[#0B1220] border border-white/[0.08] rounded-lg text-white text-sm"
+          >
+            <option value="priority">Sort: Priority</option>
+            <option value="name">Sort: Name</option>
+            <option value="completeness">Sort: Completeness</option>
+            <option value="date">Sort: Date</option>
+          </select>
+          <button
+            onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
+            className="p-2 bg-[#0B1220] border border-white/[0.08] rounded-lg text-[#64748B] hover:text-white transition-colors"
+            title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            {sortDirection === 'asc' ? (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+              </svg>
+            )}
+          </button>
+        </div>
 
         {/* Save View */}
         <button
@@ -1307,6 +1392,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
                   onUpload={handleUpload}
                   uploadingKey={uploadingKey}
                   documentTypes={data?.documentTypes || []}
+                  allContracts={contracts}
                 />
               ))
             )}
@@ -1322,7 +1408,19 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
             ) : (
               <div className="divide-y divide-white/[0.04]">
                 {filteredData.recentDocs.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between p-4 hover:bg-white/[0.02]">
+                  <button
+                    key={doc.id}
+                    onClick={() => setPreviewDoc({
+                      id: doc.id,
+                      document_type: doc.document_type,
+                      file_name: doc.file_name,
+                      file_url: doc.file_url,
+                      file_size: doc.file_size || undefined,
+                      uploaded_at: doc.uploaded_at,
+                      uploaded_by: doc.uploaded_by || undefined,
+                    })}
+                    className="w-full flex items-center justify-between p-4 hover:bg-white/[0.04] transition-colors text-left"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-[#38BDF8]/10 rounded-lg flex items-center justify-center">
                         <svg className="w-5 h-5 text-[#38BDF8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1336,11 +1434,16 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[#64748B] text-sm">{formatRelativeTime(doc.uploaded_at)}</p>
-                      <p className="text-[#64748B] text-xs">{formatFileSize(doc.file_size)}</p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-[#64748B] text-sm">{formatRelativeTime(doc.uploaded_at)}</p>
+                        <p className="text-[#64748B] text-xs">{formatFileSize(doc.file_size)}</p>
+                      </div>
+                      <span className="px-3 py-1.5 text-xs font-medium text-[#8B5CF6] bg-[#8B5CF6]/10 border border-[#8B5CF6]/30 rounded-lg">
+                        View
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -1374,6 +1477,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
                 onUpload={handleUpload}
                 uploadingKey={uploadingKey}
                 documentTypes={data?.documentTypes || []}
+                allContracts={contracts}
               />
             ))}
           </div>
@@ -1406,6 +1510,14 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           </div>
         </div>
       )}
+
+      {/* Document Preview Panel */}
+      <DocumentPreviewPanel
+        document={previewDoc}
+        isOpen={!!previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        onDownload={(doc) => window.open(doc.file_url, '_blank')}
+      />
     </div>
   );
 }
