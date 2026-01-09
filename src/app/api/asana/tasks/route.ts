@@ -5,6 +5,7 @@ import {
   getProject,
   groupTasksBySection,
   calculateTaskStats,
+  updateTask,
   AsanaTask,
 } from '@/lib/asana';
 
@@ -118,6 +119,60 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching Asana tasks:', error);
     return NextResponse.json({
       error: 'Failed to fetch tasks',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    }, { status: 500 });
+  }
+}
+
+// PATCH - Update a task (e.g., mark as complete)
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { taskId, completed, name, due_on, start_on, notes, assignee } = body;
+
+    if (!taskId) {
+      return NextResponse.json({
+        error: 'Missing taskId',
+        message: 'Please provide a taskId in the request body',
+      }, { status: 400 });
+    }
+
+    // Build updates object with only provided fields
+    const updates: {
+      completed?: boolean;
+      name?: string;
+      due_on?: string | null;
+      start_on?: string | null;
+      notes?: string;
+      assignee?: string | null;
+    } = {};
+
+    if (completed !== undefined) updates.completed = completed;
+    if (name !== undefined) updates.name = name;
+    if (due_on !== undefined) updates.due_on = due_on;
+    if (start_on !== undefined) updates.start_on = start_on;
+    if (notes !== undefined) updates.notes = notes;
+    if (assignee !== undefined) updates.assignee = assignee;
+
+    const updatedTask = await updateTask(taskId, updates);
+
+    // Invalidate cache for any project that might contain this task
+    cachedData = {};
+
+    return NextResponse.json({
+      success: true,
+      task: {
+        gid: updatedTask.gid,
+        name: updatedTask.name,
+        completed: updatedTask.completed,
+        completedAt: updatedTask.completed_at,
+      },
+    });
+
+  } catch (error) {
+    console.error('Error updating Asana task:', error);
+    return NextResponse.json({
+      error: 'Failed to update task',
       message: error instanceof Error ? error.message : 'Unknown error',
     }, { status: 500 });
   }

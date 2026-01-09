@@ -369,6 +369,244 @@ function generateComparisonDoc(
   });
 }
 
+// Generate AI Recommendations as a separate document
+function generateAiRecommendationsDoc(
+  comparisonResult: SectionCompareResult,
+  analysisResult: ComparisonAnalysisResult
+): Document {
+  const children: Paragraph[] = [];
+
+  // Title
+  children.push(
+    new Paragraph({
+      text: 'AI Contract Analysis Recommendations',
+      heading: HeadingLevel.TITLE,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 400 },
+    })
+  );
+
+  // Document Info
+  children.push(
+    new Paragraph({
+      text: 'Analysis Summary',
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 400, after: 200 },
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      children: [
+        new TextRun({ text: 'Documents Compared: ', bold: true }),
+        new TextRun({ text: `${comparisonResult.documentInfo.originalTitle} vs ${comparisonResult.documentInfo.revisedTitle}` }),
+      ],
+      spacing: { after: 100 },
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      children: [
+        new TextRun({ text: 'Analysis Date: ', bold: true }),
+        new TextRun({ text: new Date().toLocaleDateString() }),
+      ],
+      spacing: { after: 200 },
+    })
+  );
+
+  // Overall Assessment
+  children.push(
+    new Paragraph({
+      text: 'Overall Assessment',
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 400, after: 200 },
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      text: analysisResult.overallAssessment,
+      spacing: { after: 200 },
+    })
+  );
+
+  // Critical Issues
+  if (analysisResult.criticalIssues && analysisResult.criticalIssues.length > 0) {
+    children.push(
+      new Paragraph({
+        text: 'Critical Issues Requiring Attention',
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 400, after: 200 },
+      })
+    );
+
+    for (const issue of analysisResult.criticalIssues) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: '⚠ ', color: 'FF0000', bold: true }),
+            new TextRun({ text: issue }),
+          ],
+          spacing: { after: 100 },
+        })
+      );
+    }
+  }
+
+  // Recommendations Summary
+  const pushBackCount = analysisResult.recommendations.filter(r => r.verdict === 'push_back').length;
+  const negotiateCount = analysisResult.recommendations.filter(r => r.verdict === 'negotiate').length;
+  const acceptCount = analysisResult.recommendations.filter(r => r.verdict === 'accept').length;
+
+  children.push(
+    new Paragraph({
+      text: 'Recommendations Summary',
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 400, after: 200 },
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      text: `Total Sections Analyzed: ${analysisResult.recommendations.length}`,
+      spacing: { after: 100 },
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      children: [
+        new TextRun({ text: '✓ Accept: ', color: '22C55E', bold: true }),
+        new TextRun({ text: `${acceptCount} sections` }),
+      ],
+      spacing: { after: 50 },
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      children: [
+        new TextRun({ text: '⚠ Negotiate: ', color: 'F59E0B', bold: true }),
+        new TextRun({ text: `${negotiateCount} sections` }),
+      ],
+      spacing: { after: 50 },
+    })
+  );
+
+  children.push(
+    new Paragraph({
+      children: [
+        new TextRun({ text: '✗ Push Back: ', color: 'EF4444', bold: true }),
+        new TextRun({ text: `${pushBackCount} sections` }),
+      ],
+      spacing: { after: 200 },
+    })
+  );
+
+  // Detailed Recommendations
+  children.push(
+    new Paragraph({
+      text: 'Detailed Recommendations',
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 400, after: 200 },
+    })
+  );
+
+  for (const rec of analysisResult.recommendations) {
+    const verdictColor = rec.verdict === 'push_back' ? 'EF4444' :
+                         rec.verdict === 'negotiate' ? 'F59E0B' : '22C55E';
+    const verdictText = rec.verdict === 'push_back' ? 'PUSH BACK' :
+                        rec.verdict === 'negotiate' ? 'NEGOTIATE' : 'ACCEPT';
+
+    // Section header
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: `Section ${rec.sectionNumber}: ${rec.sectionTitle}`, bold: true }),
+        ],
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 100 },
+      })
+    );
+
+    // Verdict badge
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: `Recommendation: ${verdictText}`, bold: true, color: verdictColor }),
+          new TextRun({ text: ` | Risk Level: ${rec.riskLevel.toUpperCase()}`, italics: true }),
+        ],
+        spacing: { after: 100 },
+      })
+    );
+
+    // Reasoning
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Reasoning: ', bold: true }),
+          new TextRun({ text: rec.reasoning }),
+        ],
+        spacing: { after: 100 },
+      })
+    );
+
+    // Suggested counter-language
+    if (rec.suggestedLanguage) {
+      children.push(
+        new Paragraph({
+          text: 'Suggested Counter-Language:',
+          heading: HeadingLevel.HEADING_3,
+          spacing: { before: 100, after: 50 },
+        })
+      );
+      children.push(
+        new Paragraph({
+          text: rec.suggestedLanguage,
+          shading: { fill: 'F0FDF4' },
+          spacing: { after: 100 },
+        })
+      );
+    }
+
+    // Separator
+    children.push(
+      new Paragraph({
+        border: {
+          bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' },
+        },
+        spacing: { after: 200 },
+      })
+    );
+  }
+
+  // Footer
+  children.push(
+    new Paragraph({
+      text: `AI Analysis generated: ${new Date().toLocaleString()}`,
+      alignment: AlignmentType.RIGHT,
+      spacing: { before: 400 },
+    })
+  );
+
+  return new Document({
+    sections: [{
+      properties: {
+        page: {
+          margin: {
+            top: convertInchesToTwip(1),
+            right: convertInchesToTwip(1),
+            bottom: convertInchesToTwip(1),
+            left: convertInchesToTwip(1),
+          },
+        },
+      },
+      children,
+    }],
+  });
+}
+
 // ============================================================================
 // MAIN API HANDLER
 // ============================================================================
@@ -425,17 +663,17 @@ export async function POST(request: NextRequest) {
     const doc = generateComparisonDoc(comparisonResult, analysisResult);
     const buffer = await Packer.toBuffer(doc);
 
-    // 3. Upload to Supabase Storage
+    // 3. Upload Comparison Report to Supabase Storage
     const timestamp = Date.now();
     const safeContractName = contract.name.replace(/[^a-zA-Z0-9]/g, '_');
-    const fileName = `${safeContractName}-Comparison-${timestamp}.docx`;
-    const storagePath = `comparisons/${contractId}/${fileName}`;
+    const comparisonFileName = `${safeContractName}-Comparison-${timestamp}.docx`;
+    const comparisonStoragePath = `comparisons/${contractId}/${comparisonFileName}`;
 
-    console.log('[SAVE] Uploading to storage:', storagePath);
+    console.log('[SAVE] Uploading comparison to storage:', comparisonStoragePath);
 
     const { error: uploadError } = await supabase.storage
       .from('data-files')
-      .upload(storagePath, buffer, {
+      .upload(comparisonStoragePath, buffer, {
         contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         upsert: false,
       });
@@ -448,17 +686,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Create document record
-    console.log('[SAVE] Creating document record...');
+    // Get public URL for the comparison report
+    const { data: comparisonUrlData } = supabase.storage
+      .from('data-files')
+      .getPublicUrl(comparisonStoragePath);
 
-    const documentRecord = {
+    const comparisonPublicUrl = comparisonUrlData?.publicUrl || comparisonStoragePath;
+
+    // 4. Create Comparison Report document record
+    console.log('[SAVE] Creating comparison document record...');
+
+    const comparisonRecord = {
       contract_id: contractId,
       account_name: contract.account_name,
       opportunity_name: contract.opportunity_name,
       document_type: 'Comparison Report',
       status: 'under_review',
-      file_name: fileName,
-      file_url: storagePath,
+      file_name: comparisonFileName,
+      file_url: comparisonPublicUrl,
       file_size: buffer.length,
       file_mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       notes: notes || `Comparison: ${originalFileName} vs ${revisedFileName}`,
@@ -469,40 +714,121 @@ export async function POST(request: NextRequest) {
         documentInfo: comparisonResult.documentInfo,
         summary: comparisonResult.summary,
         hasAiRecommendations: !!analysisResult,
-        recommendations: analysisResult?.recommendations?.map(r => ({
-          section: `${r.sectionNumber}. ${r.sectionTitle}`,
-          verdict: r.verdict,
-          riskLevel: r.riskLevel,
-        })),
+        storagePath: comparisonStoragePath,
         timestamp: new Date().toISOString(),
       },
     };
 
-    const { data: document, error: insertError } = await supabase
+    const { data: comparisonDoc, error: comparisonInsertError } = await supabase
       .from('documents')
-      .insert(documentRecord)
+      .insert(comparisonRecord)
       .select()
       .single();
 
-    if (insertError) {
-      console.error('[SAVE] Insert error:', insertError);
-      // Try to clean up uploaded file
-      await supabase.storage.from('data-files').remove([storagePath]);
+    if (comparisonInsertError) {
+      console.error('[SAVE] Comparison insert error:', comparisonInsertError);
+      await supabase.storage.from('data-files').remove([comparisonStoragePath]);
       return NextResponse.json(
-        { error: 'Failed to create document record' },
+        { error: 'Failed to create comparison document record' },
         { status: 500 }
       );
     }
 
-    console.log('[SAVE] Document saved successfully:', document.id);
+    console.log('[SAVE] Comparison document saved:', comparisonDoc.id);
+
+    // 5. If AI Recommendations exist, save them as a separate document
+    let aiRecommendationsDoc = null;
+    if (analysisResult && analysisResult.recommendations && analysisResult.recommendations.length > 0) {
+      console.log('[SAVE] Saving AI Recommendations as separate document...');
+
+      // Generate AI Recommendations document
+      const aiDoc = generateAiRecommendationsDoc(comparisonResult, analysisResult);
+      const aiBuffer = await Packer.toBuffer(aiDoc);
+
+      const aiFileName = `${safeContractName}-AI-Recommendations-${timestamp}.docx`;
+      const aiStoragePath = `comparisons/${contractId}/${aiFileName}`;
+
+      const { error: aiUploadError } = await supabase.storage
+        .from('data-files')
+        .upload(aiStoragePath, aiBuffer, {
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          upsert: false,
+        });
+
+      if (!aiUploadError) {
+        const { data: aiUrlData } = supabase.storage
+          .from('data-files')
+          .getPublicUrl(aiStoragePath);
+
+        const aiPublicUrl = aiUrlData?.publicUrl || aiStoragePath;
+
+        const aiRecord = {
+          contract_id: contractId,
+          account_name: contract.account_name,
+          opportunity_name: contract.opportunity_name,
+          document_type: 'AI Recommendations',
+          status: 'under_review',
+          file_name: aiFileName,
+          file_url: aiPublicUrl,
+          file_size: aiBuffer.length,
+          file_mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          notes: `AI Analysis for: ${originalFileName} vs ${revisedFileName}`,
+          metadata: {
+            originalDocument: originalFileName,
+            revisedDocument: revisedFileName,
+            overallAssessment: analysisResult.overallAssessment,
+            criticalIssues: analysisResult.criticalIssues,
+            totalRecommendations: analysisResult.recommendations.length,
+            recommendations: analysisResult.recommendations.map(r => ({
+              section: `${r.sectionNumber}. ${r.sectionTitle}`,
+              verdict: r.verdict,
+              riskLevel: r.riskLevel,
+              reasoning: r.reasoning,
+            })),
+            storagePath: aiStoragePath,
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        const { data: aiDocRecord, error: aiInsertError } = await supabase
+          .from('documents')
+          .insert(aiRecord)
+          .select()
+          .single();
+
+        if (!aiInsertError) {
+          aiRecommendationsDoc = aiDocRecord;
+          console.log('[SAVE] AI Recommendations document saved:', aiDocRecord.id);
+        } else {
+          console.error('[SAVE] AI Recommendations insert error:', aiInsertError);
+        }
+      } else {
+        console.error('[SAVE] AI Recommendations upload error:', aiUploadError);
+      }
+    }
+
+    console.log('[SAVE] All documents saved successfully');
     console.log('='.repeat(60));
 
     return NextResponse.json({
       success: true,
-      documentId: document.id,
-      fileName,
-      storagePath,
+      comparisonDocumentId: comparisonDoc.id,
+      aiRecommendationsDocumentId: aiRecommendationsDoc?.id || null,
+      fileName: comparisonFileName,
+      storagePath: comparisonStoragePath,
       contractName: contract.name,
+      savedDocuments: {
+        comparison: {
+          id: comparisonDoc.id,
+          fileName: comparisonFileName,
+          url: comparisonPublicUrl,
+        },
+        aiRecommendations: aiRecommendationsDoc ? {
+          id: aiRecommendationsDoc.id,
+          fileName: aiRecommendationsDoc.file_name,
+          url: aiRecommendationsDoc.file_url,
+        } : null,
+      },
     });
 
   } catch (error) {

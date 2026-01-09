@@ -338,13 +338,33 @@ function StatusGroup({
 // Main Component
 export default function SmartProjectsTab({
   data,
-  loading
+  loading,
+  onTaskComplete,
 }: {
   data: ProjectData | null;
   loading: boolean;
+  onTaskComplete?: (taskId: string, completed: boolean) => Promise<void>;
 }) {
   const [activeView, setActiveView] = useState<SmartView>('needs_attention');
   const [searchQuery, setSearchQuery] = useState('');
+  const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
+
+  // Handle task completion
+  const handleComplete = useCallback(async (taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onTaskComplete || completingTasks.has(taskId)) return;
+
+    setCompletingTasks(prev => new Set(prev).add(taskId));
+    try {
+      await onTaskComplete(taskId, true);
+    } finally {
+      setCompletingTasks(prev => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+    }
+  }, [onTaskComplete, completingTasks]);
 
   // Calculate priorities for all tasks
   const { priorities, needsAttentionTasks, thisWeekTasks, byStatusGroups, allTasks, confirmedTasks, placeholderTasks, stats } = useMemo(() => {
@@ -665,12 +685,34 @@ export default function SmartProjectsTab({
                   {thisWeekTasks.map((task, idx) => {
                     const priority = priorities.get(task.gid);
                     const taskStatus = getTaskStatus(task);
+                    const isCompleting = completingTasks.has(task.gid);
 
                     return (
                       <div
                         key={task.gid}
                         className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
                       >
+                        {/* Complete Checkbox */}
+                        {onTaskComplete && (
+                          <button
+                            onClick={(e) => handleComplete(task.gid, e)}
+                            disabled={isCompleting}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              isCompleting
+                                ? 'border-[#22C55E] bg-[#22C55E]/20'
+                                : 'border-[#475569] hover:border-[#22C55E] hover:bg-[#22C55E]/10'
+                            }`}
+                            title="Mark as complete"
+                          >
+                            {isCompleting ? (
+                              <div className="w-3 h-3 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <svg className="w-3 h-3 text-[#475569] opacity-0 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
                         {priority && (
                           <div className="w-1 h-8 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
                         )}
@@ -733,7 +775,8 @@ export default function SmartProjectsTab({
             transition={{ duration: 0.15 }}
           >
             <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-              <div className="grid gap-4 px-5 py-2.5 text-[10px] font-medium text-[#64748B] uppercase border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '60px 100px 2fr 100px 100px 80px' }}>
+              <div className="grid gap-4 px-5 py-2.5 text-[10px] font-medium text-[#64748B] uppercase border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: onTaskComplete ? '32px 60px 100px 2fr 100px 100px 80px' : '60px 100px 2fr 100px 100px 80px' }}>
+                {onTaskComplete && <div></div>}
                 <div>Priority</div>
                 <div>Date</div>
                 <div>Project Name</div>
@@ -746,13 +789,32 @@ export default function SmartProjectsTab({
                   const priority = priorities.get(task.gid);
                   const taskStatus = getTaskStatus(task);
                   const region = getCustomField(task, 'Region');
+                  const isCompleting = completingTasks.has(task.gid);
 
                   return (
                     <div
                       key={task.gid}
                       className={`grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
-                      style={{ gridTemplateColumns: '60px 100px 2fr 100px 100px 80px' }}
+                      style={{ gridTemplateColumns: onTaskComplete ? '32px 60px 100px 2fr 100px 100px 80px' : '60px 100px 2fr 100px 100px 80px' }}
                     >
+                      {/* Complete Checkbox */}
+                      {onTaskComplete && (
+                        <button
+                          onClick={(e) => handleComplete(task.gid, e)}
+                          disabled={isCompleting}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                            isCompleting
+                              ? 'border-[#22C55E] bg-[#22C55E]/20'
+                              : 'border-[#475569] hover:border-[#22C55E] hover:bg-[#22C55E]/10'
+                          }`}
+                          title="Mark as complete"
+                        >
+                          {isCompleting && (
+                            <div className="w-3 h-3 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
+                          )}
+                        </button>
+                      )}
+
                       {/* Priority */}
                       <div className="flex items-center gap-2">
                         {priority && (
@@ -821,12 +883,30 @@ export default function SmartProjectsTab({
                   {confirmedTasks.map((task, idx) => {
                     const priority = priorities.get(task.gid);
                     const region = getCustomField(task, 'Region');
+                    const isCompleting = completingTasks.has(task.gid);
 
                     return (
                       <div
                         key={task.gid}
                         className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
                       >
+                        {/* Complete Checkbox */}
+                        {onTaskComplete && (
+                          <button
+                            onClick={(e) => handleComplete(task.gid, e)}
+                            disabled={isCompleting}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              isCompleting
+                                ? 'border-[#22C55E] bg-[#22C55E]/20'
+                                : 'border-[#475569] hover:border-[#22C55E] hover:bg-[#22C55E]/10'
+                            }`}
+                            title="Mark as complete"
+                          >
+                            {isCompleting && (
+                              <div className="w-3 h-3 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
+                            )}
+                          </button>
+                        )}
                         {priority && (
                           <div className="w-1 h-8 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
                         )}
@@ -878,12 +958,30 @@ export default function SmartProjectsTab({
                   {placeholderTasks.map((task, idx) => {
                     const priority = priorities.get(task.gid);
                     const region = getCustomField(task, 'Region');
+                    const isCompleting = completingTasks.has(task.gid);
 
                     return (
                       <div
                         key={task.gid}
                         className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}
                       >
+                        {/* Complete Checkbox */}
+                        {onTaskComplete && (
+                          <button
+                            onClick={(e) => handleComplete(task.gid, e)}
+                            disabled={isCompleting}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              isCompleting
+                                ? 'border-[#22C55E] bg-[#22C55E]/20'
+                                : 'border-[#475569] hover:border-[#22C55E] hover:bg-[#22C55E]/10'
+                            }`}
+                            title="Mark as complete"
+                          >
+                            {isCompleting && (
+                              <div className="w-3 h-3 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin" />
+                            )}
+                          </button>
+                        )}
                         {priority && (
                           <div className="w-1 h-8 rounded-full" style={{ backgroundColor: COLORS[priority.category] }} />
                         )}

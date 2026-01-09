@@ -1281,6 +1281,27 @@ export default function PMDashboard() {
     fetchDocuSign();
   };
 
+  // Handle task completion - updates Asana and refreshes data
+  const handleTaskComplete = async (taskId: string, completed: boolean) => {
+    try {
+      const response = await fetch('/api/asana/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, completed }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
+
+      // Refresh the timeline data to reflect the change
+      fetchAsanaProject(PROJECT_IDS.timeline, 'timeline');
+    } catch (error) {
+      console.error('Error completing task:', error);
+      throw error;
+    }
+  };
+
   const isLoading = Object.values(loading).some(l => l);
 
   return (
@@ -1330,7 +1351,7 @@ export default function PMDashboard() {
         <main className="max-w-[1600px] mx-auto px-8 py-6">
           <AnimatePresence mode="wait">
             <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }}>
-              {activeTab === 'smart' && <SmartProjectsTab data={timelineData} loading={loading.timeline} />}
+              {activeTab === 'smart' && <SmartProjectsTab data={timelineData} loading={loading.timeline} onTaskComplete={handleTaskComplete} />}
               {activeTab === 'timeline' && <TimelineTab data={timelineData} loading={loading.timeline} />}
               {activeTab === 'mcc' && <MCCStatusTab data={mccData} loading={loading.mcc} />}
               {activeTab === 'punchlist' && <PunchListTab data={punchlistData} loading={loading.punchlist} />}

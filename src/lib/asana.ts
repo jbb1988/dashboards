@@ -247,6 +247,35 @@ export async function getTask(taskId: string): Promise<AsanaTask> {
   return asanaFetch<AsanaTask>(`/tasks/${taskId}?opt_fields=${fields}`);
 }
 
+// Update task (e.g., mark as complete)
+export async function updateTask(
+  taskId: string,
+  updates: {
+    completed?: boolean;
+    name?: string;
+    due_on?: string | null;
+    start_on?: string | null;
+    notes?: string;
+    assignee?: string | null;
+  }
+): Promise<AsanaTask> {
+  const url = `${ASANA_BASE_URL}/tasks/${taskId}`;
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({ data: updates }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Asana API error (${response.status}): ${error}`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
 // Helper to extract custom field value
 export function getCustomFieldValue(
   task: AsanaTask,
