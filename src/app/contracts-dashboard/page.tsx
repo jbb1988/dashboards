@@ -563,7 +563,7 @@ function ContractRow({
   };
 
   // Construct Salesforce Lightning URL
-  const salesforceUrl = contract.salesforceUrl || `https://marscompany.lightning.force.com/lightning/r/Opportunity/${contract.id}/view`;
+  const salesforceUrl = contract.salesforceUrl || `https://marscompany.lightning.force.com/lightning/r/Opportunity/${contract.salesforceId}/view`;
 
   const handleSalesforceClick = (e: React.MouseEvent) => {
     e.stopPropagation();
