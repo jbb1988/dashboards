@@ -41,12 +41,54 @@ export async function GET(request: NextRequest) {
     if (viewParam === 'class' || !classNameParam || includeCharts) {
       byClass = await getDiversifiedSalesByClass({ years, months });
 
-      // If a class is selected, get customers for that class
+      // If a class is selected, get customers for that class WITH item breakdown
       if (classNameParam) {
         byCustomer = await getDiversifiedSalesByCustomer({
           years,
           months,
           className: classNameParam,
+        });
+
+        // Get raw sales to extract item data per customer
+        const classSales = await getSupabaseSales({
+          years,
+          months,
+          className: classNameParam,
+        });
+
+        // Group by customer + item to get item totals
+        const customerItemMap = new Map<string, Map<string, { item_name: string; quantity: number; revenue: number }>>();
+
+        for (const sale of classSales) {
+          if (!customerItemMap.has(sale.customer_id)) {
+            customerItemMap.set(sale.customer_id, new Map());
+          }
+          const itemMap = customerItemMap.get(sale.customer_id)!;
+
+          const itemKey = sale.item_name || sale.item_id || 'Unknown';
+          if (!itemMap.has(itemKey)) {
+            itemMap.set(itemKey, { item_name: itemKey, quantity: 0, revenue: 0 });
+          }
+          const item = itemMap.get(itemKey)!;
+          item.quantity += sale.quantity || 0;
+          item.revenue += sale.revenue || 0;
+        }
+
+        // Attach top 5 items to each customer
+        byCustomer = byCustomer.map(customer => {
+          const itemMap = customerItemMap.get(customer.customer_id);
+          if (!itemMap) {
+            return { ...customer, top_items: [], item_count: 0 };
+          }
+
+          const allItems = Array.from(itemMap.values())
+            .sort((a, b) => b.revenue - a.revenue);
+
+          return {
+            ...customer,
+            top_items: allItems.slice(0, 5),
+            item_count: allItems.length,
+          };
         });
       }
     }
@@ -58,6 +100,50 @@ export async function GET(request: NextRequest) {
 
     if (viewParam === 'customer' || customerIdParam) {
       byCustomer = await getDiversifiedSalesByCustomer({ years, months, className: classNameParam || undefined });
+
+      // If fetching customers for a specific class, add item breakdown
+      if (classNameParam && !customerIdParam) {
+        const classSales = await getSupabaseSales({
+          years,
+          months,
+          className: classNameParam,
+        });
+
+        // Group by customer + item to get item totals
+        const customerItemMap = new Map<string, Map<string, { item_name: string; quantity: number; revenue: number }>>();
+
+        for (const sale of classSales) {
+          if (!customerItemMap.has(sale.customer_id)) {
+            customerItemMap.set(sale.customer_id, new Map());
+          }
+          const itemMap = customerItemMap.get(sale.customer_id)!;
+
+          const itemKey = sale.item_name || sale.item_id || 'Unknown';
+          if (!itemMap.has(itemKey)) {
+            itemMap.set(itemKey, { item_name: itemKey, quantity: 0, revenue: 0 });
+          }
+          const item = itemMap.get(itemKey)!;
+          item.quantity += sale.quantity || 0;
+          item.revenue += sale.revenue || 0;
+        }
+
+        // Attach top 5 items to each customer
+        byCustomer = byCustomer.map(customer => {
+          const itemMap = customerItemMap.get(customer.customer_id);
+          if (!itemMap) {
+            return { ...customer, top_items: [], item_count: 0 };
+          }
+
+          const allItems = Array.from(itemMap.values())
+            .sort((a, b) => b.revenue - a.revenue);
+
+          return {
+            ...customer,
+            top_items: allItems.slice(0, 5),
+            item_count: allItems.length,
+          };
+        });
+      }
 
       // If a customer is selected, we can get their classes
       if (customerIdParam) {

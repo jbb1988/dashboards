@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets, KPICard } from '@/components/mars-ui';
 import {
@@ -22,6 +23,12 @@ interface ClassSummary {
   transaction_count: number;
 }
 
+interface ItemSummary {
+  item_name: string;
+  quantity: number;
+  revenue: number;
+}
+
 interface CustomerSummary {
   customer_id: string;
   customer_name: string;
@@ -31,6 +38,8 @@ interface CustomerSummary {
   total_gross_profit: number;
   avg_gross_profit_pct: number;
   transaction_count: number;
+  top_items?: ItemSummary[];
+  item_count?: number;
 }
 
 interface DashboardSummary {
@@ -158,6 +167,70 @@ function FilterChip({ label, selected, onClick, count }: {
   );
 }
 
+// Item Tooltip Component
+function ItemTooltip({
+  customer,
+  position
+}: {
+  customer: CustomerSummary;
+  position: { x: number; y: number };
+}) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Adjust position to prevent tooltip from going off-screen
+  const adjustedX = Math.min(position.x, typeof window !== 'undefined' ? window.innerWidth - 340 : position.x);
+  const adjustedY = Math.min(position.y, typeof window !== 'undefined' ? window.innerHeight - 250 : position.y);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 5 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: 5 }}
+      transition={{ duration: 0.15 }}
+      className="fixed z-[9999] bg-[#1B1F39] border border-white/[0.08] rounded-xl shadow-2xl p-4 min-w-[280px] max-w-[320px]"
+      style={{
+        left: adjustedX,
+        top: adjustedY,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
+      }}
+    >
+      <div className="text-[11px] text-[#64748B] uppercase tracking-wider mb-3">
+        Items purchased by {customer.customer_name}
+      </div>
+
+      {customer.top_items && customer.top_items.length > 0 ? (
+        <>
+          <div className="space-y-2">
+            {customer.top_items.map((item, idx) => (
+              <div key={idx} className="flex items-center justify-between text-[13px]">
+                <span className="text-[#E2E8F0] truncate max-w-[160px]">{item.item_name}</span>
+                <div className="flex items-center gap-3 text-[#8FA3BF]">
+                  <span className="text-[11px] tabular-nums">{item.quantity.toLocaleString()} qty</span>
+                  <span className="font-medium tabular-nums">{formatCurrency(item.revenue)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {customer.item_count && customer.item_count > 5 && (
+            <div className="mt-3 pt-3 border-t border-white/[0.06] text-[11px] text-[#64748B]">
+              + {customer.item_count - 5} more items
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-[13px] text-[#64748B] italic">No item data available</div>
+      )}
+    </motion.div>,
+    document.body
+  );
+}
+
 // Expandable Row Component
 function ExpandableRow({
   data,
@@ -180,6 +253,43 @@ function ExpandableRow({
   const gpColor = data.avg_gross_profit_pct >= 50 ? '#22C55E' : data.avg_gross_profit_pct >= 40 ? '#F59E0B' : '#EF4444';
   const name = type === 'class' ? (data as ClassSummary).class_name : (data as CustomerSummary).customer_name;
   const category = type === 'class' ? (data as ClassSummary).class_category : '';
+
+  // Hover state for item tooltip (only for class view showing customers)
+  const [hoveredCustomer, setHoveredCustomer] = useState<CustomerSummary | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = (customer: CustomerSummary, e: React.MouseEvent) => {
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    // Set tooltip after 200ms delay
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredCustomer(customer);
+      setTooltipPosition({
+        x: e.clientX + 15,
+        y: e.clientY + 10
+      });
+    }, 200);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredCustomer(null);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (hoveredCustomer) {
+      setTooltipPosition({
+        x: e.clientX + 15,
+        y: e.clientY + 10
+      });
+    }
+  };
 
   return (
     <div className={isEvenRow ? 'bg-[#131B28]' : 'bg-[#111827]'}>
@@ -279,14 +389,27 @@ function ExpandableRow({
                   ? (child as CustomerSummary).customer_name
                   : (child as ClassSummary).class_name;
                 const childGpColor = child.avg_gross_profit_pct >= 50 ? '#22C55E' : child.avg_gross_profit_pct >= 40 ? '#F59E0B' : '#EF4444';
+                const isCustomerRow = type === 'class';
+                const customerData = isCustomerRow ? (child as CustomerSummary) : null;
+                const hasItemData = customerData?.top_items && customerData.top_items.length > 0;
 
                 return (
                   <div
                     key={idx}
-                    className={`grid gap-4 px-4 py-2.5 ${idx % 2 === 0 ? 'bg-[#0B1220]' : 'bg-[#0F1729]'} hover:bg-[#1a2740] transition-colors`}
+                    className={`grid gap-4 px-4 py-2.5 ${idx % 2 === 0 ? 'bg-[#0B1220]' : 'bg-[#0F1729]'} hover:bg-[#1a2740] transition-colors ${isCustomerRow && hasItemData ? 'cursor-pointer' : ''}`}
                     style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px' }}
+                    onMouseEnter={isCustomerRow && customerData ? (e) => handleMouseEnter(customerData, e) : undefined}
+                    onMouseLeave={isCustomerRow ? handleMouseLeave : undefined}
+                    onMouseMove={isCustomerRow ? handleMouseMove : undefined}
                   >
-                    <div className="text-[13px] text-[#CBD5E1]">{childName}</div>
+                    <div className="text-[13px] text-[#CBD5E1] flex items-center gap-2">
+                      {childName}
+                      {isCustomerRow && hasItemData && (
+                        <span className="text-[10px] text-[#64748B] bg-white/[0.04] px-1.5 py-0.5 rounded">
+                          {customerData.item_count} items
+                        </span>
+                      )}
+                    </div>
                     <div className="text-right text-[13px] text-[#94A3B8]">{formatNumber(child.total_units)}</div>
                     <div className="text-right text-[13px] text-[#94A3B8]">{formatCurrency(child.total_revenue)}</div>
                     <div className="text-right text-[13px] text-[#94A3B8]">{formatCurrency(child.total_cost)}</div>
@@ -303,6 +426,16 @@ function ExpandableRow({
                 );
               })}
             </div>
+
+            {/* Item Tooltip */}
+            <AnimatePresence>
+              {hoveredCustomer && type === 'class' && (
+                <ItemTooltip
+                  customer={hoveredCustomer}
+                  position={tooltipPosition}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
