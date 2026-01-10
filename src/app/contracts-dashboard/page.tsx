@@ -36,7 +36,9 @@ interface Contract {
   closeDate: string | null;
   awardDate: string | null;
   contractDate: string | null;
+  deliverDate: string | null;
   installDate: string | null;
+  cashDate: string | null;
   statusChangeDate: string | null;
   progress: number;
   isOverdue: boolean;
@@ -386,6 +388,16 @@ function ContractRow({
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // Compact date format for tooltip: MM/DD/YY
+  const formatDateCompact = (dateStr: string | null) => {
+    if (!dateStr) return '—';
+    const date = new Date(dateStr);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const year = date.getFullYear().toString().slice(-2);
+    return `${month}/${day}/${year}`;
   };
 
   const formatDateForInput = (dateStr: string | null) => {
@@ -863,8 +875,8 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#8B5CF6] shadow-[0_0_6px_rgba(139,92,246,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Award</span>
-                        <span className={`text-[12px] font-medium ${contract.awardDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
-                          {formatDate(contract.awardDate)}
+                        <span className={`text-[12px] font-medium tabular-nums ${contract.awardDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                          {formatDateCompact(contract.awardDate)}
                         </span>
                       </div>
 
@@ -872,8 +884,8 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#0189CB] shadow-[0_0_6px_rgba(1,137,203,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Contract</span>
-                        <span className={`text-[12px] font-medium ${contract.contractDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
-                          {formatDate(contract.contractDate)}
+                        <span className={`text-[12px] font-medium tabular-nums ${contract.contractDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                          {formatDateCompact(contract.contractDate)}
                         </span>
                       </div>
 
@@ -881,15 +893,17 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#F59E0B] shadow-[0_0_6px_rgba(245,158,11,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Deliver</span>
-                        <span className="text-[12px] font-medium text-[#475569]">—</span>
+                        <span className={`text-[12px] font-medium tabular-nums ${contract.deliverDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                          {formatDateCompact(contract.deliverDate)}
+                        </span>
                       </div>
 
                       {/* Install */}
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#22C55E] shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Install</span>
-                        <span className={`text-[12px] font-medium ${contract.installDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
-                          {formatDate(contract.installDate)}
+                        <span className={`text-[12px] font-medium tabular-nums ${contract.installDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                          {formatDateCompact(contract.installDate)}
                         </span>
                       </div>
 
@@ -897,7 +911,9 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#EC4899] shadow-[0_0_6px_rgba(236,72,153,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Cash</span>
-                        <span className="text-[12px] font-medium text-[#475569]">—</span>
+                        <span className={`text-[12px] font-medium tabular-nums ${contract.cashDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                          {formatDateCompact(contract.cashDate)}
+                        </span>
                       </div>
                     </div>
 
