@@ -27,7 +27,7 @@ function GridBackground() {
   );
 }
 
-// Floating particles - more prominent effect
+// Floating particles - more prominent effect with slow, ambient movement
 function FloatingParticles() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -40,14 +40,14 @@ function FloatingParticles() {
             y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 800),
           }}
           animate={{
-            y: [null, -30, 30],
+            y: [null, -20, 20],
             opacity: [0.3, 0.7, 0.3],
           }}
           transition={{
-            duration: 3 + Math.random() * 2,
+            duration: 8 + Math.random() * 4,
             repeat: Infinity,
             repeatType: 'reverse',
-            delay: Math.random() * 2,
+            delay: Math.random() * 3,
           }}
         />
       ))}
