@@ -44,8 +44,8 @@ export async function GET() {
       sampleTransactions: [],
     };
 
-    // Query 1: Find project class IDs (TB, MCC, TBEN types)
-    console.log('Discovering TB/MCC project classes...');
+    // Query 1: Find ALL classes (to discover naming patterns)
+    console.log('Discovering all classes...');
     const classQuery = `
       SELECT
         c.id,
@@ -54,10 +54,6 @@ export async function GET() {
         c.parent,
         BUILTIN.DF(c.parent) AS parent_name
       FROM Classification c
-      WHERE c.fullname LIKE '%TB%'
-        OR c.fullname LIKE '%MCC%'
-        OR c.name LIKE '%TBEN%'
-        OR c.fullname LIKE '%Projects%'
       ORDER BY c.fullname
     `;
 
@@ -154,11 +150,6 @@ export async function GET() {
         AND tl.netamount IS NOT NULL
         AND tl.netamount != 0
         AND (a.acctnumber LIKE '4%' OR a.acctnumber LIKE '5%')
-        AND (
-          c.fullname LIKE '%TB%'
-          OR c.fullname LIKE '%MCC%'
-          OR c.name LIKE '%TBEN%'
-        )
       ORDER BY t.trandate DESC
     `;
 
@@ -167,7 +158,7 @@ export async function GET() {
       {
         method: 'POST',
         body: { q: sampleQuery },
-        params: { limit: '50' },
+        params: { limit: '100' },
       }
     );
 

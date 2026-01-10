@@ -636,19 +636,38 @@ export interface ProjectProfitabilityRecord {
 }
 
 /**
- * Parse project type from class name
- * e.g., "TB : Overhead" -> "TB", "MCC : Labor" -> "MCC", "TBEN : Materials" -> "TBEN"
+ * Parse project type from class name and account name
+ * NetSuite classes: Test Bench, Diversified Products, RCM, etc.
+ * Account names may contain: MCC Services, Test Bench Equipment, etc.
  */
-function parseProjectType(className: string): string {
-  if (!className) return 'Unknown';
+function parseProjectType(className: string, accountName?: string): string {
+  if (!className && !accountName) return 'Unknown';
 
-  const upperName = className.toUpperCase();
-  if (upperName.startsWith('MCC')) return 'MCC';
-  if (upperName.startsWith('TBEN')) return 'TBEN';
-  if (upperName.startsWith('TB')) return 'TB';
-  if (upperName.includes(' : MCC')) return 'MCC';
-  if (upperName.includes(' : TBEN')) return 'TBEN';
-  if (upperName.includes(' : TB ') || upperName.endsWith(' : TB')) return 'TB';
+  const upperClass = (className || '').toUpperCase();
+  const upperAccount = (accountName || '').toUpperCase();
+
+  // Check class name first (main categories)
+  if (upperClass.includes('TEST BENCH')) return 'Test Bench';
+  if (upperClass.includes('DIVERSIFIED')) return 'Diversified Products';
+  if (upperClass.includes('RCM')) return 'RCM';
+
+  // Check account name for specific product lines
+  if (upperAccount.includes('MCC')) return 'MCC Services';
+  if (upperAccount.includes('TEST BENCH') || upperAccount.includes('TB ')) return 'Test Bench';
+  if (upperAccount.includes('M3 ')) return 'M3 Software';
+  if (upperAccount.includes('AMR')) return 'AMR';
+  if (upperAccount.includes('DIVERSIFIED')) return 'Diversified Products';
+
+  // Specific class sub-categories
+  if (upperClass.includes('CALIBRATION')) return 'Calibration';
+  if (upperClass.includes('METER TESTING')) return 'Meter Testing';
+  if (upperClass.includes('VEROFLOW')) return 'Veroflow';
+  if (upperClass.includes('SPOOLS')) return 'Spools';
+
+  // Default based on class if present
+  if (className && className !== 'Other' && className !== 'MISC') {
+    return className;
+  }
 
   return 'Other';
 }
@@ -707,14 +726,6 @@ export async function getProjectProfitability(options: {
       AND tl.netamount IS NOT NULL
       AND tl.netamount != 0
       AND (a.acctnumber LIKE '4%' OR a.acctnumber LIKE '5%')
-      AND (
-        c.fullname LIKE 'TB%'
-        OR c.fullname LIKE 'MCC%'
-        OR c.fullname LIKE 'TBEN%'
-        OR c.fullname LIKE '%TB%'
-        OR c.fullname LIKE '%MCC%'
-        OR c.fullname LIKE '%TBEN%'
-      )
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.id
   `;
@@ -750,7 +761,8 @@ export async function getProjectProfitability(options: {
       const isCogs = accountNumber.startsWith('5');
 
       const className = row.class_name || '';
-      const projectType = parseProjectType(className);
+      const accountName = row.account_name || '';
+      const projectType = parseProjectType(className, accountName);
 
       return {
         netsuiteTransactionId: row.transaction_id?.toString() || '',
