@@ -905,8 +905,9 @@ export async function getDiversifiedSalesByClass(filters?: {
 
   return Array.from(byClass.values()).map(agg => ({
     ...agg,
-    avg_gross_profit_pct: agg.gross_profit_pcts.length > 0
-      ? agg.gross_profit_pcts.reduce((a, b) => a + b, 0) / agg.gross_profit_pcts.length
+    // Calculate GP% from totals: (revenue - cost) / revenue * 100
+    avg_gross_profit_pct: agg.total_revenue > 0
+      ? ((agg.total_revenue - agg.total_cost) / agg.total_revenue) * 100
       : 0,
     gross_profit_pcts: undefined as any,
   })).sort((a, b) => b.total_revenue - a.total_revenue);
@@ -1017,8 +1018,9 @@ export async function getDiversifiedSalesByCustomer(filters?: {
 
   return Array.from(byCustomer.values()).map(agg => ({
     ...agg,
-    avg_gross_profit_pct: agg.gross_profit_pcts.length > 0
-      ? agg.gross_profit_pcts.reduce((a, b) => a + b, 0) / agg.gross_profit_pcts.length
+    // Calculate GP% from totals: (revenue - cost) / revenue * 100
+    avg_gross_profit_pct: agg.total_revenue > 0
+      ? ((agg.total_revenue - agg.total_cost) / agg.total_revenue) * 100
       : 0,
     gross_profit_pcts: undefined as any,
   })).sort((a, b) => b.total_revenue - a.total_revenue);
