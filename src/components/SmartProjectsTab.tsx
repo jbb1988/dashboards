@@ -233,10 +233,12 @@ export default function SmartProjectsTab({
   data,
   loading,
   onTaskComplete,
+  onRefresh,
 }: {
   data: ProjectData | null;
   loading: boolean;
   onTaskComplete?: (taskId: string, completed: boolean) => Promise<void>;
+  onRefresh?: () => void;
 }) {
   const [activeView, setActiveView] = useState<SmartView>('needs_attention');
   const [searchQuery, setSearchQuery] = useState('');
@@ -688,6 +690,10 @@ export default function SmartProjectsTab({
             task={selectedTask}
             onClose={() => setSelectedTask(null)}
             onComplete={handleComplete}
+            onUpdate={() => {
+              setSelectedTask(null);
+              if (onRefresh) onRefresh();
+            }}
             isCompleting={completingTaskId === selectedTask.gid}
           />
         )}

@@ -1399,7 +1399,7 @@ export default function PMDashboard() {
         <main className="max-w-[1600px] mx-auto px-8 py-6">
           <AnimatePresence mode="wait">
             <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }}>
-              {activeTab === 'smart' && <SmartProjectsTab data={timelineData} loading={loading.timeline} onTaskComplete={handleTaskComplete} />}
+              {activeTab === 'smart' && <SmartProjectsTab data={timelineData} loading={loading.timeline} onTaskComplete={handleTaskComplete} onRefresh={() => fetchAsanaProject(PROJECT_IDS.timeline, 'timeline')} />}
               {activeTab === 'timeline' && <TimelineTab data={timelineData} loading={loading.timeline} onTaskComplete={handleTaskComplete} />}
               {activeTab === 'mcc' && <MCCStatusTab data={mccData} loading={loading.mcc} onTaskComplete={handleTaskComplete} />}
               {activeTab === 'punchlist' && <PunchListTab data={punchlistData} loading={loading.punchlist} onTaskComplete={handleTaskComplete} />}
