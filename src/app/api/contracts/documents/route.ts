@@ -88,97 +88,40 @@ function calculatePriorityScore(
   documents: Document[],
   now: Date = new Date()
 ): PriorityScore {
-  let score = 0;
   const reasons: string[] = [];
+  let category: 'critical' | 'high' | 'medium' | 'low';
+  let daysUntil: number | null = null;
 
-  const contractDocs = documents.filter(
-    d => d.contract_id === contract.id || d.salesforce_id === contract.salesforceId
-  );
-
-  // Calculate document completeness
-  const requiredDocsPresent = REQUIRED_DOCUMENT_TYPES.filter(type =>
-    contractDocs.some(d => d.document_type === type && d.is_current_version)
-  ).length;
-  const completeness = requiredDocsPresent / REQUIRED_DOCUMENT_TYPES.length;
-
-  // 1. Time-based urgency (up to 40 points)
+  // Simple days-based priority logic
   if (contract.closeDate || contract.contractDate) {
     const targetDate = new Date(contract.contractDate || contract.closeDate);
-    const daysUntil = Math.floor((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    daysUntil = Math.floor((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysUntil < 0) {
-      score += 40;
+      category = 'critical';
       reasons.push(`Overdue by ${Math.abs(daysUntil)} days`);
-    } else if (daysUntil <= 14) {
-      score += 35;
-      reasons.push(`Due in ${daysUntil} days`);
-    } else if (daysUntil <= 30) {
-      score += 25;
-      reasons.push(`Due in ${daysUntil} days`);
     } else if (daysUntil <= 90) {
-      score += 15;
-      reasons.push(`Closing in ${daysUntil} days`);
+      // Red: due within 90 days
+      category = 'critical';
+      reasons.push(`Due in ${daysUntil} days`);
+    } else if (daysUntil <= 180) {
+      // Yellow: 91-180 days
+      category = 'high';
+      reasons.push(`Due in ${daysUntil} days`);
+    } else {
+      // Blue: 181+ days
+      category = 'medium';
+      reasons.push(`Due in ${daysUntil} days`);
     }
-  }
-
-  // 2. Document completeness (up to 30 points - inverse)
-  const incompletenessScore = Math.round((1 - completeness) * 30);
-  if (incompletenessScore > 0) {
-    score += incompletenessScore;
-    const missingDocs = REQUIRED_DOCUMENT_TYPES.filter(type =>
-      !contractDocs.some(d => d.document_type === type && d.is_current_version)
-    );
-    if (missingDocs.length > 0) {
-      reasons.push(`Missing: ${missingDocs.join(', ')}`);
-    }
-  }
-
-  // 3. Value-based priority (up to 15 points)
-  if (contract.value >= 500000) {
-    score += 15;
-    reasons.push('High value contract (>$500K)');
-  } else if (contract.value >= 100000) {
-    score += 10;
-    reasons.push('Medium-high value (>$100K)');
-  } else if (contract.value >= 50000) {
-    score += 5;
-  }
-
-  // 4. Staleness penalty (up to 15 points)
-  const lastActivity = contractDocs.length > 0
-    ? Math.max(...contractDocs.map(d => new Date(d.uploaded_at).getTime()))
-    : contract.statusChangeDate
-      ? new Date(contract.statusChangeDate).getTime()
-      : null;
-
-  if (lastActivity) {
-    const daysSinceActivity = Math.floor((now.getTime() - lastActivity) / (1000 * 60 * 60 * 24));
-    if (daysSinceActivity > 60) {
-      score += 15;
-      reasons.push(`No activity for ${daysSinceActivity} days`);
-    } else if (daysSinceActivity > 30) {
-      score += 10;
-      reasons.push(`Inactive for ${daysSinceActivity} days`);
-    } else if (daysSinceActivity > 14) {
-      score += 5;
-    }
-  }
-
-  // Determine category based on score
-  let category: 'critical' | 'high' | 'medium' | 'low';
-  if (score >= 70) {
-    category = 'critical';
-  } else if (score >= 50) {
-    category = 'high';
-  } else if (score >= 25) {
-    category = 'medium';
   } else {
+    // No due date
     category = 'low';
+    reasons.push('No due date');
   }
 
   return {
     contractId: contract.id,
-    score: Math.min(score, 100),
+    score: daysUntil !== null ? Math.max(0, 365 - daysUntil) : 0,
     reasons,
     category,
   };
