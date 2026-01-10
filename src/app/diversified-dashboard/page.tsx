@@ -865,7 +865,12 @@ export default function DiversifiedDashboard() {
 
                   {/* Row 2: Class Bar + Customer Donut */}
                   <div className="grid grid-cols-2 gap-6">
-                    <ClassBarChart data={data.byClass} index={2} />
+                    <ClassBarChart
+                      data={data.byClass}
+                      classMonthlyData={data.chartData?.classMonthly}
+                      selectedYear={selectedYears.length === 1 ? selectedYears[0] : undefined}
+                      index={2}
+                    />
                     <CustomerDonut data={data.byCustomer} index={3} />
                   </div>
                 </motion.div>
