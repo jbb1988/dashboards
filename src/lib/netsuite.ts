@@ -538,8 +538,9 @@ export async function getDiversifiedSales(options: {
       // Cost from TransactionLine.costestimate (actual COGS)
       const costestimate = Math.abs(parseFloat(row.costestimate) || 0);
 
-      // Group key by transaction + line
-      const groupKey = `${row.transaction_id}-${row.line_id}`;
+      // Group key by transaction + item + quantity + amount to avoid duplicates
+      // NetSuite sometimes returns the same logical line with different internal line IDs
+      const groupKey = `${row.transaction_id}-${row.item_id}-${quantity}-${netamount}`;
 
       // Determine parent class from hierarchy
       const parentClassName = row.class_parent_name || 'Diversified Products';

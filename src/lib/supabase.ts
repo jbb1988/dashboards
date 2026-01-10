@@ -723,13 +723,29 @@ export interface DiversifiedBudget {
 
 /**
  * Upsert diversified sales records to Supabase
+ * Deduplicates records before upserting to prevent duplicate line items
  */
 export async function upsertDiversifiedSales(
   records: Omit<DiversifiedSale, 'id' | 'created_at' | 'updated_at'>[]
 ): Promise<{ success: boolean; count: number; error?: string }> {
   const admin = getSupabaseAdmin();
 
-  const recordsWithTimestamp = records.map(r => ({
+  // Deduplicate records by unique key: transaction_id + item_id + quantity + revenue
+  // This prevents duplicate line items that have different internal line IDs
+  const uniqueRecords = new Map<string, Omit<DiversifiedSale, 'id' | 'created_at' | 'updated_at'>>();
+  for (const r of records) {
+    const key = `${r.netsuite_transaction_id}-${r.item_id}-${r.quantity}-${r.revenue}`;
+    if (!uniqueRecords.has(key)) {
+      uniqueRecords.set(key, r);
+    }
+  }
+
+  const deduplicatedRecords = Array.from(uniqueRecords.values());
+  if (deduplicatedRecords.length < records.length) {
+    console.log(`Deduplicated ${records.length} -> ${deduplicatedRecords.length} records`);
+  }
+
+  const recordsWithTimestamp = deduplicatedRecords.map(r => ({
     ...r,
     synced_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -747,7 +763,7 @@ export async function upsertDiversifiedSales(
     return { success: false, count: 0, error: error.message };
   }
 
-  return { success: true, count: records.length };
+  return { success: true, count: deduplicatedRecords.length };
 }
 
 /**
