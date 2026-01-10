@@ -65,15 +65,20 @@ interface DashboardData {
   lastUpdated: string;
 }
 
-// Format currency
+// Format currency - rounded to nearest dollar with commas (for table rows)
 function formatCurrency(value: number): string {
+  return `$${Math.round(value).toLocaleString()}`;
+}
+
+// Format currency compact - abbreviated K/M format (for KPI cards)
+function formatCurrencyCompact(value: number): string {
   if (Math.abs(value) >= 1000000) {
     return `$${(value / 1000000).toFixed(2)}M`;
   }
   if (Math.abs(value) >= 1000) {
     return `$${(value / 1000).toFixed(0)}K`;
   }
-  return `$${value.toFixed(0)}`;
+  return `$${Math.round(value).toLocaleString()}`;
 }
 
 // Format number with commas
@@ -538,7 +543,7 @@ export default function DiversifiedDashboard() {
               <div className="grid grid-cols-6 gap-4 mb-6">
                 <KPICard
                   title="Total Revenue"
-                  value={formatCurrency(data.summary.totalRevenue)}
+                  value={formatCurrencyCompact(data.summary.totalRevenue)}
                   subtitle={`${data.summary.transactionCount} transactions`}
                   icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                   color="#38BDF8"
@@ -554,7 +559,7 @@ export default function DiversifiedDashboard() {
                 />
                 <KPICard
                   title="Total COGS"
-                  value={formatCurrency(data.summary.totalCost)}
+                  value={formatCurrencyCompact(data.summary.totalCost)}
                   subtitle="Cost of goods sold"
                   icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
                   color="#F59E0B"
@@ -562,7 +567,7 @@ export default function DiversifiedDashboard() {
                 />
                 <KPICard
                   title="Gross Profit"
-                  value={formatCurrency(data.summary.grossProfit)}
+                  value={formatCurrencyCompact(data.summary.grossProfit)}
                   subtitle={`${data.summary.uniqueCustomers} customers`}
                   icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
                   color="#22C55E"
@@ -579,7 +584,7 @@ export default function DiversifiedDashboard() {
                 <KPICard
                   title="vs Budget"
                   value={data.summary.variancePct !== null ? `${data.summary.variancePct >= 0 ? '+' : ''}${formatPercent(data.summary.variancePct)}` : 'N/A'}
-                  subtitle={data.summary.budgetRevenue > 0 ? `Budget: ${formatCurrency(data.summary.budgetRevenue)}` : 'No budget data'}
+                  subtitle={data.summary.budgetRevenue > 0 ? `Budget: ${formatCurrencyCompact(data.summary.budgetRevenue)}` : 'No budget data'}
                   icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
                   color={data.summary.variancePct !== null && data.summary.variancePct >= 0 ? '#22C55E' : '#EF4444'}
                   trend={data.summary.variancePct !== null ? (data.summary.variancePct >= 0 ? 'up' : 'down') : undefined}

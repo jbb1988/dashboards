@@ -138,7 +138,9 @@ const departments: Department[] = [
       </svg>
     ),
     color: 'from-[#EC4899] to-[#F472B6]',
-    dashboards: [],
+    dashboards: [
+      { name: 'Diversified Products', href: '/diversified-dashboard', description: 'Product class sales by customer', badge: 'NetSuite' },
+    ],
   },
 ];
 
@@ -149,6 +151,7 @@ function getBadgeColor(badge: string): string {
     case 'Asana': return 'bg-[#E16259]';
     case 'Excel': return 'bg-[#22C55E]';
     case 'Claude': return 'bg-[#D97706]';
+    case 'NetSuite': return 'bg-[#F97316]';
     default: return 'bg-[#64748B]';
   }
 }
@@ -314,6 +317,7 @@ export default function Home() {
             <DataSourceBadge name="Salesforce" color="bg-[#38BDF8]" delay={0.5} />
             <DataSourceBadge name="Asana" color="bg-[#E16259]" delay={0.6} />
             <DataSourceBadge name="DocuSign" color="bg-[#FFD700]" delay={0.7} />
+            <DataSourceBadge name="NetSuite" color="bg-[#F97316]" delay={0.8} />
           </motion.div>
         </div>
 

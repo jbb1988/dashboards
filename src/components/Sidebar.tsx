@@ -479,6 +479,11 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
                   <span className="text-[11px] text-[#8FA3BF]">DocuSign</span>
                   <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
                 </div>
+                <div className="flex items-center gap-3 px-3 py-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
+                  <span className="text-[11px] text-[#8FA3BF]">NetSuite</span>
+                  <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
+                </div>
               </div>
             </motion.div>
           )}

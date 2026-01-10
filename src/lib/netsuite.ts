@@ -465,6 +465,7 @@ export async function getDiversifiedSales(options: {
 
   // Query TransactionLine filtered by Class, only rows with netamount (excludes $0 lines)
   // The 414x accounts are no longer used (stopped Oct 2023), so we filter by Class instead
+  // Added costestimate field to get actual COGS data for GP% calculation
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -478,6 +479,7 @@ export async function getDiversifiedSales(options: {
       tl.class AS class_id,
       tl.quantity,
       tl.netamount,
+      tl.costestimate,
       BUILTIN.DF(tl.item) AS item_name,
       tl.item AS item_id,
       t.type AS transaction_type
@@ -526,6 +528,8 @@ export async function getDiversifiedSales(options: {
       // Revenue from TransactionLine.netamount (negative for sales, so use Math.abs)
       const netamount = parseFloat(row.netamount) || 0;
       const quantity = Math.abs(parseInt(row.quantity) || 0);
+      // Cost from TransactionLine.costestimate (actual COGS)
+      const costestimate = Math.abs(parseFloat(row.costestimate) || 0);
 
       // Group key to combine multiple accounting lines per transaction line
       const groupKey = `${row.transaction_id}-${row.line_id}`;
@@ -559,14 +563,14 @@ export async function getDiversifiedSales(options: {
         };
       }
 
-      // Add revenue (netamount is negative for sales, so use Math.abs)
+      // Add revenue and cost (netamount is negative for sales, so use Math.abs)
       grouped[groupKey].revenue += Math.abs(netamount);
+      grouped[groupKey].cost += costestimate;
     }
 
     // Convert to array and calculate gross profit
     const records: DiversifiedSaleRecord[] = Object.values(grouped).map(r => {
-      // Estimate cost at 50% for now (or we could query COGS accounts separately)
-      r.cost = r.revenue * 0.5;
+      // Calculate actual gross profit from revenue and cost
       r.grossProfit = r.revenue - r.cost;
       r.grossProfitPct = r.revenue > 0 ? (r.grossProfit / r.revenue) * 100 : 0;
       return r;
