@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDiversifiedSales as getNetSuiteSales } from '@/lib/netsuite';
-import { upsertDiversifiedSales, DiversifiedSale } from '@/lib/supabase';
+import { upsertDiversifiedSales, deleteDiversifiedSalesByDateRange, deleteAllDiversifiedSales, DiversifiedSale } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minute timeout for sync
@@ -12,8 +12,22 @@ export async function POST(request: NextRequest) {
     const endDate = searchParams.get('endDate') || undefined;
     const pageSize = parseInt(searchParams.get('pageSize') || '100', 10);
     const maxPages = parseInt(searchParams.get('maxPages') || '50', 10);
+    const clearFirst = searchParams.get('clear') === 'true';
+    const clearAll = searchParams.get('clearAll') === 'true';
 
-    console.log('Starting diversified sales sync:', { startDate, endDate, pageSize, maxPages });
+    console.log('Starting diversified sales sync:', { startDate, endDate, pageSize, maxPages, clearFirst, clearAll });
+
+    // Clear ALL data if requested
+    if (clearAll) {
+      console.log('Clearing ALL diversified sales data...');
+      const deleteResult = await deleteAllDiversifiedSales();
+      console.log(`Deleted ${deleteResult.count} total records`);
+    }
+    // Or clear just the date range
+    else if (clearFirst && startDate && endDate) {
+      console.log(`Clearing existing data for ${startDate} to ${endDate}...`);
+      await deleteDiversifiedSalesByDateRange(startDate, endDate);
+    }
 
     let allRecords: DiversifiedSale[] = [];
     let offset = 0;

@@ -463,8 +463,8 @@ export async function getDiversifiedSales(options: {
     dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
   }
 
-  // Query TransactionLine with Class filter for Diversified Products and RCM
-  // Use subquery to get all class IDs including sub-classes
+  // Query TransactionLine filtered by Class, only rows with netamount (excludes $0 lines)
+  // The 414x accounts are no longer used (stopped Oct 2023), so we filter by Class instead
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -478,8 +478,6 @@ export async function getDiversifiedSales(options: {
       tl.class AS class_id,
       tl.quantity,
       tl.netamount,
-      tl.amount,
-      tl.costestimaterate,
       BUILTIN.DF(tl.item) AS item_name,
       tl.item AS item_id,
       t.type AS transaction_type
@@ -488,6 +486,8 @@ export async function getDiversifiedSales(options: {
     WHERE t.posting = 'T'
       AND tl.mainline = 'F'
       AND tl.class IN (SELECT id FROM Classification WHERE fullname LIKE 'Diversified%' OR fullname LIKE 'RCM%')
+      AND tl.netamount IS NOT NULL
+      AND tl.netamount <> 0
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.uniquekey
   `;
@@ -507,8 +507,8 @@ export async function getDiversifiedSales(options: {
 
     console.log(`SuiteQL returned ${response.items?.length || 0} rows`);
 
-    // Convert to records
-    const records: DiversifiedSaleRecord[] = [];
+    // Convert to records - group by transaction + line to avoid duplicates
+    const grouped: Record<string, DiversifiedSaleRecord> = {};
 
     for (const row of response.items || []) {
       // Parse date - NetSuite returns MM/DD/YYYY format
@@ -523,45 +523,54 @@ export async function getDiversifiedSales(options: {
       const className = row.class_name || 'Diversified Products';
       const { category, parent } = parseClassName(className);
 
-      // Use netamount for revenue (positive values)
-      // Negative quantities indicate returns/credits
+      // Revenue from TransactionLine.netamount (negative for sales, so use Math.abs)
+      const netamount = parseFloat(row.netamount) || 0;
       const quantity = Math.abs(parseInt(row.quantity) || 0);
-      const revenue = Math.abs(parseFloat(row.netamount) || parseFloat(row.amount) || 0);
 
-      // Estimate cost from costestimaterate if available
-      const costRate = parseFloat(row.costestimaterate) || 0;
-      const cost = costRate > 0 ? costRate * quantity : revenue * 0.5; // Default 50% margin if no cost
+      // Group key to combine multiple accounting lines per transaction line
+      const groupKey = `${row.transaction_id}-${row.line_id}`;
 
-      const grossProfit = revenue - cost;
-      const grossProfitPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = {
+          netsuiteTransactionId: row.transaction_id?.toString() || '',
+          netsuiteLineId: row.line_id?.toString() || '',
+          transactionType: row.transaction_type || 'CustInvc',
+          transactionNumber: row.tranid || '',
+          transactionDate: row.trandate || '',
+          postingPeriod: row.posting_period || '',
+          year,
+          month,
+          classId: row.class_id?.toString() || '',
+          className,
+          classCategory: category,
+          parentClass: parent,
+          customerId: row.customer_id?.toString() || '',
+          customerName: row.customer_name || '',
+          accountId: row.acctnumber || '',
+          accountName: '',
+          quantity,
+          revenue: 0,
+          cost: 0,
+          grossProfit: 0,
+          grossProfitPct: 0,
+          itemId: row.item_id?.toString() || '',
+          itemName: row.item_name || '',
+          itemDescription: '',
+        };
+      }
 
-      records.push({
-        netsuiteTransactionId: row.transaction_id?.toString() || '',
-        netsuiteLineId: row.line_id?.toString() || '',
-        transactionType: row.transaction_type || 'CustInvc',
-        transactionNumber: row.tranid || '',
-        transactionDate: row.trandate || '',
-        postingPeriod: row.posting_period || '',
-        year,
-        month,
-        classId: row.class_id?.toString() || '',
-        className,
-        classCategory: category,
-        parentClass: parent,
-        customerId: row.customer_id?.toString() || '',
-        customerName: row.customer_name || '',
-        accountId: '',
-        accountName: '',
-        quantity,
-        revenue,
-        cost,
-        grossProfit,
-        grossProfitPct,
-        itemId: row.item_id?.toString() || '',
-        itemName: row.item_name || '',
-        itemDescription: '',
-      });
+      // Add revenue (netamount is negative for sales, so use Math.abs)
+      grouped[groupKey].revenue += Math.abs(netamount);
     }
+
+    // Convert to array and calculate gross profit
+    const records: DiversifiedSaleRecord[] = Object.values(grouped).map(r => {
+      // Estimate cost at 50% for now (or we could query COGS accounts separately)
+      r.cost = r.revenue * 0.5;
+      r.grossProfit = r.revenue - r.cost;
+      r.grossProfitPct = r.revenue > 0 ? (r.grossProfit / r.revenue) * 100 : 0;
+      return r;
+    });
 
     // Log summary for validation
     const totalRevenue = records.reduce((sum, r) => sum + r.revenue, 0);
@@ -673,6 +682,36 @@ export async function testSuiteQLAccess(): Promise<{ success: boolean; data: any
     );
     console.log('TAL query result:', talResult.items?.length || 0, 'rows');
 
+    // Test 4: Check TAL records for 414x accounts (any date)
+    const accountsUsedQuery = `
+      SELECT
+        a.acctnumber,
+        a.fullname,
+        SUM(COALESCE(tal.credit, 0)) AS total_credit,
+        SUM(COALESCE(tal.debit, 0)) AS total_debit,
+        COUNT(*) AS line_count,
+        MIN(t.trandate) AS earliest_date,
+        MAX(t.trandate) AS latest_date
+      FROM TransactionAccountingLine tal
+      INNER JOIN Transaction t ON t.id = tal.transaction
+      INNER JOIN Account a ON a.id = tal.account
+      WHERE t.posting = 'T'
+        AND a.acctnumber LIKE '414%'
+      GROUP BY a.acctnumber, a.fullname
+      ORDER BY total_credit DESC
+    `;
+
+    console.log('Testing SuiteQL - checking accounts used in Dec 2025 Diversified...');
+    const accountsUsedResult = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: accountsUsedQuery },
+        params: { limit: '50' },
+      }
+    );
+    console.log('Accounts used result:', accountsUsedResult.items?.length || 0, 'rows');
+
     return {
       success: true,
       data: {
@@ -680,6 +719,7 @@ export async function testSuiteQLAccess(): Promise<{ success: boolean; data: any
         classes: classResult.items || [],
         talSample: talResult.items || [],
         talCount: talResult.items?.length || 0,
+        accountsUsedInDec2025: accountsUsedResult.items || [],
       },
     };
   } catch (error) {

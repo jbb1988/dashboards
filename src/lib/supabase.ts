@@ -1141,3 +1141,66 @@ export async function upsertDiversifiedBudgets(
 
   return { success: true, count: budgets.length };
 }
+
+/**
+ * Delete diversified sales by date range
+ * Used to clear data before re-syncing
+ */
+export async function deleteDiversifiedSalesByDateRange(
+  startDate: string,
+  endDate: string
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  // Parse dates to get year/month for filtering
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const startYear = start.getFullYear();
+  const endYear = end.getFullYear();
+  const startMonth = start.getMonth() + 1;
+  const endMonth = end.getMonth() + 1;
+
+  // Delete by year/month (since transaction_date format varies)
+  let query = admin
+    .from('diversified_sales')
+    .delete()
+    .eq('year', startYear);
+
+  // If single month, filter by it
+  if (startMonth === endMonth && startYear === endYear) {
+    query = query.eq('month', startMonth);
+  } else if (startYear === endYear) {
+    query = query.gte('month', startMonth).lte('month', endMonth);
+  }
+
+  const { data, error } = await query.select();
+
+  if (error) {
+    console.error('Error deleting diversified sales:', error);
+    return { success: false, count: 0, error: error.message };
+  }
+
+  console.log(`Deleted ${data?.length || 0} records for year=${startYear} month=${startMonth}-${endMonth}`);
+  return { success: true, count: data?.length || 0 };
+}
+
+/**
+ * Delete ALL diversified sales (full table clear)
+ */
+export async function deleteAllDiversifiedSales(): Promise<{ success: boolean; count: number; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('diversified_sales')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000') // Match all rows
+    .select();
+
+  if (error) {
+    console.error('Error deleting all diversified sales:', error);
+    return { success: false, count: 0, error: error.message };
+  }
+
+  console.log(`Deleted ${data?.length || 0} total records`);
+  return { success: true, count: data?.length || 0 };
+}
