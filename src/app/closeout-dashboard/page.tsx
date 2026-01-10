@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard } from '@/components/mars-ui';
 
 interface LineItem {
   itemNumber: string;
@@ -133,51 +133,6 @@ function formatCurrency(value: number): string {
 // Format percent
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
-}
-
-// KPI Card - Updated with hover effects, refined styling
-function KPICard({ title, value, subtitle, icon, color, trend, trendValue }: {
-  title: string;
-  value: React.ReactNode;
-  subtitle: string;
-  icon: React.ReactNode;
-  color: string;
-  trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2, boxShadow: `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${color}15` }}
-      transition={{ duration: 0.15 }}
-      className="relative overflow-hidden rounded-xl p-5 bg-[#151F2E] border border-white/[0.04] shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
-    >
-      <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl" style={{ background: color }} />
-
-      <div className="flex items-start justify-between mb-3">
-        <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-[0.08em]">{title}</span>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}10` }}>
-          <span style={{ color }} className="opacity-70">{icon}</span>
-        </div>
-      </div>
-
-      <div className="text-[28px] font-semibold text-[#EAF2FF] mb-1 tracking-tight">
-        {value}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="text-[12px] text-[#64748B]">{subtitle}</div>
-        {trend && trendValue && (
-          <div className={`flex items-center gap-1 text-[11px] font-medium ${
-            trend === 'up' ? 'text-[#22C55E]' : trend === 'down' ? 'text-[#EF4444]' : 'text-[#64748B]'
-          }`}>
-            {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'} {trendValue}
-          </div>
-        )}
-      </div>
-    </motion.div>
-  );
 }
 
 // Month name helper

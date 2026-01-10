@@ -11,7 +11,7 @@ import { StageProgressCompact } from './components/StageProgressDots';
 import TaskBadge from './components/TaskBadge';
 import TasksTabSupabase from './components/TasksTabSupabase';
 import BundleModal from './components/BundleModal';
-import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard, AnimatedCounter } from '@/components/mars-ui';
 
 // Types
 interface BundleInfo {
@@ -75,43 +75,6 @@ interface ContractData {
 
 type DataSource = 'salesforce' | 'supabase';
 type ActiveFilter = 'all' | 'overdue' | 'due30' | 'highValue' | string;
-
-// Animated Counter Component
-function AnimatedCounter({ value, prefix = '', suffix = '', decimals = 0 }: {
-  value: number;
-  prefix?: string;
-  suffix?: string;
-  decimals?: number;
-}) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    const duration = 1500;
-    const steps = 60;
-    const increment = value / steps;
-    let current = 0;
-    let step = 0;
-
-    const timer = setInterval(() => {
-      step++;
-      current = Math.min(value, increment * step);
-      setDisplayValue(current);
-
-      if (step >= steps) {
-        clearInterval(timer);
-        setDisplayValue(value);
-      }
-    }, duration / steps);
-
-    return () => clearInterval(timer);
-  }, [value]);
-
-  const formatted = decimals > 0
-    ? displayValue.toFixed(decimals)
-    : Math.round(displayValue).toLocaleString();
-
-  return <span>{prefix}{formatted}{suffix}</span>;
-}
 
 // Format currency
 function formatCurrency(value: number): string {
@@ -196,84 +159,6 @@ const getSfStageColor = (salesStage: string): string => {
   const stageNum = salesStage?.match(/[SR](\d)/)?.[1];
   return stageNum ? STAGE_COLORS[stageNum as keyof typeof STAGE_COLORS] || '#64748B' : '#64748B';
 };
-
-// Interactive KPI Card Component - Executive Command Center Design
-function KPICard({
-  title,
-  value,
-  subtitle,
-  icon,
-  color,
-  delay,
-  isActive,
-  onClick,
-  filterKey,
-  trend,
-  trendLabel,
-}: {
-  title: string;
-  value: React.ReactNode;
-  subtitle: string;
-  icon: React.ReactNode;
-  color: string;
-  delay: number;
-  isActive: boolean;
-  onClick: (filter: ActiveFilter) => void;
-  filterKey: ActiveFilter;
-  trend?: 'up' | 'down' | 'neutral';
-  trendLabel?: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5 }}
-      whileHover={{ y: -2, boxShadow: `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${color}15` }}
-      whileTap={{ scale: 0.995 }}
-      onClick={() => onClick(filterKey)}
-      className={`
-        relative overflow-hidden rounded-xl p-5 cursor-pointer transition-all duration-150
-        bg-[#151F2E] border border-white/[0.06]
-        shadow-[0_8px_24px_rgba(0,0,0,0.35)]
-        ${isActive
-          ? 'bg-[#182437] border-[#38BDF8]/35 shadow-[0_8px_24px_rgba(0,0,0,0.4),0_0_20px_rgba(56,189,248,0.15)]'
-          : 'hover:bg-[#182437] hover:border-white/[0.1]'
-        }
-      `}
-    >
-      {/* Left accent bar - always visible */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
-        style={{ background: color }}
-      />
-
-      <div className="flex items-start justify-between mb-3">
-        <span className="text-[12px] font-semibold text-[#8FA3BF] uppercase tracking-[0.08em]">{title}</span>
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ background: `${color}15` }}
-        >
-          <span style={{ color }} className="opacity-60">{icon}</span>
-        </div>
-      </div>
-
-      <div className="text-[28px] font-semibold text-[#EAF2FF] mb-1 tracking-tight">
-        {value}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="text-[13px] text-[#8FA3BF]">{subtitle}</div>
-        {trend && trendLabel && (
-          <div className={`flex items-center gap-1 text-[11px] font-medium ${
-            trend === 'up' ? 'text-[#22C55E]' : trend === 'down' ? 'text-[#EF4444]' : 'text-[#64748B]'
-          }`}>
-            {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'} {trendLabel}
-          </div>
-        )}
-      </div>
-    </motion.div>
-  );
-}
 
 // Stage colors for sidebar - uses same STAGE_COLORS for consistency
 const stageColors: Record<string, string> = {
@@ -2293,8 +2178,7 @@ export default function ContractsDashboard() {
               color="#0189CB"
               delay={0.1}
               isActive={activeFilter === 'all'}
-              onClick={handleFilterChange}
-              filterKey="all"
+              onClick={() => handleFilterChange('all')}
             />
             <KPICard
               title="Due Next 30 Days"
@@ -2304,8 +2188,7 @@ export default function ContractsDashboard() {
               color="#3b82f6"
               delay={0.2}
               isActive={activeFilter === 'due30'}
-              onClick={handleFilterChange}
-              filterKey="due30"
+              onClick={() => handleFilterChange('due30')}
             />
             <KPICard
               title="Overdue"
@@ -2315,8 +2198,7 @@ export default function ContractsDashboard() {
               color="#ef4444"
               delay={0.3}
               isActive={activeFilter === 'overdue'}
-              onClick={handleFilterChange}
-              filterKey="overdue"
+              onClick={() => handleFilterChange('overdue')}
             />
             <KPICard
               title="High Value"
@@ -2326,8 +2208,7 @@ export default function ContractsDashboard() {
               color="#10b981"
               delay={0.4}
               isActive={activeFilter === 'highValue'}
-              onClick={handleFilterChange}
-              filterKey="highValue"
+              onClick={() => handleFilterChange('highValue')}
             />
           </div>
 

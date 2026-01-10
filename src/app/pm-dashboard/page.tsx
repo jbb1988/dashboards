@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard } from '@/components/mars-ui';
 import SmartProjectsTab from '@/components/SmartProjectsTab';
 import TaskDetailDrawer from '@/components/TaskDetailDrawer';
 import DocuSignDetailDrawer from '@/components/DocuSignDetailDrawer';
@@ -95,25 +95,6 @@ function TabButton({ tab, activeTab, onClick, label, count, icon }: {
       {label}
       {count !== undefined && <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-[#E16259]/20' : 'bg-white/5'}`}>{count}</span>}
     </button>
-  );
-}
-
-// KPI Card - Matching Contracts Pipeline design
-function KPICard({ title, value, subtitle, color, onClick }: { title: string; value: React.ReactNode; subtitle: string; color: string; onClick?: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2, boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(225,98,89,0.1)' }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      onClick={onClick}
-      className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] ${onClick ? 'cursor-pointer' : ''}`}
-    >
-      <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl" style={{ background: color }} />
-      <div className="text-[11px] font-medium text-[#64748B] mb-2">{title}</div>
-      <div className="text-[28px] font-semibold text-white">{value}</div>
-      <div className="text-[12px] text-[#8FA3BF] mt-1">{subtitle}</div>
-    </motion.div>
   );
 }
 

@@ -17,8 +17,8 @@ export interface KPICardProps {
   value: ReactNode;
   /** Subtitle displayed below value */
   subtitle: string;
-  /** Icon to display in top right corner */
-  icon: ReactNode;
+  /** Icon to display in top right corner (optional) */
+  icon?: ReactNode;
   /** Accent color for left bar and icon background */
   color: string;
   /** Animation delay in seconds */
@@ -179,23 +179,25 @@ export function KPICard({
         <span className={`text-[12px] font-semibold ${tokens.text.muted} uppercase tracking-[0.08em]`}>
           {title}
         </span>
-        <div className="relative">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: `${color}15` }}
-          >
-            <span style={{ color }} className="opacity-60">
-              {icon}
-            </span>
-          </div>
-          {badge !== undefined && badge > 0 && (
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#EF4444] rounded-full flex items-center justify-center">
-              <span className="text-[9px] font-bold text-white">
-                {badge > 9 ? '9+' : badge}
+        {icon && (
+          <div className="relative">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: `${color}15` }}
+            >
+              <span style={{ color }} className="opacity-60">
+                {icon}
               </span>
             </div>
-          )}
-        </div>
+            {badge !== undefined && badge > 0 && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#EF4444] rounded-full flex items-center justify-center">
+                <span className="text-[9px] font-bold text-white">
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className={`text-[28px] font-semibold ${tokens.text.primary} mb-1 tracking-tight`}>
