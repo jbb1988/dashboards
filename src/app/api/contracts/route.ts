@@ -147,8 +147,35 @@ function transformToDashboardFormat(contract: Contract): DashboardContract {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const syncStatus = searchParams.get('syncStatus');
+
+    // If requesting pending sync contracts
+    if (syncStatus === 'pending') {
+      const admin = getSupabaseAdmin();
+      const { data: pendingContracts, error } = await admin
+        .from('contracts')
+        .select('id, salesforce_id, name, opportunity_name, sales_stage, sf_sync_pending_fields')
+        .eq('sf_sync_status', 'pending');
+
+      if (error) {
+        console.error('Error fetching pending sync contracts:', error);
+        return NextResponse.json({ pendingSync: [] });
+      }
+
+      const pendingSync = (pendingContracts || []).map(c => ({
+        id: c.id,
+        salesforceId: c.salesforce_id,
+        name: c.opportunity_name || c.name,
+        pendingFields: c.sf_sync_pending_fields || {},
+        salesStage: c.sales_stage,
+      }));
+
+      return NextResponse.json({ pendingSync });
+    }
+
     // Fetch contracts from Supabase
     const contracts = await getContracts();
 

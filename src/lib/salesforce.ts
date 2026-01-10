@@ -396,3 +396,259 @@ export async function getAggregatedContracts() {
 
   return Array.from(accountMap.values());
 }
+
+// ============================================
+// BIDIRECTIONAL SYNC - Write Operations
+// ============================================
+
+export interface OpportunityUpdateFields {
+  StageName?: string;
+  Amount?: number;
+  CloseDate?: string; // YYYY-MM-DD format
+  Award_Date__c?: string;
+  Contract_Date__c?: string;
+  Install_Date__c?: string;
+  X24_Budget__c?: boolean;
+  X24_Manual_Close_Probability__c?: number;
+  Probability?: number;
+}
+
+export interface SalesforceUpdateResult {
+  success: boolean;
+  id: string;
+  errors?: string[];
+}
+
+/**
+ * Update an existing Opportunity in Salesforce
+ * Requires explicit user action - does not auto-sync
+ */
+export async function updateOpportunity(
+  opportunityId: string,
+  fields: OpportunityUpdateFields
+): Promise<SalesforceUpdateResult> {
+  const { token, instanceUrl } = await getSalesforceToken();
+
+  const response = await fetch(
+    `${instanceUrl}/services/data/v59.0/sobjects/Opportunity/${opportunityId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(fields),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errors: string[] = [];
+    try {
+      const errorJson = JSON.parse(errorText);
+      errors = Array.isArray(errorJson)
+        ? errorJson.map((e: any) => e.message || e.errorCode)
+        : [errorJson.message || errorText];
+    } catch {
+      errors = [errorText];
+    }
+    console.error('Salesforce update error:', errors);
+    return { success: false, id: opportunityId, errors };
+  }
+
+  // Salesforce returns 204 No Content on successful PATCH
+  return { success: true, id: opportunityId };
+}
+
+/**
+ * Map dashboard status back to Salesforce stage
+ */
+export function mapStatusToSalesforceStage(status: string, currentStage?: string): string {
+  // If we have the current stage from Salesforce, try to preserve the S/R prefix
+  const isRenewal = currentStage?.startsWith('R');
+
+  const statusToStageMap: Record<string, { sales: string; renewal: string }> = {
+    'Discussions Not Started': { sales: 'S1', renewal: 'R1' },
+    'Initial Agreement Development': { sales: 'S2', renewal: 'R2' },
+    'Review & Redlines': { sales: 'S3', renewal: 'R3' },
+    'Approval & Signature': { sales: 'S4', renewal: 'R4' },
+    'Agreement Submission': { sales: 'S5', renewal: 'R4' },
+    'PO Received': { sales: 'S5', renewal: 'R5' },
+  };
+
+  const mapping = statusToStageMap[status];
+  if (mapping) {
+    return isRenewal ? mapping.renewal : mapping.sales;
+  }
+
+  return currentStage || status;
+}
+
+/**
+ * Add a note/comment to an Opportunity in Salesforce
+ * Creates a ContentNote linked to the Opportunity
+ */
+export async function addOpportunityNote(
+  opportunityId: string,
+  title: string,
+  content: string
+): Promise<SalesforceUpdateResult> {
+  const { token, instanceUrl } = await getSalesforceToken();
+
+  // First, create the ContentNote
+  const noteResponse = await fetch(
+    `${instanceUrl}/services/data/v59.0/sobjects/ContentNote`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        Title: title,
+        Content: Buffer.from(content).toString('base64'),
+      }),
+    }
+  );
+
+  if (!noteResponse.ok) {
+    const errorText = await noteResponse.text();
+    console.error('Salesforce note creation error:', errorText);
+    return { success: false, id: opportunityId, errors: [errorText] };
+  }
+
+  const noteResult = await noteResponse.json();
+  const contentNoteId = noteResult.id;
+
+  // Link the note to the Opportunity via ContentDocumentLink
+  const linkResponse = await fetch(
+    `${instanceUrl}/services/data/v59.0/sobjects/ContentDocumentLink`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ContentDocumentId: contentNoteId,
+        LinkedEntityId: opportunityId,
+        ShareType: 'V', // Viewer permission
+        Visibility: 'AllUsers',
+      }),
+    }
+  );
+
+  if (!linkResponse.ok) {
+    const errorText = await linkResponse.text();
+    console.error('Salesforce note link error:', errorText);
+    return { success: false, id: opportunityId, errors: [errorText] };
+  }
+
+  return { success: true, id: contentNoteId };
+}
+
+/**
+ * Add a Task to an Opportunity in Salesforce
+ * Better for actionable items than notes
+ */
+export async function addOpportunityTask(
+  opportunityId: string,
+  subject: string,
+  description: string,
+  dueDate?: string,
+  priority: 'High' | 'Normal' | 'Low' = 'Normal'
+): Promise<SalesforceUpdateResult> {
+  const { token, instanceUrl } = await getSalesforceToken();
+
+  const taskData: Record<string, any> = {
+    Subject: subject,
+    Description: description,
+    WhatId: opportunityId, // Links task to the Opportunity
+    Priority: priority,
+    Status: 'Not Started',
+  };
+
+  if (dueDate) {
+    taskData.ActivityDate = dueDate;
+  }
+
+  const response = await fetch(
+    `${instanceUrl}/services/data/v59.0/sobjects/Task`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(taskData),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Salesforce task creation error:', errorText);
+    return { success: false, id: opportunityId, errors: [errorText] };
+  }
+
+  const result = await response.json();
+  return { success: true, id: result.id };
+}
+
+/**
+ * Batch update multiple opportunities
+ * Uses Salesforce Composite API for efficiency
+ */
+export async function batchUpdateOpportunities(
+  updates: Array<{ id: string; fields: OpportunityUpdateFields }>
+): Promise<SalesforceUpdateResult[]> {
+  if (updates.length === 0) return [];
+
+  // Salesforce composite API limit is 25 subrequests
+  if (updates.length > 25) {
+    const results: SalesforceUpdateResult[] = [];
+    for (let i = 0; i < updates.length; i += 25) {
+      const batch = updates.slice(i, i + 25);
+      const batchResults = await batchUpdateOpportunities(batch);
+      results.push(...batchResults);
+    }
+    return results;
+  }
+
+  const { token, instanceUrl } = await getSalesforceToken();
+
+  const compositeRequest = {
+    allOrNone: false, // Continue even if some fail
+    compositeRequest: updates.map((update, index) => ({
+      method: 'PATCH',
+      url: `/services/data/v59.0/sobjects/Opportunity/${update.id}`,
+      referenceId: `update_${index}`,
+      body: update.fields,
+    })),
+  };
+
+  const response = await fetch(
+    `${instanceUrl}/services/data/v59.0/composite`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(compositeRequest),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Salesforce batch update error:', errorText);
+    return updates.map(u => ({ success: false, id: u.id, errors: [errorText] }));
+  }
+
+  const result = await response.json();
+
+  return result.compositeResponse.map((res: any, index: number) => ({
+    success: res.httpStatusCode >= 200 && res.httpStatusCode < 300,
+    id: updates[index].id,
+    errors: res.httpStatusCode >= 400 ? [JSON.stringify(res.body)] : undefined,
+  }));
+}

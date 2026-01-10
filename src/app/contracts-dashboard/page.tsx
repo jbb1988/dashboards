@@ -1377,6 +1377,122 @@ export default function ContractsDashboard() {
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [batchSaveProgress, setBatchSaveProgress] = useState<{ current: number; total: number } | null>(null);
 
+  // Salesforce bidirectional sync state
+  const [sfSyncPending, setSfSyncPending] = useState<Array<{ id: string; salesforceId: string; name: string; pendingFields: Record<string, any>; salesStage?: string }>>([]);
+  const [isPushingToSalesforce, setIsPushingToSalesforce] = useState(false);
+  const [sfPushProgress, setSfPushProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Fetch contracts with pending Salesforce sync
+  const fetchSfSyncPending = useCallback(async () => {
+    try {
+      const response = await fetch('/api/contracts?syncStatus=pending');
+      if (response.ok) {
+        const result = await response.json();
+        setSfSyncPending(result.pendingSync || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch SF sync pending:', err);
+    }
+  }, []);
+
+  // Check for pending syncs after data refresh
+  useEffect(() => {
+    if (data?.contracts) {
+      fetchSfSyncPending();
+    }
+  }, [data?.contracts, fetchSfSyncPending]);
+
+  // Push pending changes to Salesforce
+  const handlePushToSalesforce = useCallback(async () => {
+    if (sfSyncPending.length === 0) return;
+
+    setIsPushingToSalesforce(true);
+    setSfPushProgress({ current: 0, total: sfSyncPending.length });
+
+    try {
+      // Build batch update payload
+      const updates = sfSyncPending.map(item => {
+        const fields: Record<string, any> = {};
+
+        // Map local field names to Salesforce field names
+        if (item.pendingFields.status) {
+          fields.status = item.pendingFields.status;
+        }
+        if (item.pendingFields.award_date) {
+          fields.Award_Date__c = item.pendingFields.award_date;
+        }
+        if (item.pendingFields.contract_date) {
+          fields.Contract_Date__c = item.pendingFields.contract_date;
+        }
+        if (item.pendingFields.install_date) {
+          fields.Install_Date__c = item.pendingFields.install_date;
+        }
+        if (item.pendingFields.value !== undefined) {
+          fields.Amount = item.pendingFields.value;
+        }
+        if (item.pendingFields.probability !== undefined) {
+          fields.Probability = item.pendingFields.probability;
+        }
+        if (item.pendingFields.budgeted !== undefined) {
+          fields.X24_Budget__c = item.pendingFields.budgeted;
+        }
+        if (item.pendingFields.manual_close_probability !== undefined) {
+          fields.X24_Manual_Close_Probability__c = item.pendingFields.manual_close_probability;
+        }
+
+        return {
+          id: item.salesforceId,
+          fields,
+          status: item.pendingFields.status,
+          currentStage: item.salesStage,
+        };
+      });
+
+      const response = await fetch('/api/salesforce/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'batchUpdate', updates }),
+      });
+
+      const result = await response.json();
+
+      if (result.successful > 0) {
+        // Clear sync status for successful pushes
+        const successfulIds = result.results
+          .filter((r: any) => r.success)
+          .map((r: any) => r.id);
+
+        if (successfulIds.length > 0) {
+          await fetch('/api/contracts/sync-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ salesforceIds: successfulIds, status: 'synced' }),
+          });
+        }
+
+        // Refresh pending list
+        await fetchSfSyncPending();
+      }
+
+      // Show result
+      if (result.failed > 0) {
+        const failedNames = result.results
+          .filter((r: any) => !r.success)
+          .map((r: any) => `• ${r.id}: ${r.errors?.join(', ') || 'Unknown error'}`)
+          .join('\n');
+        alert(`Pushed ${result.successful}/${result.total} to Salesforce.\n\nFailed:\n${failedNames}`);
+      } else {
+        console.log(`[SF PUSH] All ${result.successful} records pushed successfully`);
+      }
+    } catch (err) {
+      console.error('Salesforce push error:', err);
+      alert(`Failed to push to Salesforce: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsPushingToSalesforce(false);
+      setSfPushProgress(null);
+    }
+  }, [sfSyncPending, fetchSfSyncPending]);
+
   // Handle pending status change (batch mode)
   const handlePendingStatusChange = useCallback((contractId: string, salesforceId: string | undefined, contractName: string, notionName: string | undefined, newStatus: string, originalStatus: string) => {
     if (newStatus === originalStatus) {
@@ -2697,6 +2813,46 @@ export default function ContractsDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   Save All Changes
+                </>
+              )}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Push to Salesforce Button - appears when there are pending SF syncs */}
+      <AnimatePresence>
+        {sfSyncPending.length > 0 && Object.keys(pendingChanges).length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="fixed bottom-8 right-8 z-50 flex items-center gap-3"
+          >
+            {/* Pending sync count badge */}
+            <div className="bg-[#1E293B] border border-blue-500/30 rounded-lg px-4 py-2 shadow-lg">
+              <span className="text-blue-400 font-medium">
+                {sfSyncPending.length} pending Salesforce {sfSyncPending.length === 1 ? 'sync' : 'syncs'}
+              </span>
+            </div>
+
+            {/* Push to Salesforce button */}
+            <button
+              onClick={handlePushToSalesforce}
+              disabled={isPushingToSalesforce}
+              className="px-6 py-3 bg-gradient-to-r from-[#0189CB] to-[#0066A1] text-white font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shadow-lg flex items-center gap-2"
+            >
+              {isPushingToSalesforce ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {sfPushProgress ? `Pushing ${sfPushProgress.current}/${sfPushProgress.total}...` : 'Pushing...'}
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Push to Salesforce
                 </>
               )}
             </button>
