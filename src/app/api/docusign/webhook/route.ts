@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { notifyAcceptanceSigned } from '@/lib/slack';
+import { notifyAcceptanceSignedWithDocument, isSlackFileUploadConfigured } from '@/lib/slack';
+import { getDocumentDownload, isDocuSignConfigured } from '@/lib/docusign';
+import { uploadDocuSignDocument, saveDocuSignDocumentRecord } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,16 +75,72 @@ export async function POST(request: NextRequest) {
     }
 
     const envelope = payload.data.envelopeSummary;
+    const envelopeId = payload.data.envelopeId;
 
     // Extract customer info from subject
     const { customerName, type } = extractCustomerInfo(envelope.emailSubject);
+    const signedDate = envelope.completedDateTime || new Date().toISOString();
 
-    // Send Slack notification
-    const result = await notifyAcceptanceSigned({
+    // Track results for response
+    let documentBuffer: Buffer | undefined;
+    let supabaseStored = false;
+    let supabaseDocId: string | undefined;
+    let supabaseUrl: string | undefined;
+
+    // Step 1: Fetch the signed document from DocuSign
+    if (isDocuSignConfigured()) {
+      try {
+        console.log('Fetching signed document for envelope:', envelopeId);
+        documentBuffer = await getDocumentDownload(envelopeId, 'combined');
+        console.log('Document fetched successfully, size:', documentBuffer.length);
+      } catch (error) {
+        console.error('Failed to fetch document from DocuSign:', error);
+        // Continue without document
+      }
+    }
+
+    // Step 2: Store document in Supabase (always, as backup and audit trail)
+    if (documentBuffer) {
+      try {
+        console.log('Storing document in Supabase for:', customerName);
+        const { path, url } = await uploadDocuSignDocument({
+          buffer: documentBuffer,
+          customerName,
+          type,
+          envelopeId,
+        });
+        supabaseUrl = url;
+        console.log('Document stored in Supabase:', path);
+
+        // Step 3: Save metadata to database
+        const record = await saveDocuSignDocumentRecord({
+          customerName,
+          type,
+          envelopeId,
+          storagePath: path,
+          storageUrl: url,
+          signedDate,
+          fileSize: documentBuffer.length,
+        });
+
+        if (record) {
+          supabaseDocId = record.id;
+          supabaseStored = true;
+          console.log('Document metadata saved, ID:', record.id);
+        }
+      } catch (error) {
+        console.error('Failed to store document in Supabase:', error);
+        // Continue to Slack notification - document still in memory
+      }
+    }
+
+    // Step 4: Send Slack notification with document attachment
+    const result = await notifyAcceptanceSignedWithDocument({
       customerName,
       type,
-      signedDate: envelope.completedDateTime || new Date().toISOString(),
-      envelopeId: payload.data.envelopeId,
+      signedDate,
+      envelopeId,
+      documentBuffer,
     });
 
     if (!result.success) {
@@ -91,17 +149,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         received: true,
         processed: true,
+        supabaseStored,
+        supabaseDocId,
         slackSent: false,
         error: result.error,
       });
     }
 
-    console.log('Slack notification sent for:', customerName);
+    console.log('Processing complete for:', customerName, {
+      supabaseStored,
+      slackSent: true,
+      documentAttached: result.fileUploaded,
+    });
 
     return NextResponse.json({
       received: true,
       processed: true,
+      supabaseStored,
+      supabaseDocId,
+      supabaseUrl,
       slackSent: true,
+      documentAttached: result.fileUploaded,
       customerName,
       type,
     });
