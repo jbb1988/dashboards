@@ -13,7 +13,9 @@ import { CONTRACT_STATUSES } from '@/lib/validations';
  *     status?: string,
  *     awardDate?: string,      // YYYY-MM-DD - syncs to Salesforce
  *     contractDate?: string,   // YYYY-MM-DD - syncs to Salesforce
- *     installDate?: string     // YYYY-MM-DD - syncs to Salesforce
+ *     deliverDate?: string,    // YYYY-MM-DD - syncs to Salesforce
+ *     installDate?: string,    // YYYY-MM-DD - syncs to Salesforce
+ *     cashDate?: string        // YYYY-MM-DD - syncs to Salesforce
  *   }
  * }
  */
@@ -53,11 +55,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate and add date fields if provided
-    const dateFields = ['awardDate', 'contractDate', 'installDate'];
+    const dateFields = ['awardDate', 'contractDate', 'deliverDate', 'installDate', 'cashDate'];
     const dbFieldMap: Record<string, string> = {
       awardDate: 'award_date',
       contractDate: 'contract_date',
+      deliverDate: 'deliver_date',
       installDate: 'install_date',
+      cashDate: 'cash_date',
     };
 
     for (const field of dateFields) {
@@ -82,7 +86,7 @@ export async function POST(request: NextRequest) {
       .from('contracts')
       .update(updateData)
       .eq('salesforce_id', salesforceId)
-      .select('salesforce_id, status, award_date, contract_date, install_date');
+      .select('salesforce_id, status, award_date, contract_date, deliver_date, install_date, cash_date');
 
     if (error) {
       console.error('[UPDATE] Supabase error:', error);

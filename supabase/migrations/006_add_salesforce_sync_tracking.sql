@@ -54,7 +54,8 @@ CREATE POLICY "Service role can manage sync log"
   WITH CHECK (true);
 
 -- Function to mark a contract as having pending changes
--- Only tracks DATE fields that sync to Salesforce
+-- Tracks all 5 DATE fields that sync to Salesforce:
+-- award_date, contract_date, deliver_date, install_date, cash_date
 CREATE OR REPLACE FUNCTION mark_contract_pending_sync()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -62,7 +63,9 @@ BEGIN
   IF TG_OP = 'UPDATE' AND (
     OLD.award_date IS DISTINCT FROM NEW.award_date OR
     OLD.contract_date IS DISTINCT FROM NEW.contract_date OR
-    OLD.install_date IS DISTINCT FROM NEW.install_date
+    OLD.deliver_date IS DISTINCT FROM NEW.deliver_date OR
+    OLD.install_date IS DISTINCT FROM NEW.install_date OR
+    OLD.cash_date IS DISTINCT FROM NEW.cash_date
   ) THEN
     -- Build the pending fields object
     NEW.sf_sync_pending_fields = COALESCE(NEW.sf_sync_pending_fields, '{}'::jsonb);
@@ -73,8 +76,14 @@ BEGIN
     IF OLD.contract_date IS DISTINCT FROM NEW.contract_date THEN
       NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('contract_date', NEW.contract_date);
     END IF;
+    IF OLD.deliver_date IS DISTINCT FROM NEW.deliver_date THEN
+      NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('deliver_date', NEW.deliver_date);
+    END IF;
     IF OLD.install_date IS DISTINCT FROM NEW.install_date THEN
       NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('install_date', NEW.install_date);
+    END IF;
+    IF OLD.cash_date IS DISTINCT FROM NEW.cash_date THEN
+      NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('cash_date', NEW.cash_date);
     END IF;
 
     NEW.sf_sync_status = 'pending';

@@ -333,7 +333,9 @@ function ContractRow({
   const [editedStatus, setEditedStatus] = useState(contract.status);
   const [editedAwardDate, setEditedAwardDate] = useState(contract.awardDate || '');
   const [editedContractDate, setEditedContractDate] = useState(contract.contractDate || '');
+  const [editedDeliverDate, setEditedDeliverDate] = useState(contract.deliverDate || '');
   const [editedInstallDate, setEditedInstallDate] = useState(contract.installDate || '');
+  const [editedCashDate, setEditedCashDate] = useState(contract.cashDate || '');
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [tasks, setTasks] = useState<NotionTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -411,7 +413,9 @@ function ContractRow({
     setEditedStatus(contract.status);
     setEditedAwardDate(formatDateForInput(contract.awardDate));
     setEditedContractDate(formatDateForInput(contract.contractDate));
+    setEditedDeliverDate(formatDateForInput(contract.deliverDate));
     setEditedInstallDate(formatDateForInput(contract.installDate));
+    setEditedCashDate(formatDateForInput(contract.cashDate));
   };
 
   const handleCancel = (e: React.MouseEvent) => {
@@ -428,9 +432,11 @@ function ContractRow({
     try {
       const updates: Record<string, any> = {};
       if (editedStatus !== contract.status) updates.status = editedStatus;
-      if (editedAwardDate && editedAwardDate !== formatDateForInput(contract.awardDate)) updates.awardDate = editedAwardDate;
-      if (editedContractDate && editedContractDate !== formatDateForInput(contract.contractDate)) updates.contractDate = editedContractDate;
-      if (editedInstallDate && editedInstallDate !== formatDateForInput(contract.installDate)) updates.installDate = editedInstallDate;
+      if (editedAwardDate !== formatDateForInput(contract.awardDate)) updates.awardDate = editedAwardDate || null;
+      if (editedContractDate !== formatDateForInput(contract.contractDate)) updates.contractDate = editedContractDate || null;
+      if (editedDeliverDate !== formatDateForInput(contract.deliverDate)) updates.deliverDate = editedDeliverDate || null;
+      if (editedInstallDate !== formatDateForInput(contract.installDate)) updates.installDate = editedInstallDate || null;
+      if (editedCashDate !== formatDateForInput(contract.cashDate)) updates.cashDate = editedCashDate || null;
 
       if (Object.keys(updates).length === 0) {
         setIsEditing(false);
@@ -1001,37 +1007,59 @@ function ContractRow({
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-5 gap-4">
                   <div>
-                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Award Date</label>
+                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Award</label>
                     <input
                       type="date"
                       value={editedAwardDate}
                       onChange={e => setEditedAwardDate(e.target.value)}
                       onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      className="w-full px-3 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-sm focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
                       style={{ colorScheme: 'dark' }}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Contract Date</label>
+                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Contract</label>
                     <input
                       type="date"
                       value={editedContractDate}
                       onChange={e => setEditedContractDate(e.target.value)}
                       onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      className="w-full px-3 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-sm focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
                       style={{ colorScheme: 'dark' }}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Install Date</label>
+                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Delivery</label>
+                    <input
+                      type="date"
+                      value={editedDeliverDate}
+                      onChange={e => setEditedDeliverDate(e.target.value)}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Install</label>
                     <input
                       type="date"
                       value={editedInstallDate}
                       onChange={e => setEditedInstallDate(e.target.value)}
                       onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      className="w-full px-3 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-sm focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Cash</label>
+                    <input
+                      type="date"
+                      value={editedCashDate}
+                      onChange={e => setEditedCashDate(e.target.value)}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
                       style={{ colorScheme: 'dark' }}
                     />
                   </div>
@@ -1495,8 +1523,14 @@ export default function ContractsDashboard() {
         if (item.pendingFields.contract_date) {
           fields.Contract_Date__c = item.pendingFields.contract_date;
         }
+        if (item.pendingFields.deliver_date) {
+          fields.Deliver_Date__c = item.pendingFields.deliver_date;
+        }
         if (item.pendingFields.install_date) {
           fields.Install_Date__c = item.pendingFields.install_date;
+        }
+        if (item.pendingFields.cash_date) {
+          fields.Cash_Date__c = item.pendingFields.cash_date;
         }
 
         return {
