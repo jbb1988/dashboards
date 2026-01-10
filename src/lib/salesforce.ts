@@ -225,7 +225,7 @@ export async function getContractOpportunities() {
       Award_Date__c,
       Calculated_Award_Date__c,
       Contract_Date__c,
-      Deliver_Date__c,
+      Delivery_Date__c,
       Install_Date__c,
       Cash_Date__c,
       X24_Budget__c,
@@ -251,8 +251,8 @@ export async function getContractOpportunities() {
     const awardDate = opp.Award_Date__c || opp.Calculated_Award_Date__c || null;
     // Contract_Date__c is same as CloseDate per user
     const contractDate = opp.Contract_Date__c || opp.CloseDate || null;
-    // Deliver date from custom field
-    const deliverDate = opp.Deliver_Date__c || null;
+    // Delivery date from custom field
+    const deliverDate = opp.Delivery_Date__c || null;
     // Install date from custom field
     const installDate = opp.Install_Date__c || null;
     // Cash date from custom field

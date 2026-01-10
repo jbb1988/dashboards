@@ -186,7 +186,9 @@ export interface Contract {
   close_date: string | null;
   award_date: string | null;
   contract_date: string | null;
+  deliver_date: string | null;
   install_date: string | null;
+  cash_date: string | null;
   sales_rep: string;
   probability: number;
   budgeted: boolean;

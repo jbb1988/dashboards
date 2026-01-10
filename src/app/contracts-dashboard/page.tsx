@@ -889,10 +889,10 @@ function ContractRow({
                         </span>
                       </div>
 
-                      {/* Deliver */}
+                      {/* Delivery */}
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#F59E0B] shadow-[0_0_6px_rgba(245,158,11,0.5)]" />
-                        <span className="text-[11px] text-[#64748B] w-16">Deliver</span>
+                        <span className="text-[11px] text-[#64748B] w-16">Delivery</span>
                         <span className={`text-[12px] font-medium tabular-nums ${contract.deliverDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
                           {formatDateCompact(contract.deliverDate)}
                         </span>

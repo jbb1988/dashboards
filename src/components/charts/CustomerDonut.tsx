@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChartContainer, tooltipStyle, formatChartCurrency, CLASS_COLOR_ARRAY } from './ChartContainer';
 
 interface CustomerData {
@@ -199,7 +199,7 @@ export function CustomerDonut({ data, index = 0 }: CustomerDonutProps) {
         </svg>
       }
       index={index}
-      height={360}
+      height={400}
     >
       {/* Distributor Toggle */}
       {distributorCount > 0 && (
@@ -222,58 +222,59 @@ export function CustomerDonut({ data, index = 0 }: CustomerDonutProps) {
         </div>
       )}
 
-      <div className="relative w-full h-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              cx="40%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={90}
-              paddingAngle={2}
-              dataKey="value"
-              labelLine={false}
-              label={renderCustomizedLabel}
-              animationDuration={1000}
-              animationEasing="ease-out"
-            >
-              {chartData.map((entry, idx) => (
-                <Cell
-                  key={`cell-${idx}`}
-                  fill={entry.color}
-                  stroke="rgba(0,0,0,0.3)"
-                  strokeWidth={1}
-                />
-              ))}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              layout="vertical"
-              align="right"
-              verticalAlign="middle"
-              formatter={(value) => <span style={{ color: '#94A3B8', fontSize: 11 }}>{value}</span>}
-              wrapperStyle={{ paddingLeft: 10, right: 0 }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-        {/* Center label - positioned absolutely to ensure visibility */}
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            left: '40%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-          <div className="text-center">
-            <div className="text-[#EAF2FF] text-[16px] font-bold">
-              {formatChartCurrency(totalRevenue)}
-            </div>
-            <div className="text-[#64748B] text-[10px]">
-              Total Revenue
+      <div className="relative w-full h-full flex">
+        {/* Left side: Donut chart with center label */}
+        <div className="relative flex-1 flex items-center justify-center">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={80}
+                outerRadius={130}
+                paddingAngle={2}
+                dataKey="value"
+                labelLine={false}
+                label={renderCustomizedLabel}
+                animationDuration={1000}
+                animationEasing="ease-out"
+              >
+                {chartData.map((entry, idx) => (
+                  <Cell
+                    key={`cell-${idx}`}
+                    fill={entry.color}
+                    stroke="rgba(0,0,0,0.3)"
+                    strokeWidth={1}
+                  />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+          {/* Center label - perfectly centered in donut */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <div className="text-[#38BDF8] text-[22px] font-bold tracking-tight">
+                {formatChartCurrency(totalRevenue)}
+              </div>
+              <div className="text-[#64748B] text-[11px] mt-0.5">
+                Total Revenue
+              </div>
             </div>
           </div>
+        </div>
+        {/* Right side: Legend */}
+        <div className="w-48 flex flex-col justify-center pl-4 space-y-1.5">
+          {chartData.map((entry, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <div
+                className="w-3 h-3 rounded-sm flex-shrink-0"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-[#94A3B8] text-[11px] truncate">{entry.name}</span>
+            </div>
+          ))}
         </div>
       </div>
     </ChartContainer>

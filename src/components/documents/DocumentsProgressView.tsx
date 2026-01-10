@@ -1,19 +1,16 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import DocumentSection from './DocumentSection';
-import DocumentRow, { DocumentData } from './DocumentRow';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import DocumentPreviewPanel from './DocumentPreviewPanel';
-import AddDocumentDropdown from './AddDocumentDropdown';
 import BundleBanner from './BundleBanner';
+import { DocumentData } from './DocumentRow';
 import {
   REQUIRED_DOCUMENT_TYPES,
   ANALYSIS_DOCUMENT_TYPES,
   SUPPORTING_DOCUMENT_TYPES,
-  DOCUMENT_CATEGORIES,
+  DOCUMENT_TYPE_META,
   DocumentType,
-  isRequiredDocType,
-  isAnalysisDocType,
 } from '@/lib/constants';
 
 interface BundleInfo {
@@ -37,6 +34,114 @@ interface DocumentsProgressViewProps {
   isLoading?: boolean;
 }
 
+// Document Type Button Component - Inline clickable tile
+function DocumentTypeButton({
+  type,
+  document,
+  isUploading,
+  onUpload,
+  onView,
+  index,
+}: {
+  type: DocumentType;
+  document?: DocumentData;
+  isUploading: boolean;
+  onUpload: (file: File, type: DocumentType) => void;
+  onView: (doc: DocumentData) => void;
+  index: number;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const meta = DOCUMENT_TYPE_META[type];
+  const hasDoc = !!document;
+
+  const handleClick = () => {
+    if (hasDoc && document) {
+      onView(document);
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onUpload(file, type);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.03, duration: 0.2 }}
+      onClick={handleClick}
+      disabled={isUploading}
+      className={`
+        relative flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200 group
+        ${hasDoc
+          ? 'bg-[#22C55E]/10 border border-[#22C55E]/30 hover:bg-[#22C55E]/15 hover:border-[#22C55E]/50'
+          : 'bg-[#151F2E] border border-white/[0.06] hover:bg-[#1E293B] hover:border-white/[0.12]'
+        }
+        ${isUploading ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
+      `}
+    >
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.doc,.docx,.xls,.xlsx"
+        onChange={handleFileSelect}
+      />
+
+      {/* Icon container */}
+      <div
+        className={`
+          w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-lg
+          ${hasDoc ? 'bg-[#22C55E]/20' : 'bg-white/[0.04]'}
+        `}
+      >
+        {isUploading ? (
+          <div className="w-4 h-4 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
+        ) : (
+          meta.icon
+        )}
+      </div>
+
+      {/* Label */}
+      <span className={`flex-1 text-sm font-medium truncate ${hasDoc ? 'text-[#22C55E]' : 'text-white/80 group-hover:text-white'}`}>
+        {type}
+      </span>
+
+      {/* Status indicator */}
+      {hasDoc ? (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+          className="w-5 h-5 rounded-full bg-[#22C55E] flex items-center justify-center flex-shrink-0"
+        >
+          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </motion.div>
+      ) : (
+        <svg
+          className="w-4 h-4 text-white/30 group-hover:text-white/60 transition-colors flex-shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      )}
+    </motion.button>
+  );
+}
+
 export default function DocumentsProgressView({
   contractId,
   contractName,
@@ -54,9 +159,7 @@ export default function DocumentsProgressView({
   const documentsByType = useMemo(() => {
     const map = new Map<string, DocumentData>();
     documents.forEach(doc => {
-      // For non-unique types like "Other", collect all
       if (doc.document_type === 'Other') {
-        // Handle multiple "Other" documents - use ID as key
         map.set(`Other-${doc.id}`, doc);
       } else {
         map.set(doc.document_type, doc);
@@ -72,46 +175,6 @@ export default function DocumentsProgressView({
 
   const progressPercent = (requiredDocsUploaded / REQUIRED_DOCUMENT_TYPES.length) * 100;
 
-  // Get documents needing attention (required but not uploaded)
-  const needsAttention = useMemo(() => {
-    return REQUIRED_DOCUMENT_TYPES.filter(type => !documentsByType.has(type));
-  }, [documentsByType]);
-
-  // Get completed required documents
-  const completedDocs = useMemo(() => {
-    return REQUIRED_DOCUMENT_TYPES
-      .filter(type => documentsByType.has(type))
-      .map(type => ({ type, doc: documentsByType.get(type)! }));
-  }, [documentsByType]);
-
-  // Get analysis documents
-  const analysisDocs = useMemo(() => {
-    return ANALYSIS_DOCUMENT_TYPES
-      .filter(type => documentsByType.has(type))
-      .map(type => ({ type, doc: documentsByType.get(type)! }));
-  }, [documentsByType]);
-
-  // Get supporting documents
-  const supportingDocs = useMemo(() => {
-    const result: { type: DocumentType; doc: DocumentData }[] = [];
-
-    // Regular supporting types
-    SUPPORTING_DOCUMENT_TYPES.filter(t => t !== 'Other').forEach(type => {
-      if (documentsByType.has(type)) {
-        result.push({ type, doc: documentsByType.get(type)! });
-      }
-    });
-
-    // All "Other" documents
-    documentsByType.forEach((doc, key) => {
-      if (key.startsWith('Other-')) {
-        result.push({ type: 'Other', doc });
-      }
-    });
-
-    return result;
-  }, [documentsByType]);
-
   // Handle upload
   const handleUpload = useCallback(async (file: File, type: DocumentType) => {
     setUploadingType(type);
@@ -126,30 +189,6 @@ export default function DocumentsProgressView({
   const handleDownload = useCallback((doc: DocumentData) => {
     window.open(doc.file_url, '_blank');
   }, []);
-
-  // Get existing types for dropdown
-  const existingTypes = useMemo(() => {
-    return documents.map(d => d.document_type);
-  }, [documents]);
-
-  // Empty state
-  if (!isLoading && documents.length === 0 && needsAttention.length === REQUIRED_DOCUMENT_TYPES.length) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="w-20 h-20 mb-6 rounded-2xl bg-[#0B1220] flex items-center justify-center">
-          <svg className="w-10 h-10 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-semibold text-white mb-2">No documents yet</h3>
-        <p className="text-[#64748B] text-sm text-center max-w-sm mb-6">
-          Upload your first document to get started. Required documents include Original Contract, MARS Redlines, Final Agreement, and Executed Contract.
-        </p>
-        <AddDocumentDropdown onSelect={handleUpload} existingTypes={existingTypes} />
-        <p className="text-[#475569] text-xs mt-4">or drag files anywhere on this page</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -169,9 +208,11 @@ export default function DocumentsProgressView({
 
         {/* Progress Bar */}
         <div className="h-2 bg-[#1E293B] rounded-full overflow-hidden mb-2">
-          <div
-            className="h-full bg-[#8B5CF6] transition-all duration-500 rounded-full"
-            style={{ width: `${progressPercent}%` }}
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPercent}%` }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="h-full bg-[#8B5CF6] rounded-full"
           />
         </div>
 
@@ -195,97 +236,56 @@ export default function DocumentsProgressView({
         />
       )}
 
-      {/* Needs Attention Section */}
-      {needsAttention.length > 0 && (
-        <DocumentSection
-          title="Needs Attention"
-          count={needsAttention.length}
-          defaultExpanded={true}
-          emptyMessage="All required documents uploaded!"
-        >
-          {needsAttention.map((type, index) => (
-            <DocumentRow
+      {/* Required Documents Section */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Required</span>
+          <span className="text-xs text-[#475569]">
+            ({REQUIRED_DOCUMENT_TYPES.filter(t => documentsByType.has(t)).length}/{REQUIRED_DOCUMENT_TYPES.length})
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {REQUIRED_DOCUMENT_TYPES.map((type, index) => (
+            <DocumentTypeButton
               key={type}
-              documentType={type}
-              isRequired={true}
+              type={type}
+              document={documentsByType.get(type)}
+              isUploading={uploadingType === type}
               onUpload={handleUpload}
-              isLast={index === needsAttention.length - 1}
-            />
-          ))}
-        </DocumentSection>
-      )}
-
-      {/* Completed Section */}
-      {completedDocs.length > 0 && (
-        <DocumentSection
-          title="Completed"
-          count={completedDocs.length}
-          defaultExpanded={true}
-        >
-          {completedDocs.map(({ type, doc }, index) => (
-            <DocumentRow
-              key={doc.id}
-              documentType={type}
-              document={doc}
-              isRequired={true}
               onView={setPreviewDoc}
-              onDownload={handleDownload}
-              onDelete={onDelete}
-              onReplace={(_, file) => handleUpload(file, type)}
-              isLast={index === completedDocs.length - 1}
+              index={index}
             />
           ))}
-        </DocumentSection>
-      )}
+        </div>
+      </div>
 
       {/* Analysis & Reports Section */}
-      <DocumentSection
-        title="Analysis & Reports"
-        count={analysisDocs.length}
-        defaultExpanded={false}
-        accentColor="#8B5CF6"
-        emptyMessage="No analysis documents yet. Run a comparison to generate reports."
-      >
-        {analysisDocs.map(({ type, doc }, index) => (
-          <DocumentRow
-            key={doc.id}
-            documentType={type}
-            document={doc}
-            onView={setPreviewDoc}
-            onDownload={handleDownload}
-            onDelete={onDelete}
-            onReplace={(_, file) => handleUpload(file, type)}
-            isLast={index === analysisDocs.length - 1}
-          />
-        ))}
-      </DocumentSection>
-
-      {/* Supporting Documents Section */}
-      <DocumentSection
-        title="Supporting Documents"
-        count={supportingDocs.length}
-        defaultExpanded={false}
-        emptyMessage="No supporting documents uploaded."
-      >
-        {supportingDocs.map(({ type, doc }, index) => (
-          <DocumentRow
-            key={doc.id}
-            documentType={type}
-            document={doc}
-            onView={setPreviewDoc}
-            onDownload={handleDownload}
-            onDelete={onDelete}
-            onReplace={(_, file) => handleUpload(file, type)}
-            isLast={index === supportingDocs.length - 1}
-          />
-        ))}
-      </DocumentSection>
-
-      {/* Add Document Footer */}
-      <div className="flex items-center justify-between pt-4 border-t border-white/5">
-        <AddDocumentDropdown onSelect={handleUpload} existingTypes={existingTypes} />
-        <span className="text-[#475569] text-xs">Drag files anywhere to add</span>
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-semibold text-[#8B5CF6] uppercase tracking-wider">Analysis & Reports</span>
+          <span className="text-xs text-[#475569]">
+            ({ANALYSIS_DOCUMENT_TYPES.filter(t => documentsByType.has(t)).length}/{ANALYSIS_DOCUMENT_TYPES.length})
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {ANALYSIS_DOCUMENT_TYPES.map((type, index) => (
+            <DocumentTypeButton
+              key={type}
+              type={type}
+              document={documentsByType.get(type)}
+              isUploading={uploadingType === type}
+              onUpload={handleUpload}
+              onView={setPreviewDoc}
+              index={index + REQUIRED_DOCUMENT_TYPES.length}
+            />
+          ))}
+        </div>
       </div>
+
+      {/* Drag & Drop Hint */}
+      <p className="text-[#475569] text-xs text-center pt-2">
+        or drag files anywhere on this page
+      </p>
 
       {/* Preview Panel */}
       <DocumentPreviewPanel
