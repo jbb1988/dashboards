@@ -20,9 +20,9 @@ export const useSidebar = () => useContext(SidebarContext);
 
 // Dashboard access by role
 const DASHBOARD_ACCESS: Record<string, string[]> = {
-  admin: ['/contracts-dashboard', '/mcc-dashboard', '/closeout-dashboard', '/pm-dashboard', '/contracts/review', '/admin', '/guides'],
-  sales: ['/contracts-dashboard', '/guides'],
-  finance: ['/mcc-dashboard', '/closeout-dashboard', '/guides'],
+  admin: ['/contracts-dashboard', '/mcc-dashboard', '/closeout-dashboard', '/pm-dashboard', '/diversified-dashboard', '/contracts/review', '/admin', '/guides'],
+  sales: ['/contracts-dashboard', '/diversified-dashboard', '/guides'],
+  finance: ['/mcc-dashboard', '/closeout-dashboard', '/diversified-dashboard', '/guides'],
   pm: ['/closeout-dashboard', '/pm-dashboard', '/guides'],
   legal: ['/contracts/review', '/guides'],
   viewer: ['/guides'],
@@ -105,6 +105,16 @@ const navCategories: NavCategory[] = [
         ),
         badge: 'Excel',
       },
+      {
+        name: 'Diversified Products',
+        href: '/diversified-dashboard',
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        ),
+        badge: 'NetSuite',
+      },
     ],
   },
   {
@@ -163,6 +173,8 @@ function getBadgeDotColor(badge: string): string {
       return 'bg-[#22C55E]'; // Green
     case 'Claude':
       return 'bg-[#D97706]'; // Orange
+    case 'NetSuite':
+      return 'bg-[#22D3EE]'; // Cyan - matches NetSuite branding
     default:
       return 'bg-[#64748B]';
   }

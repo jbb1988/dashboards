@@ -503,3 +503,641 @@ export async function getTaskStats(): Promise<{
 
   return stats;
 }
+
+// ============================================
+// DOCUSIGN DOCUMENT STORAGE FUNCTIONS
+// ============================================
+
+/**
+ * Upload a DocuSign document to Supabase storage
+ * Returns the storage path and public URL
+ */
+export async function uploadDocuSignDocument(params: {
+  buffer: Buffer;
+  customerName: string;
+  type: 'project' | 'mcc';
+  envelopeId: string;
+}): Promise<{ path: string; url: string }> {
+  const admin = getSupabaseAdmin();
+  const { buffer, customerName, type, envelopeId } = params;
+
+  // Generate storage path: docusign/{year}/{month}/{customer}_{type}_{envelope}.pdf
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const sanitizedCustomer = customerName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_').substring(0, 50);
+  const envelopeShort = envelopeId.substring(0, 8);
+  const typeLabel = type === 'project' ? 'Project' : 'MCC';
+
+  const storagePath = `docusign/${year}/${month}/${sanitizedCustomer}_${typeLabel}_${envelopeShort}.pdf`;
+
+  // Upload to storage
+  const { error: uploadError } = await admin
+    .storage
+    .from('data-files')
+    .upload(storagePath, new Uint8Array(buffer), {
+      contentType: 'application/pdf',
+      upsert: true, // Overwrite if exists
+    });
+
+  if (uploadError) {
+    console.error('Error uploading DocuSign document:', uploadError);
+    throw new Error(`Failed to upload document: ${uploadError.message}`);
+  }
+
+  // Get public URL
+  const { data: urlData } = admin
+    .storage
+    .from('data-files')
+    .getPublicUrl(storagePath);
+
+  return {
+    path: storagePath,
+    url: urlData.publicUrl,
+  };
+}
+
+/**
+ * Download a DocuSign document from Supabase storage
+ * Used for retrying Slack uploads
+ */
+export async function getDocuSignDocumentFromStorage(storagePath: string): Promise<Buffer | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .storage
+    .from('data-files')
+    .download(storagePath);
+
+  if (error || !data) {
+    console.error('Error downloading DocuSign document:', error);
+    return null;
+  }
+
+  const arrayBuffer = await data.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
+ * Save DocuSign document metadata to the documents table
+ */
+export async function saveDocuSignDocumentRecord(params: {
+  customerName: string;
+  type: 'project' | 'mcc';
+  envelopeId: string;
+  storagePath: string;
+  storageUrl: string;
+  signedDate: string;
+  fileSize?: number;
+}): Promise<{ id: string } | null> {
+  const admin = getSupabaseAdmin();
+  const { customerName, type, envelopeId, storagePath, storageUrl, signedDate, fileSize } = params;
+
+  const typeLabel = type === 'project' ? 'Project' : 'MCC';
+  const documentType = type === 'project' ? 'Executed Contract' : 'MCC Acceptance';
+  const sanitizedCustomer = customerName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_');
+  const fileName = `${sanitizedCustomer}_${typeLabel}_Acceptance.pdf`;
+
+  const { data, error } = await admin
+    .from('documents')
+    .insert({
+      document_type: documentType,
+      status: 'executed',
+      file_name: fileName,
+      file_url: storageUrl,
+      file_size: fileSize || 0,
+      mime_type: 'application/pdf',
+      version_number: 1,
+      is_current_version: true,
+      metadata: {
+        envelopeId,
+        customerName,
+        signedDate,
+        storagePath,
+        type,
+        source: 'docusign_webhook',
+      },
+      notes: `Signed ${typeLabel} acceptance for ${customerName}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Error saving DocuSign document record:', error);
+    return null;
+  }
+
+  return { id: data.id };
+}
+
+/**
+ * Get DocuSign document record by envelope ID
+ */
+export async function getDocuSignDocumentByEnvelopeId(envelopeId: string): Promise<{
+  id: string;
+  storagePath: string;
+  storageUrl: string;
+  customerName: string;
+  type: 'project' | 'mcc';
+} | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('documents')
+    .select('id, file_url, metadata')
+    .filter('metadata->>envelopeId', 'eq', envelopeId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const metadata = data.metadata as {
+    envelopeId: string;
+    customerName: string;
+    storagePath: string;
+    type: 'project' | 'mcc';
+  };
+
+  return {
+    id: data.id,
+    storagePath: metadata.storagePath,
+    storageUrl: data.file_url,
+    customerName: metadata.customerName,
+    type: metadata.type,
+  };
+}
+
+// ============================================
+// DIVERSIFIED SALES FUNCTIONS
+// ============================================
+
+export interface DiversifiedSale {
+  id?: string;
+  netsuite_transaction_id: string;
+  netsuite_line_id: string;
+  transaction_type: string;
+  transaction_number: string;
+  transaction_date: string;
+  posting_period: string;
+  year: number;
+  month: number;
+  class_id: string;
+  class_name: string;
+  class_category: string;
+  parent_class: string;
+  customer_id: string;
+  customer_name: string;
+  account_id: string;
+  account_name: string;
+  quantity: number;
+  revenue: number;
+  cost: number;
+  gross_profit: number;
+  gross_profit_pct: number;
+  item_id: string;
+  item_name: string;
+  item_description: string;
+  synced_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DiversifiedBudget {
+  id?: string;
+  year: number;
+  month: number;
+  class_name: string;
+  class_category?: string;
+  budget_revenue: number;
+  budget_units: number;
+  budget_cost: number;
+  budget_gross_profit: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+}
+
+/**
+ * Upsert diversified sales records to Supabase
+ */
+export async function upsertDiversifiedSales(
+  records: Omit<DiversifiedSale, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  const recordsWithTimestamp = records.map(r => ({
+    ...r,
+    synced_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await admin
+    .from('diversified_sales')
+    .upsert(recordsWithTimestamp, {
+      onConflict: 'netsuite_transaction_id,netsuite_line_id',
+      ignoreDuplicates: false,
+    });
+
+  if (error) {
+    console.error('Error upserting diversified sales:', error);
+    return { success: false, count: 0, error: error.message };
+  }
+
+  return { success: true, count: records.length };
+}
+
+/**
+ * Get diversified sales with filters
+ */
+export async function getDiversifiedSales(filters?: {
+  year?: number;
+  years?: number[];
+  months?: number[];
+  className?: string;
+  classNames?: string[];
+  customerId?: string;
+  customerIds?: string[];
+  accountId?: string;
+}): Promise<DiversifiedSale[]> {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from('diversified_sales')
+    .select('*')
+    .order('transaction_date', { ascending: false });
+
+  if (filters?.year) {
+    query = query.eq('year', filters.year);
+  }
+  if (filters?.years && filters.years.length > 0) {
+    query = query.in('year', filters.years);
+  }
+  if (filters?.months && filters.months.length > 0) {
+    query = query.in('month', filters.months);
+  }
+  if (filters?.className) {
+    query = query.eq('class_name', filters.className);
+  }
+  if (filters?.classNames && filters.classNames.length > 0) {
+    query = query.in('class_name', filters.classNames);
+  }
+  if (filters?.customerId) {
+    query = query.eq('customer_id', filters.customerId);
+  }
+  if (filters?.customerIds && filters.customerIds.length > 0) {
+    query = query.in('customer_id', filters.customerIds);
+  }
+  if (filters?.accountId) {
+    query = query.eq('account_id', filters.accountId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching diversified sales:', error);
+    return [];
+  }
+
+  return data as DiversifiedSale[];
+}
+
+/**
+ * Get aggregated diversified sales by class
+ */
+export async function getDiversifiedSalesByClass(filters?: {
+  years?: number[];
+  months?: number[];
+}): Promise<Array<{
+  class_name: string;
+  class_category: string;
+  total_units: number;
+  total_revenue: number;
+  total_cost: number;
+  total_gross_profit: number;
+  avg_gross_profit_pct: number;
+  transaction_count: number;
+}>> {
+  const admin = getSupabaseAdmin();
+
+  let query = admin
+    .from('diversified_sales')
+    .select('class_name, class_category, quantity, revenue, cost, gross_profit, gross_profit_pct');
+
+  if (filters?.years && filters.years.length > 0) {
+    query = query.in('year', filters.years);
+  }
+  if (filters?.months && filters.months.length > 0) {
+    query = query.in('month', filters.months);
+  }
+
+  const { data, error } = await query;
+
+  if (error || !data) {
+    console.error('Error fetching diversified sales by class:', error);
+    return [];
+  }
+
+  // Aggregate by class_name
+  const byClass = new Map<string, {
+    class_name: string;
+    class_category: string;
+    total_units: number;
+    total_revenue: number;
+    total_cost: number;
+    total_gross_profit: number;
+    gross_profit_pcts: number[];
+    transaction_count: number;
+  }>();
+
+  for (const row of data) {
+    const key = row.class_name;
+    if (!byClass.has(key)) {
+      byClass.set(key, {
+        class_name: row.class_name,
+        class_category: row.class_category || '',
+        total_units: 0,
+        total_revenue: 0,
+        total_cost: 0,
+        total_gross_profit: 0,
+        gross_profit_pcts: [],
+        transaction_count: 0,
+      });
+    }
+    const agg = byClass.get(key)!;
+    agg.total_units += row.quantity || 0;
+    agg.total_revenue += row.revenue || 0;
+    agg.total_cost += row.cost || 0;
+    agg.total_gross_profit += row.gross_profit || 0;
+    if (row.gross_profit_pct) agg.gross_profit_pcts.push(row.gross_profit_pct);
+    agg.transaction_count += 1;
+  }
+
+  return Array.from(byClass.values()).map(agg => ({
+    ...agg,
+    avg_gross_profit_pct: agg.gross_profit_pcts.length > 0
+      ? agg.gross_profit_pcts.reduce((a, b) => a + b, 0) / agg.gross_profit_pcts.length
+      : 0,
+    gross_profit_pcts: undefined as any,
+  })).sort((a, b) => b.total_revenue - a.total_revenue);
+}
+
+/**
+ * Get aggregated diversified sales by customer
+ */
+export async function getDiversifiedSalesByCustomer(filters?: {
+  years?: number[];
+  months?: number[];
+  className?: string;
+}): Promise<Array<{
+  customer_id: string;
+  customer_name: string;
+  total_units: number;
+  total_revenue: number;
+  total_cost: number;
+  total_gross_profit: number;
+  avg_gross_profit_pct: number;
+  transaction_count: number;
+}>> {
+  const admin = getSupabaseAdmin();
+
+  let query = admin
+    .from('diversified_sales')
+    .select('customer_id, customer_name, quantity, revenue, cost, gross_profit, gross_profit_pct');
+
+  if (filters?.years && filters.years.length > 0) {
+    query = query.in('year', filters.years);
+  }
+  if (filters?.months && filters.months.length > 0) {
+    query = query.in('month', filters.months);
+  }
+  if (filters?.className) {
+    query = query.eq('class_name', filters.className);
+  }
+
+  const { data, error } = await query;
+
+  if (error || !data) {
+    console.error('Error fetching diversified sales by customer:', error);
+    return [];
+  }
+
+  // Aggregate by customer
+  const byCustomer = new Map<string, {
+    customer_id: string;
+    customer_name: string;
+    total_units: number;
+    total_revenue: number;
+    total_cost: number;
+    total_gross_profit: number;
+    gross_profit_pcts: number[];
+    transaction_count: number;
+  }>();
+
+  for (const row of data) {
+    const key = row.customer_id || row.customer_name || 'Unknown';
+    if (!byCustomer.has(key)) {
+      byCustomer.set(key, {
+        customer_id: row.customer_id || '',
+        customer_name: row.customer_name || 'Unknown',
+        total_units: 0,
+        total_revenue: 0,
+        total_cost: 0,
+        total_gross_profit: 0,
+        gross_profit_pcts: [],
+        transaction_count: 0,
+      });
+    }
+    const agg = byCustomer.get(key)!;
+    agg.total_units += row.quantity || 0;
+    agg.total_revenue += row.revenue || 0;
+    agg.total_cost += row.cost || 0;
+    agg.total_gross_profit += row.gross_profit || 0;
+    if (row.gross_profit_pct) agg.gross_profit_pcts.push(row.gross_profit_pct);
+    agg.transaction_count += 1;
+  }
+
+  return Array.from(byCustomer.values()).map(agg => ({
+    ...agg,
+    avg_gross_profit_pct: agg.gross_profit_pcts.length > 0
+      ? agg.gross_profit_pcts.reduce((a, b) => a + b, 0) / agg.gross_profit_pcts.length
+      : 0,
+    gross_profit_pcts: undefined as any,
+  })).sort((a, b) => b.total_revenue - a.total_revenue);
+}
+
+/**
+ * Get diversified dashboard summary
+ */
+export async function getDiversifiedDashboardSummary(filters?: {
+  years?: number[];
+  months?: number[];
+}): Promise<{
+  totalRevenue: number;
+  totalUnits: number;
+  totalCost: number;
+  grossProfit: number;
+  grossProfitPct: number;
+  transactionCount: number;
+  uniqueClasses: number;
+  uniqueCustomers: number;
+}> {
+  const admin = getSupabaseAdmin();
+
+  let query = admin
+    .from('diversified_sales')
+    .select('quantity, revenue, cost, gross_profit, class_name, customer_id');
+
+  if (filters?.years && filters.years.length > 0) {
+    query = query.in('year', filters.years);
+  }
+  if (filters?.months && filters.months.length > 0) {
+    query = query.in('month', filters.months);
+  }
+
+  const { data, error } = await query;
+
+  if (error || !data) {
+    console.error('Error fetching dashboard summary:', error);
+    return {
+      totalRevenue: 0,
+      totalUnits: 0,
+      totalCost: 0,
+      grossProfit: 0,
+      grossProfitPct: 0,
+      transactionCount: 0,
+      uniqueClasses: 0,
+      uniqueCustomers: 0,
+    };
+  }
+
+  const uniqueClasses = new Set(data.map(d => d.class_name));
+  const uniqueCustomers = new Set(data.filter(d => d.customer_id).map(d => d.customer_id));
+
+  const totals = data.reduce(
+    (acc, row) => ({
+      revenue: acc.revenue + (row.revenue || 0),
+      units: acc.units + (row.quantity || 0),
+      cost: acc.cost + (row.cost || 0),
+      grossProfit: acc.grossProfit + (row.gross_profit || 0),
+    }),
+    { revenue: 0, units: 0, cost: 0, grossProfit: 0 }
+  );
+
+  return {
+    totalRevenue: totals.revenue,
+    totalUnits: totals.units,
+    totalCost: totals.cost,
+    grossProfit: totals.grossProfit,
+    grossProfitPct: totals.revenue > 0 ? (totals.grossProfit / totals.revenue) * 100 : 0,
+    transactionCount: data.length,
+    uniqueClasses: uniqueClasses.size,
+    uniqueCustomers: uniqueCustomers.size,
+  };
+}
+
+/**
+ * Get available years and months for diversified filters
+ */
+export async function getDiversifiedFilterOptions(): Promise<{
+  years: number[];
+  months: number[];
+  classes: string[];
+  customers: Array<{ id: string; name: string }>;
+}> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('diversified_sales')
+    .select('year, month, class_name, customer_id, customer_name');
+
+  if (error || !data) {
+    return { years: [], months: [], classes: [], customers: [] };
+  }
+
+  const years = [...new Set(data.map(d => d.year))].sort((a, b) => b - a);
+  const months = [...new Set(data.map(d => d.month))].sort((a, b) => a - b);
+  const classes = [...new Set(data.map(d => d.class_name))].sort();
+
+  const customerMap = new Map<string, string>();
+  for (const d of data) {
+    if (d.customer_id && !customerMap.has(d.customer_id)) {
+      customerMap.set(d.customer_id, d.customer_name || 'Unknown');
+    }
+  }
+  const customers = Array.from(customerMap.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return { years, months, classes, customers };
+}
+
+/**
+ * Get budgets for variance calculation
+ */
+export async function getDiversifiedBudgets(filters?: {
+  year?: number;
+  years?: number[];
+  months?: number[];
+  className?: string;
+}): Promise<DiversifiedBudget[]> {
+  const admin = getSupabaseAdmin();
+
+  let query = admin
+    .from('diversified_budgets')
+    .select('*')
+    .order('year', { ascending: false })
+    .order('month', { ascending: true });
+
+  if (filters?.year) {
+    query = query.eq('year', filters.year);
+  }
+  if (filters?.years && filters.years.length > 0) {
+    query = query.in('year', filters.years);
+  }
+  if (filters?.months && filters.months.length > 0) {
+    query = query.in('month', filters.months);
+  }
+  if (filters?.className) {
+    query = query.eq('class_name', filters.className);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching diversified budgets:', error);
+    return [];
+  }
+
+  return data as DiversifiedBudget[];
+}
+
+/**
+ * Upsert diversified budgets
+ */
+export async function upsertDiversifiedBudgets(
+  budgets: Omit<DiversifiedBudget, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  const budgetsWithTimestamp = budgets.map(b => ({
+    ...b,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await admin
+    .from('diversified_budgets')
+    .upsert(budgetsWithTimestamp, {
+      onConflict: 'year,month,class_name',
+      ignoreDuplicates: false,
+    });
+
+  if (error) {
+    console.error('Error upserting diversified budgets:', error);
+    return { success: false, count: 0, error: error.message };
+  }
+
+  return { success: true, count: budgets.length };
+}

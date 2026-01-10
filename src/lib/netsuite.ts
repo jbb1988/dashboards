@@ -208,6 +208,60 @@ export interface NetSuiteSalesOrder {
   memo?: string;
 }
 
+export interface NetSuiteInvoice {
+  id: string;
+  tranId: string;
+  tranDate: string;
+  postingPeriod?: { id: string; refName: string };
+  status: { id: string; refName: string };
+  entity: { id: string; refName: string }; // Customer
+  total: number;
+  currency?: { id: string; refName: string };
+  subsidiary?: { id: string; refName: string };
+  class?: { id: string; refName: string };
+  account?: { id: string; refName: string };
+  memo?: string;
+  item?: {
+    items: Array<{
+      item: { id: string; refName: string };
+      class?: { id: string; refName: string };
+      quantity: number;
+      rate: number;
+      amount: number;
+      costEstimate?: number;
+      description?: string;
+      line: number;
+    }>;
+  };
+}
+
+export interface DiversifiedSaleRecord {
+  netsuiteTransactionId: string;
+  netsuiteLineId: string;
+  transactionType: string;
+  transactionNumber: string;
+  transactionDate: string;
+  postingPeriod: string;
+  year: number;
+  month: number;
+  classId: string;
+  className: string;
+  classCategory: string;
+  parentClass: string;
+  customerId: string;
+  customerName: string;
+  accountId: string;
+  accountName: string;
+  quantity: number;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  grossProfitPct: number;
+  itemId: string;
+  itemName: string;
+  itemDescription: string;
+}
+
 interface NetSuiteListResponse<T> {
   links: Array<{ rel: string; href: string }>;
   count: number;
@@ -316,6 +370,201 @@ export async function getSalesOrders(options: {
     total: response.totalResults,
     hasMore: response.hasMore,
   };
+}
+
+/**
+ * Fetch invoices from NetSuite (for diversified sales data)
+ */
+export async function getInvoices(options: {
+  limit?: number;
+  offset?: number;
+  q?: string;
+  expandSubResources?: boolean;
+} = {}): Promise<{ invoices: NetSuiteInvoice[]; total: number; hasMore: boolean }> {
+  const params: Record<string, string> = {
+    limit: (options.limit || 100).toString(),
+    offset: (options.offset || 0).toString(),
+  };
+
+  if (options.q) {
+    params.q = options.q;
+  }
+
+  if (options.expandSubResources) {
+    params.expandSubResources = 'true';
+  }
+
+  const response = await netsuiteRequest<NetSuiteListResponse<NetSuiteInvoice>>(
+    '/services/rest/record/v1/invoice',
+    { params }
+  );
+
+  return {
+    invoices: response.items || [],
+    total: response.totalResults,
+    hasMore: response.hasMore,
+  };
+}
+
+/**
+ * Fetch a single invoice by ID with line item details
+ */
+export async function getInvoice(id: string): Promise<NetSuiteInvoice> {
+  return netsuiteRequest<NetSuiteInvoice>(
+    `/services/rest/record/v1/invoice/${id}`,
+    { params: { expandSubResources: 'true' } }
+  );
+}
+
+/**
+ * Parse class name to extract category and parent
+ * e.g., "Diversified Products : Strainers" -> { category: "Strainers", parent: "Diversified Products" }
+ */
+function parseClassName(className: string): { category: string; parent: string } {
+  const parts = className.split(' : ').map(p => p.trim());
+  if (parts.length >= 2) {
+    return {
+      parent: parts[0],
+      category: parts[parts.length - 1],
+    };
+  }
+  return {
+    parent: className,
+    category: className,
+  };
+}
+
+/**
+ * Fetch diversified sales data from NetSuite
+ * Queries invoices and filters for Diversified Products classes
+ */
+export async function getDiversifiedSales(options: {
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ records: DiversifiedSaleRecord[]; total: number; hasMore: boolean }> {
+  const { limit = 100, offset = 0 } = options;
+
+  // Build query filter for Diversified Products class
+  // NetSuite REST API uses q parameter for filtering
+  let query = 'class.name CONTAIN "Diversified"';
+
+  if (options.startDate) {
+    query += ` AND tranDate >= "${options.startDate}"`;
+  }
+  if (options.endDate) {
+    query += ` AND tranDate <= "${options.endDate}"`;
+  }
+
+  const params: Record<string, string> = {
+    limit: limit.toString(),
+    offset: offset.toString(),
+    q: query,
+    expandSubResources: 'true',
+  };
+
+  try {
+    const response = await netsuiteRequest<NetSuiteListResponse<NetSuiteInvoice>>(
+      '/services/rest/record/v1/invoice',
+      { params }
+    );
+
+    const records: DiversifiedSaleRecord[] = [];
+
+    for (const invoice of response.items || []) {
+      const tranDate = new Date(invoice.tranDate);
+      const year = tranDate.getFullYear();
+      const month = tranDate.getMonth() + 1;
+
+      // Process line items if available
+      if (invoice.item?.items) {
+        for (const lineItem of invoice.item.items) {
+          // Only include lines with Diversified class
+          const lineClassName = lineItem.class?.refName || invoice.class?.refName || '';
+          if (!lineClassName.toLowerCase().includes('diversified')) {
+            continue;
+          }
+
+          const { category, parent } = parseClassName(lineClassName);
+          const revenue = lineItem.amount || 0;
+          const cost = lineItem.costEstimate || 0;
+          const grossProfit = revenue - cost;
+          const grossProfitPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+
+          records.push({
+            netsuiteTransactionId: invoice.id,
+            netsuiteLineId: lineItem.line.toString(),
+            transactionType: 'Invoice',
+            transactionNumber: invoice.tranId,
+            transactionDate: invoice.tranDate,
+            postingPeriod: invoice.postingPeriod?.refName || '',
+            year,
+            month,
+            classId: lineItem.class?.id || invoice.class?.id || '',
+            className: lineClassName,
+            classCategory: category,
+            parentClass: parent,
+            customerId: invoice.entity?.id || '',
+            customerName: invoice.entity?.refName || '',
+            accountId: invoice.account?.id || '',
+            accountName: invoice.account?.refName || '',
+            quantity: lineItem.quantity || 0,
+            revenue,
+            cost,
+            grossProfit,
+            grossProfitPct: Math.round(grossProfitPct * 100) / 100,
+            itemId: lineItem.item?.id || '',
+            itemName: lineItem.item?.refName || '',
+            itemDescription: lineItem.description || '',
+          });
+        }
+      } else if (invoice.class?.refName?.toLowerCase().includes('diversified')) {
+        // Header-level class (no line items expanded)
+        const className = invoice.class.refName;
+        const { category, parent } = parseClassName(className);
+        const revenue = invoice.total || 0;
+        const cost = 0; // Not available at header level
+        const grossProfit = revenue - cost;
+
+        records.push({
+          netsuiteTransactionId: invoice.id,
+          netsuiteLineId: '0',
+          transactionType: 'Invoice',
+          transactionNumber: invoice.tranId,
+          transactionDate: invoice.tranDate,
+          postingPeriod: invoice.postingPeriod?.refName || '',
+          year,
+          month,
+          classId: invoice.class.id,
+          className,
+          classCategory: category,
+          parentClass: parent,
+          customerId: invoice.entity?.id || '',
+          customerName: invoice.entity?.refName || '',
+          accountId: invoice.account?.id || '',
+          accountName: invoice.account?.refName || '',
+          quantity: 1,
+          revenue,
+          cost,
+          grossProfit,
+          grossProfitPct: 0,
+          itemId: '',
+          itemName: '',
+          itemDescription: '',
+        });
+      }
+    }
+
+    return {
+      records,
+      total: response.totalResults,
+      hasMore: response.hasMore,
+    };
+  } catch (error) {
+    console.error('Error fetching diversified sales:', error);
+    throw error;
+  }
 }
 
 /**
