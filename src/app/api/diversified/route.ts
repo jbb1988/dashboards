@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (viewParam === 'customer' || customerIdParam) {
-      byCustomer = await getDiversifiedSalesByCustomer({ years, months });
+      byCustomer = await getDiversifiedSalesByCustomer({ years, months, className: classNameParam || undefined });
 
       // If a customer is selected, we can get their classes
       if (customerIdParam) {
