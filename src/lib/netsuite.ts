@@ -441,7 +441,8 @@ function parseClassName(className: string): { category: string; parent: string }
 
 /**
  * Fetch diversified sales data from NetSuite using SuiteQL
- * Queries transaction lines with Diversified Products class
+ * Uses TransactionAccountingLine to get GL impact data
+ * Filters by Account number (414% for Revenue, 514% for COGS)
  */
 export async function getDiversifiedSales(options: {
   startDate?: string;
@@ -449,9 +450,9 @@ export async function getDiversifiedSales(options: {
   limit?: number;
   offset?: number;
 } = {}): Promise<{ records: DiversifiedSaleRecord[]; total: number; hasMore: boolean }> {
-  const { limit = 100, offset = 0 } = options;
+  const { limit = 1000, offset = 0 } = options;
 
-  // Build SuiteQL query for transaction lines with Diversified class
+  // Build date filter
   let dateFilter = '';
   if (options.startDate) {
     dateFilter += ` AND t.trandate >= TO_DATE('${options.startDate}', 'YYYY-MM-DD')`;
@@ -460,34 +461,47 @@ export async function getDiversifiedSales(options: {
     dateFilter += ` AND t.trandate <= TO_DATE('${options.endDate}', 'YYYY-MM-DD')`;
   }
 
-  // Query transaction lines with revenue data
-  // Include full class hierarchy (fullname includes parent : child)
+  // Query TransactionAccountingLine for GL data
+  // Filter by Account numbers: 414% (Revenue) and 514% (COGS)
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
+      tal.id AS accounting_line_id,
       tl.uniquekey AS line_id,
       t.tranid,
       t.trandate,
-      t.postingperiod,
-      c.companyname AS customer_name,
-      c.id AS customer_id,
+      BUILTIN.DF(t.postingperiod) AS posting_period,
+      BUILTIN.DF(t.entity) AS customer_name,
+      t.entity AS customer_id,
       BUILTIN.DF(tl.class) AS class_name,
-      tl.netamount AS amount,
+      tl.class AS class_id,
+      BUILTIN.DF(tal.account) AS account_name,
+      tal.account AS account_id,
       tl.quantity,
-      tl.rate,
-      BUILTIN.DF(tl.item) AS item_name
-    FROM transactionline tl
-    INNER JOIN transaction t ON t.id = tl.transaction
-    LEFT JOIN customer c ON c.id = t.entity
-    WHERE t.type = 'CustInvc'
+      COALESCE(tal.credit, 0) - COALESCE(tal.debit, 0) AS amount,
+      BUILTIN.DF(tl.item) AS item_name,
+      tl.item AS item_id,
+      a.acctnumber AS account_number,
+      a.accttype AS account_type
+    FROM Transaction t
+    INNER JOIN TransactionLine tl ON tl.transaction = t.id
+    INNER JOIN TransactionAccountingLine tal ON tal.transactionline = tl.id
+      AND tal.transaction = tl.transaction
+    INNER JOIN Account a ON a.id = tal.account
+    WHERE t.posting = 'T'
+      AND tal.posting = 'T'
       AND tl.mainline = 'F'
-      AND BUILTIN.DF(tl.class) LIKE '%Diversified%'
+      AND (
+        a.acctnumber LIKE '414%'
+        OR a.acctnumber LIKE '514%'
+      )
       ${dateFilter}
-    ORDER BY t.trandate DESC
+    ORDER BY t.trandate DESC, t.id, tl.uniquekey
   `;
 
   try {
-    console.log('Executing SuiteQL query for diversified sales...');
+    console.log('Executing SuiteQL query for diversified sales (TransactionAccountingLine)...');
+    console.log('Date filter:', options.startDate, 'to', options.endDate);
 
     const response = await netsuiteRequest<{ items: any[]; hasMore: boolean; totalResults: number }>(
       '/services/rest/query/v1/suiteql',
@@ -500,45 +514,115 @@ export async function getDiversifiedSales(options: {
 
     console.log(`SuiteQL returned ${response.items?.length || 0} rows`);
 
-    const records: DiversifiedSaleRecord[] = [];
+    // Group by transaction + line + class to combine revenue and COGS
+    const grouped: Record<string, {
+      transactionId: string;
+      lineId: string;
+      tranid: string;
+      trandate: string;
+      postingPeriod: string;
+      customerName: string;
+      customerId: string;
+      className: string;
+      classId: string;
+      itemName: string;
+      itemId: string;
+      quantity: number;
+      revenue: number;
+      cost: number;
+      accountName: string;
+    }> = {};
 
     for (const row of response.items || []) {
-      const tranDate = new Date(row.trandate);
+      const accountNumber = row.account_number || '';
+      const amount = parseFloat(row.amount) || 0;
+      const groupKey = `${row.transaction_id}-${row.line_id}-${row.class_id}`;
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = {
+          transactionId: row.transaction_id?.toString() || '',
+          lineId: row.line_id?.toString() || '',
+          tranid: row.tranid || '',
+          trandate: row.trandate || '',
+          postingPeriod: row.posting_period || '',
+          customerName: row.customer_name || '',
+          customerId: row.customer_id?.toString() || '',
+          className: row.class_name || '',
+          classId: row.class_id?.toString() || '',
+          itemName: row.item_name || '',
+          itemId: row.item_id?.toString() || '',
+          quantity: parseInt(row.quantity) || 0,
+          revenue: 0,
+          cost: 0,
+          accountName: row.account_name || '',
+        };
+      }
+
+      // Revenue accounts (414x) - credit > debit = positive amount
+      if (accountNumber.startsWith('414')) {
+        grouped[groupKey].revenue += amount;
+        // Use quantity from revenue line
+        if (row.quantity) {
+          grouped[groupKey].quantity = parseInt(row.quantity) || 0;
+        }
+      }
+      // COGS accounts (514x) - debit > credit = negative amount, take absolute value
+      else if (accountNumber.startsWith('514')) {
+        grouped[groupKey].cost += Math.abs(amount);
+      }
+    }
+
+    // Convert grouped data to records
+    const records: DiversifiedSaleRecord[] = [];
+
+    for (const key of Object.keys(grouped)) {
+      const g = grouped[key];
+      const tranDate = new Date(g.trandate);
       const year = tranDate.getFullYear();
       const month = tranDate.getMonth() + 1;
 
-      const className = row.class_name || 'Diversified Products';
+      const className = g.className || 'Diversified Products';
       const { category, parent } = parseClassName(className);
 
-      const revenue = parseFloat(row.amount) || 0;
+      const grossProfit = g.revenue - g.cost;
+      const grossProfitPct = g.revenue > 0 ? (grossProfit / g.revenue) * 100 : 0;
 
       records.push({
-        netsuiteTransactionId: row.transaction_id?.toString() || '',
-        netsuiteLineId: row.line_id?.toString() || '0',
+        netsuiteTransactionId: g.transactionId,
+        netsuiteLineId: g.lineId,
         transactionType: 'Invoice',
-        transactionNumber: row.tranid || '',
-        transactionDate: row.trandate || '',
-        postingPeriod: row.postingperiod || '',
+        transactionNumber: g.tranid,
+        transactionDate: g.trandate,
+        postingPeriod: g.postingPeriod,
         year,
         month,
-        classId: '',
+        classId: g.classId,
         className,
         classCategory: category,
         parentClass: parent,
-        customerId: row.customer_id?.toString() || '',
-        customerName: row.customer_name || '',
+        customerId: g.customerId,
+        customerName: g.customerName,
         accountId: '',
-        accountName: '',
-        quantity: parseInt(row.quantity) || 1,
-        revenue,
-        cost: 0,
-        grossProfit: revenue,
-        grossProfitPct: 100,
-        itemId: '',
-        itemName: row.item_name || '',
+        accountName: g.accountName,
+        quantity: g.quantity,
+        revenue: g.revenue,
+        cost: g.cost,
+        grossProfit,
+        grossProfitPct,
+        itemId: g.itemId,
+        itemName: g.itemName,
         itemDescription: '',
       });
     }
+
+    // Log summary for validation
+    const totalRevenue = records.reduce((sum, r) => sum + r.revenue, 0);
+    const totalCost = records.reduce((sum, r) => sum + r.cost, 0);
+    const totalUnits = records.reduce((sum, r) => sum + r.quantity, 0);
+    console.log(`Processed ${records.length} unique line items`);
+    console.log(`Total Revenue: $${totalRevenue.toFixed(2)}`);
+    console.log(`Total COGS: $${totalCost.toFixed(2)}`);
+    console.log(`Total Units: ${totalUnits}`);
 
     return {
       records,
