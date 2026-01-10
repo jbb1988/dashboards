@@ -460,7 +460,7 @@ export default function MCCDashboard() {
       >
         {/* Header */}
         <header className="border-b border-white/[0.04] bg-[#0B1220]/90 backdrop-blur-xl sticky top-0 z-50">
-          <div className="px-8 py-4">
+          <div className="max-w-[1600px] mx-auto px-8 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-semibold text-[#EAF2FF] tracking-tight">MCC Profitability</h1>
@@ -497,7 +497,7 @@ export default function MCCDashboard() {
           </div>
         </header>
 
-        <main className="w-full px-8 py-6">
+        <main className="max-w-[1600px] mx-auto px-8 py-6">
           {/* KPI Cards */}
           <div className="w-full grid grid-cols-5 gap-4 mb-6">
             <KPICard
