@@ -441,8 +441,7 @@ function parseClassName(className: string): { category: string; parent: string }
 
 /**
  * Fetch diversified sales data from NetSuite using SuiteQL
- * Uses TransactionAccountingLine to get GL impact data
- * Filters by Account number (414% for Revenue, 514% for COGS)
+ * Queries TransactionLine filtered by Diversified Products class hierarchy
  */
 export async function getDiversifiedSales(options: {
   startDate?: string;
@@ -452,21 +451,23 @@ export async function getDiversifiedSales(options: {
 } = {}): Promise<{ records: DiversifiedSaleRecord[]; total: number; hasMore: boolean }> {
   const { limit = 1000, offset = 0 } = options;
 
-  // Build date filter
+  // Build date filter - NetSuite uses MM/DD/YYYY format
   let dateFilter = '';
   if (options.startDate) {
-    dateFilter += ` AND t.trandate >= TO_DATE('${options.startDate}', 'YYYY-MM-DD')`;
+    // Convert YYYY-MM-DD to MM/DD/YYYY
+    const [y, m, d] = options.startDate.split('-');
+    dateFilter += ` AND t.trandate >= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
   }
   if (options.endDate) {
-    dateFilter += ` AND t.trandate <= TO_DATE('${options.endDate}', 'YYYY-MM-DD')`;
+    const [y, m, d] = options.endDate.split('-');
+    dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
   }
 
-  // Query TransactionAccountingLine for GL data
-  // Filter by Account numbers: 414% (Revenue) and 514% (COGS)
+  // Query TransactionLine with Class filter for Diversified Products
+  // Use subquery to get all Diversified class IDs including sub-classes
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
-      tal.id AS accounting_line_id,
       tl.uniquekey AS line_id,
       t.tranid,
       t.trandate,
@@ -475,32 +476,24 @@ export async function getDiversifiedSales(options: {
       t.entity AS customer_id,
       BUILTIN.DF(tl.class) AS class_name,
       tl.class AS class_id,
-      BUILTIN.DF(tal.account) AS account_name,
-      tal.account AS account_id,
       tl.quantity,
-      COALESCE(tal.credit, 0) - COALESCE(tal.debit, 0) AS amount,
+      tl.netamount,
+      tl.amount,
+      tl.costestimaterate,
       BUILTIN.DF(tl.item) AS item_name,
       tl.item AS item_id,
-      a.acctnumber AS account_number,
-      a.accttype AS account_type
-    FROM Transaction t
-    INNER JOIN TransactionLine tl ON tl.transaction = t.id
-    INNER JOIN TransactionAccountingLine tal ON tal.transactionline = tl.id
-      AND tal.transaction = tl.transaction
-    INNER JOIN Account a ON a.id = tal.account
+      t.type AS transaction_type
+    FROM TransactionLine tl
+    INNER JOIN Transaction t ON t.id = tl.transaction
     WHERE t.posting = 'T'
-      AND tal.posting = 'T'
       AND tl.mainline = 'F'
-      AND (
-        a.acctnumber LIKE '414%'
-        OR a.acctnumber LIKE '514%'
-      )
+      AND tl.class IN (SELECT id FROM Classification WHERE fullname LIKE 'Diversified%')
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.uniquekey
   `;
 
   try {
-    console.log('Executing SuiteQL query for diversified sales (TransactionAccountingLine)...');
+    console.log('Executing SuiteQL query for diversified sales...');
     console.log('Date filter:', options.startDate, 'to', options.endDate);
 
     const response = await netsuiteRequest<{ items: any[]; hasMore: boolean; totalResults: number }>(
@@ -514,103 +507,58 @@ export async function getDiversifiedSales(options: {
 
     console.log(`SuiteQL returned ${response.items?.length || 0} rows`);
 
-    // Group by transaction + line + class to combine revenue and COGS
-    const grouped: Record<string, {
-      transactionId: string;
-      lineId: string;
-      tranid: string;
-      trandate: string;
-      postingPeriod: string;
-      customerName: string;
-      customerId: string;
-      className: string;
-      classId: string;
-      itemName: string;
-      itemId: string;
-      quantity: number;
-      revenue: number;
-      cost: number;
-      accountName: string;
-    }> = {};
-
-    for (const row of response.items || []) {
-      const accountNumber = row.account_number || '';
-      const amount = parseFloat(row.amount) || 0;
-      const groupKey = `${row.transaction_id}-${row.line_id}-${row.class_id}`;
-
-      if (!grouped[groupKey]) {
-        grouped[groupKey] = {
-          transactionId: row.transaction_id?.toString() || '',
-          lineId: row.line_id?.toString() || '',
-          tranid: row.tranid || '',
-          trandate: row.trandate || '',
-          postingPeriod: row.posting_period || '',
-          customerName: row.customer_name || '',
-          customerId: row.customer_id?.toString() || '',
-          className: row.class_name || '',
-          classId: row.class_id?.toString() || '',
-          itemName: row.item_name || '',
-          itemId: row.item_id?.toString() || '',
-          quantity: parseInt(row.quantity) || 0,
-          revenue: 0,
-          cost: 0,
-          accountName: row.account_name || '',
-        };
-      }
-
-      // Revenue accounts (414x) - credit > debit = positive amount
-      if (accountNumber.startsWith('414')) {
-        grouped[groupKey].revenue += amount;
-        // Use quantity from revenue line
-        if (row.quantity) {
-          grouped[groupKey].quantity = parseInt(row.quantity) || 0;
-        }
-      }
-      // COGS accounts (514x) - debit > credit = negative amount, take absolute value
-      else if (accountNumber.startsWith('514')) {
-        grouped[groupKey].cost += Math.abs(amount);
-      }
-    }
-
-    // Convert grouped data to records
+    // Convert to records
     const records: DiversifiedSaleRecord[] = [];
 
-    for (const key of Object.keys(grouped)) {
-      const g = grouped[key];
-      const tranDate = new Date(g.trandate);
-      const year = tranDate.getFullYear();
-      const month = tranDate.getMonth() + 1;
+    for (const row of response.items || []) {
+      // Parse date - NetSuite returns MM/DD/YYYY format
+      const dateParts = (row.trandate || '').split('/');
+      let year = 2025;
+      let month = 1;
+      if (dateParts.length === 3) {
+        month = parseInt(dateParts[0]) || 1;
+        year = parseInt(dateParts[2]) || 2025;
+      }
 
-      const className = g.className || 'Diversified Products';
+      const className = row.class_name || 'Diversified Products';
       const { category, parent } = parseClassName(className);
 
-      const grossProfit = g.revenue - g.cost;
-      const grossProfitPct = g.revenue > 0 ? (grossProfit / g.revenue) * 100 : 0;
+      // Use netamount for revenue (positive values)
+      // Negative quantities indicate returns/credits
+      const quantity = Math.abs(parseInt(row.quantity) || 0);
+      const revenue = Math.abs(parseFloat(row.netamount) || parseFloat(row.amount) || 0);
+
+      // Estimate cost from costestimaterate if available
+      const costRate = parseFloat(row.costestimaterate) || 0;
+      const cost = costRate > 0 ? costRate * quantity : revenue * 0.5; // Default 50% margin if no cost
+
+      const grossProfit = revenue - cost;
+      const grossProfitPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
       records.push({
-        netsuiteTransactionId: g.transactionId,
-        netsuiteLineId: g.lineId,
-        transactionType: 'Invoice',
-        transactionNumber: g.tranid,
-        transactionDate: g.trandate,
-        postingPeriod: g.postingPeriod,
+        netsuiteTransactionId: row.transaction_id?.toString() || '',
+        netsuiteLineId: row.line_id?.toString() || '',
+        transactionType: row.transaction_type || 'CustInvc',
+        transactionNumber: row.tranid || '',
+        transactionDate: row.trandate || '',
+        postingPeriod: row.posting_period || '',
         year,
         month,
-        classId: g.classId,
+        classId: row.class_id?.toString() || '',
         className,
         classCategory: category,
         parentClass: parent,
-        customerId: g.customerId,
-        customerName: g.customerName,
+        customerId: row.customer_id?.toString() || '',
+        customerName: row.customer_name || '',
         accountId: '',
-        accountName: g.accountName,
-        quantity: g.quantity,
-        revenue: g.revenue,
-        cost: g.cost,
+        accountName: '',
+        quantity,
+        revenue,
+        cost,
         grossProfit,
         grossProfitPct,
-        itemId: g.itemId,
-        itemName: g.itemName,
+        itemId: row.item_id?.toString() || '',
+        itemName: row.item_name || '',
         itemDescription: '',
       });
     }
@@ -619,7 +567,7 @@ export async function getDiversifiedSales(options: {
     const totalRevenue = records.reduce((sum, r) => sum + r.revenue, 0);
     const totalCost = records.reduce((sum, r) => sum + r.cost, 0);
     const totalUnits = records.reduce((sum, r) => sum + r.quantity, 0);
-    console.log(`Processed ${records.length} unique line items`);
+    console.log(`Processed ${records.length} records`);
     console.log(`Total Revenue: $${totalRevenue.toFixed(2)}`);
     console.log(`Total COGS: $${totalCost.toFixed(2)}`);
     console.log(`Total Units: ${totalUnits}`);
@@ -646,5 +594,100 @@ export async function testConnection(): Promise<{ success: boolean; message: str
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, message: `Connection failed: ${message}` };
+  }
+}
+
+/**
+ * Test SuiteQL access - query accounts to verify permissions
+ */
+export async function testSuiteQLAccess(): Promise<{ success: boolean; data: any; error?: string }> {
+  try {
+    // Test 1: Query Account table for Diversified accounts
+    const accountQuery = `
+      SELECT id, acctnumber, fullname, accttype
+      FROM Account
+      WHERE acctnumber LIKE '414%' OR acctnumber LIKE '514%'
+      ORDER BY acctnumber
+    `;
+
+    console.log('Testing SuiteQL - querying Account table...');
+    const accountResult = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: accountQuery },
+        params: { limit: '20' },
+      }
+    );
+    console.log('Account query result:', accountResult.items?.length || 0, 'rows');
+
+    // Test 2: Query Classification table to see all Diversified classes
+    const classQuery = `
+      SELECT id, name, fullname, parent
+      FROM Classification
+      WHERE fullname LIKE 'Diversified%'
+      ORDER BY fullname
+    `;
+
+    console.log('Testing SuiteQL - querying Classification table...');
+    const classResult = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: classQuery },
+        params: { limit: '50' },
+      }
+    );
+    console.log('Classification query result:', classResult.items?.length || 0, 'rows');
+
+    // Test 3: Query TransactionLine for most recent Diversified data
+    const talQuery = `
+      SELECT
+        tl.transaction,
+        tl.uniquekey as line_id,
+        BUILTIN.DF(tl.class) as class_name,
+        tl.class as class_id,
+        tl.netamount,
+        tl.quantity,
+        tl.amount,
+        t.trandate,
+        t.tranid,
+        t.type,
+        BUILTIN.DF(t.entity) as customer_name
+      FROM TransactionLine tl
+      INNER JOIN Transaction t ON t.id = tl.transaction
+      WHERE t.posting = 'T'
+        AND tl.mainline = 'F'
+        AND (tl.class IN (SELECT id FROM Classification WHERE fullname LIKE 'Diversified%'))
+      ORDER BY t.trandate DESC
+    `;
+
+    console.log('Testing SuiteQL - querying TAL for Dec 2025 Diversified...');
+    const talResult = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: talQuery },
+        params: { limit: '20' },
+      }
+    );
+    console.log('TAL query result:', talResult.items?.length || 0, 'rows');
+
+    return {
+      success: true,
+      data: {
+        accounts: accountResult.items || [],
+        classes: classResult.items || [],
+        talSample: talResult.items || [],
+        talCount: talResult.items?.length || 0,
+      },
+    };
+  } catch (error) {
+    console.error('SuiteQL test error:', error);
+    return {
+      success: false,
+      data: null,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }
