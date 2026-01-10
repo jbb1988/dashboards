@@ -3,13 +3,18 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { CONTRACT_STATUSES } from '@/lib/validations';
 
 /**
- * POST - Update a contract's status
+ * POST - Update a contract's fields
  *
  * Body format:
  * {
  *   salesforceId: string,
  *   contractName?: string,  // for logging
- *   updates: { status: string }
+ *   updates: {
+ *     status?: string,
+ *     awardDate?: string,      // YYYY-MM-DD - syncs to Salesforce
+ *     contractDate?: string,   // YYYY-MM-DD - syncs to Salesforce
+ *     installDate?: string     // YYYY-MM-DD - syncs to Salesforce
+ *   }
  * }
  */
 export async function POST(request: NextRequest) {
@@ -24,36 +29,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!updates || !updates.status) {
+    if (!updates || Object.keys(updates).length === 0) {
       return NextResponse.json(
-        { error: 'updates.status is required' },
+        { error: 'updates object is required with at least one field' },
         { status: 400 }
       );
     }
 
-    const newStatus = updates.status;
+    // Build update object
+    const updateData: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
 
-    // Validate status
-    if (!CONTRACT_STATUSES.includes(newStatus as typeof CONTRACT_STATUSES[number])) {
-      return NextResponse.json(
-        { error: `Invalid status. Valid: ${CONTRACT_STATUSES.join(', ')}` },
-        { status: 400 }
-      );
+    // Validate and add status if provided
+    if (updates.status) {
+      if (!CONTRACT_STATUSES.includes(updates.status as typeof CONTRACT_STATUSES[number])) {
+        return NextResponse.json(
+          { error: `Invalid status. Valid: ${CONTRACT_STATUSES.join(', ')}` },
+          { status: 400 }
+        );
+      }
+      updateData.status = updates.status;
     }
 
-    console.log(`[UPDATE] Updating contract ${salesforceId} (${contractName || 'unknown'}) to status: ${newStatus}`);
+    // Validate and add date fields if provided
+    const dateFields = ['awardDate', 'contractDate', 'installDate'];
+    const dbFieldMap: Record<string, string> = {
+      awardDate: 'award_date',
+      contractDate: 'contract_date',
+      installDate: 'install_date',
+    };
+
+    for (const field of dateFields) {
+      if (updates[field] !== undefined) {
+        const value = updates[field];
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          return NextResponse.json(
+            { error: `${field} must be in YYYY-MM-DD format` },
+            { status: 400 }
+          );
+        }
+        updateData[dbFieldMap[field]] = value || null;
+      }
+    }
+
+    console.log(`[UPDATE] Updating contract ${salesforceId} (${contractName || 'unknown'}):`, updateData);
 
     const admin = getSupabaseAdmin();
 
     // Use .select() to get the updated row and verify it exists
     const { data, error } = await admin
       .from('contracts')
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('salesforce_id', salesforceId)
-      .select('salesforce_id, status');
+      .select('salesforce_id, status, award_date, contract_date, install_date');
 
     if (error) {
       console.error('[UPDATE] Supabase error:', error);
@@ -72,12 +101,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[UPDATE] Successfully updated ${salesforceId} to ${data[0].status}`);
+    console.log(`[UPDATE] Successfully updated ${salesforceId}`);
 
     return NextResponse.json({
       success: true,
       salesforceId,
-      status: newStatus,
+      updates: updateData,
       updatedAt: new Date().toISOString(),
     });
 

@@ -36,6 +36,7 @@ interface Contract {
   closeDate: string | null;
   awardDate: string | null;
   contractDate: string | null;
+  installDate: string | null;
   statusChangeDate: string | null;
   progress: number;
   isOverdue: boolean;
@@ -445,6 +446,7 @@ function ContractRow({
   const [editedStatus, setEditedStatus] = useState(contract.status);
   const [editedAwardDate, setEditedAwardDate] = useState(contract.awardDate || '');
   const [editedContractDate, setEditedContractDate] = useState(contract.contractDate || '');
+  const [editedInstallDate, setEditedInstallDate] = useState(contract.installDate || '');
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [tasks, setTasks] = useState<NotionTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -510,6 +512,7 @@ function ContractRow({
     setEditedStatus(contract.status);
     setEditedAwardDate(formatDateForInput(contract.awardDate));
     setEditedContractDate(formatDateForInput(contract.contractDate));
+    setEditedInstallDate(formatDateForInput(contract.installDate));
   };
 
   const handleCancel = (e: React.MouseEvent) => {
@@ -528,6 +531,7 @@ function ContractRow({
       if (editedStatus !== contract.status) updates.status = editedStatus;
       if (editedAwardDate && editedAwardDate !== formatDateForInput(contract.awardDate)) updates.awardDate = editedAwardDate;
       if (editedContractDate && editedContractDate !== formatDateForInput(contract.contractDate)) updates.contractDate = editedContractDate;
+      if (editedInstallDate && editedInstallDate !== formatDateForInput(contract.installDate)) updates.installDate = editedInstallDate;
 
       if (Object.keys(updates).length === 0) {
         setIsEditing(false);
@@ -982,7 +986,101 @@ function ContractRow({
             )}
           </div>
 
+          {/* Edit Button */}
+          <div className="text-center" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={handleEdit}
+              className="p-1.5 rounded hover:bg-[#38BDF8]/20 text-[#64748B] hover:text-[#38BDF8] transition-colors"
+              title="Edit dates (syncs to Salesforce)"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
           </div>
+
+          </div>
+
+        {/* Edit Mode Panel - for editing dates that sync to Salesforce */}
+        <AnimatePresence>
+          {isEditing && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden bg-[#1E293B] border-b border-[#38BDF8]/30"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-6 py-4">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[11px] text-[#38BDF8] uppercase tracking-wider font-semibold">Edit Dates (Syncs to Salesforce)</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCancel}
+                      className="px-3 py-1.5 text-xs text-[#8FA3BF] hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="px-4 py-1.5 text-xs bg-[#22C55E] text-white rounded hover:bg-[#16A34A] transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save'
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Award Date</label>
+                    <input
+                      type="date"
+                      value={editedAwardDate}
+                      onChange={e => setEditedAwardDate(e.target.value)}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      className="w-full px-3 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-sm focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Contract Date</label>
+                    <input
+                      type="date"
+                      value={editedContractDate}
+                      onChange={e => setEditedContractDate(e.target.value)}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      className="w-full px-3 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-sm focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Install Date</label>
+                    <input
+                      type="date"
+                      value={editedInstallDate}
+                      onChange={e => setEditedInstallDate(e.target.value)}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      className="w-full px-3 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-sm focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                  </div>
+                </div>
+                {saveMessage && (
+                  <div className={`mt-3 text-xs ${saveMessage.type === 'success' ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+                    {saveMessage.text}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Expanded Details */}
         <AnimatePresence>
@@ -2628,6 +2726,7 @@ export default function ContractsDashboard() {
                         <div className="sticky bottom-0 bg-[#0F1722] px-6 py-4 border-t border-white/10 flex gap-3">
                           <button
                             onClick={() => {
+                              setActiveFilter('all');
                               setStatusFilter([]);
                               setDateFilter('all');
                               setContractTypeFilter('all');
@@ -2635,10 +2734,11 @@ export default function ContractsDashboard() {
                               setBudgetedFilter(false);
                               setProbabilityMin(0);
                               setHideMidContract(true);
+                              setSearchQuery('');
                             }}
                             className="flex-1 px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm font-medium hover:bg-white/10 transition-colors"
                           >
-                            Reset
+                            Reset All
                           </button>
                           <button
                             onClick={() => setFilterPanelOpen(false)}

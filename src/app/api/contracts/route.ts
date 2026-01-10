@@ -89,6 +89,7 @@ interface DashboardContract {
   closeDate: string | null;
   awardDate: string | null;
   contractDate: string | null;
+  installDate: string | null;
   statusChangeDate: string | null;
   progress: number;
   isOverdue: boolean;
@@ -135,6 +136,7 @@ function transformToDashboardFormat(contract: Contract): DashboardContract {
     closeDate: contract.close_date,
     awardDate: contract.award_date,
     contractDate: contract.contract_date,
+    installDate: contract.install_date,
     statusChangeDate: contract.updated_at || null,
     progress: contract.probability,
     isOverdue: daysUntilDeadline < 0,
