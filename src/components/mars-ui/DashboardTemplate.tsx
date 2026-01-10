@@ -290,7 +290,7 @@ export default function DashboardTemplate() {
             />
           ) : (
             <div className="space-y-6">
-              {/* KPI Cards Grid - with gradient styling for premium pop */}
+              {/* KPI Cards Grid - gradient is enabled by default */}
               <div className="grid grid-cols-4 gap-4">
                 <KPICard
                   title="Total Items"
@@ -299,8 +299,6 @@ export default function DashboardTemplate() {
                   icon={KPIIcons.folder}
                   color="#38BDF8"
                   delay={0.1}
-                  gradient
-                  glowIntensity="subtle"
                 />
                 <KPICard
                   title="Active"
@@ -309,8 +307,6 @@ export default function DashboardTemplate() {
                   icon={KPIIcons.clock}
                   color="#F59E0B"
                   delay={0.2}
-                  gradient
-                  glowIntensity="subtle"
                 />
                 <KPICard
                   title="Completed"
@@ -319,8 +315,6 @@ export default function DashboardTemplate() {
                   icon={KPIIcons.checkCircle}
                   color="#22C55E"
                   delay={0.3}
-                  gradient
-                  glowIntensity="subtle"
                 />
                 <KPICard
                   title="Overdue"
@@ -329,8 +323,6 @@ export default function DashboardTemplate() {
                   icon={KPIIcons.alert}
                   color="#EF4444"
                   delay={0.4}
-                  gradient
-                  glowIntensity="subtle"
                 />
               </div>
 
@@ -400,7 +392,8 @@ KPI Icons:
   - KPIIcons.clipboard, checkCircle, clock, folder, warning, users
 
 KPI Card Gradient Props (Mind-Muscle style):
-  - gradient={true}              - Enable colored gradient background
+  - gradient={true} (DEFAULT)    - Colored gradient background enabled by default
+  - gradient={false}             - Disable gradient for flat style
   - glowIntensity="subtle"       - Options: 'none' | 'subtle' | 'strong'
   - Creates: gradient bg, colored border, shadow glow, specular highlight
 */

@@ -81,14 +81,15 @@ Always show KPI cards at the top of dashboards (3-6 cards):
     delay={0.1}           // Stagger animation
     isActive={isActive}   // Optional highlight
     onClick={handleClick} // Optional interaction
-    gradient              // Enable gradient background (recommended)
+    // gradient={true}    // DEFAULT - gradient enabled automatically
+    // gradient={false}   // Optional - disable for flat style
     glowIntensity="subtle" // 'none' | 'subtle' | 'strong'
   />
 </div>
 ```
 
-**Gradient KPI Cards (Mind-Muscle Style):**
-Enable the `gradient` prop for premium visual pop:
+**Gradient KPI Cards (Mind-Muscle Style) - ENABLED BY DEFAULT:**
+All KPI cards now have gradient styling by default. Use `gradient={false}` to disable:
 - Colored gradient background from accent color to dark
 - Semantic colored border
 - Shadow glow effect

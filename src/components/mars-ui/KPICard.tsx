@@ -116,7 +116,7 @@ export function KPICard({
   trend,
   trendLabel,
   badge,
-  gradient = false,
+  gradient = true,
   glowIntensity = 'subtle',
 }: KPICardProps) {
   // Gradient styling inspired by Mind-Muscle project
