@@ -6,6 +6,7 @@ import {
   groupTasksBySection,
   calculateTaskStats,
   updateTask,
+  getSubtasks,
   AsanaTask,
 } from '@/lib/asana';
 
@@ -19,9 +20,31 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
+    const taskId = searchParams.get('taskId');
+    const action = searchParams.get('action');
     const bust = searchParams.get('bust') === 'true';
     const groupBy = searchParams.get('groupBy'); // 'section' | 'assignee' | 'status'
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
+
+    // Handle subtasks request
+    if (action === 'subtasks' && taskId) {
+      try {
+        const subtasks = await getSubtasks(taskId);
+        return NextResponse.json({
+          subtasks: subtasks.map(st => ({
+            gid: st.gid,
+            name: st.name,
+            completed: st.completed,
+            completedAt: st.completed_at,
+            dueOn: st.due_on,
+            assignee: st.assignee ? { name: st.assignee.name } : null,
+          })),
+        });
+      } catch (error) {
+        console.error('Error fetching subtasks:', error);
+        return NextResponse.json({ subtasks: [] });
+      }
+    }
 
     if (!projectId) {
       return NextResponse.json({

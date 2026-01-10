@@ -1,6 +1,16 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+
+interface Subtask {
+  gid: string;
+  name: string;
+  completed: boolean;
+  completedAt: string | null;
+  dueOn: string | null;
+  assignee: { name: string } | null;
+}
 
 interface AsanaTask {
   gid: string;
@@ -58,6 +68,44 @@ const COLORS = {
   placeholder: '#F1BD6C',
 };
 
+// Helper to format notes with clickable, truncated URLs
+function formatNotesWithLinks(notes: string): React.ReactNode[] {
+  // URL regex pattern
+  const urlPattern = /(https?:\/\/[^\s]+)/g;
+  const parts = notes.split(urlPattern);
+
+  return parts.map((part, idx) => {
+    if (urlPattern.test(part)) {
+      // Reset lastIndex since we're testing again
+      urlPattern.lastIndex = 0;
+
+      try {
+        const url = new URL(part);
+        const displayText = url.hostname.replace('www.', '');
+
+        return (
+          <a
+            key={idx}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] rounded text-[12px] transition-colors max-w-full"
+            title={part}
+          >
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            <span className="truncate">{displayText}</span>
+          </a>
+        );
+      } catch {
+        return part;
+      }
+    }
+    return <span key={idx}>{part}</span>;
+  });
+}
+
 interface TaskDetailDrawerProps {
   task: AsanaTask;
   onClose: () => void;
@@ -73,6 +121,27 @@ export default function TaskDetailDrawer({
   isCompleting = false,
   showCompleteButton = true,
 }: TaskDetailDrawerProps) {
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [loadingSubtasks, setLoadingSubtasks] = useState(true);
+
+  // Fetch subtasks when task changes
+  useEffect(() => {
+    async function fetchSubtasks() {
+      setLoadingSubtasks(true);
+      try {
+        const response = await fetch(`/api/asana/tasks?action=subtasks&taskId=${task.gid}`);
+        const data = await response.json();
+        setSubtasks(data.subtasks || []);
+      } catch (error) {
+        console.error('Error fetching subtasks:', error);
+        setSubtasks([]);
+      } finally {
+        setLoadingSubtasks(false);
+      }
+    }
+    fetchSubtasks();
+  }, [task.gid]);
+
   const taskStatus = getTaskStatus(task);
   const statusColor = taskStatus === 'confirmed' ? COLORS.confirmed : taskStatus === 'placeholder' ? COLORS.placeholder : '#64748B';
   const region = getCustomField(task, 'Region');
@@ -89,6 +158,10 @@ export default function TaskDetailDrawer({
   const duration = startDate && endDate
     ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : 1;
+
+  // Calculate subtask progress
+  const completedSubtasks = subtasks.filter(st => st.completed).length;
+  const subtaskProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 0;
 
   return (
     <>
@@ -223,12 +296,72 @@ export default function TaskDetailDrawer({
             )}
           </div>
 
+          {/* Subtasks */}
+          {(subtasks.length > 0 || loadingSubtasks) && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[12px] font-medium text-[#64748B]">Subtasks</h4>
+                {subtasks.length > 0 && (
+                  <span className="text-[11px] text-[#8FA3BF]">
+                    {completedSubtasks}/{subtasks.length} complete
+                  </span>
+                )}
+              </div>
+              {loadingSubtasks ? (
+                <div className="bg-[#0F1722] rounded-xl p-4 flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="bg-[#0F1722] rounded-xl overflow-hidden">
+                  {/* Progress bar */}
+                  {subtasks.length > 0 && (
+                    <div className="px-4 pt-3 pb-2">
+                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${subtaskProgress}%` }}
+                          className="h-full bg-gradient-to-r from-[#22C55E] to-[#38BDF8] rounded-full"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {/* Subtask list */}
+                  <div className="divide-y divide-white/[0.04]">
+                    {subtasks.map((subtask) => (
+                      <div key={subtask.gid} className="px-4 py-2.5 flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                          subtask.completed ? 'bg-[#22C55E] border-[#22C55E]' : 'border-[#475569]'
+                        }`}>
+                          {subtask.completed && (
+                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className={`flex-1 text-[12px] ${
+                          subtask.completed ? 'text-[#64748B] line-through' : 'text-[#EAF2FF]'
+                        }`}>
+                          {subtask.name}
+                        </span>
+                        {subtask.assignee && (
+                          <span className="text-[10px] text-[#64748B]">
+                            {subtask.assignee.name.split(' ')[0]}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Notes */}
           {task.notes && (
             <div>
               <h4 className="text-[12px] font-medium text-[#64748B] mb-2">Notes</h4>
-              <div className="bg-[#0F1722] rounded-xl p-4 text-[13px] text-[#8FA3BF] whitespace-pre-wrap">
-                {task.notes}
+              <div className="bg-[#0F1722] rounded-xl p-4 text-[13px] text-[#8FA3BF] whitespace-pre-wrap break-words overflow-hidden">
+                {formatNotesWithLinks(task.notes)}
               </div>
             </div>
           )}

@@ -247,6 +247,15 @@ export async function getTask(taskId: string): Promise<AsanaTask> {
   return asanaFetch<AsanaTask>(`/tasks/${taskId}?opt_fields=${fields}`);
 }
 
+// Get subtasks for a task
+export async function getSubtasks(taskId: string): Promise<AsanaTask[]> {
+  const fields = [
+    'gid', 'name', 'completed', 'completed_at', 'due_on', 'assignee', 'assignee.name'
+  ].join(',');
+
+  return asanaFetch<AsanaTask[]>(`/tasks/${taskId}/subtasks?opt_fields=${fields}`, { allPages: true });
+}
+
 // Update task (e.g., mark as complete)
 export async function updateTask(
   taskId: string,
