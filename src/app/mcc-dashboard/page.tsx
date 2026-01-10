@@ -448,7 +448,7 @@ export default function MCCDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0B1220] relative overflow-hidden">
+    <div className="min-h-screen bg-[#0B1220] relative overflow-hidden">
       <DashboardBackground {...backgroundPresets.finance} />
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
       <div className="fixed inset-0 bg-gradient-to-b from-[#0F1722] via-[#0B1220] to-[#0B1220]" />
