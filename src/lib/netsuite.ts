@@ -464,6 +464,7 @@ export async function getDiversifiedSales(options: {
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
+      tl.id AS line_id,
       t.tranid,
       t.trandate,
       t.postingperiod,
@@ -512,7 +513,7 @@ export async function getDiversifiedSales(options: {
 
       records.push({
         netsuiteTransactionId: row.transaction_id?.toString() || '',
-        netsuiteLineId: '0',
+        netsuiteLineId: row.line_id?.toString() || '0',
         transactionType: 'Invoice',
         transactionNumber: row.tranid || '',
         transactionDate: row.trandate || '',
