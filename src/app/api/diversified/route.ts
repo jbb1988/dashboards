@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           className: classNameParam,
         });
 
-        // Group by customer + item to get item totals
+        // Group by customer + item to get item totals (use item_id as key, description for display)
         const customerItemMap = new Map<string, Map<string, { item_name: string; quantity: number; revenue: number }>>();
 
         for (const sale of classSales) {
@@ -65,9 +65,12 @@ export async function GET(request: NextRequest) {
           }
           const itemMap = customerItemMap.get(sale.customer_id)!;
 
-          const itemKey = sale.item_name || sale.item_id || 'Unknown';
+          // Use item_id as key for grouping, but display item_description (or fallback to item_name, then item_id)
+          const itemKey = sale.item_id || sale.item_name || 'Unknown';
+          const displayName = sale.item_description || sale.item_name || sale.item_id || 'Unknown Item';
+
           if (!itemMap.has(itemKey)) {
-            itemMap.set(itemKey, { item_name: itemKey, quantity: 0, revenue: 0 });
+            itemMap.set(itemKey, { item_name: displayName, quantity: 0, revenue: 0 });
           }
           const item = itemMap.get(itemKey)!;
           item.quantity += sale.quantity || 0;
@@ -109,7 +112,7 @@ export async function GET(request: NextRequest) {
           className: classNameParam,
         });
 
-        // Group by customer + item to get item totals
+        // Group by customer + item to get item totals (use item_id as key, description for display)
         const customerItemMap = new Map<string, Map<string, { item_name: string; quantity: number; revenue: number }>>();
 
         for (const sale of classSales) {
@@ -118,9 +121,12 @@ export async function GET(request: NextRequest) {
           }
           const itemMap = customerItemMap.get(sale.customer_id)!;
 
-          const itemKey = sale.item_name || sale.item_id || 'Unknown';
+          // Use item_id as key for grouping, but display item_description (or fallback to item_name, then item_id)
+          const itemKey = sale.item_id || sale.item_name || 'Unknown';
+          const displayName = sale.item_description || sale.item_name || sale.item_id || 'Unknown Item';
+
           if (!itemMap.has(itemKey)) {
-            itemMap.set(itemKey, { item_name: itemKey, quantity: 0, revenue: 0 });
+            itemMap.set(itemKey, { item_name: displayName, quantity: 0, revenue: 0 });
           }
           const item = itemMap.get(itemKey)!;
           item.quantity += sale.quantity || 0;

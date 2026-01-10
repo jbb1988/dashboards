@@ -167,7 +167,7 @@ function FilterChip({ label, selected, onClick, count }: {
   );
 }
 
-// Item Tooltip Component
+// Item Tooltip Component - styled to match Contracts Pipeline KEY DATES tooltip
 function ItemTooltip({
   customer,
   position
@@ -183,49 +183,71 @@ function ItemTooltip({
 
   // Adjust position to prevent tooltip from going off-screen
   const adjustedX = Math.min(position.x, typeof window !== 'undefined' ? window.innerWidth - 340 : position.x);
-  const adjustedY = Math.min(position.y, typeof window !== 'undefined' ? window.innerHeight - 250 : position.y);
+  const adjustedY = Math.min(position.y, typeof window !== 'undefined' ? window.innerHeight - 300 : position.y);
 
   if (!mounted) return null;
 
+  // Colors for item dots (cycle through)
+  const dotColors = ['#38BDF8', '#22C55E', '#F59E0B', '#A855F7', '#EC4899'];
+
   return createPortal(
     <motion.div
-      initial={{ opacity: 0, scale: 0.95, y: 5 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: 5 }}
-      transition={{ duration: 0.15 }}
-      className="fixed z-[9999] bg-[#1B1F39] border border-white/[0.08] rounded-xl shadow-2xl p-4 min-w-[280px] max-w-[320px]"
-      style={{
-        left: adjustedX,
-        top: adjustedY,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
-      }}
+      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
+      className="fixed z-[9999]"
+      style={{ left: adjustedX, top: adjustedY }}
     >
-      <div className="text-[11px] text-[#64748B] uppercase tracking-wider mb-3">
-        Items purchased by {customer.customer_name}
-      </div>
+      <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[280px] max-w-[380px]">
+        {/* Header */}
+        <div className="px-4 py-2.5 border-b border-white/[0.06] bg-gradient-to-r from-[#38BDF8]/10 to-transparent">
+          <span className="text-[10px] font-semibold text-[#38BDF8] uppercase tracking-wider">Items Purchased</span>
+        </div>
 
-      {customer.top_items && customer.top_items.length > 0 ? (
-        <>
-          <div className="space-y-2">
-            {customer.top_items.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between text-[13px]">
-                <span className="text-[#E2E8F0] truncate max-w-[160px]">{item.item_name}</span>
-                <div className="flex items-center gap-3 text-[#8FA3BF]">
-                  <span className="text-[11px] tabular-nums">{item.quantity.toLocaleString()} qty</span>
-                  <span className="font-medium tabular-nums">{formatCurrency(item.revenue)}</span>
+        {/* Items List */}
+        <div className="p-3 space-y-0">
+          {customer.top_items && customer.top_items.length > 0 ? (
+            <>
+              {customer.top_items.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors"
+                >
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{
+                      backgroundColor: dotColors[idx % dotColors.length],
+                      boxShadow: `0 0 6px ${dotColors[idx % dotColors.length]}50`
+                    }}
+                  />
+                  <span className="text-[12px] text-[#94A3B8] flex-1 truncate max-w-[180px]" title={item.item_name}>
+                    {item.item_name}
+                  </span>
+                  <span className="text-[11px] text-[#64748B] tabular-nums">
+                    {item.quantity.toLocaleString()} qty
+                  </span>
+                  <span className="text-[13px] font-medium text-[#E2E8F0] tabular-nums min-w-[70px] text-right">
+                    {formatCurrency(item.revenue)}
+                  </span>
                 </div>
-              </div>
-            ))}
-          </div>
-          {customer.item_count && customer.item_count > 5 && (
-            <div className="mt-3 pt-3 border-t border-white/[0.06] text-[11px] text-[#64748B]">
-              + {customer.item_count - 5} more items
-            </div>
+              ))}
+
+              {/* More items indicator */}
+              {customer.item_count && customer.item_count > 5 && (
+                <div className="flex items-center gap-3 py-2 px-1 mt-1 border-t border-white/[0.04]">
+                  <div className="w-2 h-2 rounded-full bg-[#475569]" />
+                  <span className="text-[11px] text-[#64748B] italic">
+                    + {customer.item_count - 5} more items
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="py-2 px-1 text-[12px] text-[#64748B] italic">No item data available</div>
           )}
-        </>
-      ) : (
-        <div className="text-[13px] text-[#64748B] italic">No item data available</div>
-      )}
+        </div>
+      </div>
     </motion.div>,
     document.body
   );
@@ -471,6 +493,7 @@ function LoadingSkeleton() {
 export default function DiversifiedDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // Light loading state for filter changes
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
@@ -490,10 +513,19 @@ export default function DiversifiedDashboard() {
   const [childData, setChildData] = useState<Array<ClassSummary | CustomerSummary>>([]);
   const [loadingChild, setLoadingChild] = useState(false);
 
+  // Debounce ref for filter changes
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Fetch dashboard data
-  const fetchData = async () => {
+  const fetchData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      // Use full loading skeleton only on initial load, lighter refresh indicator otherwise
+      if (isInitialLoad || !data) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
       const params = new URLSearchParams();
 
       if (selectedYears.length > 0) params.set('years', selectedYears.join(','));
@@ -517,6 +549,7 @@ export default function DiversifiedDashboard() {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -582,9 +615,31 @@ export default function DiversifiedDashboard() {
     }
   };
 
-  // Initial load and refresh on filter/tab change
+  // Initial load
   useEffect(() => {
-    fetchData();
+    fetchData(true);
+  }, []);
+
+  // Debounced refresh on filter/tab change
+  useEffect(() => {
+    // Clear any pending fetch
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Skip initial render (handled by initial load useEffect)
+    if (loading) return;
+
+    // Debounce filter changes by 300ms to avoid rapid API calls
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchData(false);
+    }, 300);
+
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, [selectedYears, selectedMonths, selectedClass, selectedCustomer, viewMode, activeTab]);
 
   // Fetch budget data on mount
@@ -637,7 +692,18 @@ export default function DiversifiedDashboard() {
             className="flex items-center justify-between mb-8"
           >
             <div>
-              <h1 className="text-3xl font-bold text-[#EAF2FF] tracking-tight">Diversified Products</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-[#EAF2FF] tracking-tight">Diversified Products</h1>
+                {refreshing && (
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#38BDF8]/10 border border-[#38BDF8]/20">
+                    <svg className="w-3.5 h-3.5 animate-spin text-[#38BDF8]" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span className="text-[11px] font-medium text-[#38BDF8]">Updating...</span>
+                  </div>
+                )}
+              </div>
               <p className="text-[#64748B] mt-1">
                 Sales performance by class and customer
                 {data?.lastUpdated && (
@@ -687,7 +753,7 @@ export default function DiversifiedDashboard() {
               <p className="font-medium mb-2">Error loading dashboard</p>
               <p className="text-[13px] opacity-80">{error}</p>
               <button
-                onClick={fetchData}
+                onClick={() => fetchData(true)}
                 className="mt-4 px-4 py-2 rounded-lg bg-[#EF4444]/20 hover:bg-[#EF4444]/30 transition-colors"
               >
                 Retry
@@ -883,7 +949,7 @@ export default function DiversifiedDashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.35 }}
-                className="rounded-xl bg-[#151F2E] border border-white/[0.04] overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
+                className={`rounded-xl bg-[#151F2E] border border-white/[0.04] overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.25)] relative transition-opacity duration-200 ${refreshing ? 'opacity-70' : ''}`}
               >
                 {/* Table Header */}
                 <div
