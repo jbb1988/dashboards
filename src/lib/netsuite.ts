@@ -435,8 +435,8 @@ function parseClassName(className: string): { category: string; parent: string }
 }
 
 /**
- * Fetch diversified sales data from NetSuite
- * Queries invoices and filters for Diversified Products classes
+ * Fetch diversified sales data from NetSuite using SuiteQL
+ * Queries transaction lines with Diversified Products class
  */
 export async function getDiversifiedSales(options: {
   startDate?: string;
@@ -446,129 +446,97 @@ export async function getDiversifiedSales(options: {
 } = {}): Promise<{ records: DiversifiedSaleRecord[]; total: number; hasMore: boolean }> {
   const { limit = 100, offset = 0 } = options;
 
-  // Build query filter for Diversified Products class
-  // NetSuite REST API uses q parameter for filtering
-  let query = 'class.name CONTAIN "Diversified"';
-
+  // Build SuiteQL query for transaction lines with Diversified class
+  let dateFilter = '';
   if (options.startDate) {
-    query += ` AND tranDate >= "${options.startDate}"`;
+    dateFilter += ` AND t.trandate >= TO_DATE('${options.startDate}', 'YYYY-MM-DD')`;
   }
   if (options.endDate) {
-    query += ` AND tranDate <= "${options.endDate}"`;
+    dateFilter += ` AND t.trandate <= TO_DATE('${options.endDate}', 'YYYY-MM-DD')`;
   }
 
-  const params: Record<string, string> = {
-    limit: limit.toString(),
-    offset: offset.toString(),
-    q: query,
-  };
+  // Query transaction lines joined with class info
+  const suiteQL = `
+    SELECT
+      t.id AS transaction_id,
+      t.tranid,
+      t.trandate,
+      t.postingperiod,
+      c.entityid AS customer_name,
+      c.id AS customer_id,
+      cl.name AS class_name,
+      tl.amount,
+      tl.quantity,
+      i.itemid AS item_name
+    FROM transactionline tl
+    INNER JOIN transaction t ON t.id = tl.transaction
+    LEFT JOIN customer c ON c.id = t.entity
+    LEFT JOIN classification cl ON cl.id = tl.class
+    LEFT JOIN item i ON i.id = tl.item
+    WHERE t.type = 'CustInvc'
+      AND cl.name LIKE '%Diversified%'
+      ${dateFilter}
+    ORDER BY t.trandate DESC
+  `;
 
   try {
-    // First get the list of invoices (header-level only)
-    const response = await netsuiteRequest<NetSuiteListResponse<NetSuiteInvoice>>(
-      '/services/rest/record/v1/invoice',
-      { params }
+    console.log('Executing SuiteQL query for diversified sales...');
+
+    const response = await netsuiteRequest<{ items: any[]; hasMore: boolean; totalResults: number }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: suiteQL },
+        params: { limit: limit.toString(), offset: offset.toString() },
+      }
     );
+
+    console.log(`SuiteQL returned ${response.items?.length || 0} rows`);
 
     const records: DiversifiedSaleRecord[] = [];
 
-    // Fetch each invoice individually to get line items
-    for (const invoiceHeader of response.items || []) {
-      try {
-        // Fetch full invoice with line items
-        const invoice = await getInvoice(invoiceHeader.id);
+    for (const row of response.items || []) {
+      const tranDate = new Date(row.trandate);
+      const year = tranDate.getFullYear();
+      const month = tranDate.getMonth() + 1;
 
-        const tranDate = new Date(invoice.tranDate);
-        const year = tranDate.getFullYear();
-        const month = tranDate.getMonth() + 1;
+      const className = row.class_name || 'Diversified Products';
+      const { category, parent } = parseClassName(className);
 
-        // Process line items if available
-        if (invoice.item?.items && invoice.item.items.length > 0) {
-          for (const lineItem of invoice.item.items) {
-            // Only include lines with Diversified class
-            const lineClassName = lineItem.class?.refName || invoice.class?.refName || '';
-            if (!lineClassName.toLowerCase().includes('diversified')) {
-              continue;
-            }
+      const revenue = parseFloat(row.amount) || 0;
 
-            const { category, parent } = parseClassName(lineClassName);
-            const revenue = lineItem.amount || 0;
-            const cost = lineItem.costEstimate || 0;
-            const grossProfit = revenue - cost;
-            const grossProfitPct = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
-
-            records.push({
-              netsuiteTransactionId: invoice.id,
-              netsuiteLineId: lineItem.line.toString(),
-              transactionType: 'Invoice',
-              transactionNumber: invoice.tranId,
-              transactionDate: invoice.tranDate,
-              postingPeriod: invoice.postingPeriod?.refName || '',
-              year,
-              month,
-              classId: lineItem.class?.id || invoice.class?.id || '',
-              className: lineClassName,
-              classCategory: category,
-              parentClass: parent,
-              customerId: invoice.entity?.id || '',
-              customerName: invoice.entity?.refName || '',
-              accountId: invoice.account?.id || '',
-              accountName: invoice.account?.refName || '',
-              quantity: lineItem.quantity || 0,
-              revenue,
-              cost,
-              grossProfit,
-              grossProfitPct: Math.round(grossProfitPct * 100) / 100,
-              itemId: lineItem.item?.id || '',
-              itemName: lineItem.item?.refName || '',
-              itemDescription: lineItem.description || '',
-            });
-          }
-        } else if (invoice.class?.refName?.toLowerCase().includes('diversified')) {
-          // Header-level class (no line items)
-          const className = invoice.class.refName;
-          const { category, parent } = parseClassName(className);
-          const revenue = invoice.total || 0;
-          const cost = 0;
-          const grossProfit = revenue - cost;
-
-          records.push({
-            netsuiteTransactionId: invoice.id,
-            netsuiteLineId: '0',
-            transactionType: 'Invoice',
-            transactionNumber: invoice.tranId,
-            transactionDate: invoice.tranDate,
-            postingPeriod: invoice.postingPeriod?.refName || '',
-            year,
-            month,
-            classId: invoice.class.id,
-            className,
-            classCategory: category,
-            parentClass: parent,
-            customerId: invoice.entity?.id || '',
-            customerName: invoice.entity?.refName || '',
-            accountId: invoice.account?.id || '',
-            accountName: invoice.account?.refName || '',
-            quantity: 1,
-            revenue,
-            cost,
-            grossProfit,
-            grossProfitPct: 0,
-            itemId: '',
-            itemName: '',
-            itemDescription: '',
-          });
-        }
-      } catch (err) {
-        console.warn(`Failed to fetch invoice ${invoiceHeader.id}:`, err);
-        // Continue with other invoices
-      }
+      records.push({
+        netsuiteTransactionId: row.transaction_id?.toString() || '',
+        netsuiteLineId: '0',
+        transactionType: 'Invoice',
+        transactionNumber: row.tranid || '',
+        transactionDate: row.trandate || '',
+        postingPeriod: row.postingperiod || '',
+        year,
+        month,
+        classId: '',
+        className,
+        classCategory: category,
+        parentClass: parent,
+        customerId: row.customer_id?.toString() || '',
+        customerName: row.customer_name || '',
+        accountId: '',
+        accountName: '',
+        quantity: parseInt(row.quantity) || 1,
+        revenue,
+        cost: 0,
+        grossProfit: revenue,
+        grossProfitPct: 100,
+        itemId: '',
+        itemName: row.item_name || '',
+        itemDescription: '',
+      });
     }
 
     return {
       records,
-      total: response.totalResults,
-      hasMore: response.hasMore,
+      total: response.totalResults || records.length,
+      hasMore: response.hasMore || false,
     };
   } catch (error) {
     console.error('Error fetching diversified sales:', error);
