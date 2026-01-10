@@ -100,3 +100,31 @@ export {
   type DistributionSegment,
   type UrgencyBarProps,
 } from './ProgressBar';
+
+// =============================================================================
+// DASHBOARD BACKGROUND COMPONENTS
+// =============================================================================
+
+export {
+  DashboardBackground,
+  backgroundPresets,
+  type DashboardBackgroundProps,
+} from './DashboardBackground';
+
+// =============================================================================
+// SKELETON LOADING COMPONENTS
+// =============================================================================
+
+export {
+  Skeleton,
+  SkeletonGroup,
+  KPICardSkeleton,
+  TableRowSkeleton,
+  CardSkeleton,
+  ListItemSkeleton,
+  ChartSkeleton,
+  DashboardSkeleton,
+  type SkeletonProps,
+  type SkeletonVariant,
+  type SkeletonGroupProps,
+} from './Skeleton';

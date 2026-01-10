@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH, useSidebar } from '@/components/Sidebar';
+import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 
 interface GuideTopic {
   id: string;
@@ -676,7 +677,8 @@ export default function GuideCategoryPage() {
 
   if (!guide) {
     return (
-      <div className="flex min-h-screen bg-[#0B1220]">
+      <div className="flex min-h-screen bg-[#0B1220] relative overflow-hidden">
+        <DashboardBackground {...backgroundPresets.guides} />
         <Sidebar />
         <motion.main
           animate={{
@@ -697,7 +699,8 @@ export default function GuideCategoryPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0B1220]">
+    <div className="flex min-h-screen bg-[#0B1220] relative overflow-hidden">
+      <DashboardBackground {...backgroundPresets.guides} />
       <Sidebar />
 
       <motion.main

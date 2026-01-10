@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH, useSidebar } from '@/components/Sidebar';
+import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 
 interface GuideCategory {
   id: string;
@@ -121,7 +122,8 @@ export default function GuidesPage() {
   const { isCollapsed } = useSidebar();
 
   return (
-    <div className="flex min-h-screen bg-[#0B1220]">
+    <div className="flex min-h-screen bg-[#0B1220] relative overflow-hidden">
+      <DashboardBackground {...backgroundPresets.guides} />
       <Sidebar />
 
       <motion.main
@@ -162,6 +164,7 @@ export default function GuidesPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
+                whileHover={{ y: -4, boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(56,189,248,0.15)' }}
               >
                 <Link href={category.href}>
                   <div

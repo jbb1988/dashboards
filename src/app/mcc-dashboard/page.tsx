@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
+import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 
 interface MCCCustomer {
   customer: string;
@@ -129,7 +130,7 @@ function CustomerRow({ customer, index, years, isSelected, onSelect, maxRevenue 
     >
       {/* At-risk accent line */}
       {isAtRisk && (
-        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#EF4444]" />
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#EF4444] animate-pulse" />
       )}
 
       <div
@@ -177,7 +178,7 @@ function CustomerRow({ customer, index, years, isSelected, onSelect, maxRevenue 
             className="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded-full text-[11px] font-semibold"
             style={{ backgroundColor: `${gpmColor}20`, color: gpmColor }}
           >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: gpmColor }} />
+            <span className={`w-1.5 h-1.5 rounded-full ${isAtRisk ? 'animate-pulse' : ''}`} style={{ background: gpmColor }} />
             {formatPercent(customer.avgGPM)}
           </span>
         </div>
@@ -492,7 +493,8 @@ export default function MCCDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1220]">
+    <div className="flex min-h-screen bg-[#0B1220] relative overflow-hidden">
+      <DashboardBackground {...backgroundPresets.finance} />
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
       <div className="fixed inset-0 bg-gradient-to-b from-[#0F1722] via-[#0B1220] to-[#0B1220]" />
 
@@ -669,7 +671,7 @@ export default function MCCDashboard() {
 
                 {/* Table Header */}
                 <div
-                  className="grid gap-4 px-6 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-[0.06em] border-b border-white/[0.04] bg-[#0B1220]"
+                  className="grid gap-4 px-6 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-[0.06em] border-b border-white/[0.04] bg-[#0B1220] sticky top-0 z-10 shadow-[0_1px_0_rgba(255,255,255,0.05)]"
                   style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}
                 >
                   <button

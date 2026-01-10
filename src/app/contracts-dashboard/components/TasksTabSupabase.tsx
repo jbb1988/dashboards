@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from '@/lib/supabase';
-import { KPICard, KPIIcons } from '@/components/KPICard';
+import { KPICard, KPIIcons } from '@/components/mars-ui';
 
 interface Contract {
   id: string;
@@ -341,10 +341,12 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           }}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
-          className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium flex-shrink-0"
+          className="p-1.5 rounded-lg hover:bg-red-500/20 text-[#64748B] hover:text-red-400 transition-colors flex-shrink-0"
           title="Delete task"
         >
-          ✕
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
         </motion.button>
       </motion.div>
     );
@@ -367,8 +369,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           color="#38BDF8"
           delay={0.1}
           isActive={filter === 'all'}
-          onClick={handleKPIClick}
-          filterKey="all"
+          onClick={() => handleKPIClick('all')}
         />
         <KPICard
           title="Overdue"
@@ -378,8 +379,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           color="#EF4444"
           delay={0.2}
           isActive={filter === 'overdue'}
-          onClick={handleKPIClick}
-          filterKey="overdue"
+          onClick={() => handleKPIClick('overdue')}
           badge={taskKpis.overdue > 0 ? taskKpis.overdue : undefined}
         />
         <KPICard
@@ -390,8 +390,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           color="#F59E0B"
           delay={0.3}
           isActive={filter === 'pending'}
-          onClick={handleKPIClick}
-          filterKey="pending"
+          onClick={() => handleKPIClick('pending')}
         />
         <KPICard
           title="Completed"
@@ -401,8 +400,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           color="#22C55E"
           delay={0.4}
           isActive={filter === 'completed'}
-          onClick={handleKPIClick}
-          filterKey="completed"
+          onClick={() => handleKPIClick('completed')}
         />
       </div>
 
@@ -790,10 +788,12 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                               e.stopPropagation();
                               deleteTask(task.id!);
                             }}
-                            className="px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium"
+                            className="p-1 rounded hover:bg-red-500/20 text-[#64748B] hover:text-red-400 transition-colors"
                             title="Delete task"
                           >
-                            ✕
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                         </div>
                       </motion.div>

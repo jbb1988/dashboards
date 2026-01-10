@@ -11,6 +11,7 @@ import { StageProgressCompact } from './components/StageProgressDots';
 import TaskBadge from './components/TaskBadge';
 import TasksTabSupabase from './components/TasksTabSupabase';
 import BundleModal from './components/BundleModal';
+import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 
 // Types
 interface BundleInfo {
@@ -1938,7 +1939,8 @@ export default function ContractsDashboard() {
   if (!data) return null;
 
   return (
-    <div className="min-h-screen bg-[#0F1722]">
+    <div className="min-h-screen bg-[#0F1722] relative overflow-hidden">
+      <DashboardBackground {...backgroundPresets.contracts} />
       {/* Command Palette */}
       <CommandPalette
         isOpen={commandPaletteOpen}

@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
+import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 import SmartProjectsTab from '@/components/SmartProjectsTab';
+import TaskDetailDrawer from '@/components/TaskDetailDrawer';
+import DocuSignDetailDrawer from '@/components/DocuSignDetailDrawer';
 
 type TabType = 'smart' | 'timeline' | 'mcc' | 'punchlist' | 'docusign';
 
@@ -249,15 +252,13 @@ function GanttBar({
   startCol,
   spanCols,
   row,
-  onHover,
-  onLeave
+  onClick
 }: {
   task: AsanaTask;
   startCol: number;
   spanCols: number;
   row: number;
-  onHover: (task: AsanaTask, e: React.MouseEvent) => void;
-  onLeave: () => void;
+  onClick: (task: AsanaTask) => void;
 }) {
   const taskStatus = getTaskStatus(task);
   const bgColor = taskStatus === 'confirmed' ? ASANA_COLORS.confirmed :
@@ -269,7 +270,7 @@ function GanttBar({
 
   return (
     <div
-      className={`absolute h-[22px] rounded cursor-pointer transition-all duration-100 flex items-center px-2 overflow-hidden group
+      className={`absolute h-[22px] rounded cursor-pointer transition-all duration-100 flex items-center px-2 overflow-hidden group hover:brightness-110 hover:scale-[1.02]
         ${overdue ? 'ring-2 ring-[#EF4444] ring-offset-1 ring-offset-[#151F2E]' : ''}
         ${dueToday ? 'ring-2 ring-[#F59E0B] ring-offset-1 ring-offset-[#151F2E] animate-pulse' : ''}
         ${dueSoon && !dueToday ? 'border-l-4 border-l-[#F59E0B]' : ''}
@@ -280,8 +281,7 @@ function GanttBar({
         top: `${28 + row * 26}px`,
         backgroundColor: bgColor,
       }}
-      onMouseEnter={(e) => onHover(task, e)}
-      onMouseLeave={onLeave}
+      onClick={() => onClick(task)}
     >
       <span className="text-[10px] text-white font-medium truncate">
         {task.name}
@@ -296,12 +296,24 @@ function GanttBar({
 }
 
 // Timeline Tab - Calendar focused view with Gantt bars
-function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boolean }) {
+function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | null; loading: boolean; onTaskComplete?: (taskId: string, completed: boolean) => Promise<void> }) {
   const [scheduleFilter, setScheduleFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter' | 'all'>('month');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
-  const [hoveredTask, setHoveredTask] = useState<{ task: AsanaTask; position: { x: number; y: number } } | null>(null);
+  const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+
+  const handleTaskComplete = useCallback(async (taskId: string) => {
+    if (!onTaskComplete || completingTaskId) return;
+    setCompletingTaskId(taskId);
+    try {
+      await onTaskComplete(taskId, true);
+      setSelectedTask(null);
+    } finally {
+      setCompletingTaskId(null);
+    }
+  }, [onTaskComplete, completingTaskId]);
 
   // Check if viewing current month
   const isCurrentMonth = useMemo(() => {
@@ -544,16 +556,8 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
     return rows;
   };
 
-  const handleTaskHover = (task: AsanaTask, e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoveredTask({
-      task,
-      position: { x: rect.left + rect.width / 2, y: rect.top }
-    });
-  };
-
-  const handleTaskLeave = () => {
-    setHoveredTask(null);
+  const handleTaskClick = (task: AsanaTask) => {
+    setSelectedTask(task);
   };
 
   if (loading || !data) {
@@ -712,8 +716,7 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
                     startCol={startCol}
                     spanCols={spanCols}
                     row={row}
-                    onHover={handleTaskHover}
-                    onLeave={handleTaskLeave}
+                    onClick={handleTaskClick}
                   />
                 ))}
               </div>
@@ -722,13 +725,15 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
         </div>
       )}
 
-      {/* Tooltip */}
+      {/* Task Detail Drawer */}
       <AnimatePresence>
-        {hoveredTask && (
-          <TaskTooltip
-            task={hoveredTask.task}
-            position={hoveredTask.position}
-            onClose={handleTaskLeave}
+        {selectedTask && (
+          <TaskDetailDrawer
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onComplete={onTaskComplete ? handleTaskComplete : undefined}
+            isCompleting={completingTaskId === selectedTask.gid}
+            showCompleteButton={!!onTaskComplete}
           />
         )}
       </AnimatePresence>
@@ -756,7 +761,7 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
                                           taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : null;
 
                       return (
-                        <div key={task.gid} className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`}>
+                        <div key={task.gid} onClick={() => handleTaskClick(task)} className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors cursor-pointer group`}>
                           {/* Status Indicator */}
                           {statusColor && (
                             <div className="w-1 h-8 rounded-full" style={{ backgroundColor: statusColor }} />
@@ -774,7 +779,7 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
 
                           {/* Task Name */}
                           <div className="flex-1 min-w-0">
-                            <div className="text-[13px] text-[#EAF2FF] truncate">{task.name}</div>
+                            <div className="text-[13px] text-[#EAF2FF] truncate group-hover:text-[#E16259]">{task.name}</div>
                             <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
                           </div>
 
@@ -795,6 +800,11 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
 
                           {/* Region */}
                           {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
+
+                          {/* Arrow indicator */}
+                          <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
                         </div>
                       );
                     })}
@@ -810,10 +820,23 @@ function TimelineTab({ data, loading }: { data: ProjectData | null; loading: boo
 }
 
 // MCC Status Tab - Date and status focused
-function MCCStatusTab({ data, loading }: { data: ProjectData | null; loading: boolean }) {
+function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | null; loading: boolean; onTaskComplete?: (taskId: string, completed: boolean) => Promise<void> }) {
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'region' | 'status'>('date');
+  const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+
+  const handleTaskComplete = useCallback(async (taskId: string) => {
+    if (!onTaskComplete || completingTaskId) return;
+    setCompletingTaskId(taskId);
+    try {
+      await onTaskComplete(taskId, true);
+      setSelectedTask(null);
+    } finally {
+      setCompletingTaskId(null);
+    }
+  }, [onTaskComplete, completingTaskId]);
 
   // Get unique values for filters
   const { regions, categories } = useMemo(() => {
@@ -906,13 +929,14 @@ function MCCStatusTab({ data, loading }: { data: ProjectData | null; loading: bo
 
       {/* MCC Table */}
       <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-        <div className="grid gap-4 px-5 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-wider border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '100px 2fr 100px 100px 120px 100px' }}>
+        <div className="grid gap-4 px-5 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-wider border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '100px 2fr 100px 100px 120px 100px 24px' }}>
           <div>Dates</div>
           <div>MCC Name</div>
           <div>Region</div>
           <div>Category</div>
           <div>Status</div>
           <div>Sales Lead</div>
+          <div></div>
         </div>
         <div className="max-h-[500px] overflow-y-auto">
           {filteredTasks.map((task, idx) => {
@@ -925,7 +949,7 @@ function MCCStatusTab({ data, loading }: { data: ProjectData | null; loading: bo
             const dueSoon = isDueSoon(task.dueOn);
 
             return (
-              <div key={task.gid} className={`grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`} style={{ gridTemplateColumns: '100px 2fr 100px 100px 120px 100px' }}>
+              <div key={task.gid} onClick={() => setSelectedTask(task)} className={`grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors cursor-pointer group`} style={{ gridTemplateColumns: '100px 2fr 100px 100px 120px 100px 24px' }}>
                 {/* Dates */}
                 <div>
                   <div className={`text-[12px] font-medium ${overdue ? 'text-[#EF4444]' : dueSoon ? 'text-[#F59E0B]' : 'text-[#EAF2FF]'}`}>
@@ -938,7 +962,7 @@ function MCCStatusTab({ data, loading }: { data: ProjectData | null; loading: bo
 
                 {/* Name */}
                 <div>
-                  <div className="text-[13px] text-[#EAF2FF] truncate">{task.name}</div>
+                  <div className="text-[13px] text-[#EAF2FF] truncate group-hover:text-[#E16259]">{task.name}</div>
                   {docuSign && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FFD700]/20 text-[#FFD700] mt-1 inline-block">DocuSign: {docuSign}</span>}
                 </div>
 
@@ -955,18 +979,49 @@ function MCCStatusTab({ data, loading }: { data: ProjectData | null; loading: bo
 
                 {/* Sales Lead */}
                 <div className="text-[11px] text-[#8FA3BF]">{salesLead || '-'}</div>
+
+                {/* Arrow */}
+                <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Task Detail Drawer */}
+      <AnimatePresence>
+        {selectedTask && (
+          <TaskDetailDrawer
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onComplete={onTaskComplete ? handleTaskComplete : undefined}
+            isCompleting={completingTaskId === selectedTask.gid}
+            showCompleteButton={!!onTaskComplete}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 // Punch List Tab
-function PunchListTab({ data, loading }: { data: ProjectData | null; loading: boolean }) {
+function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | null; loading: boolean; onTaskComplete?: (taskId: string, completed: boolean) => Promise<void> }) {
   const [showCompleted, setShowCompleted] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+
+  const handleTaskComplete = useCallback(async (taskId: string) => {
+    if (!onTaskComplete || completingTaskId) return;
+    setCompletingTaskId(taskId);
+    try {
+      await onTaskComplete(taskId, true);
+      setSelectedTask(null);
+    } finally {
+      setCompletingTaskId(null);
+    }
+  }, [onTaskComplete, completingTaskId]);
 
   const { groupedTasks, progress } = useMemo(() => {
     if (!data) return { groupedTasks: {}, progress: 0 };
@@ -1023,18 +1078,34 @@ function PunchListTab({ data, loading }: { data: ProjectData | null; loading: bo
           </div>
           <div className="divide-y divide-white/[0.03]">
             {tasks.map((task, idx) => (
-              <div key={task.gid} className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'}`}>
+              <div key={task.gid} onClick={() => setSelectedTask(task)} className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors cursor-pointer group`}>
                 <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${task.completed ? 'bg-[#22C55E] border-[#22C55E]' : 'border-[#475569]'}`}>
                   {task.completed && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                 </div>
-                <div className={`flex-1 text-[13px] ${task.completed ? 'text-[#64748B] line-through' : 'text-[#EAF2FF]'}`}>{task.name}</div>
+                <div className={`flex-1 text-[13px] ${task.completed ? 'text-[#64748B] line-through' : 'text-[#EAF2FF] group-hover:text-[#E16259]'}`}>{task.name}</div>
                 <div className="text-[11px] text-[#8FA3BF]">{task.assignee?.name || <span className="text-[#475569]">Unassigned</span>}</div>
                 <div className={`text-[11px] ${isOverdue(task.dueOn) ? 'text-[#EF4444]' : 'text-[#64748B]'}`}>{formatShortDate(task.dueOn)}</div>
+                <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </div>
             ))}
           </div>
         </div>
       ))}
+
+      {/* Task Detail Drawer */}
+      <AnimatePresence>
+        {selectedTask && (
+          <TaskDetailDrawer
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onComplete={onTaskComplete ? handleTaskComplete : undefined}
+            isCompleting={completingTaskId === selectedTask.gid}
+            showCompleteButton={!!onTaskComplete && !selectedTask.completed}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1044,6 +1115,7 @@ function PunchListTab({ data, loading }: { data: ProjectData | null; loading: bo
 function DocuSignTab({ data, loading }: { data: DocuSignData | null; loading: boolean }) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showVoided, setShowVoided] = useState<boolean>(false);
+  const [selectedEnvelope, setSelectedEnvelope] = useState<DocuSignEnvelope | null>(null);
 
   const filteredEnvelopes = useMemo(() => {
     if (!data) return [];
@@ -1159,13 +1231,13 @@ function DocuSignTab({ data, loading }: { data: DocuSignData | null; loading: bo
 
       {/* Envelope List */}
       <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-        <div className="grid gap-4 px-5 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-wider border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 90px 100px 100px 80px 150px' }}>
+        <div className="grid gap-4 px-5 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-wider border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 90px 100px 100px 80px 24px' }}>
           <div>Document</div>
           <div>Status</div>
           <div>Sent</div>
           <div>Completed</div>
           <div>Sender</div>
-          <div>Actions</div>
+          <div></div>
         </div>
         <div className="max-h-[500px] overflow-y-auto">
           {filteredEnvelopes.map((envelope, idx) => {
@@ -1173,37 +1245,32 @@ function DocuSignTab({ data, loading }: { data: DocuSignData | null; loading: bo
             const label = getStatusLabel(envelope.status);
 
             return (
-              <div key={envelope.envelopeId} className={`grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors`} style={{ gridTemplateColumns: '2fr 90px 100px 100px 80px 150px' }}>
-                <div className="text-[13px] text-[#EAF2FF] truncate">{envelope.emailSubject}</div>
+              <div key={envelope.envelopeId} onClick={() => setSelectedEnvelope(envelope)} className={`grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors cursor-pointer group`} style={{ gridTemplateColumns: '2fr 90px 100px 100px 80px 24px' }}>
+                <div className="text-[13px] text-[#EAF2FF] truncate group-hover:text-[#FFD700]">{envelope.emailSubject}</div>
                 <div>
                   <span className="text-[10px] px-2 py-1 rounded font-medium" style={{ backgroundColor: `${color}20`, color }}>{label}</span>
                 </div>
                 <div className="text-[11px] text-[#8FA3BF]">{formatDate(envelope.sentDateTime || null)}</div>
                 <div className="text-[11px] text-[#8FA3BF]">{formatDate(envelope.completedDateTime || envelope.declinedDateTime || null)}</div>
                 <div className="text-[11px] text-[#8FA3BF]">{envelope.sender?.userName?.split(' ')[0] || '-'}</div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleViewInDocuSign(envelope.envelopeId)}
-                    className="text-[10px] px-2 py-1 rounded bg-[#38BDF8]/10 text-[#38BDF8] hover:bg-[#38BDF8]/20 transition-colors"
-                    title="View in DocuSign"
-                  >
-                    View
-                  </button>
-                  {['completed', 'signed'].includes(envelope.status) && (
-                      <button
-                        onClick={() => handleDownload(envelope.envelopeId)}
-                        className="text-[10px] px-2 py-1 rounded bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20 transition-colors"
-                        title="Download PDF"
-                      >
-                        PDF
-                      </button>
-                  )}
-                </div>
+                <svg className="w-4 h-4 text-[#475569] group-hover:text-[#FFD700] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* DocuSign Detail Drawer */}
+      <AnimatePresence>
+        {selectedEnvelope && (
+          <DocuSignDetailDrawer
+            envelope={selectedEnvelope}
+            onClose={() => setSelectedEnvelope(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1305,9 +1372,9 @@ export default function PMDashboard() {
   const isLoading = Object.values(loading).some(l => l);
 
   return (
-    <div className="min-h-screen bg-[#0F1722]">
+    <div className="min-h-screen bg-[#0F1722] relative overflow-hidden">
+      <DashboardBackground {...backgroundPresets.pm} />
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
-      <div className="fixed inset-0 bg-[#0F1722]" />
 
       <motion.div
         className="relative z-10 text-white"
@@ -1352,9 +1419,9 @@ export default function PMDashboard() {
           <AnimatePresence mode="wait">
             <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }}>
               {activeTab === 'smart' && <SmartProjectsTab data={timelineData} loading={loading.timeline} onTaskComplete={handleTaskComplete} />}
-              {activeTab === 'timeline' && <TimelineTab data={timelineData} loading={loading.timeline} />}
-              {activeTab === 'mcc' && <MCCStatusTab data={mccData} loading={loading.mcc} />}
-              {activeTab === 'punchlist' && <PunchListTab data={punchlistData} loading={loading.punchlist} />}
+              {activeTab === 'timeline' && <TimelineTab data={timelineData} loading={loading.timeline} onTaskComplete={handleTaskComplete} />}
+              {activeTab === 'mcc' && <MCCStatusTab data={mccData} loading={loading.mcc} onTaskComplete={handleTaskComplete} />}
+              {activeTab === 'punchlist' && <PunchListTab data={punchlistData} loading={loading.punchlist} onTaskComplete={handleTaskComplete} />}
               {activeTab === 'docusign' && <DocuSignTab data={docusignData} loading={loading.docusign} />}
             </motion.div>
           </AnimatePresence>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
+import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 
 interface LineItem {
   itemNumber: string;
@@ -157,7 +158,7 @@ function KPICard({ title, value, subtitle, icon, color, trend, trendValue }: {
       <div className="flex items-start justify-between mb-3">
         <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-[0.08em]">{title}</span>
         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}10` }}>
-          <span style={{ color }} className="opacity-40">{icon}</span>
+          <span style={{ color }} className="opacity-70">{icon}</span>
         </div>
       </div>
 
@@ -207,7 +208,7 @@ function ProjectRow({ project, index, isSelected, onSelect }: {
     >
       {/* Negative variance accent line - left edge only */}
       {isAtRisk && (
-        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#EF4444]" />
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#EF4444] animate-pulse" />
       )}
       <div
         onClick={() => {
@@ -585,7 +586,8 @@ export default function CloseoutDashboard() {
   const maxTypeRevenue = Math.max(...data.typeBreakdown.map(t => t.revenue));
 
   return (
-    <div className="min-h-screen bg-[#0B1220]">
+    <div className="min-h-screen bg-[#0B1220] relative overflow-hidden">
+      <DashboardBackground {...backgroundPresets.finance} />
       {/* Global Sidebar */}
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
@@ -762,7 +764,7 @@ export default function CloseoutDashboard() {
 
               {/* Table Header */}
               <div
-                className="grid gap-4 px-6 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-[0.06em] border-b border-white/[0.04] bg-[#0B1220]"
+                className="grid gap-4 px-6 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-[0.06em] border-b border-white/[0.04] bg-[#151F2E] sticky top-0 z-10 shadow-[0_1px_0_rgba(255,255,255,0.05)]"
                 style={{ gridTemplateColumns: '2fr 0.8fr 1fr 1fr 1fr 0.8fr 0.8fr' }}
               >
                 <div>Project</div>

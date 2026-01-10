@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
+import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 
 interface User {
   id: string;
@@ -192,7 +193,8 @@ export default function AdminPage() {
   const marginLeft = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
-    <div className="min-h-screen bg-[#0B1220]">
+    <div className="min-h-screen bg-[#0B1220] relative overflow-hidden">
+      <DashboardBackground {...backgroundPresets.admin} />
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
       <main
@@ -234,7 +236,7 @@ export default function AdminPage() {
           {/* Users Table */}
           {!loading && !error && (
             <div className="bg-[#151F2E] rounded-xl border border-white/[0.04] overflow-hidden">
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-6 py-4 bg-[#0F1722] border-b border-white/[0.04] text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-6 py-4 bg-[#0F1722] border-b border-white/[0.04] text-[11px] font-semibold text-[#64748B] uppercase tracking-wider sticky top-0 z-10 shadow-[0_1px_0_rgba(255,255,255,0.05)]">
                 <div>User</div>
                 <div>Role</div>
                 <div>Created</div>
@@ -292,27 +294,33 @@ export default function AdminPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      <button
+                      <motion.button
                         onClick={() => {
                           setEditingUser(user);
                           setEditRole(user.role);
                         }}
                         className="p-2 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded-lg transition-colors"
                         title="Edit role"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.1 }}
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
                         onClick={() => setDeletingUser(user)}
                         className="p-2 text-[#64748B] hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                         title="Delete user"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.1 }}
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
-                      </button>
+                      </motion.button>
                     </div>
                   </motion.div>
                 ))
