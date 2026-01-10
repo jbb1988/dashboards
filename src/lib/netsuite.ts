@@ -463,13 +463,13 @@ export async function getDiversifiedSales(options: {
     dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
   }
 
-  // Query TransactionLine filtered by Class, only rows with netamount (excludes $0 lines)
-  // The 414x accounts are no longer used (stopped Oct 2023), so we filter by Class instead
-  // Added costestimate field to get actual COGS data for GP% calculation
+  // Query TransactionLine filtered by Diversified Products class hierarchy
+  // Diversified Products (class_id=18) and children (parent=18), plus RCM (class_id=17 for AMR-RCMS)
+  // Revenue accounts: 4131 (AMR-RCMS), 4140-4148 (Diversified Products)
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
-      tl.uniquekey AS line_id,
+      tl.id AS line_id,
       t.tranid,
       t.trandate,
       BUILTIN.DF(t.postingperiod) AS posting_period,
@@ -482,16 +482,23 @@ export async function getDiversifiedSales(options: {
       tl.costestimate,
       BUILTIN.DF(tl.item) AS item_name,
       tl.item AS item_id,
-      t.type AS transaction_type
-    FROM TransactionLine tl
-    INNER JOIN Transaction t ON t.id = tl.transaction
+      t.type AS transaction_type,
+      c.parent AS class_parent_id,
+      BUILTIN.DF(c.parent) AS class_parent_name
+    FROM Transaction t
+    INNER JOIN TransactionLine tl ON tl.transaction = t.id
+    LEFT JOIN Classification c ON c.id = tl.class
     WHERE t.posting = 'T'
       AND tl.mainline = 'F'
-      AND tl.class IN (SELECT id FROM Classification WHERE fullname LIKE 'Diversified%' OR fullname LIKE 'RCM%')
       AND tl.netamount IS NOT NULL
-      AND tl.netamount <> 0
+      AND tl.netamount != 0
+      AND (
+        tl.class = 18
+        OR c.parent = 18
+        OR tl.class = 17
+      )
       ${dateFilter}
-    ORDER BY t.trandate DESC, t.id, tl.uniquekey
+    ORDER BY t.trandate DESC, t.id, tl.id
   `;
 
   try {
@@ -525,14 +532,17 @@ export async function getDiversifiedSales(options: {
       const className = row.class_name || 'Diversified Products';
       const { category, parent } = parseClassName(className);
 
-      // Revenue from TransactionLine.netamount (negative for sales, so use Math.abs)
+      // Revenue from TransactionLine.netamount (negative for sales credits, positive for sales)
       const netamount = parseFloat(row.netamount) || 0;
       const quantity = Math.abs(parseInt(row.quantity) || 0);
       // Cost from TransactionLine.costestimate (actual COGS)
       const costestimate = Math.abs(parseFloat(row.costestimate) || 0);
 
-      // Group key to combine multiple accounting lines per transaction line
+      // Group key by transaction + line
       const groupKey = `${row.transaction_id}-${row.line_id}`;
+
+      // Determine parent class from hierarchy
+      const parentClassName = row.class_parent_name || 'Diversified Products';
 
       if (!grouped[groupKey]) {
         grouped[groupKey] = {
@@ -547,11 +557,11 @@ export async function getDiversifiedSales(options: {
           classId: row.class_id?.toString() || '',
           className,
           classCategory: category,
-          parentClass: parent,
+          parentClass: parentClassName,
           customerId: row.customer_id?.toString() || '',
           customerName: row.customer_name || '',
-          accountId: row.acctnumber || '',
-          accountName: '',
+          accountId: '',  // Not used in this query
+          accountName: '',  // Not used in this query
           quantity,
           revenue: 0,
           cost: 0,
@@ -563,7 +573,8 @@ export async function getDiversifiedSales(options: {
         };
       }
 
-      // Add revenue and cost (netamount is negative for sales, so use Math.abs)
+      // Add revenue (netamount should be positive for sales)
+      // Note: NetSuite netamount is typically negative for credits, positive for sales
       grouped[groupKey].revenue += Math.abs(netamount);
       grouped[groupKey].cost += costestimate;
     }
