@@ -222,62 +222,60 @@ export function CustomerDonut({ data, index = 0 }: CustomerDonutProps) {
         </div>
       )}
 
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={chartData}
-            cx="40%"
-            cy="50%"
-            innerRadius={55}
-            outerRadius={90}
-            paddingAngle={2}
-            dataKey="value"
-            labelLine={false}
-            label={renderCustomizedLabel}
-            animationDuration={1000}
-            animationEasing="ease-out"
-          >
-            {chartData.map((entry, idx) => (
-              <Cell
-                key={`cell-${idx}`}
-                fill={entry.color}
-                stroke="rgba(0,0,0,0.3)"
-                strokeWidth={1}
-              />
-            ))}
-          </Pie>
-          <Tooltip content={<CustomTooltip />} />
-          <Legend
-            layout="vertical"
-            align="right"
-            verticalAlign="middle"
-            formatter={(value) => <span style={{ color: '#94A3B8', fontSize: 11 }}>{value}</span>}
-            wrapperStyle={{ paddingLeft: 10, right: 0 }}
-          />
-          {/* Center label */}
-          <text
-            x="40%"
-            y="46%"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#EAF2FF"
-            fontSize={16}
-            fontWeight={700}
-          >
-            {formatChartCurrency(totalRevenue)}
-          </text>
-          <text
-            x="40%"
-            y="56%"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#64748B"
-            fontSize={10}
-          >
-            Total Revenue
-          </text>
-        </PieChart>
-      </ResponsiveContainer>
+      <div className="relative w-full h-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="40%"
+              cy="50%"
+              innerRadius={55}
+              outerRadius={90}
+              paddingAngle={2}
+              dataKey="value"
+              labelLine={false}
+              label={renderCustomizedLabel}
+              animationDuration={1000}
+              animationEasing="ease-out"
+            >
+              {chartData.map((entry, idx) => (
+                <Cell
+                  key={`cell-${idx}`}
+                  fill={entry.color}
+                  stroke="rgba(0,0,0,0.3)"
+                  strokeWidth={1}
+                />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+            <Legend
+              layout="vertical"
+              align="right"
+              verticalAlign="middle"
+              formatter={(value) => <span style={{ color: '#94A3B8', fontSize: 11 }}>{value}</span>}
+              wrapperStyle={{ paddingLeft: 10, right: 0 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+        {/* Center label - positioned absolutely to ensure visibility */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: '40%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <div className="text-center">
+            <div className="text-[#EAF2FF] text-[16px] font-bold">
+              {formatChartCurrency(totalRevenue)}
+            </div>
+            <div className="text-[#64748B] text-[10px]">
+              Total Revenue
+            </div>
+          </div>
+        </div>
+      </div>
     </ChartContainer>
   );
 }
