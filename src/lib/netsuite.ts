@@ -463,8 +463,8 @@ export async function getDiversifiedSales(options: {
     dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
   }
 
-  // Query TransactionLine with Class filter for Diversified Products
-  // Use subquery to get all Diversified class IDs including sub-classes
+  // Query TransactionLine with Class filter for Diversified Products and RCM
+  // Use subquery to get all class IDs including sub-classes
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -487,7 +487,7 @@ export async function getDiversifiedSales(options: {
     INNER JOIN Transaction t ON t.id = tl.transaction
     WHERE t.posting = 'T'
       AND tl.mainline = 'F'
-      AND tl.class IN (SELECT id FROM Classification WHERE fullname LIKE 'Diversified%')
+      AND tl.class IN (SELECT id FROM Classification WHERE fullname LIKE 'Diversified%' OR fullname LIKE 'RCM%')
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.uniquekey
   `;
@@ -621,11 +621,11 @@ export async function testSuiteQLAccess(): Promise<{ success: boolean; data: any
     );
     console.log('Account query result:', accountResult.items?.length || 0, 'rows');
 
-    // Test 2: Query Classification table to see all Diversified classes
+    // Test 2: Query Classification table to see all relevant classes
     const classQuery = `
       SELECT id, name, fullname, parent
       FROM Classification
-      WHERE fullname LIKE 'Diversified%'
+      WHERE fullname LIKE 'Diversified%' OR fullname LIKE 'RCM%' OR fullname LIKE 'AMR%'
       ORDER BY fullname
     `;
 
