@@ -203,20 +203,20 @@ function ExpandableRow({
             ▶
           </motion.span>
           <div>
-            <div className="font-medium text-[#EAF2FF] text-[13px]">{name}</div>
-            {category && <div className="text-[10px] text-[#64748B]">{category}</div>}
+            <div className="font-medium text-[#EAF2FF] text-[14px]">{name}</div>
+            {category && <div className="text-[11px] text-[#64748B]">{category}</div>}
           </div>
         </div>
 
         {/* Units */}
         <div className="text-right">
-          <div className="text-[#CBD5E1] font-semibold text-[13px]">{formatNumber(data.total_units)}</div>
-          <div className="text-[10px] text-[#64748B]">units</div>
+          <div className="text-[#CBD5E1] font-semibold text-[14px]">{formatNumber(data.total_units)}</div>
+          <div className="text-[11px] text-[#64748B]">units</div>
         </div>
 
         {/* Revenue */}
         <div className="text-right">
-          <div className="text-[#CBD5E1] font-semibold text-[13px]">{formatCurrency(data.total_revenue)}</div>
+          <div className="text-[#CBD5E1] font-semibold text-[14px]">{formatCurrency(data.total_revenue)}</div>
           <div className="w-16 h-[3px] rounded-full bg-white/10 overflow-hidden mt-1 ml-auto">
             <div
               className="h-full rounded-full bg-[#38BDF8]"
@@ -227,20 +227,20 @@ function ExpandableRow({
 
         {/* Cost */}
         <div className="text-right">
-          <div className="text-[#CBD5E1] font-semibold text-[13px]">{formatCurrency(data.total_cost)}</div>
-          <div className="text-[10px] text-[#64748B]">COGS</div>
+          <div className="text-[#CBD5E1] font-semibold text-[14px]">{formatCurrency(data.total_cost)}</div>
+          <div className="text-[11px] text-[#64748B]">COGS</div>
         </div>
 
         {/* Gross Profit */}
         <div className="text-right">
-          <div className="text-[#CBD5E1] font-semibold text-[13px]">{formatCurrency(data.total_gross_profit)}</div>
-          <div className="text-[10px] text-[#64748B]">GP</div>
+          <div className="text-[#CBD5E1] font-semibold text-[14px]">{formatCurrency(data.total_gross_profit)}</div>
+          <div className="text-[11px] text-[#64748B]">GP</div>
         </div>
 
         {/* GP% */}
         <div className="text-center">
           <span
-            className="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded-full text-[11px] font-semibold"
+            className="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded-full text-[12px] font-semibold"
             style={{ backgroundColor: `${gpColor}20`, color: gpColor }}
           >
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: gpColor }} />
@@ -262,7 +262,7 @@ function ExpandableRow({
             <div className="mx-4 mb-4 rounded-lg bg-[#0B1220] border border-white/[0.04] shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)] overflow-hidden">
               {/* Child Header */}
               <div
-                className="grid gap-4 px-4 py-2 bg-[#0F172A] border-b border-white/[0.04] text-[10px] font-semibold text-[#64748B] uppercase tracking-wider"
+                className="grid gap-4 px-4 py-2 bg-[#0F172A] border-b border-white/[0.04] text-[11px] font-semibold text-[#64748B] uppercase tracking-wider"
                 style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px' }}
               >
                 <div>{type === 'class' ? 'Customer' : 'Class'}</div>
@@ -286,14 +286,14 @@ function ExpandableRow({
                     className={`grid gap-4 px-4 py-2.5 ${idx % 2 === 0 ? 'bg-[#0B1220]' : 'bg-[#0F1729]'} hover:bg-[#1a2740] transition-colors`}
                     style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px' }}
                   >
-                    <div className="text-[12px] text-[#CBD5E1]">{childName}</div>
-                    <div className="text-right text-[12px] text-[#94A3B8]">{formatNumber(child.total_units)}</div>
-                    <div className="text-right text-[12px] text-[#94A3B8]">{formatCurrency(child.total_revenue)}</div>
-                    <div className="text-right text-[12px] text-[#94A3B8]">{formatCurrency(child.total_cost)}</div>
-                    <div className="text-right text-[12px] text-[#94A3B8]">{formatCurrency(child.total_gross_profit)}</div>
+                    <div className="text-[13px] text-[#CBD5E1]">{childName}</div>
+                    <div className="text-right text-[13px] text-[#94A3B8]">{formatNumber(child.total_units)}</div>
+                    <div className="text-right text-[13px] text-[#94A3B8]">{formatCurrency(child.total_revenue)}</div>
+                    <div className="text-right text-[13px] text-[#94A3B8]">{formatCurrency(child.total_cost)}</div>
+                    <div className="text-right text-[13px] text-[#94A3B8]">{formatCurrency(child.total_gross_profit)}</div>
                     <div className="text-center">
                       <span
-                        className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-medium"
+                        className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[11px] font-medium"
                         style={{ backgroundColor: `${childGpColor}15`, color: childGpColor }}
                       >
                         {formatPercent(child.avg_gross_profit_pct)}
@@ -754,7 +754,7 @@ export default function DiversifiedDashboard() {
               >
                 {/* Table Header */}
                 <div
-                  className="grid gap-4 px-6 py-3 bg-[#0F172A] border-b border-white/[0.04] text-[10px] font-semibold text-[#64748B] uppercase tracking-wider"
+                  className="grid gap-4 px-6 py-3 bg-[#0F172A] border-b border-white/[0.04] text-[11px] font-semibold text-[#64748B] uppercase tracking-wider"
                   style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px' }}
                 >
                   <div>{viewMode === 'class' ? 'Class' : 'Customer'}</div>

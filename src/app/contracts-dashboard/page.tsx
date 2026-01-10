@@ -744,7 +744,7 @@ function ContractRow({
                 )}
               </div>
               {contract.opportunityName && contract.opportunityName !== contract.name && (
-                <span className="text-[11px] text-[#64748B] truncate block" title={contract.opportunityName}>
+                <span className="text-[12px] text-[#64748B] truncate block" title={contract.opportunityName}>
                   {contract.opportunityName}
                 </span>
               )}
@@ -763,7 +763,7 @@ function ContractRow({
 
           {/* Value */}
           <div className="text-right">
-            <span className="text-[#CBD5E1] font-semibold text-[13px] tabular-nums">{formatCurrency(contract.value)}</span>
+            <span className="text-[#CBD5E1] font-semibold text-[14px] tabular-nums">{formatCurrency(contract.value)}</span>
           </div>
 
           {/* Status - Editable with Quick Dropdown */}
@@ -779,7 +779,7 @@ function ContractRow({
                   disabled={isSaving}
                   className={`
                     appearance-none cursor-pointer
-                    pl-5 pr-6 py-1 rounded-full text-[11px] font-medium
+                    pl-5 pr-6 py-1 rounded-full text-[12px] font-medium
                     border-0 outline-none
                     transition-all duration-200
                     ${isSaving ? 'opacity-50 cursor-wait' : 'hover:ring-1 hover:ring-white/20'}
@@ -816,11 +816,11 @@ function ContractRow({
           {/* Sales Stage - from Salesforce - neutral gray */}
           <div className="text-center">
             {contract.salesStage ? (
-              <span className="inline-flex items-center justify-center px-2 py-1 rounded text-[11px] font-semibold bg-white/10 text-[#94A3B8]">
+              <span className="inline-flex items-center justify-center px-2 py-1 rounded text-[12px] font-semibold bg-white/10 text-[#94A3B8]">
                 {contract.salesStage}
               </span>
             ) : (
-              <span className="text-[#475569] text-[11px]">—</span>
+              <span className="text-[#475569] text-[12px]">—</span>
             )}
           </div>
 
@@ -847,7 +847,7 @@ function ContractRow({
                 style={{ colorScheme: 'dark' }}
               />
             ) : (
-              <span className="text-[13px] text-[#8FA3BF] cursor-pointer hover:text-[#38BDF8] transition-colors">
+              <span className="text-[14px] text-[#8FA3BF] cursor-pointer hover:text-[#38BDF8] transition-colors">
                 {formatDate(contract.contractDate)}
               </span>
             )}
@@ -875,7 +875,7 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#8B5CF6] shadow-[0_0_6px_rgba(139,92,246,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Award</span>
-                        <span className={`text-[12px] font-medium tabular-nums ${contract.awardDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                        <span className={`text-[13px] font-medium tabular-nums ${contract.awardDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
                           {formatDateCompact(contract.awardDate)}
                         </span>
                       </div>
@@ -884,7 +884,7 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#0189CB] shadow-[0_0_6px_rgba(1,137,203,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Contract</span>
-                        <span className={`text-[12px] font-medium tabular-nums ${contract.contractDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                        <span className={`text-[13px] font-medium tabular-nums ${contract.contractDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
                           {formatDateCompact(contract.contractDate)}
                         </span>
                       </div>
@@ -893,7 +893,7 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#F59E0B] shadow-[0_0_6px_rgba(245,158,11,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Delivery</span>
-                        <span className={`text-[12px] font-medium tabular-nums ${contract.deliverDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                        <span className={`text-[13px] font-medium tabular-nums ${contract.deliverDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
                           {formatDateCompact(contract.deliverDate)}
                         </span>
                       </div>
@@ -902,7 +902,7 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#22C55E] shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Install</span>
-                        <span className={`text-[12px] font-medium tabular-nums ${contract.installDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                        <span className={`text-[13px] font-medium tabular-nums ${contract.installDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
                           {formatDateCompact(contract.installDate)}
                         </span>
                       </div>
@@ -911,7 +911,7 @@ function ContractRow({
                       <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
                         <div className="w-2 h-2 rounded-full bg-[#EC4899] shadow-[0_0_6px_rgba(236,72,153,0.5)]" />
                         <span className="text-[11px] text-[#64748B] w-16">Cash</span>
-                        <span className={`text-[12px] font-medium tabular-nums ${contract.cashDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                        <span className={`text-[13px] font-medium tabular-nums ${contract.cashDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
                           {formatDateCompact(contract.cashDate)}
                         </span>
                       </div>
@@ -930,7 +930,7 @@ function ContractRow({
             {contract.daysUntilDeadline !== undefined && contract.contractDate ? (
               <div className="inline-flex flex-col items-center gap-1">
                 <span className={`
-                  inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[11px] font-semibold min-w-[48px] tabular-nums
+                  inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[12px] font-semibold min-w-[48px] tabular-nums
                   ${contract.daysUntilDeadline < 0
                     ? 'bg-[#EF4444]/15 text-[#EF4444]'  // Overdue - red
                     : contract.daysUntilDeadline <= 90
@@ -2735,7 +2735,7 @@ export default function ContractsDashboard() {
                 </AnimatePresence>
 
                 {/* Table Column Headers */}
-                <div className="grid gap-4 px-6 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-[0.05em] border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
+                <div className="grid gap-4 px-6 py-3 text-[12px] font-semibold text-[#64748B] uppercase tracking-[0.05em] border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
                   <button
                     className="text-left hover:text-white flex items-center gap-1"
                     onClick={() => { setSortField('name'); setSortDirection(d => d === 'asc' ? 'desc' : 'asc'); }}

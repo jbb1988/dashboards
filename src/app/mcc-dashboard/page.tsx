@@ -99,14 +99,14 @@ function CustomerRow({ customer, index, years, isSelected, onSelect, maxRevenue 
         {/* Customer Name */}
         <div className="flex items-center gap-3">
           <div>
-            <div className="font-medium text-[#EAF2FF] text-[13px]">{customer.customer}</div>
-            <div className="text-[10px] text-[#64748B]">{customer.yearsActive} years active</div>
+            <div className="font-medium text-[#EAF2FF] text-[14px]">{customer.customer}</div>
+            <div className="text-[11px] text-[#64748B]">{customer.yearsActive} years active</div>
           </div>
         </div>
 
         {/* Total Revenue */}
         <div className="text-right">
-          <div className="text-[#CBD5E1] font-semibold text-[13px]">{formatCurrency(customer.totalRevenue)}</div>
+          <div className="text-[#CBD5E1] font-semibold text-[14px]">{formatCurrency(customer.totalRevenue)}</div>
           <div className="w-16 h-[3px] rounded-full bg-white/10 overflow-hidden mt-1 ml-auto">
             <div
               className="h-full rounded-full bg-[#38BDF8]"
@@ -117,20 +117,20 @@ function CustomerRow({ customer, index, years, isSelected, onSelect, maxRevenue 
 
         {/* Total COGS */}
         <div className="text-right">
-          <div className="text-[#CBD5E1] font-semibold text-[13px]">{formatCurrency(customer.totalCOGS)}</div>
-          <div className="text-[10px] text-[#64748B]">COGS</div>
+          <div className="text-[#CBD5E1] font-semibold text-[14px]">{formatCurrency(customer.totalCOGS)}</div>
+          <div className="text-[11px] text-[#64748B]">COGS</div>
         </div>
 
         {/* Total GP */}
         <div className="text-right">
-          <div className="text-[#CBD5E1] font-semibold text-[13px]">{formatCurrency(customer.totalGP)}</div>
-          <div className="text-[10px] text-[#64748B]">Gross Profit</div>
+          <div className="text-[#CBD5E1] font-semibold text-[14px]">{formatCurrency(customer.totalGP)}</div>
+          <div className="text-[11px] text-[#64748B]">Gross Profit</div>
         </div>
 
         {/* GPM */}
         <div className="text-center">
           <span
-            className="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded-full text-[11px] font-semibold"
+            className="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded-full text-[12px] font-semibold"
             style={{ backgroundColor: `${gpmColor}20`, color: gpmColor }}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${isAtRisk ? 'animate-pulse' : ''}`} style={{ background: gpmColor }} />
@@ -460,7 +460,7 @@ export default function MCCDashboard() {
       >
         {/* Header */}
         <header className="border-b border-white/[0.04] bg-[#0B1220]/90 backdrop-blur-xl sticky top-0 z-50">
-          <div className="max-w-[1600px] mx-auto px-8 py-4">
+          <div className="px-8 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-semibold text-[#EAF2FF] tracking-tight">MCC Profitability</h1>
@@ -497,7 +497,7 @@ export default function MCCDashboard() {
           </div>
         </header>
 
-        <main className="max-w-[1600px] mx-auto px-8 py-6">
+        <main className="px-8 py-6">
           {/* KPI Cards */}
           <div className="grid grid-cols-5 gap-4 mb-6">
             <KPICard
@@ -626,7 +626,7 @@ export default function MCCDashboard() {
 
                 {/* Table Header */}
                 <div
-                  className="grid gap-4 px-6 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-[0.06em] border-b border-white/[0.04] bg-[#0B1220] sticky top-0 z-10 shadow-[0_1px_0_rgba(255,255,255,0.05)]"
+                  className="grid gap-4 px-6 py-2.5 text-[11px] font-semibold text-[#475569] uppercase tracking-[0.06em] border-b border-white/[0.04] bg-[#0B1220] sticky top-0 z-10 shadow-[0_1px_0_rgba(255,255,255,0.05)]"
                   style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}
                 >
                   <button

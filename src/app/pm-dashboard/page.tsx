@@ -201,11 +201,11 @@ function TaskTooltip({ task, position, onClose }: {
 
         {/* Assignee & Region */}
         <div className="mb-3">
-          <div className="text-[12px] text-white font-medium">
+          <div className="text-[13px] text-white font-medium">
             {task.assignee?.name || 'Unassigned'}
           </div>
           {region && (
-            <div className="text-[11px] text-[#64748B]">{region}</div>
+            <div className="text-[12px] text-[#64748B]">{region}</div>
           )}
         </div>
 
@@ -729,8 +729,8 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
               {Object.entries(groupedByDate).map(([week, tasks]) => (
                 <div key={week} className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
                   <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center justify-between">
-                    <span className="font-semibold text-[#EAF2FF] text-[13px]">Week of {week}</span>
-                    <span className="text-[10px] text-[#64748B]">{tasks.length} tasks</span>
+                    <span className="font-semibold text-[#EAF2FF] text-[14px]">Week of {week}</span>
+                    <span className="text-[11px] text-[#64748B]">{tasks.length} tasks</span>
                   </div>
                   <div className="divide-y divide-white/[0.03]">
                     {tasks.map((task, idx) => {
@@ -750,7 +750,7 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
 
                           {/* Date */}
                           <div className="w-20 text-center">
-                            <div className={`text-[13px] font-semibold ${overdue ? 'text-[#EF4444]' : 'text-[#EAF2FF]'}`}>
+                            <div className={`text-[14px] font-semibold ${overdue ? 'text-[#EF4444]' : 'text-[#EAF2FF]'}`}>
                               {formatShortDate(task.startOn || task.dueOn)}
                             </div>
                             {task.startOn && task.dueOn && task.startOn !== task.dueOn && (
@@ -760,8 +760,8 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
 
                           {/* Task Name */}
                           <div className="flex-1 min-w-0">
-                            <div className="text-[13px] text-[#EAF2FF] truncate group-hover:text-[#E16259]">{task.name}</div>
-                            <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
+                            <div className="text-[14px] text-[#EAF2FF] truncate group-hover:text-[#E16259]">{task.name}</div>
+                            <div className="text-[11px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
                           </div>
 
                           {/* Status Badge with Asana colors */}
@@ -780,7 +780,7 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
                           )}
 
                           {/* Region */}
-                          {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
+                          {region && <span className="text-[11px] text-[#8FA3BF]">{region}</span>}
 
                           {/* Arrow indicator */}
                           <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
