@@ -14,6 +14,38 @@ import {
   StatusDot,
 } from '@/components/mars-ui';
 
+// Priority accent colors for visual treatments
+const PRIORITY_ACCENT = {
+  critical: {
+    color: colors.accent.red,
+    gradient: 'from-[#1E2028] to-[#2D1F24]',
+    borderColor: 'border-red-500/20',
+    glowShadow: '0 20px 40px -10px rgba(229,72,77,0.3), 0 0 20px rgba(229,72,77,0.15)',
+    hoverBg: 'hover:border-red-500/40',
+  },
+  high: {
+    color: colors.accent.amber,
+    gradient: 'from-[#1E2028] to-[#2D2A1F]',
+    borderColor: 'border-amber-500/20',
+    glowShadow: '0 20px 40px -10px rgba(212,167,44,0.25), 0 0 20px rgba(212,167,44,0.12)',
+    hoverBg: 'hover:border-amber-500/40',
+  },
+  medium: {
+    color: colors.accent.blue,
+    gradient: 'from-[#1E2028] to-[#1F2432]',
+    borderColor: 'border-blue-500/20',
+    glowShadow: '0 20px 40px -10px rgba(91,141,239,0.2), 0 0 20px rgba(91,141,239,0.1)',
+    hoverBg: 'hover:border-blue-500/40',
+  },
+  low: {
+    color: colors.accent.green,
+    gradient: 'from-[#1E2028] to-[#1F2824]',
+    borderColor: 'border-emerald-500/20',
+    glowShadow: '0 20px 40px -10px rgba(48,164,108,0.2), 0 0 20px rgba(48,164,108,0.1)',
+    hoverBg: 'hover:border-emerald-500/40',
+  },
+} as const;
+
 // Priority level metadata for tooltips
 const PRIORITY_META = {
   critical: {
@@ -692,7 +724,7 @@ function ContractCard({
   );
 }
 
-// Priority Contract Card (for Needs Attention view) - with Progress-First Document View
+// Priority Contract Card (for Needs Attention view) - PREMIUM VISUAL DESIGN
 function PriorityCard({
   contract,
   accountName,
@@ -700,6 +732,7 @@ function PriorityCard({
   uploadingKey,
   documentTypes,
   contracts,
+  index = 0,
 }: {
   contract: ContractDocuments & { accountName?: string };
   accountName: string;
@@ -707,8 +740,13 @@ function PriorityCard({
   uploadingKey: string | null;
   documentTypes: string[];
   contracts?: Contract[];
+  index?: number;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Get priority visual config
+  const priorityConfig = PRIORITY_ACCENT[contract.priority.category];
+  const priorityColor = priorityConfig.color;
 
   // Find the matching contract for additional details
   const matchingContract = contracts?.find(c => c.id === contract.contractId || c.salesforceId === contract.contractId);
@@ -744,81 +782,171 @@ function PriorityCard({
     console.log('Delete document:', doc.id);
   };
 
+  // Progress bar color based on completion
+  const progressColor = contract.completeness.percentage >= 100
+    ? colors.accent.green
+    : contract.completeness.percentage >= 50
+    ? colors.accent.blue
+    : priorityColor;
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`${tokens.bg.card} ${tokens.radius.card} border ${isExpanded ? tokens.border.strong : tokens.border.default} ${isExpanded ? tokens.shadow.elevated : tokens.shadow.card} overflow-hidden group transition-all duration-200`}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        delay: index * 0.05,
+        duration: 0.4,
+        ease: [0.25, 0.46, 0.45, 0.94]
+      }}
+      whileHover={{
+        y: -4,
+        scale: 1.01,
+        boxShadow: priorityConfig.glowShadow,
+        transition: { type: "spring", stiffness: 400, damping: 25 }
+      }}
+      whileTap={{ scale: 0.98 }}
+      className={`
+        relative overflow-hidden rounded-xl cursor-pointer
+        bg-gradient-to-br ${priorityConfig.gradient}
+        border ${priorityConfig.borderColor} ${priorityConfig.hoverBg}
+        transition-all duration-200
+        group
+      `}
     >
-      {/* Card Header - Slimmed down, click to expand */}
+      {/* LEFT ACCENT BAR WITH GLOW */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
+        style={{
+          background: priorityColor,
+          boxShadow: `0 0 8px ${priorityColor}60, 0 0 20px ${priorityColor}30`,
+        }}
+      />
+
+      {/* Card Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full p-3 text-left hover:${tokens.bg.hover} transition-colors`}
+        className="w-full p-4 pl-5 text-left hover:bg-white/[0.02] transition-all duration-200"
       >
-        {/* Row 1: Priority dot + Contract name + Account + Progress */}
+        {/* Row 1: Priority icon + Contract name + Progress */}
         <div className="flex items-center gap-3">
-          <PriorityDot category={contract.priority.category} />
+          {/* Priority Icon Container with Gradient Background */}
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${priorityColor}25, ${priorityColor}10)`,
+              boxShadow: `0 0 20px ${priorityColor}15`,
+            }}
+          >
+            <StatusDot
+              color={PRIORITY_META[contract.priority.category].color}
+              size="md"
+              pulse={contract.priority.category === 'critical'}
+            />
+          </div>
+
+          {/* Contract Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className={`${tokens.text.primary} font-semibold truncate text-[15px]`}>{contract.contractName}</h3>
-              {/* Tags - inline, subtle */}
+              <h3 className="text-white font-semibold truncate text-[15px]">
+                {contract.contractName}
+              </h3>
+              {/* Tags with color coding */}
               {contractTypes.slice(0, 1).map((type) => (
                 <span
                   key={type}
-                  className={`px-1.5 py-0.5 ${tokens.bg.elevated} ${tokens.text.muted} text-[11px] ${tokens.radius.control} hidden sm:inline`}
+                  className="px-2 py-0.5 bg-white/10 text-white/60 text-[11px] rounded-md hidden sm:inline border border-white/5"
                 >
                   {type}
                 </span>
               ))}
             </div>
-            <p className={`${tokens.text.muted} text-sm truncate`}>{accountName}</p>
+            <p className="text-white/50 text-sm truncate">{accountName}</p>
           </div>
-          {/* Progress on same line */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className={`${tokens.text.muted} text-xs tabular-nums`}>
+
+          {/* Progress Bar with Animation */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="text-white/40 text-xs tabular-nums font-medium">
               {contract.completeness.required}/4
             </span>
-            <div className={`w-12 h-1 ${tokens.bg.input} rounded-full overflow-hidden`}>
-              <div
-                className="h-full bg-[#5B8DEF] rounded-full transition-all"
-                style={{ width: `${contract.completeness.percentage}%` }}
+            <div className="w-16 h-2 bg-white/5 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${contract.completeness.percentage}%` }}
+                transition={{ duration: 0.8, ease: "easeOut", delay: index * 0.05 + 0.2 }}
+                className="h-full rounded-full"
+                style={{
+                  background: `linear-gradient(90deg, ${progressColor}, ${progressColor}CC)`,
+                  boxShadow: contract.completeness.percentage > 50
+                    ? `0 0 12px ${progressColor}50`
+                    : undefined,
+                }}
               />
             </div>
           </div>
         </div>
 
-        {/* Row 2: Status reason + Expand (all on one line) */}
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#252D38]/50">
-          <span className={`${tokens.text.muted} text-xs truncate flex-1`}>
-            {contract.priority.reasons[0] || 'On track'}
-          </span>
-          <div className={`flex items-center gap-1.5 ${tokens.text.muted} text-xs`}>
+        {/* Row 2: Status reason + Expand */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.06]">
+          {/* Priority Badge */}
+          <div className="flex items-center gap-2">
+            <span
+              className="px-2.5 py-1 rounded-full text-xs font-medium border"
+              style={{
+                background: `${priorityColor}15`,
+                color: priorityColor,
+                borderColor: `${priorityColor}30`,
+              }}
+            >
+              {contract.priority.reasons[0] || 'On track'}
+            </span>
+          </div>
+
+          {/* Expand Button */}
+          <div className="flex items-center gap-1.5 text-white/40 text-xs group-hover:text-white/60 transition-colors">
             <motion.svg
               animate={{ rotate: isExpanded ? 180 : 0 }}
-              transition={{ duration: 0.15 }}
-              className="w-3.5 h-3.5"
+              transition={{ duration: 0.2 }}
+              className="w-4 h-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </motion.svg>
-            <span className="hidden sm:inline">{isExpanded ? 'Hide' : 'Manage'}</span>
+            <span className="hidden sm:inline font-medium">
+              {isExpanded ? 'Hide' : 'Manage'}
+            </span>
           </div>
         </div>
       </button>
 
-      {/* Expanded Document View - Elevated surface for focus */}
+      {/* Expanded Document View */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            animate={{
+              height: 'auto',
+              opacity: 1,
+              transition: {
+                height: { duration: 0.3 },
+                opacity: { duration: 0.2, delay: 0.1 }
+              }
+            }}
+            exit={{
+              height: 0,
+              opacity: 0,
+              transition: {
+                height: { duration: 0.2 },
+                opacity: { duration: 0.1 }
+              }
+            }}
             className="overflow-hidden"
           >
-            <div className={`px-4 py-4 ${tokens.bg.elevated} border-t ${tokens.border.default} ${tokens.shadow.inner}`}>
+            <div
+              className="px-4 py-4 pl-5 border-t border-white/[0.08]"
+              style={{ background: 'rgba(0,0,0,0.2)' }}
+            >
               <DocumentsProgressView
                 contractId={contract.contractId}
                 contractName={contract.contractName}
@@ -828,17 +956,20 @@ function PriorityCard({
               />
             </div>
 
-            {/* Actions - show on hover only for daily users */}
-            <div className="flex items-center gap-2 px-4 pb-4">
-              <button className={`flex-1 px-3 py-2 ${tokens.bg.elevated} hover:bg-[#262D3A] ${tokens.text.primary} text-sm ${tokens.radius.control} transition-colors`}>
+            {/* Action Buttons with Premium Styling */}
+            <div className="flex items-center gap-2 px-4 pb-4 pl-5">
+              {/* Primary Button */}
+              <button className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white/80 hover:text-white text-sm font-medium transition-all duration-200">
                 View Contract
               </button>
+
+              {/* Salesforce Link - Accent Style */}
               {salesforceId && (
                 <a
                   href={`https://marscompany.lightning.force.com/lightning/r/Opportunity/${salesforceId}/view`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`px-3 py-2 ${tokens.bg.elevated} hover:bg-[#262D3A] ${tokens.text.accent} hover:${tokens.text.primary} text-sm ${tokens.radius.control} transition-colors flex items-center gap-1`}
+                  className="px-3 py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-xl text-cyan-400 text-sm font-medium transition-all duration-200 flex items-center gap-1.5"
                   title="Open in Salesforce"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -1383,24 +1514,38 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'needs_attention' && (
           <>
             {filteredData.priorityContracts.length === 0 ? (
-              <div className={`text-center py-16 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}>
-                <div className={`w-14 h-14 mx-auto mb-4 ${tokens.status.success.bg} rounded-xl flex items-center justify-center`}>
-                  <svg className={`w-7 h-7 ${tokens.status.success.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className={`text-center py-20 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}
+              >
+                <div
+                  className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center border border-white/10"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(48,164,108,0.2), rgba(48,164,108,0.05))',
+                    boxShadow: '0 0 40px rgba(48,164,108,0.15)',
+                  }}
+                >
+                  <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className={`${tokens.text.primary} text-lg font-semibold mb-1`}>All caught up!</h3>
-                <p className={`${tokens.text.muted} text-sm`}>No contracts need immediate attention</p>
-              </div>
+                <h3 className="text-xl font-semibold text-white mb-2">All caught up!</h3>
+                <p className="text-white/50 text-sm max-w-md mx-auto">
+                  No contracts need immediate attention. Great work keeping everything on track.
+                </p>
+              </motion.div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {filteredData.priorityContracts.map((contract) => (
+              <div className="grid grid-cols-2 gap-4">
+                {filteredData.priorityContracts.map((contract, index) => (
                   <PriorityCard
                     key={contract.contractId}
                     contract={contract}
                     accountName={contract.accountName}
                     onUpload={handleUpload}
                     uploadingKey={uploadingKey}
+                    index={index}
                     documentTypes={data?.requiredTypes || []}
                     contracts={contracts}
                   />
@@ -1413,24 +1558,38 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'closing_soon' && (
           <>
             {filteredData.closingSoonContracts?.length === 0 ? (
-              <div className={`text-center py-16 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}>
-                <div className={`w-14 h-14 mx-auto mb-4 ${tokens.status.info.bg} rounded-xl flex items-center justify-center`}>
-                  <svg className={`w-7 h-7 ${tokens.status.info.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className={`text-center py-20 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}
+              >
+                <div
+                  className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center border border-white/10"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(212,167,44,0.2), rgba(212,167,44,0.05))',
+                    boxShadow: '0 0 40px rgba(212,167,44,0.15)',
+                  }}
+                >
+                  <svg className="w-10 h-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <h3 className={`${tokens.text.primary} text-lg font-semibold mb-1`}>No upcoming deadlines</h3>
-                <p className={`${tokens.text.muted} text-sm`}>No contracts closing in the next 90 days</p>
-              </div>
+                <h3 className="text-xl font-semibold text-white mb-2">No upcoming deadlines</h3>
+                <p className="text-white/50 text-sm max-w-md mx-auto">
+                  No contracts closing in the next 90 days. Check back later for updates.
+                </p>
+              </motion.div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {filteredData.closingSoonContracts?.map((contract) => (
+              <div className="grid grid-cols-2 gap-4">
+                {filteredData.closingSoonContracts?.map((contract, index) => (
                   <PriorityCard
                     key={contract.contractId}
                     contract={contract}
                     accountName={contract.accountName}
                     onUpload={handleUpload}
                     uploadingKey={uploadingKey}
+                    index={index}
                     documentTypes={data?.documentTypes || []}
                     contracts={contracts}
                   />
@@ -1443,24 +1602,38 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'budgeted' && (
           <>
             {filteredData.budgetedContracts?.length === 0 ? (
-              <div className={`text-center py-16 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}>
-                <div className="w-14 h-14 mx-auto mb-4 bg-[#8B5CF6]/10 rounded-xl flex items-center justify-center">
-                  <svg className="w-7 h-7 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className={`text-center py-20 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}
+              >
+                <div
+                  className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center border border-white/10"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(139,92,246,0.05))',
+                    boxShadow: '0 0 40px rgba(139,92,246,0.15)',
+                  }}
+                >
+                  <svg className="w-10 h-10 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className={`${tokens.text.primary} text-lg font-semibold mb-1`}>No budgeted contracts</h3>
-                <p className={`${tokens.text.muted} text-sm`}>No contracts are marked as budgeted/forecasted</p>
-              </div>
+                <h3 className="text-xl font-semibold text-white mb-2">No budgeted contracts</h3>
+                <p className="text-white/50 text-sm max-w-md mx-auto">
+                  No contracts are marked as budgeted or forecasted. Update contract status in Salesforce.
+                </p>
+              </motion.div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {filteredData.budgetedContracts?.map((contract) => (
+              <div className="grid grid-cols-2 gap-4">
+                {filteredData.budgetedContracts?.map((contract, index) => (
                   <PriorityCard
                     key={contract.contractId}
                     contract={contract}
                     accountName={contract.accountName}
                     onUpload={handleUpload}
                     uploadingKey={uploadingKey}
+                    index={index}
                     documentTypes={data?.documentTypes || []}
                     contracts={contracts}
                   />
@@ -1488,9 +1661,28 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
               </button>
             </div>
             {filteredData.accounts.length === 0 ? (
-              <div className={`text-center py-16 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}>
-                <p className={tokens.text.muted}>No accounts found</p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className={`text-center py-20 ${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle}`}
+              >
+                <div
+                  className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center border border-white/10"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(91,141,239,0.2), rgba(139,92,246,0.1))',
+                    boxShadow: '0 0 40px rgba(91,141,239,0.12)',
+                  }}
+                >
+                  <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">No accounts found</h3>
+                <p className="text-white/50 text-sm max-w-md mx-auto">
+                  Try adjusting your search or filters to find accounts.
+                </p>
+              </motion.div>
             ) : (
               filteredData.accounts.map(([accountName, account]) => (
                 <AccountSection
@@ -1512,9 +1704,28 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         {activeView === 'recent' && (
           <div className={`${tokens.bg.card} ${tokens.radius.card} border ${tokens.border.subtle} overflow-hidden`}>
             {filteredData.recentDocs.length === 0 ? (
-              <div className="text-center py-16">
-                <p className={tokens.text.muted}>No documents uploaded in the last 7 days</p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="text-center py-20"
+              >
+                <div
+                  className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center border border-white/10"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(56,189,248,0.2), rgba(91,141,239,0.1))',
+                    boxShadow: '0 0 40px rgba(56,189,248,0.12)',
+                  }}
+                >
+                  <svg className="w-10 h-10 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">No recent activity</h3>
+                <p className="text-white/50 text-sm max-w-md mx-auto">
+                  No documents have been uploaded in the last 7 days.
+                </p>
+              </motion.div>
             ) : (
               <div className={`divide-y ${tokens.border.subtle}`}>
                 {filteredData.recentDocs.map((doc) => (
