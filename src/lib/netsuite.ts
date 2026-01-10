@@ -136,6 +136,11 @@ export async function netsuiteRequest<T>(
     Accept: 'application/json',
   };
 
+  // SuiteQL requires Prefer header
+  if (endpoint.includes('suiteql')) {
+    headers['Prefer'] = 'transient';
+  }
+
   const fetchOptions: RequestInit = {
     method,
     headers,
