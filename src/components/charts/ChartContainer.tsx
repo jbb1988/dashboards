@@ -1,7 +1,7 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { ReactNode } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ReactNode, useState, useEffect } from 'react';
 
 interface ChartContainerProps {
   title: string;
@@ -11,6 +11,7 @@ interface ChartContainerProps {
   index?: number;
   className?: string;
   height?: number;
+  expandable?: boolean;
 }
 
 export function ChartContainer({
@@ -21,27 +22,127 @@ export function ChartContainer({
   index = 0,
   className = '',
   height = 300,
+  expandable = true,
 }: ChartContainerProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isExpanded) {
+        setIsExpanded(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isExpanded) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isExpanded]);
+
+  const chartContent = (
+    <div style={{ height: isExpanded ? 'calc(80vh - 100px)' : height }}>{children}</div>
+  );
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.1 }}
-      className={`bg-[#0F1123]/80 rounded-2xl p-6 border border-white/[0.08] shadow-lg shadow-cyan-500/5 backdrop-blur-sm ${className}`}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-white font-semibold flex items-center gap-2">
-            {icon && <span className="text-cyan-400">{icon}</span>}
-            {title}
-          </h3>
-          {subtitle && (
-            <p className="text-[#64748B] text-[12px] mt-0.5">{subtitle}</p>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: index * 0.1 }}
+        className={`bg-[#0F1123]/80 rounded-2xl p-6 border border-white/[0.08] shadow-lg shadow-cyan-500/5 backdrop-blur-sm ${className}`}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-white font-semibold flex items-center gap-2">
+              {icon && <span className="text-cyan-400">{icon}</span>}
+              {title}
+            </h3>
+            {subtitle && (
+              <p className="text-[#64748B] text-[12px] mt-0.5">{subtitle}</p>
+            )}
+          </div>
+          {expandable && (
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="p-2 rounded-lg text-[#64748B] hover:text-white hover:bg-white/[0.05] transition-all"
+              title="Expand chart"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            </button>
           )}
         </div>
-      </div>
-      <div style={{ height }}>{children}</div>
-    </motion.div>
+        <div style={{ height }}>{children}</div>
+      </motion.div>
+
+      {/* Expanded Modal */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-8"
+            onClick={() => setIsExpanded(false)}
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+
+            {/* Modal Content */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-full max-w-6xl max-h-[90vh] bg-[#0F1123] rounded-2xl p-8 border border-white/[0.08] shadow-2xl shadow-cyan-500/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-white text-xl font-semibold flex items-center gap-3">
+                    {icon && <span className="text-cyan-400">{icon}</span>}
+                    {title}
+                  </h3>
+                  {subtitle && (
+                    <p className="text-[#64748B] text-[13px] mt-1">{subtitle}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsExpanded(false)}
+                  className="p-2 rounded-lg text-[#64748B] hover:text-white hover:bg-white/[0.05] transition-all"
+                  title="Close (Esc)"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Chart at larger size */}
+              {chartContent}
+
+              {/* Footer hint */}
+              <div className="mt-4 text-center">
+                <span className="text-[11px] text-[#475569]">Press Esc or click outside to close</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
