@@ -167,19 +167,21 @@ const navCategories: NavCategory[] = [
   },
 ];
 
-// Badge dot color mapping (matches Data Sources colors)
+// Badge dot color mapping (matches Data Sources colors exactly)
 function getBadgeDotColor(badge: string): string {
   switch (badge) {
     case 'Salesforce':
       return 'bg-[#38BDF8]'; // Blue - matches Salesforce in data sources
     case 'Asana':
       return 'bg-[#E16259]'; // Red - matches Asana in data sources
-    case 'Excel':
-      return 'bg-[#22C55E]'; // Green
-    case 'Claude':
-      return 'bg-[#D97706]'; // Orange
+    case 'DocuSign':
+      return 'bg-[#FFD700]'; // Gold - matches DocuSign in data sources
     case 'NetSuite':
-      return 'bg-[#22D3EE]'; // Cyan - matches NetSuite branding
+      return 'bg-[#F97316]'; // Orange - matches NetSuite in data sources
+    case 'Excel':
+      return 'bg-[#22C55E]'; // Green - local files
+    case 'Claude':
+      return 'bg-[#D97706]'; // Amber - AI powered
     default:
       return 'bg-[#64748B]';
   }
