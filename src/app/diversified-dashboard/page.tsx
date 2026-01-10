@@ -858,7 +858,8 @@ export default function DiversifiedDashboard() {
                     <BudgetVarianceChart
                       actualData={data.chartData.monthly}
                       budgetData={budgetData}
-                      selectedYear={selectedYears.length === 1 ? selectedYears[0] : 2025}
+                      selectedYear={selectedYears.length === 1 ? selectedYears[0] : undefined}
+                      selectedMonths={selectedMonths}
                       index={1}
                     />
                   </div>

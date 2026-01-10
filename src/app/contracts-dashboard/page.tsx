@@ -986,19 +986,6 @@ function ContractRow({
             )}
           </div>
 
-          {/* Edit Button */}
-          <div className="text-center" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={handleEdit}
-              className="p-1.5 rounded hover:bg-[#38BDF8]/20 text-[#64748B] hover:text-[#38BDF8] transition-colors"
-              title="Edit dates (syncs to Salesforce)"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </button>
-          </div>
-
           </div>
 
         {/* Edit Mode Panel - for editing dates that sync to Salesforce */}
@@ -1169,6 +1156,19 @@ function ContractRow({
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Edit Dates Button */}
+              <div className="px-6 py-3 border-t border-white/[0.04] flex justify-end">
+                <button
+                  onClick={handleEdit}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#38BDF8]/10 text-[#38BDF8] text-xs font-medium hover:bg-[#38BDF8]/20 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  Edit Dates
+                </button>
               </div>
 
               {/* Latest Review Summary */}

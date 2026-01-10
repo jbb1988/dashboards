@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   ComposedChart,
   Bar,
@@ -33,58 +34,88 @@ interface BudgetVarianceChartProps {
   actualData: MonthlyData[];
   budgetData: BudgetData[];
   selectedYear?: number;
+  selectedMonths?: number[];
   index?: number;
 }
 
 export function BudgetVarianceChart({
   actualData,
   budgetData,
-  selectedYear = 2025,
+  selectedYear,
+  selectedMonths,
   index = 0,
 }: BudgetVarianceChartProps) {
-  // Filter to selected year
-  const yearActual = actualData.filter(d => d.year === selectedYear);
+  // Determine the year to display - use selectedYear or auto-detect from data
+  const displayYear = useMemo(() => {
+    if (selectedYear) return selectedYear;
+    if (actualData.length === 0) return new Date().getFullYear();
+    // Get the most recent year in the data
+    return Math.max(...actualData.map(d => d.year));
+  }, [selectedYear, actualData]);
 
-  // Aggregate budget by month (sum across all classes)
-  const budgetByMonth = budgetData
-    .filter(d => d.year === selectedYear)
-    .reduce((acc, d) => {
-      if (!acc[d.month]) acc[d.month] = 0;
-      acc[d.month] += d.budget_revenue;
-      return acc;
-    }, {} as Record<number, number>);
+  // Filter actual data to selected year
+  const yearActual = useMemo(() => {
+    return actualData.filter(d => d.year === displayYear);
+  }, [actualData, displayYear]);
 
-  // Build chart data for all 12 months
+  // Aggregate budget by month (sum across all classes) for the display year
+  const budgetByMonth = useMemo(() => {
+    return budgetData
+      .filter(d => d.year === displayYear)
+      .reduce((acc, d) => {
+        if (!acc[d.month]) acc[d.month] = 0;
+        acc[d.month] += d.budget_revenue;
+        return acc;
+      }, {} as Record<number, number>);
+  }, [budgetData, displayYear]);
+
+  // Determine which months to show
+  const monthsToShow = useMemo(() => {
+    if (selectedMonths && selectedMonths.length > 0) {
+      return selectedMonths.sort((a, b) => a - b);
+    }
+    // Show all 12 months
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  }, [selectedMonths]);
+
+  // Build chart data
   const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  const chartData = MONTH_NAMES.map((monthName, idx) => {
-    const month = idx + 1;
-    const actualMonth = yearActual.find(d => d.month === month);
-    const actual = actualMonth?.revenue || 0;
-    const budget = budgetByMonth[month] || 0;
-    const variance = actual - budget;
-    const variancePct = budget > 0 ? ((actual - budget) / budget) * 100 : 0;
+  const chartData = useMemo(() => {
+    return monthsToShow.map(month => {
+      const monthName = MONTH_NAMES[month - 1];
+      const actualMonth = yearActual.find(d => d.month === month);
+      const actual = actualMonth?.revenue || 0;
+      const budget = budgetByMonth[month] || 0;
+      const variance = actual - budget;
+      const variancePct = budget > 0 ? ((actual - budget) / budget) * 100 : 0;
 
-    return {
-      name: monthName,
-      actual,
-      budget,
-      variance,
-      variancePct,
-      isAboveBudget: variance >= 0,
-    };
-  });
+      return {
+        name: monthName,
+        actual,
+        budget,
+        variance,
+        variancePct,
+        isAboveBudget: variance >= 0,
+      };
+    });
+  }, [monthsToShow, yearActual, budgetByMonth]);
 
   // Calculate totals for subtitle
   const totalActual = chartData.reduce((sum, d) => sum + d.actual, 0);
   const totalBudget = chartData.reduce((sum, d) => sum + d.budget, 0);
-  const totalVariance = totalActual - totalBudget;
   const totalVariancePct = totalBudget > 0 ? ((totalActual - totalBudget) / totalBudget) * 100 : 0;
+
+  // Check if we have any data
+  const hasData = totalActual > 0 || totalBudget > 0;
 
   return (
     <ChartContainer
       title="Budget vs Actual"
-      subtitle={`${selectedYear} | Actual: ${formatChartCurrency(totalActual)} | Budget: ${formatChartCurrency(totalBudget)} | Variance: ${totalVariancePct >= 0 ? '+' : ''}${totalVariancePct.toFixed(1)}%`}
+      subtitle={hasData
+        ? `${displayYear} | Actual: ${formatChartCurrency(totalActual)} | Budget: ${formatChartCurrency(totalBudget)} | Variance: ${totalVariancePct >= 0 ? '+' : ''}${totalVariancePct.toFixed(1)}%`
+        : `${displayYear} | No data for selected filters`
+      }
       icon={
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -128,7 +159,7 @@ export function BudgetVarianceChart({
               if (name === 'budget') return [formatChartCurrency(numValue), 'Budget'];
               return [formatChartCurrency(numValue), String(name)];
             }}
-            labelFormatter={(label) => `${label} ${selectedYear}`}
+            labelFormatter={(label) => `${label} ${displayYear}`}
             cursor={{ fill: 'rgba(56, 189, 248, 0.05)' }}
           />
           <Legend
