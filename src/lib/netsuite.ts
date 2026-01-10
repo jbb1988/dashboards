@@ -482,12 +482,14 @@ export async function getDiversifiedSales(options: {
       tl.costestimate,
       BUILTIN.DF(tl.item) AS item_name,
       tl.item AS item_id,
+      i.salesdescription AS item_description,
       t.type AS transaction_type,
       c.parent AS class_parent_id,
       BUILTIN.DF(c.parent) AS class_parent_name
     FROM Transaction t
     INNER JOIN TransactionLine tl ON tl.transaction = t.id
     LEFT JOIN Classification c ON c.id = tl.class
+    LEFT JOIN Item i ON i.id = tl.item
     WHERE t.posting = 'T'
       AND tl.mainline = 'F'
       AND tl.netamount IS NOT NULL
@@ -570,7 +572,7 @@ export async function getDiversifiedSales(options: {
           grossProfitPct: 0,
           itemId: row.item_id?.toString() || '',
           itemName: row.item_name || '',
-          itemDescription: '',
+          itemDescription: row.item_description || '',
         };
       }
 
