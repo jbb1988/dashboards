@@ -21,7 +21,8 @@ function generateOAuthSignature(
   method: string,
   url: string,
   oauthParams: Record<string, string>,
-  queryParams?: Record<string, string>
+  queryParams?: Record<string, string>,
+  signatureMethod: 'HMAC-SHA256' | 'HMAC-SHA1' = 'HMAC-SHA256'
 ): string {
   // Combine OAuth params and query params for signature
   const allParams: Record<string, string> = { ...oauthParams };
@@ -45,9 +46,10 @@ function generateOAuthSignature(
   // Create signing key (consumer secret & token secret)
   const signingKey = `${encodeURIComponent(config.consumerSecret)}&${encodeURIComponent(config.tokenSecret)}`;
 
-  // Generate HMAC-SHA256 signature
+  // Generate signature based on method
+  const algorithm = signatureMethod === 'HMAC-SHA256' ? 'sha256' : 'sha1';
   const signature = crypto
-    .createHmac('sha256', signingKey)
+    .createHmac(algorithm, signingKey)
     .update(signatureBaseString)
     .digest('base64');
 
@@ -63,19 +65,23 @@ function generateAuthHeader(
   queryParams?: Record<string, string>
 ): string {
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const nonce = crypto.randomBytes(16).toString('hex');
+  // Use alphanumeric nonce (some OAuth implementations are picky)
+  const nonce = crypto.randomBytes(16).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
+
+  // Try HMAC-SHA1 first as it's more widely supported
+  const signatureMethod = 'HMAC-SHA1';
 
   const oauthParams: Record<string, string> = {
     oauth_consumer_key: config.consumerKey,
     oauth_token: config.tokenId,
-    oauth_signature_method: 'HMAC-SHA256',
+    oauth_signature_method: signatureMethod,
     oauth_timestamp: timestamp,
     oauth_nonce: nonce,
     oauth_version: '1.0',
   };
 
   // Generate signature (include query params in signature base)
-  const signature = generateOAuthSignature(method, baseUrl, oauthParams, queryParams);
+  const signature = generateOAuthSignature(method, baseUrl, oauthParams, queryParams, signatureMethod);
   oauthParams.oauth_signature = signature;
 
   // Build Authorization header (only OAuth params, not query params)
