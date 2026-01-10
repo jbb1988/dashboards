@@ -27,21 +27,21 @@ function GridBackground() {
   );
 }
 
-// Floating particles
+// Floating particles - more prominent effect
 function FloatingParticles() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {[...Array(20)].map((_, i) => (
+      {[...Array(35)].map((_, i) => (
         <motion.div
           key={i}
-          className="absolute w-1 h-1 bg-[#38BDF8]/30 rounded-full"
+          className={`absolute rounded-full ${i % 3 === 0 ? 'w-2 h-2 bg-[#38BDF8]/40' : 'w-1.5 h-1.5 bg-[#38BDF8]/50'}`}
           initial={{
             x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200),
             y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 800),
           }}
           animate={{
-            y: [null, -20, 20],
-            opacity: [0.2, 0.5, 0.2],
+            y: [null, -30, 30],
+            opacity: [0.3, 0.7, 0.3],
           }}
           transition={{
             duration: 3 + Math.random() * 2,
@@ -350,7 +350,7 @@ export default function Home() {
       >
         <div className="max-w-7xl mx-auto px-8 flex items-center justify-between">
           <p className="text-sm text-[#64748B]">
-            MARS Water Solutions - Business Intelligence Platform
+            MARS Company - Business Intelligence Platform
           </p>
           <div className="flex items-center gap-6">
             <Link href="/admin" className="text-sm text-[#64748B] hover:text-white transition-colors">
