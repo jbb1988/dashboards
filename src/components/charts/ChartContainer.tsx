@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, cloneElement, isValidElement } from 'react';
 
 interface ChartContainerProps {
   title: string;
@@ -49,9 +49,7 @@ export function ChartContainer({
     };
   }, [isExpanded]);
 
-  const chartContent = (
-    <div style={{ height: isExpanded ? 'calc(80vh - 100px)' : height }}>{children}</div>
-  );
+  const expandedHeight = 'calc(80vh - 120px)';
 
   return (
     <>
@@ -83,7 +81,10 @@ export function ChartContainer({
             </button>
           )}
         </div>
-        <div style={{ height }}>{children}</div>
+        {/* Only render chart here when not expanded */}
+        <div style={{ height, opacity: isExpanded ? 0 : 1, pointerEvents: isExpanded ? 'none' : 'auto' }}>
+          {!isExpanded && children}
+        </div>
       </motion.div>
 
       {/* Expanded Modal */}
@@ -131,8 +132,10 @@ export function ChartContainer({
                 </button>
               </div>
 
-              {/* Chart at larger size */}
-              {chartContent}
+              {/* Chart at larger size - only rendered when expanded */}
+              <div style={{ height: expandedHeight }}>
+                {children}
+              </div>
 
               {/* Footer hint */}
               <div className="mt-4 text-center">
