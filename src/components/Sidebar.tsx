@@ -181,7 +181,7 @@ function getBadgeDotColor(badge: string): string {
     case 'Excel':
       return 'bg-[#22C55E]'; // Green - local files
     case 'Claude':
-      return 'bg-[#D97706]'; // Amber - AI powered
+      return 'bg-[#A855F7]'; // Purple - AI powered (Claude)
     default:
       return 'bg-[#64748B]';
   }
