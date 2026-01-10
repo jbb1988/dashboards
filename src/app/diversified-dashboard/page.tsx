@@ -696,8 +696,7 @@ export default function DiversifiedDashboard() {
                 </button>
               </motion.div>
 
-              {/* Filters - Only show on table view */}
-              {activeTab === 'table' && (
+              {/* Filters */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -705,34 +704,37 @@ export default function DiversifiedDashboard() {
                 className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04] mb-6"
               >
                 <div className="flex items-center gap-6">
-                  {/* View Toggle */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">View:</span>
-                    <div className="flex rounded-lg overflow-hidden border border-white/[0.04]">
-                      <button
-                        onClick={() => { setViewMode('class'); setExpandedRow(null); setChildData([]); }}
-                        className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
-                          viewMode === 'class'
-                            ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
-                            : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
-                        }`}
-                      >
-                        By Class
-                      </button>
-                      <button
-                        onClick={() => { setViewMode('customer'); setExpandedRow(null); setChildData([]); }}
-                        className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
-                          viewMode === 'customer'
-                            ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
-                            : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
-                        }`}
-                      >
-                        By Customer
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="h-6 w-px bg-white/[0.08]" />
+                  {/* View Toggle - Only on table view */}
+                  {activeTab === 'table' && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">View:</span>
+                        <div className="flex rounded-lg overflow-hidden border border-white/[0.04]">
+                          <button
+                            onClick={() => { setViewMode('class'); setExpandedRow(null); setChildData([]); }}
+                            className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
+                              viewMode === 'class'
+                                ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                                : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
+                            }`}
+                          >
+                            By Class
+                          </button>
+                          <button
+                            onClick={() => { setViewMode('customer'); setExpandedRow(null); setChildData([]); }}
+                            className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
+                              viewMode === 'customer'
+                                ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                                : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
+                            }`}
+                          >
+                            By Customer
+                          </button>
+                        </div>
+                      </div>
+                      <div className="h-6 w-px bg-white/[0.08]" />
+                    </>
+                  )}
 
                   {/* Year Filter */}
                   <div className="flex items-center gap-2">
@@ -787,7 +789,6 @@ export default function DiversifiedDashboard() {
                   )}
                 </div>
               </motion.div>
-              )}
 
               {/* Main Table - Only show on table view */}
               {activeTab === 'table' && (
