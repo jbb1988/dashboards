@@ -345,6 +345,8 @@ function ContractRow({
   const [quickTaskDueDate, setQuickTaskDueDate] = useState('');
   const [isCreatingQuickTask, setIsCreatingQuickTask] = useState(false);
   const quickTaskRef = useRef<HTMLDivElement>(null);
+  const [showDateTooltip, setShowDateTooltip] = useState(false);
+  const dateTooltipRef = useRef<HTMLDivElement>(null);
 
   // Use pending status if available (batch mode)
   const effectiveStatus = pendingStatus || contract.status;
@@ -810,8 +812,14 @@ function ContractRow({
             )}
           </div>
 
-          {/* Close Date - Editable */}
-          <div className="text-center" onClick={e => e.stopPropagation()}>
+          {/* Close Date - Editable with Date Timeline Tooltip */}
+          <div
+            className="text-center relative"
+            onClick={e => e.stopPropagation()}
+            onMouseEnter={() => !isEditing && setShowDateTooltip(true)}
+            onMouseLeave={() => setShowDateTooltip(false)}
+            ref={dateTooltipRef}
+          >
             {isEditing ? (
               <input
                 type="date"
@@ -827,10 +835,78 @@ function ContractRow({
                 style={{ colorScheme: 'dark' }}
               />
             ) : (
-              <span className="text-[13px] text-[#8FA3BF]">
+              <span className="text-[13px] text-[#8FA3BF] cursor-pointer hover:text-[#38BDF8] transition-colors">
                 {formatDate(contract.contractDate)}
               </span>
             )}
+
+            {/* Sophisticated Date Timeline Tooltip */}
+            <AnimatePresence>
+              {showDateTooltip && !isEditing && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="absolute z-50 top-full mt-2 left-1/2 -translate-x-1/2"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[200px]">
+                    {/* Header */}
+                    <div className="px-4 py-2.5 border-b border-white/[0.06] bg-gradient-to-r from-[#0189CB]/10 to-transparent">
+                      <span className="text-[10px] font-semibold text-[#0189CB] uppercase tracking-wider">Key Dates</span>
+                    </div>
+
+                    {/* Date Timeline */}
+                    <div className="p-3 space-y-0">
+                      {/* Award */}
+                      <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
+                        <div className="w-2 h-2 rounded-full bg-[#8B5CF6] shadow-[0_0_6px_rgba(139,92,246,0.5)]" />
+                        <span className="text-[11px] text-[#64748B] w-16">Award</span>
+                        <span className={`text-[12px] font-medium ${contract.awardDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                          {formatDate(contract.awardDate)}
+                        </span>
+                      </div>
+
+                      {/* Contract */}
+                      <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
+                        <div className="w-2 h-2 rounded-full bg-[#0189CB] shadow-[0_0_6px_rgba(1,137,203,0.5)]" />
+                        <span className="text-[11px] text-[#64748B] w-16">Contract</span>
+                        <span className={`text-[12px] font-medium ${contract.contractDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                          {formatDate(contract.contractDate)}
+                        </span>
+                      </div>
+
+                      {/* Deliver */}
+                      <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
+                        <div className="w-2 h-2 rounded-full bg-[#F59E0B] shadow-[0_0_6px_rgba(245,158,11,0.5)]" />
+                        <span className="text-[11px] text-[#64748B] w-16">Deliver</span>
+                        <span className="text-[12px] font-medium text-[#475569]">—</span>
+                      </div>
+
+                      {/* Install */}
+                      <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
+                        <div className="w-2 h-2 rounded-full bg-[#22C55E] shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
+                        <span className="text-[11px] text-[#64748B] w-16">Install</span>
+                        <span className={`text-[12px] font-medium ${contract.installDate ? 'text-[#E2E8F0]' : 'text-[#475569]'}`}>
+                          {formatDate(contract.installDate)}
+                        </span>
+                      </div>
+
+                      {/* Cash */}
+                      <div className="flex items-center gap-3 py-2 px-1 rounded hover:bg-white/[0.02] transition-colors">
+                        <div className="w-2 h-2 rounded-full bg-[#EC4899] shadow-[0_0_6px_rgba(236,72,153,0.5)]" />
+                        <span className="text-[11px] text-[#64748B] w-16">Cash</span>
+                        <span className="text-[12px] font-medium text-[#475569]">—</span>
+                      </div>
+                    </div>
+
+                    {/* Tooltip Arrow */}
+                    <div className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-[#0F1722] border-l border-t border-white/10 rotate-45" />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Days Until Close - Color coded by urgency with bar indicator */}
