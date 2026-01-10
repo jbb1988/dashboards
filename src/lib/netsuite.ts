@@ -65,11 +65,11 @@ function generateAuthHeader(
   queryParams?: Record<string, string>
 ): string {
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  // Use alphanumeric nonce (some OAuth implementations are picky)
+  // Use alphanumeric nonce
   const nonce = crypto.randomBytes(16).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
 
-  // Try HMAC-SHA1 first as it's more widely supported
-  const signatureMethod = 'HMAC-SHA1';
+  // HMAC-SHA256 is required (HMAC-SHA1 deprecated since 2023.1)
+  const signatureMethod = 'HMAC-SHA256';
 
   const oauthParams: Record<string, string> = {
     oauth_consumer_key: config.consumerKey,
