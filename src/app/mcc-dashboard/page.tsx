@@ -497,9 +497,9 @@ export default function MCCDashboard() {
           </div>
         </header>
 
-        <main className="px-8 py-6">
+        <main className="w-full px-8 py-6">
           {/* KPI Cards */}
-          <div className="grid grid-cols-5 gap-4 mb-6">
+          <div className="w-full grid grid-cols-5 gap-4 mb-6">
             <KPICard
               title="Total MCC Revenue"
               value={formatCurrency(filteredKpis.totalRevenue)}
@@ -565,9 +565,9 @@ export default function MCCDashboard() {
             />
           </div>
 
-          <div className="grid grid-cols-4 gap-6">
+          <div className="w-full grid grid-cols-4 gap-6">
             {/* Main Content - Customer List */}
-            <div className="col-span-3">
+            <div className="col-span-3 w-full">
               <div className="rounded-xl bg-[#111827] border border-white/[0.04] shadow-[0_4px_16px_rgba(0,0,0,0.25)] overflow-hidden">
                 {/* Filters */}
                 <div className="px-6 py-3 border-b border-white/[0.04] bg-[#0B1220]/60">
@@ -694,7 +694,7 @@ export default function MCCDashboard() {
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-6">
+            <div className="col-span-1 space-y-6">
               {/* Year-over-Year Totals */}
               <div className="rounded-xl bg-[#111827] border border-white/[0.04] shadow-[0_4px_16px_rgba(0,0,0,0.2)] p-4">
                 <h3 className="text-[10px] font-semibold text-[#475569] uppercase tracking-[0.08em] mb-4">
