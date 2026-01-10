@@ -461,7 +461,7 @@ export async function getDiversifiedSales(options: {
   }
 
   // Query transaction lines with revenue data
-  // Use netamount for actual revenue, foreignamount as fallback
+  // Include full class hierarchy (fullname includes parent : child)
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -471,19 +471,17 @@ export async function getDiversifiedSales(options: {
       t.postingperiod,
       c.companyname AS customer_name,
       c.id AS customer_id,
-      cl.name AS class_name,
+      BUILTIN.DF(tl.class) AS class_name,
       tl.netamount AS amount,
       tl.quantity,
       tl.rate,
-      i.displayname AS item_name
+      BUILTIN.DF(tl.item) AS item_name
     FROM transactionline tl
     INNER JOIN transaction t ON t.id = tl.transaction
     LEFT JOIN customer c ON c.id = t.entity
-    LEFT JOIN classification cl ON cl.id = tl.class
-    LEFT JOIN item i ON i.id = tl.item
     WHERE t.type = 'CustInvc'
       AND tl.mainline = 'F'
-      AND cl.name LIKE '%Diversified%'
+      AND BUILTIN.DF(tl.class) LIKE '%Diversified%'
       ${dateFilter}
     ORDER BY t.trandate DESC
   `;
