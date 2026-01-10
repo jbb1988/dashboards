@@ -806,6 +806,7 @@ export async function getDiversifiedSales(filters?: {
 
 /**
  * Get aggregated diversified sales by class
+ * Fetches data in batches per year to avoid 1000-row limit
  */
 export async function getDiversifiedSalesByClass(filters?: {
   years?: number[];
@@ -822,21 +823,48 @@ export async function getDiversifiedSalesByClass(filters?: {
 }>> {
   const admin = getSupabaseAdmin();
 
-  let query = admin
-    .from('diversified_sales')
-    .select('class_name, class_category, quantity, revenue, cost, gross_profit, gross_profit_pct');
+  // Determine which years to query
+  const yearsToQuery = filters?.years && filters.years.length > 0
+    ? filters.years
+    : [2024, 2025, 2026];
 
-  if (filters?.years && filters.years.length > 0) {
-    query = query.in('year', filters.years);
+  const allData: Array<{ class_name: string; class_category: string; quantity: number; revenue: number; cost: number; gross_profit: number; gross_profit_pct: number }> = [];
+
+  // Fetch data per year in batches to avoid 1000-row limit
+  for (const year of yearsToQuery) {
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = admin
+        .from('diversified_sales')
+        .select('class_name, class_category, quantity, revenue, cost, gross_profit, gross_profit_pct')
+        .eq('year', year)
+        .range(offset, offset + batchSize - 1);
+
+      if (filters?.months && filters.months.length > 0) {
+        query = query.in('month', filters.months);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`Error fetching year ${year} class data:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...data);
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
   }
-  if (filters?.months && filters.months.length > 0) {
-    query = query.in('month', filters.months);
-  }
 
-  const { data, error } = await query;
-
-  if (error || !data) {
-    console.error('Error fetching diversified sales by class:', error);
+  if (allData.length === 0) {
     return [];
   }
 
@@ -852,7 +880,7 @@ export async function getDiversifiedSalesByClass(filters?: {
     transaction_count: number;
   }>();
 
-  for (const row of data) {
+  for (const row of allData) {
     const key = row.class_name;
     if (!byClass.has(key)) {
       byClass.set(key, {
@@ -886,6 +914,7 @@ export async function getDiversifiedSalesByClass(filters?: {
 
 /**
  * Get aggregated diversified sales by customer
+ * Fetches data in batches per year to avoid 1000-row limit
  */
 export async function getDiversifiedSalesByCustomer(filters?: {
   years?: number[];
@@ -903,24 +932,51 @@ export async function getDiversifiedSalesByCustomer(filters?: {
 }>> {
   const admin = getSupabaseAdmin();
 
-  let query = admin
-    .from('diversified_sales')
-    .select('customer_id, customer_name, quantity, revenue, cost, gross_profit, gross_profit_pct');
+  // Determine which years to query
+  const yearsToQuery = filters?.years && filters.years.length > 0
+    ? filters.years
+    : [2024, 2025, 2026];
 
-  if (filters?.years && filters.years.length > 0) {
-    query = query.in('year', filters.years);
-  }
-  if (filters?.months && filters.months.length > 0) {
-    query = query.in('month', filters.months);
-  }
-  if (filters?.className) {
-    query = query.eq('class_name', filters.className);
+  const allData: Array<{ customer_id: string; customer_name: string; quantity: number; revenue: number; cost: number; gross_profit: number; gross_profit_pct: number }> = [];
+
+  // Fetch data per year in batches to avoid 1000-row limit
+  for (const year of yearsToQuery) {
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = admin
+        .from('diversified_sales')
+        .select('customer_id, customer_name, quantity, revenue, cost, gross_profit, gross_profit_pct')
+        .eq('year', year)
+        .range(offset, offset + batchSize - 1);
+
+      if (filters?.months && filters.months.length > 0) {
+        query = query.in('month', filters.months);
+      }
+      if (filters?.className) {
+        query = query.eq('class_name', filters.className);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`Error fetching year ${year} customer data:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...data);
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
   }
 
-  const { data, error } = await query;
-
-  if (error || !data) {
-    console.error('Error fetching diversified sales by customer:', error);
+  if (allData.length === 0) {
     return [];
   }
 
@@ -936,7 +992,7 @@ export async function getDiversifiedSalesByCustomer(filters?: {
     transaction_count: number;
   }>();
 
-  for (const row of data) {
+  for (const row of allData) {
     const key = row.customer_id || row.customer_name || 'Unknown';
     if (!byCustomer.has(key)) {
       byCustomer.set(key, {
@@ -970,6 +1026,7 @@ export async function getDiversifiedSalesByCustomer(filters?: {
 
 /**
  * Get diversified dashboard summary
+ * Fetches data in batches per year to avoid 1000-row limit
  */
 export async function getDiversifiedDashboardSummary(filters?: {
   years?: number[];
@@ -986,21 +1043,48 @@ export async function getDiversifiedDashboardSummary(filters?: {
 }> {
   const admin = getSupabaseAdmin();
 
-  let query = admin
-    .from('diversified_sales')
-    .select('quantity, revenue, cost, gross_profit, class_name, customer_id');
+  // Determine which years to query
+  const yearsToQuery = filters?.years && filters.years.length > 0
+    ? filters.years
+    : [2024, 2025, 2026];
 
-  if (filters?.years && filters.years.length > 0) {
-    query = query.in('year', filters.years);
+  const allData: Array<{ quantity: number; revenue: number; cost: number; gross_profit: number; class_name: string; customer_id: string }> = [];
+
+  // Fetch data per year in batches to avoid 1000-row limit
+  for (const year of yearsToQuery) {
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = admin
+        .from('diversified_sales')
+        .select('quantity, revenue, cost, gross_profit, class_name, customer_id')
+        .eq('year', year)
+        .range(offset, offset + batchSize - 1);
+
+      if (filters?.months && filters.months.length > 0) {
+        query = query.in('month', filters.months);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`Error fetching year ${year} data:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...data);
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
   }
-  if (filters?.months && filters.months.length > 0) {
-    query = query.in('month', filters.months);
-  }
 
-  const { data, error } = await query;
-
-  if (error || !data) {
-    console.error('Error fetching dashboard summary:', error);
+  if (allData.length === 0) {
     return {
       totalRevenue: 0,
       totalUnits: 0,
@@ -1013,10 +1097,10 @@ export async function getDiversifiedDashboardSummary(filters?: {
     };
   }
 
-  const uniqueClasses = new Set(data.map(d => d.class_name));
-  const uniqueCustomers = new Set(data.filter(d => d.customer_id).map(d => d.customer_id));
+  const uniqueClasses = new Set(allData.map(d => d.class_name));
+  const uniqueCustomers = new Set(allData.filter(d => d.customer_id).map(d => d.customer_id));
 
-  const totals = data.reduce(
+  const totals = allData.reduce(
     (acc, row) => ({
       revenue: acc.revenue + (row.revenue || 0),
       units: acc.units + (row.quantity || 0),
@@ -1032,7 +1116,7 @@ export async function getDiversifiedDashboardSummary(filters?: {
     totalCost: totals.cost,
     grossProfit: totals.grossProfit,
     grossProfitPct: totals.revenue > 0 ? (totals.grossProfit / totals.revenue) * 100 : 0,
-    transactionCount: data.length,
+    transactionCount: allData.length,
     uniqueClasses: uniqueClasses.size,
     uniqueCustomers: uniqueCustomers.size,
   };
@@ -1040,6 +1124,7 @@ export async function getDiversifiedDashboardSummary(filters?: {
 
 /**
  * Get available years and months for diversified filters
+ * Uses separate queries per year to avoid 1000 row limit issue
  */
 export async function getDiversifiedFilterOptions(): Promise<{
   years: number[];
@@ -1049,24 +1134,52 @@ export async function getDiversifiedFilterOptions(): Promise<{
 }> {
   const admin = getSupabaseAdmin();
 
-  const { data, error } = await admin
-    .from('diversified_sales')
-    .select('year, month, class_name, customer_id, customer_name');
+  // Get distinct years by querying each potential year range separately
+  // This avoids the 1000-row limit issue that causes missing years
+  const potentialYears = [2024, 2025, 2026, 2027];
+  const yearsWithData: number[] = [];
 
-  if (error || !data) {
-    return { years: [], months: [], classes: [], customers: [] };
-  }
-
-  const years = [...new Set(data.map(d => d.year))].sort((a, b) => b - a);
-  const months = [...new Set(data.map(d => d.month))].sort((a, b) => a - b);
-  const classes = [...new Set(data.map(d => d.class_name))].sort();
-
-  const customerMap = new Map<string, string>();
-  for (const d of data) {
-    if (d.customer_id && !customerMap.has(d.customer_id)) {
-      customerMap.set(d.customer_id, d.customer_name || 'Unknown');
+  for (const year of potentialYears) {
+    const { data } = await admin
+      .from('diversified_sales')
+      .select('id')
+      .eq('year', year)
+      .limit(1);
+    if (data && data.length > 0) {
+      yearsWithData.push(year);
     }
   }
+
+  const years = yearsWithData.sort((a, b) => b - a);
+
+  // Get distinct months (always 1-12)
+  const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  // Get distinct classes - order by year DESC to get from all years
+  const { data: classData } = await admin
+    .from('diversified_sales')
+    .select('class_name')
+    .order('year', { ascending: false })
+    .range(0, 999);
+
+  const classes = [...new Set((classData || []).map(d => d.class_name))].sort();
+
+  // Get distinct customers from all years
+  const customerMap = new Map<string, string>();
+  for (const year of yearsWithData) {
+    const { data: customerData } = await admin
+      .from('diversified_sales')
+      .select('customer_id, customer_name')
+      .eq('year', year)
+      .range(0, 999);
+
+    for (const d of customerData || []) {
+      if (d.customer_id && !customerMap.has(d.customer_id)) {
+        customerMap.set(d.customer_id, d.customer_name || 'Unknown');
+      }
+    }
+  }
+
   const customers = Array.from(customerMap.entries())
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
