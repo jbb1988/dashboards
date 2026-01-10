@@ -33,6 +33,10 @@ export interface KPICardProps {
   trendLabel?: string;
   /** Optional badge count (e.g., for notifications) */
   badge?: number;
+  /** Enable gradient background effect (Mind-Muscle style) */
+  gradient?: boolean;
+  /** Glow intensity for the card */
+  glowIntensity?: 'none' | 'subtle' | 'strong';
 }
 
 // =============================================================================
@@ -112,7 +116,26 @@ export function KPICard({
   trend,
   trendLabel,
   badge,
+  gradient = false,
+  glowIntensity = 'subtle',
 }: KPICardProps) {
+  // Gradient styling inspired by Mind-Muscle project
+  const getGradientStyle = () => {
+    if (!gradient) return {};
+    const glowStrength = {
+      none: '0',
+      subtle: '0.1',
+      strong: '0.2',
+    }[glowIntensity];
+    return {
+      background: `linear-gradient(135deg, ${color}15 0%, #1B1F39 50%, #151821 100%)`,
+      borderColor: `${color}30`,
+      boxShadow: `0 8px 32px ${color}${glowStrength === '0.2' ? '30' : glowStrength === '0.1' ? '20' : '00'}, inset 0 1px 0 ${color}15`,
+    };
+  };
+
+  const gradientStyle = getGradientStyle();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -120,24 +143,36 @@ export function KPICard({
       transition={{ delay, duration: 0.5 }}
       whileHover={{
         y: -2,
-        boxShadow: `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${color}15`,
+        boxShadow: gradient
+          ? `0 16px 40px ${color}25, 0 0 30px ${color}15`
+          : `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${color}15`,
       }}
       whileTap={{ scale: 0.995 }}
       onClick={onClick}
       className={`
         relative overflow-hidden rounded-xl p-5 cursor-pointer transition-all duration-150
-        ${tokens.bg.card} border ${tokens.border.subtle}
-        ${tokens.shadow.card}
+        ${gradient ? '' : `${tokens.bg.card} border ${tokens.border.subtle} ${tokens.shadow.card}`}
         ${isActive
-          ? `${tokens.bg.elevated} border-[${color}]/35 shadow-[0_8px_24px_rgba(0,0,0,0.4),0_0_20px_${color}15]`
+          ? `${tokens.bg.elevated} shadow-[0_8px_24px_rgba(0,0,0,0.4),0_0_20px_${color}15]`
           : `hover:${tokens.bg.elevated} hover:border-white/[0.1]`
         }
       `}
+      style={gradient ? { ...gradientStyle, border: `1px solid ${color}30` } : undefined}
     >
+      {/* Specular highlight (top edge) - only for gradient variant */}
+      {gradient && (
+        <div
+          className="absolute top-0 left-0 right-0 h-[1px]"
+          style={{
+            background: `linear-gradient(90deg, transparent 10%, ${color}40 50%, transparent 90%)`,
+          }}
+        />
+      )}
+
       {/* Left accent bar - always visible */}
       <div
         className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
-        style={{ background: color }}
+        style={{ background: gradient ? `linear-gradient(180deg, ${color} 0%, ${color}60 100%)` : color }}
       />
 
       <div className="flex items-start justify-between mb-3">

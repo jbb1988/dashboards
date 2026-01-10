@@ -861,7 +861,7 @@ export default function ContractReviewPage() {
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
       <motion.main
-        className="relative z-10 p-8"
+        className="relative z-20 p-8"
         animate={{ marginLeft: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
       >
@@ -879,7 +879,7 @@ export default function ContractReviewPage() {
           </button>
         </div>
 
-        {/* KPI Summary */}
+        {/* KPI Summary - with gradient styling for premium pop */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <KPICard
             title="Contracts Available"
@@ -888,6 +888,8 @@ export default function ContractReviewPage() {
             icon={KPIIcons.document}
             color="#38BDF8"
             delay={0.1}
+            gradient
+            glowIntensity="subtle"
           />
           <KPICard
             title="Analysis Tool"
@@ -896,6 +898,8 @@ export default function ContractReviewPage() {
             icon={KPIIcons.trending}
             color="#8B5CF6"
             delay={0.2}
+            gradient
+            glowIntensity="subtle"
           />
           <KPICard
             title="Quick Review"
@@ -904,6 +908,8 @@ export default function ContractReviewPage() {
             icon={KPIIcons.clipboard}
             color="#22C55E"
             delay={0.3}
+            gradient
+            glowIntensity="subtle"
           />
         </div>
 
