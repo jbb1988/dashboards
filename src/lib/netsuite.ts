@@ -636,38 +636,50 @@ export interface ProjectProfitabilityRecord {
 }
 
 /**
- * Parse project type from class name and account name
- * NetSuite classes: Test Bench, Diversified Products, RCM, etc.
- * Account names may contain: MCC Services, Test Bench Equipment, etc.
+ * Parse project type from account number
+ * Maps NetSuite account numbers to project types matching the Excel spreadsheet:
+ * - TBEN: Test Bench Equipment New (4011, 5011)
+ * - TBEU: Test Bench Equipment Upgrade (4012, 5012)
+ * - TBIN: TB Install & Training New (4031, 5031)
+ * - TBIU: TB Install & Training Upgrade (4032, 5032)
+ * - M3IN: M3 Install New (4041, 5041)
+ * - M3IU: M3 Install Upgrade (4042, 5042)
+ * - M3SW: M3 Software (4051, 4080-4099, 5051, 5080-5099)
+ * - MCC: MCC Services (4100-4111, 5100-5111)
+ * - TBSV: TB Service/Maintenance (4071-4079, 5071-5079)
  */
-function parseProjectType(className: string, accountName?: string): string {
-  if (!className && !accountName) return 'Unknown';
+function parseProjectType(accountNumber: string, accountName?: string): string {
+  if (!accountNumber) return 'Unknown';
 
-  const upperClass = (className || '').toUpperCase();
-  const upperAccount = (accountName || '').toUpperCase();
+  const acct = accountNumber.trim();
 
-  // Check class name first (main categories)
-  if (upperClass.includes('TEST BENCH')) return 'Test Bench';
-  if (upperClass.includes('DIVERSIFIED')) return 'Diversified Products';
-  if (upperClass.includes('RCM')) return 'RCM';
+  // Test Bench Equipment
+  if (acct === '4011' || acct === '5011') return 'TBEN';
+  if (acct === '4012' || acct === '5012') return 'TBEU';
+  if (acct.startsWith('401') || acct.startsWith('501')) return 'TBEN'; // 4010, 4013-4019, etc.
+  if (acct === '4021' || acct === '5021') return 'TB Components';
 
-  // Check account name for specific product lines
-  if (upperAccount.includes('MCC')) return 'MCC Services';
-  if (upperAccount.includes('TEST BENCH') || upperAccount.includes('TB ')) return 'Test Bench';
-  if (upperAccount.includes('M3 ')) return 'M3 Software';
-  if (upperAccount.includes('AMR')) return 'AMR';
-  if (upperAccount.includes('DIVERSIFIED')) return 'Diversified Products';
+  // TB Install & Training
+  if (acct === '4031' || acct === '5031') return 'TBIN';
+  if (acct === '4032' || acct === '5032') return 'TBIU';
+  if (acct.startsWith('403') || acct.startsWith('503')) return 'TBIN';
 
-  // Specific class sub-categories
-  if (upperClass.includes('CALIBRATION')) return 'Calibration';
-  if (upperClass.includes('METER TESTING')) return 'Meter Testing';
-  if (upperClass.includes('VEROFLOW')) return 'Veroflow';
-  if (upperClass.includes('SPOOLS')) return 'Spools';
+  // M3 Install & Training
+  if (acct === '4041' || acct === '5041') return 'M3IN';
+  if (acct === '4042' || acct === '5042') return 'M3IU';
+  if (acct.startsWith('404') || acct.startsWith('504')) return 'M3IN';
 
-  // Default based on class if present
-  if (className && className !== 'Other' && className !== 'MISC') {
-    return className;
-  }
+  // M3 Software
+  if (acct.startsWith('405') || acct.startsWith('505')) return 'M3 Software';
+  if (acct.startsWith('408') || acct.startsWith('409') ||
+      acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
+
+  // TB Service/Maintenance
+  if (acct.startsWith('407') || acct.startsWith('507')) return 'TB Service';
+
+  // MCC Services
+  if (acct.startsWith('410') || acct.startsWith('411') ||
+      acct.startsWith('510') || acct.startsWith('511')) return 'MCC';
 
   return 'Other';
 }
@@ -695,8 +707,12 @@ export async function getProjectProfitability(options: {
     dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
   }
 
-  // Query TransactionLine with revenue (4xxx) and COGS (5xxx) accounts
-  // Filtered by TB/MCC/TBEN project classes
+  // Query TransactionLine with TB/MCC/M3 specific accounts only
+  // Revenue accounts: 4010-4019 (TB Equip), 4021 (TB Components), 4031-4039 (TB Install),
+  //   4041-4049 (M3 Install), 4051-4059 (M3 Subscription), 4071-4079 (TB Service),
+  //   4080-4099 (M3 Software), 4100-4119 (MCC Services)
+  // COGS accounts: Corresponding 5xxx accounts
+  // EXCLUDES: 4050 (Other/Shipping), 4120+ (AMR/Diversified)
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -720,12 +736,35 @@ export async function getProjectProfitability(options: {
     FROM Transaction t
     INNER JOIN TransactionLine tl ON tl.transaction = t.id
     LEFT JOIN Account a ON a.id = tl.account
-    LEFT JOIN Classification c ON c.id = tl.class
     WHERE t.posting = 'T'
       AND tl.mainline = 'F'
       AND tl.netamount IS NOT NULL
       AND tl.netamount != 0
-      AND (a.acctnumber LIKE '4%' OR a.acctnumber LIKE '5%')
+      AND (
+        -- Test Bench Equipment (Revenue & COGS)
+        (a.acctnumber >= '4010' AND a.acctnumber <= '4019')
+        OR (a.acctnumber >= '5010' AND a.acctnumber <= '5019')
+        -- Test Bench Components
+        OR a.acctnumber = '4021' OR a.acctnumber = '5021'
+        -- TB Install & Training
+        OR (a.acctnumber >= '4031' AND a.acctnumber <= '4039')
+        OR (a.acctnumber >= '5031' AND a.acctnumber <= '5039')
+        -- M3 Install & Training
+        OR (a.acctnumber >= '4041' AND a.acctnumber <= '4049')
+        OR (a.acctnumber >= '5041' AND a.acctnumber <= '5049')
+        -- M3 Software Subscription
+        OR (a.acctnumber >= '4051' AND a.acctnumber <= '4059')
+        OR (a.acctnumber >= '5051' AND a.acctnumber <= '5059')
+        -- TB Service/Maintenance
+        OR (a.acctnumber >= '4071' AND a.acctnumber <= '4079')
+        OR (a.acctnumber >= '5071' AND a.acctnumber <= '5079')
+        -- M3 Software
+        OR (a.acctnumber >= '4080' AND a.acctnumber <= '4099')
+        OR (a.acctnumber >= '5080' AND a.acctnumber <= '5099')
+        -- MCC Services
+        OR (a.acctnumber >= '4100' AND a.acctnumber <= '4119')
+        OR (a.acctnumber >= '5100' AND a.acctnumber <= '5119')
+      )
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.id
   `;
@@ -762,7 +801,7 @@ export async function getProjectProfitability(options: {
 
       const className = row.class_name || '';
       const accountName = row.account_name || '';
-      const projectType = parseProjectType(className, accountName);
+      const projectType = parseProjectType(accountNumber, accountName);
 
       return {
         netsuiteTransactionId: row.transaction_id?.toString() || '',
