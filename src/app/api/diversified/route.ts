@@ -6,6 +6,8 @@ import {
   getDiversifiedFilterOptions,
   getDiversifiedBudgets,
   getDiversifiedSales as getSupabaseSales,
+  getDiversifiedMonthlySummary,
+  getDiversifiedClassMonthlySummary,
 } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -19,8 +21,9 @@ export async function GET(request: NextRequest) {
     const monthsParam = searchParams.get('months');
     const classNameParam = searchParams.get('className');
     const customerIdParam = searchParams.get('customerId');
-    const viewParam = searchParams.get('view') || 'class'; // 'class' or 'customer'
+    const viewParam = searchParams.get('view') || 'class'; // 'class', 'customer', or 'charts'
     const includeDetails = searchParams.get('details') === 'true';
+    const includeCharts = searchParams.get('charts') === 'true' || viewParam === 'charts';
 
     const years = yearsParam ? yearsParam.split(',').map(Number) : undefined;
     const months = monthsParam ? monthsParam.split(',').map(Number) : undefined;
@@ -35,7 +38,7 @@ export async function GET(request: NextRequest) {
     let byClass;
     let byCustomer;
 
-    if (viewParam === 'class' || !classNameParam) {
+    if (viewParam === 'class' || !classNameParam || includeCharts) {
       byClass = await getDiversifiedSalesByClass({ years, months });
 
       // If a class is selected, get customers for that class
@@ -46,6 +49,11 @@ export async function GET(request: NextRequest) {
           className: classNameParam,
         });
       }
+    }
+
+    // Always fetch customer data for charts (needed for CustomerDonut)
+    if (includeCharts && !byCustomer) {
+      byCustomer = await getDiversifiedSalesByCustomer({ years, months });
     }
 
     if (viewParam === 'customer' || customerIdParam) {
@@ -128,6 +136,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Include chart data if requested
+    let chartData;
+    if (includeCharts) {
+      const [monthly, classMonthly] = await Promise.all([
+        getDiversifiedMonthlySummary({ years }),
+        getDiversifiedClassMonthlySummary({ years }),
+      ]);
+      chartData = {
+        monthly,
+        classMonthly,
+      };
+    }
+
     return NextResponse.json({
       summary: {
         ...summary,
@@ -148,6 +169,7 @@ export async function GET(request: NextRequest) {
         view: viewParam,
       },
       details,
+      chartData,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {

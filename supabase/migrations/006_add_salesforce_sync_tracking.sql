@@ -54,26 +54,19 @@ CREATE POLICY "Service role can manage sync log"
   WITH CHECK (true);
 
 -- Function to mark a contract as having pending changes
+-- Only tracks DATE fields that sync to Salesforce
 CREATE OR REPLACE FUNCTION mark_contract_pending_sync()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Only mark as pending if tracking columns weren't the ones changed
+  -- Only mark as pending if Salesforce DATE fields changed
   IF TG_OP = 'UPDATE' AND (
-    OLD.status IS DISTINCT FROM NEW.status OR
     OLD.award_date IS DISTINCT FROM NEW.award_date OR
     OLD.contract_date IS DISTINCT FROM NEW.contract_date OR
-    OLD.install_date IS DISTINCT FROM NEW.install_date OR
-    OLD.value IS DISTINCT FROM NEW.value OR
-    OLD.probability IS DISTINCT FROM NEW.probability OR
-    OLD.budgeted IS DISTINCT FROM NEW.budgeted OR
-    OLD.manual_close_probability IS DISTINCT FROM NEW.manual_close_probability
+    OLD.install_date IS DISTINCT FROM NEW.install_date
   ) THEN
     -- Build the pending fields object
     NEW.sf_sync_pending_fields = COALESCE(NEW.sf_sync_pending_fields, '{}'::jsonb);
 
-    IF OLD.status IS DISTINCT FROM NEW.status THEN
-      NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('status', NEW.status);
-    END IF;
     IF OLD.award_date IS DISTINCT FROM NEW.award_date THEN
       NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('award_date', NEW.award_date);
     END IF;
@@ -82,18 +75,6 @@ BEGIN
     END IF;
     IF OLD.install_date IS DISTINCT FROM NEW.install_date THEN
       NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('install_date', NEW.install_date);
-    END IF;
-    IF OLD.value IS DISTINCT FROM NEW.value THEN
-      NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('value', NEW.value);
-    END IF;
-    IF OLD.probability IS DISTINCT FROM NEW.probability THEN
-      NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('probability', NEW.probability);
-    END IF;
-    IF OLD.budgeted IS DISTINCT FROM NEW.budgeted THEN
-      NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('budgeted', NEW.budgeted);
-    END IF;
-    IF OLD.manual_close_probability IS DISTINCT FROM NEW.manual_close_probability THEN
-      NEW.sf_sync_pending_fields = NEW.sf_sync_pending_fields || jsonb_build_object('manual_close_probability', NEW.manual_close_probability);
     END IF;
 
     NEW.sf_sync_status = 'pending';

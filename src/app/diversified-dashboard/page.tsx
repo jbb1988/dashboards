@@ -4,6 +4,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
+import {
+  RevenueAreaChart,
+  ClassBarChart,
+  BudgetVarianceChart,
+  CustomerDonut,
+} from '@/components/charts';
 
 interface ClassSummary {
   class_name: string;
@@ -50,6 +56,41 @@ interface FilterOptions {
   customers: Array<{ id: string; name: string }>;
 }
 
+interface MonthlyChartData {
+  year: number;
+  month: number;
+  monthName: string;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  grossProfitPct: number;
+  units: number;
+  transactionCount: number;
+}
+
+interface ClassMonthlyData {
+  className: string;
+  year: number;
+  month: number;
+  monthName: string;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  units: number;
+}
+
+interface BudgetData {
+  year: number;
+  month: number;
+  class_name: string;
+  budget_revenue: number;
+}
+
+interface ChartData {
+  monthly: MonthlyChartData[];
+  classMonthly: ClassMonthlyData[];
+}
+
 interface DashboardData {
   summary: DashboardSummary;
   byClass: ClassSummary[];
@@ -62,6 +103,7 @@ interface DashboardData {
     customerId?: string;
     view: string;
   };
+  chartData?: ChartData;
   lastUpdated: string;
 }
 
@@ -345,6 +387,10 @@ export default function DiversifiedDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'table' | 'charts'>('table');
+  const [budgetData, setBudgetData] = useState<BudgetData[]>([]);
+
   // Filter state
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
@@ -369,6 +415,11 @@ export default function DiversifiedDashboard() {
       if (selectedCustomer) params.set('customerId', selectedCustomer);
       params.set('view', viewMode);
 
+      // Request chart data when on charts tab
+      if (activeTab === 'charts') {
+        params.set('charts', 'true');
+      }
+
       const response = await fetch(`/api/diversified?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch data');
 
@@ -379,6 +430,19 @@ export default function DiversifiedDashboard() {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch budget data for charts
+  const fetchBudgetData = async () => {
+    try {
+      const response = await fetch('/api/diversified/budgets');
+      if (response.ok) {
+        const result = await response.json();
+        setBudgetData(result.budgets || []);
+      }
+    } catch (err) {
+      console.error('Error fetching budget data:', err);
     }
   };
 
@@ -431,10 +495,15 @@ export default function DiversifiedDashboard() {
     }
   };
 
-  // Initial load and refresh on filter change
+  // Initial load and refresh on filter/tab change
   useEffect(() => {
     fetchData();
-  }, [selectedYears, selectedMonths, selectedClass, selectedCustomer, viewMode]);
+  }, [selectedYears, selectedMonths, selectedClass, selectedCustomer, viewMode, activeTab]);
+
+  // Fetch budget data on mount
+  useEffect(() => {
+    fetchBudgetData();
+  }, []);
 
   // Handle row expansion
   const handleRowExpand = (rowId: string, type: 'class' | 'customer') => {
@@ -592,7 +661,43 @@ export default function DiversifiedDashboard() {
                 />
               </div>
 
-              {/* Filters */}
+              {/* Tab Navigation */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.28 }}
+                className="flex items-center gap-1 mb-6"
+              >
+                <button
+                  onClick={() => setActiveTab('table')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'table'
+                      ? 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/30 shadow-[0_0_20px_rgba(56,189,248,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Data Table
+                </button>
+                <button
+                  onClick={() => setActiveTab('charts')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'charts'
+                      ? 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/30 shadow-[0_0_20px_rgba(56,189,248,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                  </svg>
+                  Charts
+                </button>
+              </motion.div>
+
+              {/* Filters - Only show on table view */}
+              {activeTab === 'table' && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -682,8 +787,10 @@ export default function DiversifiedDashboard() {
                   )}
                 </div>
               </motion.div>
+              )}
 
-              {/* Main Table */}
+              {/* Main Table - Only show on table view */}
+              {activeTab === 'table' && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -734,6 +841,44 @@ export default function DiversifiedDashboard() {
                   )}
                 </div>
               </motion.div>
+              )}
+
+              {/* Charts View */}
+              {activeTab === 'charts' && data.chartData && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  {/* Row 1: Revenue Trend + Budget Variance */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <RevenueAreaChart data={data.chartData.monthly} index={0} />
+                    <BudgetVarianceChart
+                      actualData={data.chartData.monthly}
+                      budgetData={budgetData}
+                      selectedYear={selectedYears.length === 1 ? selectedYears[0] : 2025}
+                      index={1}
+                    />
+                  </div>
+
+                  {/* Row 2: Class Bar + Customer Donut */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <ClassBarChart data={data.byClass} index={2} />
+                    <CustomerDonut data={data.byCustomer} index={3} />
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Charts Loading State */}
+              {activeTab === 'charts' && !data.chartData && (
+                <div className="p-12 text-center">
+                  <div className="text-[#64748B] text-[14px]">Loading chart data...</div>
+                  <p className="text-[#475569] text-[12px] mt-1">
+                    Please wait while we fetch the visualization data
+                  </p>
+                </div>
+              )}
             </>
           ) : null}
         </div>

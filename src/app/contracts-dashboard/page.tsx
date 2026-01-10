@@ -1410,14 +1410,10 @@ export default function ContractsDashboard() {
     setSfPushProgress({ current: 0, total: sfSyncPending.length });
 
     try {
-      // Build batch update payload
+      // Build batch update payload - only date fields sync to Salesforce
       const updates = sfSyncPending.map(item => {
         const fields: Record<string, any> = {};
 
-        // Map local field names to Salesforce field names
-        if (item.pendingFields.status) {
-          fields.status = item.pendingFields.status;
-        }
         if (item.pendingFields.award_date) {
           fields.Award_Date__c = item.pendingFields.award_date;
         }
@@ -1427,24 +1423,10 @@ export default function ContractsDashboard() {
         if (item.pendingFields.install_date) {
           fields.Install_Date__c = item.pendingFields.install_date;
         }
-        if (item.pendingFields.value !== undefined) {
-          fields.Amount = item.pendingFields.value;
-        }
-        if (item.pendingFields.probability !== undefined) {
-          fields.Probability = item.pendingFields.probability;
-        }
-        if (item.pendingFields.budgeted !== undefined) {
-          fields.X24_Budget__c = item.pendingFields.budgeted;
-        }
-        if (item.pendingFields.manual_close_probability !== undefined) {
-          fields.X24_Manual_Close_Probability__c = item.pendingFields.manual_close_probability;
-        }
 
         return {
           id: item.salesforceId,
           fields,
-          status: item.pendingFields.status,
-          currentStage: item.salesStage,
         };
       });
 

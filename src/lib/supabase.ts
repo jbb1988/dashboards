@@ -1319,3 +1319,200 @@ export async function deleteAllDiversifiedSales(): Promise<{ success: boolean; c
   console.log(`Deleted ${data?.length || 0} total records`);
   return { success: true, count: data?.length || 0 };
 }
+
+/**
+ * Get monthly summary data for charts
+ * Returns aggregated data by year/month for trend visualizations
+ */
+export async function getDiversifiedMonthlySummary(filters?: {
+  years?: number[];
+}): Promise<Array<{
+  year: number;
+  month: number;
+  monthName: string;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  grossProfitPct: number;
+  units: number;
+  transactionCount: number;
+}>> {
+  const admin = getSupabaseAdmin();
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Determine which years to query
+  const yearsToQuery = filters?.years && filters.years.length > 0
+    ? filters.years
+    : [2024, 2025, 2026];
+
+  const allData: Array<{ year: number; month: number; quantity: number; revenue: number; cost: number; gross_profit: number }> = [];
+
+  // Fetch data per year in batches
+  for (const year of yearsToQuery) {
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await admin
+        .from('diversified_sales')
+        .select('year, month, quantity, revenue, cost, gross_profit')
+        .eq('year', year)
+        .range(offset, offset + batchSize - 1);
+
+      if (error) {
+        console.error(`Error fetching year ${year} data:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...data);
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+  }
+
+  // Group by year + month
+  const monthlyMap = new Map<string, {
+    year: number;
+    month: number;
+    revenue: number;
+    cost: number;
+    grossProfit: number;
+    units: number;
+    count: number;
+  }>();
+
+  for (const row of allData) {
+    const key = `${row.year}-${row.month}`;
+    if (!monthlyMap.has(key)) {
+      monthlyMap.set(key, {
+        year: row.year,
+        month: row.month,
+        revenue: 0,
+        cost: 0,
+        grossProfit: 0,
+        units: 0,
+        count: 0,
+      });
+    }
+    const agg = monthlyMap.get(key)!;
+    agg.revenue += row.revenue || 0;
+    agg.cost += row.cost || 0;
+    agg.grossProfit += row.gross_profit || 0;
+    agg.units += row.quantity || 0;
+    agg.count += 1;
+  }
+
+  // Convert to array and sort
+  return Array.from(monthlyMap.values())
+    .map(m => ({
+      year: m.year,
+      month: m.month,
+      monthName: MONTH_NAMES[m.month - 1] || `M${m.month}`,
+      revenue: m.revenue,
+      cost: m.cost,
+      grossProfit: m.grossProfit,
+      grossProfitPct: m.revenue > 0 ? ((m.revenue - m.cost) / m.revenue) * 100 : 0,
+      units: m.units,
+      transactionCount: m.count,
+    }))
+    .sort((a, b) => a.year === b.year ? a.month - b.month : a.year - b.year);
+}
+
+/**
+ * Get monthly data by class for heatmap and comparison charts
+ */
+export async function getDiversifiedClassMonthlySummary(filters?: {
+  years?: number[];
+}): Promise<Array<{
+  className: string;
+  year: number;
+  month: number;
+  monthName: string;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  units: number;
+}>> {
+  const admin = getSupabaseAdmin();
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const yearsToQuery = filters?.years && filters.years.length > 0
+    ? filters.years
+    : [2024, 2025, 2026];
+
+  const allData: Array<{ class_name: string; year: number; month: number; quantity: number; revenue: number; cost: number; gross_profit: number }> = [];
+
+  for (const year of yearsToQuery) {
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await admin
+        .from('diversified_sales')
+        .select('class_name, year, month, quantity, revenue, cost, gross_profit')
+        .eq('year', year)
+        .range(offset, offset + batchSize - 1);
+
+      if (error) {
+        console.error(`Error fetching year ${year} class data:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...data);
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+  }
+
+  // Group by class + year + month
+  const classMonthlyMap = new Map<string, {
+    className: string;
+    year: number;
+    month: number;
+    revenue: number;
+    cost: number;
+    grossProfit: number;
+    units: number;
+  }>();
+
+  for (const row of allData) {
+    const key = `${row.class_name}-${row.year}-${row.month}`;
+    if (!classMonthlyMap.has(key)) {
+      classMonthlyMap.set(key, {
+        className: row.class_name,
+        year: row.year,
+        month: row.month,
+        revenue: 0,
+        cost: 0,
+        grossProfit: 0,
+        units: 0,
+      });
+    }
+    const agg = classMonthlyMap.get(key)!;
+    agg.revenue += row.revenue || 0;
+    agg.cost += row.cost || 0;
+    agg.grossProfit += row.gross_profit || 0;
+    agg.units += row.quantity || 0;
+  }
+
+  return Array.from(classMonthlyMap.values())
+    .map(m => ({
+      ...m,
+      monthName: MONTH_NAMES[m.month - 1] || `M${m.month}`,
+    }))
+    .sort((a, b) => {
+      if (a.className !== b.className) return a.className.localeCompare(b.className);
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+}
