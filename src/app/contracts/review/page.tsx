@@ -861,7 +861,7 @@ export default function ContractReviewPage() {
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
       <motion.main
-        className="p-8"
+        className="relative z-10 p-8"
         animate={{ marginLeft: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
       >
