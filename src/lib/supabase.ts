@@ -1534,3 +1534,561 @@ export async function getDiversifiedClassMonthlySummary(filters?: {
       return a.month - b.month;
     });
 }
+
+// ============================================
+// PROJECT PROFITABILITY FUNCTIONS
+// ============================================
+
+export interface ProjectProfitability {
+  id?: string;
+  netsuite_transaction_id: string;
+  netsuite_line_id: string;
+  transaction_number: string;
+  transaction_type: string;
+  transaction_date: string;
+  posting_period: string;
+  year: number;
+  month: number;
+  customer_id: string;
+  customer_name: string;
+  class_id: string;
+  class_name: string;
+  project_type: string;
+  account_id: string;
+  account_number: string;
+  account_name: string;
+  account_type: string;
+  is_revenue: boolean;
+  is_cogs: boolean;
+  amount: number;
+  quantity: number;
+  item_id: string;
+  item_name: string;
+  item_description?: string;
+  synced_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProjectBudget {
+  id?: string;
+  year: number;
+  customer_name: string;
+  project_type?: string;
+  budget_revenue: number;
+  budget_cogs: number;
+  budget_gp: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+}
+
+export interface ProjectProfitabilitySyncLog {
+  id?: string;
+  sync_type: 'full' | 'delta';
+  started_at: string;
+  completed_at?: string;
+  status: 'running' | 'completed' | 'failed';
+  records_fetched: number;
+  records_upserted: number;
+  records_deleted: number;
+  error_message?: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Upsert project profitability records to Supabase
+ */
+export async function upsertProjectProfitability(
+  records: Omit<ProjectProfitability, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  const recordsWithTimestamp = records.map(r => ({
+    ...r,
+    synced_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await admin
+    .from('project_profitability')
+    .upsert(recordsWithTimestamp, {
+      onConflict: 'netsuite_transaction_id,netsuite_line_id',
+      ignoreDuplicates: false,
+    });
+
+  if (error) {
+    console.error('Error upserting project profitability:', error);
+    return { success: false, count: 0, error: error.message };
+  }
+
+  return { success: true, count: records.length };
+}
+
+/**
+ * Get project profitability data with filters
+ */
+export async function getProjectProfitabilityData(filters?: {
+  years?: number[];
+  months?: number[];
+  projectTypes?: string[];
+  customerName?: string;
+}): Promise<ProjectProfitability[]> {
+  const admin = getSupabaseAdmin();
+
+  const yearsToQuery = filters?.years && filters.years.length > 0
+    ? filters.years
+    : [2024, 2025, 2026];
+
+  const allData: ProjectProfitability[] = [];
+
+  for (const year of yearsToQuery) {
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = admin
+        .from('project_profitability')
+        .select('*')
+        .eq('year', year)
+        .range(offset, offset + batchSize - 1);
+
+      if (filters?.months && filters.months.length > 0) {
+        query = query.in('month', filters.months);
+      }
+      if (filters?.projectTypes && filters.projectTypes.length > 0) {
+        query = query.in('project_type', filters.projectTypes);
+      }
+      if (filters?.customerName) {
+        query = query.ilike('customer_name', `%${filters.customerName}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`Error fetching year ${year} profitability data:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...(data as ProjectProfitability[]));
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+  }
+
+  return allData;
+}
+
+/**
+ * Get aggregated profitability by project (customer)
+ */
+export async function getProjectProfitabilityByProject(filters?: {
+  years?: number[];
+  projectTypes?: string[];
+}): Promise<Array<{
+  customer_name: string;
+  project_type: string;
+  total_revenue: number;
+  total_cogs: number;
+  gross_profit: number;
+  gross_profit_pct: number;
+  transaction_count: number;
+}>> {
+  const data = await getProjectProfitabilityData(filters);
+
+  // Aggregate by customer
+  const byCustomer = new Map<string, {
+    customer_name: string;
+    project_type: string;
+    total_revenue: number;
+    total_cogs: number;
+    transaction_ids: Set<string>;
+  }>();
+
+  for (const row of data) {
+    const key = row.customer_name;
+    if (!byCustomer.has(key)) {
+      byCustomer.set(key, {
+        customer_name: row.customer_name,
+        project_type: row.project_type || 'Unknown',
+        total_revenue: 0,
+        total_cogs: 0,
+        transaction_ids: new Set(),
+      });
+    }
+    const agg = byCustomer.get(key)!;
+
+    if (row.is_revenue) {
+      agg.total_revenue += Math.abs(row.amount);
+    }
+    if (row.is_cogs) {
+      agg.total_cogs += Math.abs(row.amount);
+    }
+    agg.transaction_ids.add(row.netsuite_transaction_id);
+  }
+
+  return Array.from(byCustomer.values())
+    .map(agg => ({
+      customer_name: agg.customer_name,
+      project_type: agg.project_type,
+      total_revenue: agg.total_revenue,
+      total_cogs: agg.total_cogs,
+      gross_profit: agg.total_revenue - agg.total_cogs,
+      gross_profit_pct: agg.total_revenue > 0
+        ? ((agg.total_revenue - agg.total_cogs) / agg.total_revenue) * 100
+        : 0,
+      transaction_count: agg.transaction_ids.size,
+    }))
+    .sort((a, b) => b.total_revenue - a.total_revenue);
+}
+
+/**
+ * Get profitability summary for dashboard KPIs
+ */
+export async function getProjectProfitabilitySummary(filters?: {
+  years?: number[];
+  projectTypes?: string[];
+}): Promise<{
+  totalRevenue: number;
+  totalCogs: number;
+  grossProfit: number;
+  grossProfitPct: number;
+  projectCount: number;
+  atRiskCount: number;
+}> {
+  const projects = await getProjectProfitabilityByProject(filters);
+
+  const totals = projects.reduce(
+    (acc, p) => ({
+      revenue: acc.revenue + p.total_revenue,
+      cogs: acc.cogs + p.total_cogs,
+    }),
+    { revenue: 0, cogs: 0 }
+  );
+
+  const grossProfit = totals.revenue - totals.cogs;
+  const grossProfitPct = totals.revenue > 0 ? (grossProfit / totals.revenue) * 100 : 0;
+
+  // At-risk = GPM < 50%
+  const atRiskCount = projects.filter(p => p.gross_profit_pct < 50).length;
+
+  return {
+    totalRevenue: totals.revenue,
+    totalCogs: totals.cogs,
+    grossProfit,
+    grossProfitPct,
+    projectCount: projects.length,
+    atRiskCount,
+  };
+}
+
+/**
+ * Get monthly profitability trend
+ */
+export async function getProjectProfitabilityMonthly(filters?: {
+  years?: number[];
+  projectTypes?: string[];
+}): Promise<Array<{
+  year: number;
+  month: number;
+  monthName: string;
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  grossProfitPct: number;
+}>> {
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const data = await getProjectProfitabilityData(filters);
+
+  // Aggregate by year/month
+  const monthly = new Map<string, {
+    year: number;
+    month: number;
+    revenue: number;
+    cogs: number;
+  }>();
+
+  for (const row of data) {
+    const key = `${row.year}-${row.month}`;
+    if (!monthly.has(key)) {
+      monthly.set(key, {
+        year: row.year,
+        month: row.month,
+        revenue: 0,
+        cogs: 0,
+      });
+    }
+    const agg = monthly.get(key)!;
+    if (row.is_revenue) agg.revenue += Math.abs(row.amount);
+    if (row.is_cogs) agg.cogs += Math.abs(row.amount);
+  }
+
+  return Array.from(monthly.values())
+    .map(m => ({
+      year: m.year,
+      month: m.month,
+      monthName: MONTH_NAMES[m.month - 1] || `M${m.month}`,
+      revenue: m.revenue,
+      cogs: m.cogs,
+      grossProfit: m.revenue - m.cogs,
+      grossProfitPct: m.revenue > 0 ? ((m.revenue - m.cogs) / m.revenue) * 100 : 0,
+    }))
+    .sort((a, b) => a.year === b.year ? a.month - b.month : a.year - b.year);
+}
+
+/**
+ * Get profitability by project type
+ */
+export async function getProjectProfitabilityByType(filters?: {
+  years?: number[];
+}): Promise<Array<{
+  project_type: string;
+  total_revenue: number;
+  total_cogs: number;
+  gross_profit: number;
+  gross_profit_pct: number;
+  project_count: number;
+}>> {
+  const projects = await getProjectProfitabilityByProject(filters);
+
+  // Aggregate by type
+  const byType = new Map<string, {
+    project_type: string;
+    total_revenue: number;
+    total_cogs: number;
+    project_count: number;
+  }>();
+
+  for (const p of projects) {
+    const type = p.project_type || 'Unknown';
+    if (!byType.has(type)) {
+      byType.set(type, {
+        project_type: type,
+        total_revenue: 0,
+        total_cogs: 0,
+        project_count: 0,
+      });
+    }
+    const agg = byType.get(type)!;
+    agg.total_revenue += p.total_revenue;
+    agg.total_cogs += p.total_cogs;
+    agg.project_count += 1;
+  }
+
+  return Array.from(byType.values())
+    .map(t => ({
+      project_type: t.project_type,
+      total_revenue: t.total_revenue,
+      total_cogs: t.total_cogs,
+      gross_profit: t.total_revenue - t.total_cogs,
+      gross_profit_pct: t.total_revenue > 0
+        ? ((t.total_revenue - t.total_cogs) / t.total_revenue) * 100
+        : 0,
+      project_count: t.project_count,
+    }))
+    .sort((a, b) => b.total_revenue - a.total_revenue);
+}
+
+/**
+ * Get project budgets
+ */
+export async function getProjectBudgets(filters?: {
+  year?: number;
+  customerName?: string;
+}): Promise<ProjectBudget[]> {
+  const admin = getSupabaseAdmin();
+
+  let query = admin
+    .from('project_budgets')
+    .select('*')
+    .order('year', { ascending: false });
+
+  if (filters?.year) {
+    query = query.eq('year', filters.year);
+  }
+  if (filters?.customerName) {
+    query = query.ilike('customer_name', `%${filters.customerName}%`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching project budgets:', error);
+    return [];
+  }
+
+  return data as ProjectBudget[];
+}
+
+/**
+ * Upsert project budgets
+ */
+export async function upsertProjectBudgets(
+  budgets: Omit<ProjectBudget, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  const budgetsWithTimestamp = budgets.map(b => ({
+    ...b,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await admin
+    .from('project_budgets')
+    .upsert(budgetsWithTimestamp, {
+      onConflict: 'year,customer_name',
+      ignoreDuplicates: false,
+    });
+
+  if (error) {
+    console.error('Error upserting project budgets:', error);
+    return { success: false, count: 0, error: error.message };
+  }
+
+  return { success: true, count: budgets.length };
+}
+
+/**
+ * Create sync log entry
+ */
+export async function createProfitabilitySyncLog(
+  syncType: 'full' | 'delta'
+): Promise<string | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('project_profitability_sync_log')
+    .insert({
+      sync_type: syncType,
+      started_at: new Date().toISOString(),
+      status: 'running',
+      records_fetched: 0,
+      records_upserted: 0,
+      records_deleted: 0,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Error creating sync log:', error);
+    return null;
+  }
+
+  return data.id;
+}
+
+/**
+ * Update sync log entry
+ */
+export async function updateProfitabilitySyncLog(
+  logId: string,
+  updates: Partial<ProjectProfitabilitySyncLog>
+): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+
+  const { error } = await admin
+    .from('project_profitability_sync_log')
+    .update(updates)
+    .eq('id', logId);
+
+  if (error) {
+    console.error('Error updating sync log:', error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Delete project profitability by year (for full re-sync)
+ */
+export async function deleteProjectProfitabilityByYear(year: number): Promise<number> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('project_profitability')
+    .delete()
+    .eq('year', year)
+    .select();
+
+  if (error) {
+    console.error('Error deleting project profitability:', error);
+    return 0;
+  }
+
+  return data?.length || 0;
+}
+
+/**
+ * Delete all project profitability data
+ */
+export async function deleteAllProjectProfitability(): Promise<number> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('project_profitability')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000')
+    .select();
+
+  if (error) {
+    console.error('Error deleting all project profitability:', error);
+    return 0;
+  }
+
+  return data?.length || 0;
+}
+
+/**
+ * Get filter options for profitability dashboard
+ */
+export async function getProjectProfitabilityFilterOptions(): Promise<{
+  years: number[];
+  projectTypes: string[];
+  customers: string[];
+}> {
+  const admin = getSupabaseAdmin();
+
+  // Check which years have data
+  const potentialYears = [2022, 2023, 2024, 2025, 2026];
+  const yearsWithData: number[] = [];
+
+  for (const year of potentialYears) {
+    const { data } = await admin
+      .from('project_profitability')
+      .select('id')
+      .eq('year', year)
+      .limit(1);
+    if (data && data.length > 0) {
+      yearsWithData.push(year);
+    }
+  }
+
+  // Get distinct project types
+  const { data: typeData } = await admin
+    .from('project_profitability')
+    .select('project_type')
+    .limit(1000);
+
+  const projectTypes = [...new Set((typeData || []).map(d => d.project_type).filter(Boolean))].sort();
+
+  // Get distinct customers
+  const { data: customerData } = await admin
+    .from('project_profitability')
+    .select('customer_name')
+    .limit(1000);
+
+  const customers = [...new Set((customerData || []).map(d => d.customer_name).filter(Boolean))].sort();
+
+  return {
+    years: yearsWithData.sort((a, b) => b - a),
+    projectTypes,
+    customers,
+  };
+}

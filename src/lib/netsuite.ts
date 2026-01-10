@@ -608,6 +608,196 @@ export async function getDiversifiedSales(options: {
   }
 }
 
+// Types for Project Profitability
+export interface ProjectProfitabilityRecord {
+  netsuiteTransactionId: string;
+  netsuiteLineId: string;
+  transactionNumber: string;
+  transactionDate: string;
+  postingPeriod: string;
+  transactionType: string;
+  year: number;
+  month: number;
+  customerId: string;
+  customerName: string;
+  classId: string;
+  className: string;
+  projectType: string;
+  accountId: string;
+  accountNumber: string;
+  accountName: string;
+  accountType: string;
+  isRevenue: boolean;
+  isCogs: boolean;
+  amount: number;
+  quantity: number;
+  itemId: string;
+  itemName: string;
+}
+
+/**
+ * Parse project type from class name
+ * e.g., "TB : Overhead" -> "TB", "MCC : Labor" -> "MCC", "TBEN : Materials" -> "TBEN"
+ */
+function parseProjectType(className: string): string {
+  if (!className) return 'Unknown';
+
+  const upperName = className.toUpperCase();
+  if (upperName.startsWith('MCC')) return 'MCC';
+  if (upperName.startsWith('TBEN')) return 'TBEN';
+  if (upperName.startsWith('TB')) return 'TB';
+  if (upperName.includes(' : MCC')) return 'MCC';
+  if (upperName.includes(' : TBEN')) return 'TBEN';
+  if (upperName.includes(' : TB ') || upperName.endsWith(' : TB')) return 'TB';
+
+  return 'Other';
+}
+
+/**
+ * Fetch project profitability data from NetSuite using SuiteQL
+ * Queries TransactionLine filtered by TB/MCC/TBEN classes and revenue/COGS accounts
+ */
+export async function getProjectProfitability(options: {
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ records: ProjectProfitabilityRecord[]; total: number; hasMore: boolean }> {
+  const { limit = 1000, offset = 0 } = options;
+
+  // Build date filter - NetSuite uses MM/DD/YYYY format
+  let dateFilter = '';
+  if (options.startDate) {
+    const [y, m, d] = options.startDate.split('-');
+    dateFilter += ` AND t.trandate >= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+  }
+  if (options.endDate) {
+    const [y, m, d] = options.endDate.split('-');
+    dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+  }
+
+  // Query TransactionLine with revenue (4xxx) and COGS (5xxx) accounts
+  // Filtered by TB/MCC/TBEN project classes
+  const suiteQL = `
+    SELECT
+      t.id AS transaction_id,
+      tl.id AS line_id,
+      t.tranid,
+      t.trandate,
+      BUILTIN.DF(t.postingperiod) AS posting_period,
+      t.type AS transaction_type,
+      t.entity AS customer_id,
+      BUILTIN.DF(t.entity) AS customer_name,
+      tl.class AS class_id,
+      BUILTIN.DF(tl.class) AS class_name,
+      tl.account AS account_id,
+      a.acctnumber AS account_number,
+      a.fullname AS account_name,
+      a.accttype AS account_type,
+      tl.netamount AS amount,
+      tl.quantity,
+      tl.item AS item_id,
+      BUILTIN.DF(tl.item) AS item_name
+    FROM Transaction t
+    INNER JOIN TransactionLine tl ON tl.transaction = t.id
+    LEFT JOIN Account a ON a.id = tl.account
+    LEFT JOIN Classification c ON c.id = tl.class
+    WHERE t.posting = 'T'
+      AND tl.mainline = 'F'
+      AND tl.netamount IS NOT NULL
+      AND tl.netamount != 0
+      AND (a.acctnumber LIKE '4%' OR a.acctnumber LIKE '5%')
+      AND (
+        c.fullname LIKE 'TB%'
+        OR c.fullname LIKE 'MCC%'
+        OR c.fullname LIKE 'TBEN%'
+        OR c.fullname LIKE '%TB%'
+        OR c.fullname LIKE '%MCC%'
+        OR c.fullname LIKE '%TBEN%'
+      )
+      ${dateFilter}
+    ORDER BY t.trandate DESC, t.id, tl.id
+  `;
+
+  try {
+    console.log('Executing SuiteQL query for project profitability...');
+    console.log('Date filter:', options.startDate, 'to', options.endDate);
+
+    const response = await netsuiteRequest<{ items: any[]; hasMore: boolean; totalResults: number }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: suiteQL },
+        params: { limit: limit.toString(), offset: offset.toString() },
+      }
+    );
+
+    console.log(`SuiteQL returned ${response.items?.length || 0} rows`);
+
+    // Transform rows to records
+    const records: ProjectProfitabilityRecord[] = (response.items || []).map(row => {
+      // Parse date - NetSuite returns MM/DD/YYYY format
+      const dateParts = (row.trandate || '').split('/');
+      let year = 2025;
+      let month = 1;
+      if (dateParts.length === 3) {
+        month = parseInt(dateParts[0]) || 1;
+        year = parseInt(dateParts[2]) || 2025;
+      }
+
+      const accountNumber = row.account_number || '';
+      const isRevenue = accountNumber.startsWith('4');
+      const isCogs = accountNumber.startsWith('5');
+
+      const className = row.class_name || '';
+      const projectType = parseProjectType(className);
+
+      return {
+        netsuiteTransactionId: row.transaction_id?.toString() || '',
+        netsuiteLineId: row.line_id?.toString() || '',
+        transactionNumber: row.tranid || '',
+        transactionDate: row.trandate || '',
+        postingPeriod: row.posting_period || '',
+        transactionType: row.transaction_type || '',
+        year,
+        month,
+        customerId: row.customer_id?.toString() || '',
+        customerName: row.customer_name || '',
+        classId: row.class_id?.toString() || '',
+        className,
+        projectType,
+        accountId: row.account_id?.toString() || '',
+        accountNumber,
+        accountName: row.account_name || '',
+        accountType: row.account_type || '',
+        isRevenue,
+        isCogs,
+        amount: parseFloat(row.amount) || 0,
+        quantity: parseFloat(row.quantity) || 0,
+        itemId: row.item_id?.toString() || '',
+        itemName: row.item_name || '',
+      };
+    });
+
+    // Log summary for validation
+    const totalRevenue = records.filter(r => r.isRevenue).reduce((sum, r) => sum + r.amount, 0);
+    const totalCogs = records.filter(r => r.isCogs).reduce((sum, r) => sum + Math.abs(r.amount), 0);
+    console.log(`Processed ${records.length} records`);
+    console.log(`Total Revenue: $${totalRevenue.toFixed(2)}`);
+    console.log(`Total COGS: $${totalCogs.toFixed(2)}`);
+    console.log(`Gross Profit: $${(totalRevenue - totalCogs).toFixed(2)}`);
+
+    return {
+      records,
+      total: response.totalResults || records.length,
+      hasMore: response.hasMore || false,
+    };
+  } catch (error) {
+    console.error('Error fetching project profitability:', error);
+    throw error;
+  }
+}
+
 /**
  * Test the NetSuite connection
  */
