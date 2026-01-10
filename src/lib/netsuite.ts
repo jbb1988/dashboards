@@ -460,26 +460,29 @@ export async function getDiversifiedSales(options: {
     dateFilter += ` AND t.trandate <= TO_DATE('${options.endDate}', 'YYYY-MM-DD')`;
   }
 
-  // Query transaction lines joined with class info
+  // Query transaction lines with revenue data
+  // Use netamount for actual revenue, foreignamount as fallback
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
-      tl.id AS line_id,
+      tl.uniquekey AS line_id,
       t.tranid,
       t.trandate,
       t.postingperiod,
-      c.entityid AS customer_name,
+      c.companyname AS customer_name,
       c.id AS customer_id,
       cl.name AS class_name,
-      tl.amount,
+      tl.netamount AS amount,
       tl.quantity,
-      i.itemid AS item_name
+      tl.rate,
+      i.displayname AS item_name
     FROM transactionline tl
     INNER JOIN transaction t ON t.id = tl.transaction
     LEFT JOIN customer c ON c.id = t.entity
     LEFT JOIN classification cl ON cl.id = tl.class
     LEFT JOIN item i ON i.id = tl.item
     WHERE t.type = 'CustInvc'
+      AND tl.mainline = 'F'
       AND cl.name LIKE '%Diversified%'
       ${dateFilter}
     ORDER BY t.trandate DESC
