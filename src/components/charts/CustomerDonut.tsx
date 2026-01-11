@@ -249,7 +249,11 @@ export function CustomerDonut({ data, index = 0 }: CustomerDonutProps) {
                   />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={<CustomTooltip />}
+                position={{ x: 10, y: 10 }}
+                wrapperStyle={{ zIndex: 100 }}
+              />
             </PieChart>
           </ResponsiveContainer>
           {/* Center label - perfectly centered in donut */}

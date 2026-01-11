@@ -303,6 +303,8 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
                     itemStyle={{ color: '#fff' }}
                     labelStyle={{ color: '#94A3B8' }}
                     formatter={(value) => [formatCurrency(value as number), 'Revenue']}
+                    position={{ x: 10, y: 10 }}
+                    wrapperStyle={{ zIndex: 100 }}
                   />
                 </PieChart>
               </ResponsiveContainer>

@@ -176,6 +176,7 @@ export function ConcentrationChart({ data, index = 0 }: ConcentrationChartProps)
                       </div>
                     );
                   }}
+                  position={{ x: 10, y: 10 }}
                   wrapperStyle={{ zIndex: 100 }}
                 />
               </PieChart>
