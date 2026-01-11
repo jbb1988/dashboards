@@ -253,8 +253,8 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
                   tick={{ fill: '#94A3B8', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
-                  width={140}
-                  tickFormatter={(val) => val && val.length > 22 ? `${val.slice(0, 22)}...` : (val || 'Unknown')}
+                  width={100}
+                  tickFormatter={(val) => val && val.length > 12 ? `${val.slice(0, 12)}...` : (val || 'Unknown')}
                 />
                 <Tooltip
                   contentStyle={{
