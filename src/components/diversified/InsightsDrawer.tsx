@@ -54,7 +54,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: 'General',
 };
 
-type TabType = 'all' | 'executive' | 'action-plan';
+type TabType = 'all' | 'quick-wins' | 'executive' | 'action-plan';
 
 export default function InsightsDrawer({
   isOpen,
@@ -268,7 +268,17 @@ export default function InsightsDrawer({
                 </div>
 
                 {/* Tab Buttons */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setActiveTab('quick-wins')}
+                    className={`px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${
+                      activeTab === 'quick-wins'
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'text-[#64748B] hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    Quick Wins
+                  </button>
                   <button
                     onClick={() => setActiveTab('all')}
                     className={`px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${
@@ -306,6 +316,167 @@ export default function InsightsDrawer({
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto">
               <div className="p-5 space-y-4">
+                {/* Quick Wins Tab */}
+                {activeTab === 'quick-wins' && (
+                  <>
+                    {/* Quick Wins Header */}
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="text-white font-semibold">Quick Wins</h3>
+                          <p className="text-[11px] text-green-400/70">Actions that can close with one phone call</p>
+                        </div>
+                      </div>
+                      <p className="text-[12px] text-[#94A3B8] leading-relaxed">
+                        These are your highest-probability opportunities based on customer order patterns and cross-sell gaps. Each includes a call script.
+                      </p>
+                    </div>
+
+                    {/* Quick Wins List */}
+                    {(() => {
+                      const quickWins = recommendations.filter(r => r.title.includes('Quick Win'));
+                      const totalValue = quickWins.reduce((sum, rec) => {
+                        const match = rec.expected_impact.match(/\$([0-9,.]+)([KMB])?/i);
+                        if (match) {
+                          let value = parseFloat(match[1].replace(/,/g, ''));
+                          const multiplier = match[2]?.toUpperCase();
+                          if (multiplier === 'K') value *= 1000;
+                          if (multiplier === 'M') value *= 1000000;
+                          return sum + value;
+                        }
+                        return sum;
+                      }, 0);
+
+                      if (quickWins.length === 0) {
+                        return (
+                          <div className="bg-[#0F1722] border border-white/[0.04] rounded-xl p-6 text-center">
+                            <p className="text-[#64748B] text-[13px]">No quick wins found. Generate new insights to analyze customer patterns.</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <>
+                          {/* Summary Stats */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-[#0F1722] border border-white/[0.04] rounded-lg p-3 text-center">
+                              <div className="text-2xl font-bold text-green-400">{quickWins.length}</div>
+                              <div className="text-[10px] text-[#64748B] uppercase">Quick Wins</div>
+                            </div>
+                            <div className="bg-[#0F1722] border border-white/[0.04] rounded-lg p-3 text-center">
+                              <div className="text-2xl font-bold text-green-400">
+                                ${totalValue >= 1000 ? `${(totalValue / 1000).toFixed(0)}K` : totalValue.toFixed(0)}
+                              </div>
+                              <div className="text-[10px] text-[#64748B] uppercase">Potential Value</div>
+                            </div>
+                          </div>
+
+                          {/* Quick Wins Cards */}
+                          <div className="space-y-3">
+                            {quickWins.map((rec, idx) => {
+                              const isRepeatOrder = rec.recommendation.toLowerCase().includes('order') || rec.recommendation.toLowerCase().includes('reorder');
+                              const isCrossSell = rec.recommendation.toLowerCase().includes('cross') || rec.recommendation.toLowerCase().includes('pitch') || rec.recommendation.toLowerCase().includes('pricing');
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className="bg-[#0F1722] border border-white/[0.04] rounded-xl overflow-hidden"
+                                >
+                                  {/* Header */}
+                                  <div className="px-4 py-3 border-b border-white/[0.04] bg-gradient-to-r from-green-500/5 to-transparent">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${
+                                        isRepeatOrder ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'
+                                      }`}>
+                                        {isRepeatOrder ? 'Repeat Order' : isCrossSell ? 'Cross-Sell' : 'Quick Win'}
+                                      </span>
+                                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${PRIORITY_STYLES[rec.priority].badge}`}>
+                                        {rec.priority}
+                                      </span>
+                                    </div>
+                                    <h4 className="text-white font-medium text-[14px]">{rec.title.replace('Quick Win: ', '')}</h4>
+                                  </div>
+
+                                  {/* Body */}
+                                  <div className="p-4 space-y-3">
+                                    {/* Why this is a quick win */}
+                                    <div>
+                                      <h5 className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Why Now</h5>
+                                      <p className="text-[12px] text-[#94A3B8]">{rec.problem}</p>
+                                    </div>
+
+                                    {/* Expected Value */}
+                                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2 flex items-center justify-between">
+                                      <span className="text-[11px] text-[#64748B]">Expected Value</span>
+                                      <span className="text-[13px] text-green-400 font-semibold">{rec.expected_impact}</span>
+                                    </div>
+
+                                    {/* Call Script / Action Items */}
+                                    {rec.action_items.length > 0 && (
+                                      <div className="bg-[#151F2E] rounded-lg p-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <h5 className="text-[10px] text-green-400 uppercase tracking-wide flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                            </svg>
+                                            Call Script
+                                          </h5>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              selectAllFromRecommendation(idx, rec);
+                                            }}
+                                            className="text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                                          >
+                                            Select All
+                                          </button>
+                                        </div>
+                                        <ul className="space-y-2">
+                                          {rec.action_items.map((item, i) => {
+                                            const taskKey = getTaskKey(idx, i);
+                                            const isSelected = selectedTasks.has(taskKey);
+                                            return (
+                                              <li key={i} className="flex items-start gap-2 text-[11px]">
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleTaskSelection(taskKey, item, rec);
+                                                  }}
+                                                  className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-all border ${
+                                                    isSelected
+                                                      ? 'bg-cyan-500 border-cyan-500 text-white'
+                                                      : 'bg-white/5 border-white/20 hover:border-cyan-400/50'
+                                                  }`}
+                                                >
+                                                  {isSelected && (
+                                                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                  )}
+                                                </button>
+                                                <span className={`flex-1 leading-relaxed ${isSelected ? 'text-white' : 'text-[#94A3B8]'}`}>{item}</span>
+                                              </li>
+                                            );
+                                          })}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+
                 {/* All Insights Tab */}
                 {activeTab === 'all' && (
                   <>

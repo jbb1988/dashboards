@@ -1227,6 +1227,413 @@ export async function generateInsightAlerts(filters?: {
 // METRIC EXPLAINERS
 // ============================================
 
+// ============================================
+// CUSTOMER CONTEXT FOR QUICK WINS
+// ============================================
+
+export interface CustomerContext {
+  customer_id: string;
+  customer_name: string;
+
+  // Order Patterns
+  avg_order_frequency_days: number;    // They usually order every X days
+  days_since_last_order: number;       // Current gap
+  is_overdue: boolean;                 // Gap > avg frequency * 1.5
+  last_order_date: string | null;
+
+  // What They Buy
+  product_classes: string[];           // Classes they've purchased
+  top_products: string[];              // Most frequent items
+  avg_order_value: number;
+
+  // Lifetime Value
+  total_revenue_12mo: number;
+  order_count_12mo: number;
+
+  // Customer Type (for appropriate cross-sell)
+  inferred_type: 'utility' | 'distributor' | 'contractor' | 'unknown';
+
+  // Comparison to Similar Customers
+  missing_classes: string[];           // Classes similar customers buy that they don't
+  cross_sell_potential: number;        // Estimated $ if they bought missing classes
+}
+
+// Infer customer type from purchase patterns
+function inferCustomerType(
+  classes: Set<string>,
+  avgOrderValue: number,
+  orderCount: number
+): 'utility' | 'distributor' | 'contractor' | 'unknown' {
+  const classArray = Array.from(classes);
+
+  // Distributors: High volume, broad product mix, consumables focus
+  const distributorIndicators = [
+    'Flanges', 'Gaskets', 'Valve Boxes', 'Valve Keys', 'Drill Taps'
+  ];
+  const distributorMatches = classArray.filter(c =>
+    distributorIndicators.some(d => c.toLowerCase().includes(d.toLowerCase()))
+  ).length;
+
+  // Utilities: Equipment buyers (VEROflow, Strainers, Spools, Calibration)
+  const utilityIndicators = [
+    'VEROflow', 'Strainer', 'Spool', 'Calibration', 'Meter', 'Testing'
+  ];
+  const utilityMatches = classArray.filter(c =>
+    utilityIndicators.some(u => c.toLowerCase().includes(u.toLowerCase()))
+  ).length;
+
+  // High volume + broad mix + consumables = distributor
+  if (orderCount >= 10 && distributorMatches >= 2 && avgOrderValue < 5000) {
+    return 'distributor';
+  }
+
+  // Equipment purchases = utility
+  if (utilityMatches >= 1 || avgOrderValue > 10000) {
+    return 'utility';
+  }
+
+  // Few orders, lower value = contractor
+  if (orderCount < 5 && avgOrderValue < 3000) {
+    return 'contractor';
+  }
+
+  return 'unknown';
+}
+
+/**
+ * Calculate customer context for quick wins analysis
+ * This provides order frequency patterns and cross-sell gaps
+ */
+export async function calculateCustomerContext(): Promise<CustomerContext[]> {
+  const admin = getSupabaseAdmin();
+  const now = new Date();
+
+  // Use rolling 12 months for analysis
+  const periodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const periodStart = new Date(periodEnd);
+  periodStart.setMonth(periodStart.getMonth() - 12);
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+  // Fetch all transaction data for the 12-month window
+  const allData: Array<{
+    customer_id: string;
+    customer_name: string;
+    class_name: string;
+    item_name: string;
+    transaction_date: string;
+    revenue: number;
+    quantity: number;
+  }> = [];
+
+  let offset = 0;
+  const batchSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await admin
+      .from('diversified_sales')
+      .select('customer_id, customer_name, class_name, item_name, transaction_date, revenue, quantity')
+      .gte('transaction_date', formatDate(periodStart))
+      .lte('transaction_date', formatDate(periodEnd))
+      .range(offset, offset + batchSize - 1);
+
+    if (error) {
+      console.error('Error fetching customer context data:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allData.push(...data);
+      offset += batchSize;
+      hasMore = data.length === batchSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  if (allData.length === 0) {
+    return [];
+  }
+
+  // Group by customer
+  const customerMap = new Map<string, {
+    customer_id: string;
+    customer_name: string;
+    transactions: typeof allData;
+    orderDates: Date[];
+    classes: Set<string>;
+    productCounts: Map<string, number>;
+    totalRevenue: number;
+  }>();
+
+  for (const row of allData) {
+    const key = row.customer_id || row.customer_name;
+    if (!key) continue;
+
+    if (!customerMap.has(key)) {
+      customerMap.set(key, {
+        customer_id: row.customer_id,
+        customer_name: row.customer_name,
+        transactions: [],
+        orderDates: [],
+        classes: new Set(),
+        productCounts: new Map(),
+        totalRevenue: 0,
+      });
+    }
+
+    const customer = customerMap.get(key)!;
+    customer.transactions.push(row);
+    customer.orderDates.push(new Date(row.transaction_date));
+    customer.totalRevenue += row.revenue || 0;
+
+    if (row.class_name) {
+      customer.classes.add(row.class_name);
+    }
+
+    if (row.item_name) {
+      const count = customer.productCounts.get(row.item_name) || 0;
+      customer.productCounts.set(row.item_name, count + (row.quantity || 1));
+    }
+  }
+
+  // Calculate class frequency across all customers (for missing class analysis)
+  const classCustomerCount = new Map<string, number>();
+  const classAvgRevenue = new Map<string, { total: number; count: number }>();
+
+  for (const [, customer] of customerMap) {
+    for (const className of customer.classes) {
+      classCustomerCount.set(className, (classCustomerCount.get(className) || 0) + 1);
+    }
+  }
+
+  // Calculate avg revenue per class
+  for (const row of allData) {
+    if (!row.class_name) continue;
+    const stats = classAvgRevenue.get(row.class_name) || { total: 0, count: 0 };
+    stats.total += row.revenue || 0;
+    stats.count += 1;
+    classAvgRevenue.set(row.class_name, stats);
+  }
+
+  const totalCustomers = customerMap.size;
+
+  // Build customer context
+  const results: CustomerContext[] = [];
+
+  for (const [, customer] of customerMap) {
+    // Calculate order frequency
+    const sortedDates = customer.orderDates.sort((a, b) => a.getTime() - b.getTime());
+    const uniqueDates = [...new Set(sortedDates.map(d => d.toDateString()))].map(ds => new Date(ds));
+
+    let avgFrequencyDays = 0;
+    if (uniqueDates.length >= 2) {
+      const gaps: number[] = [];
+      for (let i = 1; i < uniqueDates.length; i++) {
+        gaps.push(differenceInDays(uniqueDates[i], uniqueDates[i - 1]));
+      }
+      avgFrequencyDays = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+    }
+
+    const lastOrderDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
+    const daysSinceLastOrder = lastOrderDate ? differenceInDays(now, lastOrderDate) : 999;
+
+    // Overdue if gap > avg frequency * 1.5 (and they have a pattern)
+    const isOverdue = avgFrequencyDays > 0 && daysSinceLastOrder > (avgFrequencyDays * 1.5);
+
+    // Top products
+    const sortedProducts = Array.from(customer.productCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+
+    // Average order value
+    const avgOrderValue = uniqueDates.length > 0
+      ? customer.totalRevenue / uniqueDates.length
+      : 0;
+
+    // Infer customer type
+    const customerType = inferCustomerType(customer.classes, avgOrderValue, uniqueDates.length);
+
+    // Find missing classes (common classes this customer doesn't buy)
+    // Only consider classes that at least 20% of customers buy
+    const popularThreshold = Math.max(1, totalCustomers * 0.2);
+    const missingClasses: string[] = [];
+    let crossSellPotential = 0;
+
+    for (const [className, count] of classCustomerCount) {
+      if (count >= popularThreshold && !customer.classes.has(className)) {
+        // Check if this class is appropriate for customer type
+        const isAppropriate = isClassAppropriateForType(className, customerType);
+        if (isAppropriate) {
+          missingClasses.push(className);
+          // Estimate revenue from avg revenue per customer for this class
+          const stats = classAvgRevenue.get(className);
+          if (stats && stats.count > 0) {
+            crossSellPotential += stats.total / classCustomerCount.get(className)!;
+          }
+        }
+      }
+    }
+
+    results.push({
+      customer_id: customer.customer_id,
+      customer_name: customer.customer_name,
+      avg_order_frequency_days: avgFrequencyDays,
+      days_since_last_order: daysSinceLastOrder,
+      is_overdue: isOverdue,
+      last_order_date: lastOrderDate?.toISOString() || null,
+      product_classes: Array.from(customer.classes),
+      top_products: sortedProducts,
+      avg_order_value: avgOrderValue,
+      total_revenue_12mo: customer.totalRevenue,
+      order_count_12mo: uniqueDates.length,
+      inferred_type: customerType,
+      missing_classes: missingClasses.slice(0, 5), // Top 5 missing
+      cross_sell_potential: Math.round(crossSellPotential),
+    });
+  }
+
+  return results.sort((a, b) => b.total_revenue_12mo - a.total_revenue_12mo);
+}
+
+/**
+ * Check if a product class is appropriate for a customer type
+ * Distributors: consumables only (no $20K VEROflow testers)
+ * Utilities: equipment + consumables
+ * Contractors: tools + job items
+ */
+function isClassAppropriateForType(className: string, customerType: 'utility' | 'distributor' | 'contractor' | 'unknown'): boolean {
+  const lower = className.toLowerCase();
+
+  // Equipment classes (high-value, not for distributors to stock)
+  const equipmentClasses = ['veroflow', 'strainer', 'calibration', 'tester'];
+  const isEquipment = equipmentClasses.some(e => lower.includes(e));
+
+  // Consumables (appropriate for all)
+  const consumableClasses = ['flange', 'gasket', 'valve', 'key', 'tap', 'box', 'spool'];
+  const isConsumable = consumableClasses.some(c => lower.includes(c));
+
+  switch (customerType) {
+    case 'distributor':
+      // Distributors should only get consumable cross-sell, not equipment
+      return isConsumable && !isEquipment;
+    case 'utility':
+      // Utilities can buy anything
+      return true;
+    case 'contractor':
+      // Contractors get tools and consumables
+      return isConsumable || lower.includes('tool') || lower.includes('key');
+    default:
+      return true;
+  }
+}
+
+// ============================================
+// QUICK WIN OPPORTUNITIES
+// ============================================
+
+export interface QuickWinOpportunity {
+  type: 'repeat_order' | 'cross_sell';
+  priority: 'high' | 'medium' | 'low';
+  customer_id: string;
+  customer_name: string;
+  customer_type: string;
+
+  // For repeat orders
+  usual_frequency_days?: number;
+  days_overdue?: number;
+  typical_order_value?: number;
+  typical_products?: string[];
+
+  // For cross-sell
+  recommended_products?: string[];
+  similar_customers_buy?: string;
+
+  // Action info
+  action_summary: string;
+  estimated_value: number;
+  call_script: string;
+}
+
+/**
+ * Generate quick win opportunities from customer context
+ * These are actionable items for today's sales calls
+ */
+export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
+  const customerContexts = await calculateCustomerContext();
+  const quickWins: QuickWinOpportunity[] = [];
+
+  for (const ctx of customerContexts) {
+    // Skip customers with very low revenue (not worth the call)
+    if (ctx.total_revenue_12mo < 1000) continue;
+
+    // REPEAT ORDER OPPORTUNITIES
+    // Customer is overdue and has a regular order pattern
+    if (ctx.is_overdue && ctx.avg_order_frequency_days > 0 && ctx.avg_order_frequency_days < 90) {
+      const daysOverdue = ctx.days_since_last_order - ctx.avg_order_frequency_days;
+
+      // Priority based on how overdue and value
+      let priority: 'high' | 'medium' | 'low' = 'low';
+      if (ctx.avg_order_value > 5000 || daysOverdue > 30) {
+        priority = 'high';
+      } else if (ctx.avg_order_value > 1000 || daysOverdue > 14) {
+        priority = 'medium';
+      }
+
+      quickWins.push({
+        type: 'repeat_order',
+        priority,
+        customer_id: ctx.customer_id,
+        customer_name: ctx.customer_name,
+        customer_type: ctx.inferred_type,
+        usual_frequency_days: ctx.avg_order_frequency_days,
+        days_overdue: daysOverdue,
+        typical_order_value: Math.round(ctx.avg_order_value),
+        typical_products: ctx.top_products.slice(0, 3),
+        action_summary: `Usually orders every ${ctx.avg_order_frequency_days} days, ${daysOverdue} days overdue`,
+        estimated_value: Math.round(ctx.avg_order_value),
+        call_script: `Hi, I noticed it's been about ${Math.round(ctx.days_since_last_order / 7)} weeks since your last order. You usually order ${ctx.top_products.slice(0, 2).join(' and ') || 'your usual items'} around this time. Want me to put together a quote for your standard order?`,
+      });
+    }
+
+    // CROSS-SELL OPPORTUNITIES
+    // Customer has missing classes that similar customers buy
+    if (ctx.missing_classes.length > 0 && ctx.cross_sell_potential > 500) {
+      const priority: 'high' | 'medium' | 'low' =
+        ctx.cross_sell_potential > 10000 ? 'high' :
+        ctx.cross_sell_potential > 3000 ? 'medium' : 'low';
+
+      const typeLabel = ctx.inferred_type === 'distributor' ? 'distributors' :
+                        ctx.inferred_type === 'utility' ? 'utilities' :
+                        ctx.inferred_type === 'contractor' ? 'contractors' : 'similar customers';
+
+      quickWins.push({
+        type: 'cross_sell',
+        priority,
+        customer_id: ctx.customer_id,
+        customer_name: ctx.customer_name,
+        customer_type: ctx.inferred_type,
+        recommended_products: ctx.missing_classes,
+        similar_customers_buy: `Most ${typeLabel} also buy these`,
+        action_summary: `Missing ${ctx.missing_classes.slice(0, 2).join(', ')} that similar ${typeLabel} carry`,
+        estimated_value: ctx.cross_sell_potential,
+        call_script: `I noticed you stock ${ctx.product_classes.slice(0, 2).join(' and ') || 'similar products'} but not ${ctx.missing_classes[0]}. Most ${typeLabel} your size carry both. Would you like me to send over our pricing?`,
+      });
+    }
+  }
+
+  // Sort by priority and value
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  return quickWins
+    .sort((a, b) => {
+      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.estimated_value - a.estimated_value;
+    })
+    .slice(0, 20); // Top 20 opportunities
+}
+
 export const METRIC_EXPLAINERS = {
   attrition_score: {
     title: 'Attrition Score',

@@ -4,10 +4,12 @@ import {
   calculateYoYPerformance,
   generateCrossSellOpportunities,
   calculateConcentrationMetrics,
+  generateQuickWins,
   CustomerAttritionScore,
   YoYPerformance,
   CrossSellOpportunity,
   ConcentrationMetrics,
+  QuickWinOpportunity,
 } from '@/lib/insights';
 import { generateProductContext, DIVERSIFIED_PRODUCTS } from '@/lib/diversified-business-context';
 
@@ -367,6 +369,91 @@ Respond ONLY with JSON.`;
   }
 }
 
+async function generateQuickWinInsights(
+  quickWins: QuickWinOpportunity[]
+): Promise<AIRecommendation[]> {
+  if (quickWins.length === 0) {
+    return [];
+  }
+
+  // Separate repeat orders and cross-sell
+  const repeatOrders = quickWins.filter(q => q.type === 'repeat_order').slice(0, 8);
+  const crossSells = quickWins.filter(q => q.type === 'cross_sell').slice(0, 8);
+
+  const totalRepeatValue = repeatOrders.reduce((sum, q) => sum + q.estimated_value, 0);
+  const totalCrossSellValue = crossSells.reduce((sum, q) => sum + q.estimated_value, 0);
+
+  const prompt = `${SALES_INTELLIGENCE_CONTEXT}
+
+QUICK WINS - These customers are ready to buy TODAY.
+
+=== REPEAT ORDER OPPORTUNITIES ===
+These customers usually order regularly but are OVERDUE. Easy win - just call and remind them.
+${repeatOrders.length > 0 ? JSON.stringify(repeatOrders.map(q => ({
+  customer: q.customer_name,
+  type: q.customer_type,
+  usual_order_every: `${q.usual_frequency_days} days`,
+  days_overdue: q.days_overdue,
+  typical_order: formatCurrency(q.typical_order_value || 0),
+  products: q.typical_products?.join(', '),
+  script: q.call_script,
+})), null, 2) : 'None found'}
+Total potential: ${formatCurrency(totalRepeatValue)}
+
+=== CROSS-SELL OPPORTUNITIES ===
+These customers buy some products but are missing ones that similar customers carry.
+IMPORTANT: Distributors get consumables (Flanges, Gaskets), Utilities get equipment (VEROflow).
+${crossSells.length > 0 ? JSON.stringify(crossSells.map(q => ({
+  customer: q.customer_name,
+  type: q.customer_type,
+  missing: q.recommended_products?.slice(0, 3).join(', '),
+  why: q.similar_customers_buy,
+  potential: formatCurrency(q.estimated_value),
+  script: q.call_script,
+})), null, 2) : 'None found'}
+Total potential: ${formatCurrency(totalCrossSellValue)}
+
+TASK: Pick the TOP 3-4 QUICK WINS to call TODAY.
+
+Rules:
+- Repeat orders are easier wins than cross-sell (customer already buys from us)
+- High-value opportunities (>$3K) go first
+- Include the specific call script for each
+- Customer type matters: don't pitch VEROflow to distributors (they won't stock $20K equipment)
+
+Return JSON:
+{
+  "recommendations": [
+    {
+      "priority": "high" | "medium" | "low",
+      "title": "Quick Win: [Action] for [Customer]",
+      "problem": "Why this is a quick win",
+      "recommendation": "What to do - use the call script",
+      "expected_impact": "Expected $ value",
+      "action_items": ["Call script line 1", "Call script line 2", "Follow up action"],
+      "category": "general"
+    }
+  ]
+}
+
+Focus on ACTIONABLE quick wins - these should close with one phone call.
+Respond ONLY with JSON.`;
+
+  try {
+    const response = await callAI(prompt, 2500);
+    const result = extractJSON(response) as { recommendations: AIRecommendation[] };
+    // Mark these as general but with quick win context
+    return result.recommendations.map(r => ({
+      ...r,
+      category: 'general' as const,
+      title: r.title.includes('Quick Win') ? r.title : `Quick Win: ${r.title}`,
+    }));
+  } catch (error) {
+    console.error('[AI] Quick wins analysis error:', error);
+    return [];
+  }
+}
+
 async function generateExecutiveSummary(
   recommendations: AIRecommendation[],
   summary: {
@@ -432,7 +519,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { type = 'all', years } = body as {
-      type?: 'all' | 'attrition' | 'growth' | 'crosssell' | 'concentration';
+      type?: 'all' | 'attrition' | 'growth' | 'crosssell' | 'concentration' | 'quickwins';
       years?: number[];
     };
 
@@ -489,6 +576,20 @@ export async function POST(request: NextRequest) {
 
       const concentrationInsights = await generateConcentrationInsights(concentration);
       allRecommendations.push(...concentrationInsights);
+    }
+
+    // QUICK WINS - This runs by default with 'all' or explicitly with 'quickwins'
+    // Quick wins are prioritized and added at the beginning
+    if (type === 'all' || type === 'quickwins') {
+      console.log('[AI INSIGHTS] Analyzing quick wins...');
+      const quickWins = await generateQuickWins();
+      console.log(`[AI INSIGHTS] Found ${quickWins.length} quick win opportunities`);
+
+      if (quickWins.length > 0) {
+        const quickWinInsights = await generateQuickWinInsights(quickWins);
+        // Add quick wins at the beginning (they're the most actionable)
+        allRecommendations.unshift(...quickWinInsights);
+      }
     }
 
     // Sort by priority
