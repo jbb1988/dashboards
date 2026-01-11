@@ -152,7 +152,7 @@ export default function GuidesPage() {
           width: `calc(100% - ${isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH}px)`,
         }}
         transition={{ duration: 0.15, ease: 'easeOut' }}
-        className="flex-1 min-h-screen"
+        className="flex-1 min-h-screen relative z-10"
       >
         <div className="max-w-6xl mx-auto px-8 py-12">
           {/* Hero Section */}

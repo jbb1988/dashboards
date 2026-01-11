@@ -932,7 +932,7 @@ export default function GuideCategoryPage() {
             marginLeft: isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH,
             width: `calc(100% - ${isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH}px)`,
           }}
-          className="flex-1 flex items-center justify-center"
+          className="flex-1 flex items-center justify-center relative z-10"
         >
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white mb-4">Guide Not Found</h1>
@@ -956,7 +956,7 @@ export default function GuideCategoryPage() {
           width: `calc(100% - ${isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH}px)`,
         }}
         transition={{ duration: 0.15, ease: 'easeOut' }}
-        className="flex-1 min-h-screen"
+        className="flex-1 min-h-screen relative z-10"
       >
         <div className="max-w-5xl mx-auto px-8 py-12">
           {/* Back Link */}
