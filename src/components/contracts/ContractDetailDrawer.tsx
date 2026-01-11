@@ -20,6 +20,28 @@ interface NotionTask {
   assignee: string | null;
 }
 
+interface ContractDocument {
+  id: string;
+  document_type: string;
+  status: string;
+  file_name: string | null;
+  file_url: string | null;
+  file_size: number | null;
+  version: number;
+  uploaded_at: string | null;
+  uploaded_by: string | null;
+}
+
+const DOCUMENT_TYPES = [
+  { type: 'Original Contract', required: true },
+  { type: 'MARS Redlines', required: true },
+  { type: 'Client Response', required: false },
+  { type: 'Final Agreement', required: true },
+  { type: 'Executed Contract', required: true },
+  { type: 'Purchase Order', required: false },
+  { type: 'Amendment', required: false },
+];
+
 export interface Contract {
   id: string;
   salesforceId?: string;
@@ -142,6 +164,13 @@ export default function ContractDetailDrawer({
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [isCreatingTask, setIsCreatingTask] = useState(false);
 
+  // Documents state
+  const [documents, setDocuments] = useState<ContractDocument[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsFetched, setDocsFetched] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+
   // Reset state when contract changes
   useEffect(() => {
     if (contract) {
@@ -154,6 +183,8 @@ export default function ContractDetailDrawer({
       setEditedCashDate(formatDateForInput(contract.cashDate));
       setTasksFetched(false);
       setTasks([]);
+      setDocsFetched(false);
+      setDocuments([]);
     }
   }, [contract?.id]);
 
@@ -171,6 +202,22 @@ export default function ContractDetailDrawer({
         .finally(() => setTasksLoading(false));
     }
   }, [contract, tasksFetched]);
+
+  // Fetch documents when drawer opens
+  useEffect(() => {
+    if (contract && !docsFetched) {
+      setDocsLoading(true);
+      const id = contract.salesforceId || contract.id;
+      fetch(`/api/contracts/documents?salesforceId=${encodeURIComponent(id)}`)
+        .then(res => res.json())
+        .then(data => {
+          setDocuments(data.documents || []);
+          setDocsFetched(true);
+        })
+        .catch(err => console.error('Error fetching documents:', err))
+        .finally(() => setDocsLoading(false));
+    }
+  }, [contract, docsFetched]);
 
   // Escape key handler
   useEffect(() => {
@@ -340,6 +387,62 @@ export default function ContractDetailDrawer({
       console.error('Error deleting task:', err);
     }
   };
+
+  // Document handlers
+  const handleDocumentUpload = async (file: File, documentType: string) => {
+    setUploadingDocType(documentType);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('contractId', contract.id);
+    formData.append('salesforceId', contract.salesforceId || '');
+    formData.append('accountName', contract.opportunityName || contract.name);
+    formData.append('documentType', documentType);
+
+    try {
+      const response = await fetch('/api/contracts/documents', {
+        method: 'POST',
+        body: formData,
+      });
+      if (response.ok) {
+        // Refresh documents
+        setDocsFetched(false);
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+    } finally {
+      setUploadingDocType(null);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleDocumentUpload(file, documentType);
+    }
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDownload = (doc: ContractDocument) => {
+    if (doc.file_url) {
+      window.open(doc.file_url, '_blank');
+    }
+  };
+
+  const handleView = (doc: ContractDocument) => {
+    if (doc.file_url) {
+      window.open(doc.file_url, '_blank');
+    }
+  };
+
+  // Document calculations
+  const getDocumentByType = (type: string) => documents.find(d => d.document_type === type);
+  const requiredDocs = DOCUMENT_TYPES.filter(d => d.required);
+  const optionalDocs = DOCUMENT_TYPES.filter(d => !d.required);
+  const uploadedRequiredCount = requiredDocs.filter(d => getDocumentByType(d.type)?.file_url).length;
+  const completionPercentage = (uploadedRequiredCount / requiredDocs.length) * 100;
 
   const reviewSummary = parseLatestSummary(contract.redlines || '');
   const pendingTasksCount = tasks.filter(t => !t.status.toLowerCase().includes('done') && !t.status.toLowerCase().includes('complete')).length;
@@ -696,6 +799,237 @@ export default function ContractDetailDrawer({
                     </div>
                   </div>
                 )}
+
+                {/* Documents Section */}
+                <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/[0.04]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-[#A78BFA]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Documents</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                          completionPercentage === 100 ? 'bg-[#22C55E]/15 text-[#22C55E]' :
+                          completionPercentage >= 50 ? 'bg-[#38BDF8]/15 text-[#38BDF8]' :
+                          completionPercentage > 0 ? 'bg-[#F59E0B]/15 text-[#F59E0B]' :
+                          'bg-[#64748B]/15 text-[#64748B]'
+                        }`}>
+                          {uploadedRequiredCount}/{requiredDocs.length} required
+                        </span>
+                      </div>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="mt-2 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          completionPercentage === 100 ? 'bg-[#22C55E]' :
+                          completionPercentage >= 50 ? 'bg-[#38BDF8]' :
+                          completionPercentage > 0 ? 'bg-[#F59E0B]' :
+                          'bg-[#64748B]'
+                        }`}
+                        style={{ width: `${completionPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    {docsLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="w-5 h-5 border-2 border-[#A78BFA]/20 border-t-[#A78BFA] rounded-full animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Required Documents */}
+                        <div>
+                          <h4 className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">Required</h4>
+                          <div className="space-y-2">
+                            {requiredDocs.map(({ type }) => {
+                              const doc = getDocumentByType(type);
+                              const hasFile = doc?.file_url;
+
+                              return (
+                                <div
+                                  key={type}
+                                  className={`flex items-center justify-between p-2.5 rounded-lg ${
+                                    hasFile ? 'bg-[#22C55E]/5' : 'bg-[#EF4444]/5'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    {hasFile ? (
+                                      <div className="w-5 h-5 rounded flex items-center justify-center bg-[#22C55E]/20 text-[#22C55E]">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      </div>
+                                    ) : (
+                                      <div className="w-5 h-5 rounded flex items-center justify-center bg-[#EF4444]/20 text-[#EF4444]">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-[12px] text-white font-medium">{type}</span>
+                                      {hasFile && doc.file_name && (
+                                        <p className="text-[10px] text-[#64748B] truncate">{doc.file_name}</p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    {hasFile ? (
+                                      <>
+                                        {doc.uploaded_at && (
+                                          <span className="text-[10px] text-[#64748B]">
+                                            {new Date(doc.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                          </span>
+                                        )}
+                                        {doc.version > 1 && (
+                                          <span className="text-[9px] text-[#64748B] bg-[#1E293B] px-1.5 py-0.5 rounded">
+                                            v{doc.version}
+                                          </span>
+                                        )}
+                                        <button
+                                          onClick={() => handleDownload(doc)}
+                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                          title="Download"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                          </svg>
+                                        </button>
+                                        <button
+                                          onClick={() => handleView(doc)}
+                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                          title="View"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                          </svg>
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-[10px] text-[#EF4444] mr-1">Missing</span>
+                                        <label className="cursor-pointer">
+                                          <input
+                                            type="file"
+                                            className="hidden"
+                                            onChange={(e) => handleFileSelect(e, type)}
+                                            disabled={uploadingDocType === type}
+                                          />
+                                          <span className={`px-2.5 py-1.5 text-[10px] font-medium rounded-lg transition-colors inline-flex items-center gap-1 ${
+                                            uploadingDocType === type
+                                              ? 'bg-[#A78BFA]/20 text-[#A78BFA] cursor-wait'
+                                              : 'bg-[#A78BFA] text-white hover:bg-[#A78BFA]/80'
+                                          }`}>
+                                            {uploadingDocType === type ? (
+                                              <>
+                                                <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                                                Uploading...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                                </svg>
+                                                Upload
+                                              </>
+                                            )}
+                                          </span>
+                                        </label>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Optional Documents */}
+                        <div>
+                          <h4 className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">Optional</h4>
+                          <div className="space-y-2">
+                            {optionalDocs.map(({ type }) => {
+                              const doc = getDocumentByType(type);
+                              const hasFile = doc?.file_url;
+
+                              return (
+                                <div
+                                  key={type}
+                                  className={`flex items-center justify-between p-2.5 rounded-lg ${
+                                    hasFile ? 'bg-[#22C55E]/5' : 'bg-[#151F2E]'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    {hasFile ? (
+                                      <div className="w-5 h-5 rounded flex items-center justify-center bg-[#22C55E]/20 text-[#22C55E]">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      </div>
+                                    ) : (
+                                      <div className="w-5 h-5 rounded flex items-center justify-center bg-[#64748B]/20 text-[#64748B]">
+                                        <div className="w-2 h-2 rounded-full bg-current" />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <span className={`text-[12px] ${hasFile ? 'text-white font-medium' : 'text-[#8FA3BF]'}`}>{type}</span>
+                                      {hasFile && doc.file_name && (
+                                        <p className="text-[10px] text-[#64748B] truncate">{doc.file_name}</p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    {hasFile ? (
+                                      <>
+                                        {doc.uploaded_at && (
+                                          <span className="text-[10px] text-[#64748B]">
+                                            {new Date(doc.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                          </span>
+                                        )}
+                                        {doc.version > 1 && (
+                                          <span className="text-[9px] text-[#64748B] bg-[#1E293B] px-1.5 py-0.5 rounded">
+                                            v{doc.version}
+                                          </span>
+                                        )}
+                                        <button
+                                          onClick={() => handleDownload(doc)}
+                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                          title="Download"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                          </svg>
+                                        </button>
+                                        <button
+                                          onClick={() => handleView(doc)}
+                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                          title="View"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                          </svg>
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <span className="text-[10px] text-[#64748B]">Not uploaded</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {/* Tasks Section */}
                 <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] overflow-hidden">

@@ -1051,6 +1051,8 @@ export async function getDiversifiedSalesByCustomer(filters?: {
 export async function getDiversifiedDashboardSummary(filters?: {
   years?: number[];
   months?: number[];
+  className?: string;
+  classNames?: string[];
 }): Promise<{
   totalRevenue: number;
   totalUnits: number;
@@ -1085,6 +1087,13 @@ export async function getDiversifiedDashboardSummary(filters?: {
 
       if (filters?.months && filters.months.length > 0) {
         query = query.in('month', filters.months);
+      }
+
+      // Apply class name filters
+      if (filters?.className) {
+        query = query.eq('class_name', filters.className);
+      } else if (filters?.classNames && filters.classNames.length > 0) {
+        query = query.in('class_name', filters.classNames);
       }
 
       const { data, error } = await query;
@@ -1704,9 +1713,9 @@ export async function getProjectProfitabilityByProject(filters?: {
 }>> {
   const data = await getProjectProfitabilityData(filters);
 
-  // Aggregate revenue and COGS by customer from NetSuite data
+  // Aggregate revenue and COGS by customer AND project type
   // COGS now comes from costestimate field (like Diversified Products)
-  const byCustomer = new Map<string, {
+  const byCustomerType = new Map<string, {
     customer_name: string;
     project_type: string;
     total_revenue: number;
@@ -1715,17 +1724,19 @@ export async function getProjectProfitabilityByProject(filters?: {
   }>();
 
   for (const row of data) {
-    const key = row.customer_name;
-    if (!byCustomer.has(key)) {
-      byCustomer.set(key, {
+    // Key by both customer AND project type to see breakdown
+    const projectType = row.project_type || 'Unknown';
+    const key = `${row.customer_name}|||${projectType}`;
+    if (!byCustomerType.has(key)) {
+      byCustomerType.set(key, {
         customer_name: row.customer_name,
-        project_type: row.project_type || 'Unknown',
+        project_type: projectType,
         total_revenue: 0,
         total_cogs: 0,
         transaction_ids: new Set(),
       });
     }
-    const agg = byCustomer.get(key)!;
+    const agg = byCustomerType.get(key)!
 
     if (row.is_revenue) {
       agg.total_revenue += Math.abs(row.amount);
@@ -1735,7 +1746,7 @@ export async function getProjectProfitabilityByProject(filters?: {
     agg.transaction_ids.add(row.netsuite_transaction_id);
   }
 
-  return Array.from(byCustomer.values())
+  return Array.from(byCustomerType.values())
     .map(agg => {
       const gross_profit = agg.total_revenue - agg.total_cogs;
       const gross_profit_pct = agg.total_revenue > 0
@@ -2078,13 +2089,25 @@ export async function getProjectProfitabilityFilterOptions(): Promise<{
     }
   }
 
-  // Get distinct project types
-  const { data: typeData } = await admin
-    .from('project_profitability')
-    .select('project_type')
-    .limit(1000);
+  // Get distinct project types - check each known type to see if it has data
+  const knownProjectTypes = [
+    'TBEN', 'TBEU', 'TBIN', 'TBIU', 'M3IN', 'M3IU', 'M3 Software',
+    'MCC', 'TB Service', 'TB Components', 'Other'
+  ];
+  const projectTypesWithData: string[] = [];
 
-  const projectTypes = [...new Set((typeData || []).map(d => d.project_type).filter(Boolean))].sort();
+  for (const projectType of knownProjectTypes) {
+    const { data } = await admin
+      .from('project_profitability')
+      .select('id')
+      .eq('project_type', projectType)
+      .limit(1);
+    if (data && data.length > 0) {
+      projectTypesWithData.push(projectType);
+    }
+  }
+
+  const projectTypes = projectTypesWithData.sort();
 
   // Get distinct customers
   const { data: customerData } = await admin

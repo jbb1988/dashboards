@@ -140,6 +140,55 @@ export async function GET(request: NextRequest) {
         break;
       }
 
+      case 'details': {
+        // Get line item details for a specific customer/project
+        const customerName = searchParams.get('customer');
+        if (!customerName) {
+          return NextResponse.json(
+            { error: 'Customer name required for details view' },
+            { status: 400 }
+          );
+        }
+
+        // Import directly from supabase for line items
+        const { getProjectProfitabilityData } = await import('@/lib/supabase');
+        const lineItems = await getProjectProfitabilityData({
+          years,
+          projectTypes,
+          customerName,
+        });
+
+        // Sort by date desc, then by transaction
+        const sortedItems = lineItems.sort((a, b) => {
+          const dateCompare = (b.transaction_date || '').localeCompare(a.transaction_date || '');
+          if (dateCompare !== 0) return dateCompare;
+          return (b.transaction_number || '').localeCompare(a.transaction_number || '');
+        });
+
+        responseData = {
+          customer: customerName,
+          lineItems: sortedItems.map(item => ({
+            transactionNumber: item.transaction_number,
+            transactionDate: item.transaction_date,
+            transactionType: item.transaction_type,
+            projectType: item.project_type,
+            accountNumber: item.account_number,
+            accountName: item.account_name,
+            itemName: item.item_name,
+            revenue: item.is_revenue ? Math.abs(item.amount) : 0,
+            cogs: item.costestimate || 0,
+            quantity: item.quantity,
+            year: item.year,
+            month: item.month,
+          })),
+          count: sortedItems.length,
+          totalRevenue: sortedItems.filter(i => i.is_revenue).reduce((sum, i) => sum + Math.abs(i.amount), 0),
+          totalCogs: sortedItems.reduce((sum, i) => sum + (i.costestimate || 0), 0),
+          lastUpdated: new Date().toISOString(),
+        };
+        break;
+      }
+
       case 'dashboard': {
         // Get all data for dashboard in one call
         const [summary, projects, monthly, types, options] = await Promise.all([
