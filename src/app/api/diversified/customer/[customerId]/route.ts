@@ -238,7 +238,7 @@ export async function GET(request: NextRequest, { params }: CustomerDetailParams
     const transactionMap = new Map<string, {
       date: string;
       transaction_number: string;
-      items: Array<{ item_name: string; quantity: number; revenue: number }>;
+      items: Array<{ item_name: string; item_description: string; quantity: number; revenue: number }>;
       total_revenue: number;
       total_units: number;
     }>();
@@ -257,6 +257,7 @@ export async function GET(request: NextRequest, { params }: CustomerDetailParams
       const tx = transactionMap.get(txKey)!;
       tx.items.push({
         item_name: row.item_name,
+        item_description: row.item_description || '',
         quantity: row.quantity || 0,
         revenue: row.revenue || 0,
       });

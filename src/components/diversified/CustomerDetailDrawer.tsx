@@ -64,7 +64,7 @@ interface CustomerDetail {
   transactions: Array<{
     date: string;
     transaction_number: string;
-    items: Array<{ item_name: string; quantity: number; revenue: number }>;
+    items: Array<{ item_name: string; item_description?: string; quantity: number; revenue: number }>;
     total_revenue: number;
     total_units: number;
   }>;
@@ -429,7 +429,7 @@ export function CustomerDetailDrawer({ customerId, customerName, onClose }: Cust
                                 <div className="p-4 space-y-2">
                                   {tx.items.map((item, idx) => (
                                     <div key={idx} className="flex items-center justify-between text-[12px]">
-                                      <span className="text-[#94A3B8]">{item.item_name}</span>
+                                      <span className="text-[#94A3B8]">{item.item_description || item.item_name}</span>
                                       <div className="flex items-center gap-4">
                                         <span className="text-[#64748B]">{item.quantity} qty</span>
                                         <span className="text-white font-medium">{formatCurrency(item.revenue)}</span>
@@ -468,7 +468,7 @@ function ProductRow({ product }: { product: CustomerDetail['products'][0] }) {
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[13px] text-white font-medium">{product.item_name}</span>
+            <span className="text-[13px] text-white font-medium">{product.item_description || product.item_name}</span>
             {product.stopped_buying === 'stopped' && (
               <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-500/20 text-red-400">STOPPED</span>
             )}

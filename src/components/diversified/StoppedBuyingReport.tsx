@@ -35,6 +35,7 @@ interface StoppedBuyingData {
     product_list: Array<{
       item_id: string;
       item_name: string;
+      item_description?: string;
       class_name: string;
       prior_revenue: number;
       last_purchase_date: string;
@@ -224,7 +225,7 @@ export function StoppedBuyingReport({ onCustomerClick, selectedYears, selectedMo
                     onClick={() => setExpandedItem(isExpanded ? null : product.item_id)}
                   >
                     <div>
-                      <div className="text-[13px] text-white font-medium">{product.item_name}</div>
+                      <div className="text-[13px] text-white font-medium">{product.item_description || product.item_name}</div>
                       <div className="text-[11px] text-[#64748B]">{product.class_name}</div>
                     </div>
                     <div className="text-right text-[13px] text-red-400 font-medium">
@@ -359,7 +360,7 @@ export function StoppedBuyingReport({ onCustomerClick, selectedYears, selectedMo
                                 className="flex items-center justify-between p-2 rounded-lg bg-white/[0.01]"
                               >
                                 <div>
-                                  <span className="text-[12px] text-white">{product.item_name}</span>
+                                  <span className="text-[12px] text-white">{product.item_description || product.item_name}</span>
                                   <span className="text-[10px] text-[#64748B] ml-2">{product.class_name}</span>
                                 </div>
                                 <div className="text-right">

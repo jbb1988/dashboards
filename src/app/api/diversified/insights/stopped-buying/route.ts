@@ -214,6 +214,7 @@ export async function GET(request: NextRequest) {
       product_list: Array<{
         item_id: string;
         item_name: string;
+        item_description: string;
         class_name: string;
         prior_revenue: number;
         last_purchase_date: string;
@@ -239,6 +240,7 @@ export async function GET(request: NextRequest) {
       customer.product_list.push({
         item_id: entry.item_id,
         item_name: entry.item_name,
+        item_description: entry.item_description,
         class_name: entry.class_name,
         prior_revenue: entry.prior_revenue,
         last_purchase_date: entry.last_purchase_date,
