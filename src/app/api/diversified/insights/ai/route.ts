@@ -111,6 +111,13 @@ PRIORITY (in order):
 2. Z-Plate Strainers (equipment-level pricing)
 3. Fabricated Spools (custom work, good margins)
 
+CRITICAL RULE - CALIBRATION = OWNERSHIP:
+- If a customer buys calibration services, they ALREADY OWN VEROflow equipment!
+- Calibration means they send us THEIR equipment to calibrate - can't calibrate what you don't own.
+- NEVER recommend VEROflow equipment to calibration customers - they already have it!
+- The equipment purchase may be before our data history, but calibration proves ownership.
+- For calibration customers: upsell MORE calibrations, parts, accessories - NOT the base equipment.
+
 IGNORE:
 - Low-dollar commodity items are not worth chasing (Zinc Caps, Drill Taps, etc.)
 - If a customer only buys small items, pitch them VEROflow or Strainers instead
@@ -349,6 +356,7 @@ TASK: Give me 2-3 customers to call about HIGH-VALUE products.
 - For Strainer/Spool buyers: cross-sell Flanges and Gaskets
 - VEROflow owners: push annual calibration service
 - DON'T recommend cross-selling low-dollar items
+- CRITICAL: If a customer buys calibration, they ALREADY OWN VEROflow - NEVER pitch them equipment!
 - Example: "Call X, they buy commodity items - pitch them VEROflow or Strainers"
 
 Return JSON:
@@ -486,6 +494,7 @@ Total potential: ${formatCurrency(totalRepeatValue)}
 === CROSS-SELL OPPORTUNITIES ===
 These are DIVERSE BUYERS who buy multiple product categories and are missing ones that similar customers carry.
 IMPORTANT: Distributors get consumables (Flanges, Gaskets), Utilities get equipment (VEROflow).
+CRITICAL: If a customer buys calibration, they ALREADY OWN VEROflow - NEVER pitch them new equipment!
 ${crossSells.length > 0 ? JSON.stringify(crossSells.map(enrichCrossSell), null, 2) : 'None found'}
 Total potential: ${formatCurrency(totalCrossSellValue)}
 

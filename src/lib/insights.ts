@@ -850,6 +850,22 @@ export async function generateCrossSellOpportunities(filters?: {
       const coverage = data.count / similarCustomers.length;
       if (coverage < 0.3) continue; // Must be common among similar customers
 
+      // CRITICAL: If customer buys calibration services, they ALREADY own VEROflow equipment!
+      // Calibration = sending us THEIR equipment to calibrate. Can't calibrate what you don't own.
+      // So NEVER recommend VEROflow equipment to calibration customers - they have it already.
+      const classLower = className.toLowerCase();
+      const isVeroflowEquipment = classLower.includes('veroflow') ||
+        classLower.includes('vf-1') || classLower.includes('vf-4') ||
+        classLower.includes('meter tester') || classLower.includes('touch');
+
+      const customerBuysCalibration = Array.from(target.classes).some(c =>
+        c.toLowerCase().includes('calibration')
+      );
+
+      if (isVeroflowEquipment && customerBuysCalibration) {
+        continue; // Skip - they already own the equipment (proven by calibration purchases)
+      }
+
       const stats = classStats.get(className);
       if (!stats) continue;
 

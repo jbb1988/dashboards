@@ -111,8 +111,10 @@ export const DIVERSIFIED_PRODUCTS = {
   crossSellRules: [
     { when: 'VEROflow-4', suggest: ['Calibration Service', 'Cart Kit', 'ThrustBuster', 'Hose Accessories'], reason: 'Complete testing solution' },
     { when: 'VEROflow-1', suggest: ['Calibration Service'], reason: 'Annual service revenue' },
-    // NOTE: Calibration Service can ONLY be sold to VEROflow owners - it's an in-house service
-    // where they send us their tester to calibrate. No tester = nothing to calibrate!
+    // CRITICAL: If they buy Calibration, they ALREADY OWN VEROflow equipment!
+    // Calibration = sending us THEIR equipment to calibrate. Can't calibrate what you don't own.
+    // So NEVER recommend VEROflow equipment to calibration customers - upsell accessories instead.
+    { when: 'Calibration Service', suggest: ['Additional Calibrations', 'Hose Accessories', 'Cart Kit'], reason: 'They ALREADY own VEROflow - sell accessories not equipment!' },
     { when: 'Strainers', suggest: ['Flanges', 'Gaskets', 'Flange Kits'], reason: 'Strainers need flanges to install' },
     { when: 'Spools', suggest: ['Flanges', 'Gaskets'], reason: 'Spools connect with flanges' },
     { when: 'Flanges', suggest: ['Gaskets', 'Flange Kits'], reason: 'Every flange needs gaskets' },
