@@ -1929,6 +1929,41 @@ export default function DiversifiedDashboard() {
             console.error('Error adding task:', err);
           }
         }}
+        onBulkAddToTasks={async (items) => {
+          try {
+            // Create all tasks in parallel
+            const promises = items.map(({ action, recommendation }) =>
+              fetch('/api/diversified/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: action,
+                  description: `From AI insight: ${recommendation.title}\n\nProblem: ${recommendation.problem}\n\nRecommendation: ${recommendation.recommendation}`,
+                  priority: recommendation.priority === 'high' ? 'high' : recommendation.priority === 'medium' ? 'medium' : 'low',
+                  source: 'ai_insight',
+                  insight_id: recommendation.title,
+                }),
+              })
+            );
+
+            const results = await Promise.all(promises);
+            const successCount = results.filter(r => r.ok).length;
+
+            // Show confirmation
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-[100]';
+            toast.innerHTML = `<div class="flex items-center gap-2"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>${successCount} task${successCount !== 1 ? 's' : ''} added to Asana</span></div>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+          } catch (err) {
+            console.error('Error adding tasks:', err);
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-[100]';
+            toast.textContent = 'Failed to add tasks';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+          }
+        }}
       />
     </div>
   );

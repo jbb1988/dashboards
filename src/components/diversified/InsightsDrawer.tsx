@@ -13,12 +13,19 @@ interface AIRecommendation {
   category: 'attrition' | 'growth' | 'crosssell' | 'concentration' | 'general';
 }
 
+interface SelectedTask {
+  action: string;
+  recommendation: AIRecommendation;
+  key: string;
+}
+
 interface InsightsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   recommendations: AIRecommendation[];
   executiveSummary: string;
   onAddToTasks?: (item: string, recommendation: AIRecommendation) => void;
+  onBulkAddToTasks?: (items: Array<{ action: string; recommendation: AIRecommendation }>) => Promise<void>;
 }
 
 const PRIORITY_STYLES = {
@@ -55,9 +62,71 @@ export default function InsightsDrawer({
   recommendations,
   executiveSummary,
   onAddToTasks,
+  onBulkAddToTasks,
 }: InsightsDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [expandedInsights, setExpandedInsights] = useState<Set<number>>(new Set([0]));
+  const [selectedTasks, setSelectedTasks] = useState<Map<string, SelectedTask>>(new Map());
+  const [isAddingTasks, setIsAddingTasks] = useState(false);
+
+  // Generate a unique key for an action item
+  const getTaskKey = (recIdx: number, actionIdx: number) => `${recIdx}-${actionIdx}`;
+
+  // Toggle task selection
+  const toggleTaskSelection = (key: string, action: string, recommendation: AIRecommendation) => {
+    setSelectedTasks(prev => {
+      const next = new Map(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.set(key, { action, recommendation, key });
+      }
+      return next;
+    });
+  };
+
+  // Select all action items from a recommendation
+  const selectAllFromRecommendation = (recIdx: number, recommendation: AIRecommendation) => {
+    setSelectedTasks(prev => {
+      const next = new Map(prev);
+      recommendation.action_items.forEach((action, actionIdx) => {
+        const key = getTaskKey(recIdx, actionIdx);
+        next.set(key, { action, recommendation, key });
+      });
+      return next;
+    });
+  };
+
+  // Clear all selections
+  const clearSelections = () => {
+    setSelectedTasks(new Map());
+  };
+
+  // Add selected tasks to Asana
+  const handleAddSelectedTasks = async () => {
+    if (selectedTasks.size === 0) return;
+
+    setIsAddingTasks(true);
+    try {
+      if (onBulkAddToTasks) {
+        const items = Array.from(selectedTasks.values()).map(t => ({
+          action: t.action,
+          recommendation: t.recommendation,
+        }));
+        await onBulkAddToTasks(items);
+      } else if (onAddToTasks) {
+        // Fallback to individual adds
+        for (const task of selectedTasks.values()) {
+          onAddToTasks(task.action, task.recommendation);
+        }
+      }
+      clearSelections();
+    } catch (err) {
+      console.error('Error adding tasks:', err);
+    } finally {
+      setIsAddingTasks(false);
+    }
+  };
 
   const toggleInsight = (index: number) => {
     setExpandedInsights(prev => {
@@ -326,29 +395,46 @@ export default function InsightsDrawer({
                                     {/* Action Items */}
                                     {rec.action_items.length > 0 && (
                                       <div>
-                                        <h5 className="text-[10px] text-[#64748B] uppercase tracking-wide mb-2">Action Items</h5>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <h5 className="text-[10px] text-[#64748B] uppercase tracking-wide">Action Items</h5>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              selectAllFromRecommendation(idx, rec);
+                                            }}
+                                            className="text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                                          >
+                                            Select All
+                                          </button>
+                                        </div>
                                         <ul className="space-y-1.5">
-                                          {rec.action_items.map((item, i) => (
-                                            <li key={i} className="flex items-start gap-2 text-[11px] group">
-                                              <span className="text-cyan-400 mt-0.5 flex-shrink-0">
-                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                </svg>
-                                              </span>
-                                              <span className="text-[#94A3B8] flex-1">{item}</span>
-                                              {onAddToTasks && (
+                                          {rec.action_items.map((item, i) => {
+                                            const taskKey = getTaskKey(idx, i);
+                                            const isSelected = selectedTasks.has(taskKey);
+                                            return (
+                                              <li key={i} className="flex items-start gap-2 text-[11px] group">
+                                                {/* Checkbox */}
                                                 <button
                                                   onClick={(e) => {
                                                     e.stopPropagation();
-                                                    onAddToTasks(item, rec);
+                                                    toggleTaskSelection(taskKey, item, rec);
                                                   }}
-                                                  className="text-[10px] text-cyan-400 hover:text-cyan-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                                  className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-all border ${
+                                                    isSelected
+                                                      ? 'bg-cyan-500 border-cyan-500 text-white'
+                                                      : 'bg-white/5 border-white/20 hover:border-cyan-400/50'
+                                                  }`}
                                                 >
-                                                  + Add Task
+                                                  {isSelected && (
+                                                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                  )}
                                                 </button>
-                                              )}
-                                            </li>
-                                          ))}
+                                                <span className={`flex-1 ${isSelected ? 'text-white' : 'text-[#94A3B8]'}`}>{item}</span>
+                                              </li>
+                                            );
+                                          })}
                                         </ul>
                                       </div>
                                     )}
@@ -569,6 +655,58 @@ export default function InsightsDrawer({
                 )}
               </div>
             </div>
+
+            {/* Selected Tasks Action Bar */}
+            <AnimatePresence>
+              {selectedTasks.size > 0 && (
+                <motion.div
+                  initial={{ y: 100, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 100, opacity: 0 }}
+                  className="flex-shrink-0 border-t border-cyan-500/30 bg-cyan-500/10 px-5 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                        <span className="text-[13px] font-bold text-cyan-400">{selectedTasks.size}</span>
+                      </div>
+                      <span className="text-[12px] text-cyan-300">
+                        task{selectedTasks.size !== 1 ? 's' : ''} selected
+                      </span>
+                    </div>
+                    <div className="flex-1" />
+                    <button
+                      onClick={clearSelections}
+                      className="px-3 py-1.5 text-[12px] text-[#94A3B8] hover:text-white transition-colors"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={handleAddSelectedTasks}
+                      disabled={isAddingTasks}
+                      className="px-4 py-2 bg-cyan-500 text-white font-medium text-[13px] rounded-lg hover:bg-cyan-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isAddingTasks ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Add to Asana Tasks
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Footer Actions */}
             <div className="flex-shrink-0 border-t border-white/[0.06] bg-[#0F1722] px-5 py-4">
