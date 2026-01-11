@@ -678,37 +678,116 @@ const guideContent: Record<string, GuideData> = {
     color: '#A855F7',
     topics: [
       {
-        id: 'getting-started',
-        title: 'Getting Started with Insights',
+        id: 'products-tab',
+        title: 'Products Tab',
         content: (
           <div className="space-y-4">
             <p className="text-[#8FA3BF]">
-              The Insights tab in the Diversified Products dashboard provides sales intelligence to help managers and VPs identify opportunities and risks without manually analyzing sales data.
+              The Products tab provides a product-centric view of your sales data, helping you understand which products are performing well and which need attention.
             </p>
             <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
-              <h4 className="text-white font-medium mb-3">Sub-tabs</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-[#111827] rounded-lg">
-                  <span className="text-[#A855F7] font-medium">Overview</span>
-                  <p className="text-[#64748B] text-xs mt-1">KPI cards, alerts, and quick charts</p>
-                </div>
-                <div className="p-3 bg-[#111827] rounded-lg">
-                  <span className="text-[#A855F7] font-medium">Attrition</span>
-                  <p className="text-[#64748B] text-xs mt-1">At-risk customer analysis</p>
-                </div>
-                <div className="p-3 bg-[#111827] rounded-lg">
-                  <span className="text-[#A855F7] font-medium">YoY Growth</span>
-                  <p className="text-[#64748B] text-xs mt-1">Year-over-year comparisons</p>
-                </div>
-                <div className="p-3 bg-[#111827] rounded-lg">
-                  <span className="text-[#A855F7] font-medium">Opportunities</span>
-                  <p className="text-[#64748B] text-xs mt-1">Cross-sell recommendations</p>
-                </div>
+              <h4 className="text-white font-medium mb-3">Product Table</h4>
+              <ul className="space-y-2 text-sm text-[#8FA3BF]">
+                <li><strong className="text-white">Item Name:</strong> Product identifier from NetSuite</li>
+                <li><strong className="text-white">Class:</strong> Product category/classification</li>
+                <li><strong className="text-white">R12 Revenue:</strong> Rolling 12-month revenue</li>
+                <li><strong className="text-white">Change %:</strong> Comparison vs prior rolling 12 months</li>
+                <li><strong className="text-white">Customers:</strong> Number of unique customers buying this product</li>
+                <li><strong className="text-white">Margin %:</strong> Average gross profit margin</li>
+              </ul>
+            </div>
+            <h4 className="text-white font-medium mt-4">Charts</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <span className="text-[#22C55E] font-medium">Top 10 Products</span>
+                <p className="text-[#64748B] text-xs mt-1">Bar chart showing highest revenue products</p>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <span className="text-[#22C55E] font-medium">Class Breakdown</span>
+                <p className="text-[#64748B] text-xs mt-1">Pie chart of revenue by product class</p>
               </div>
             </div>
-            <p className="text-[#64748B] text-sm">
-              Data is analyzed from the last 3 years of sales transactions. Click the Refresh button to recalculate metrics.
+            <p className="text-[#64748B] text-sm mt-4">
+              <strong className="text-white">Tip:</strong> Click any row to expand and see the top customers for that product. Click a customer name to open their detail drawer.
             </p>
+          </div>
+        ),
+      },
+      {
+        id: 'customer-detail',
+        title: 'Customer Detail Drawer',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Click any customer name in the dashboard to open the Customer Detail Drawer, which shows their complete purchase history and product breakdown.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Drawer Sections</h4>
+              <ul className="space-y-2 text-sm text-[#8FA3BF]">
+                <li><strong className="text-white">Header:</strong> Customer name, total R12 revenue, status badge</li>
+                <li><strong className="text-white">Monthly Trend:</strong> Bar chart showing last 24 months of purchases</li>
+                <li><strong className="text-white">Products Tab:</strong> All products this customer buys with status indicators</li>
+                <li><strong className="text-white">Transactions Tab:</strong> Last 50 orders with expandable line items</li>
+              </ul>
+            </div>
+            <h4 className="text-white font-medium mt-4">Product Status Indicators</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-[#0B1220] rounded-lg border-l-4 border-[#22C55E]">
+                <span className="text-[#22C55E] font-medium">Active</span>
+                <p className="text-[#64748B] text-xs mt-1">Recent purchases, healthy</p>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border-l-4 border-[#F59E0B]">
+                <span className="text-[#F59E0B] font-medium">Warning</span>
+                <p className="text-[#64748B] text-xs mt-1">3-4 months since last purchase</p>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border-l-4 border-[#EF4444]">
+                <span className="text-[#EF4444] font-medium">Stopped</span>
+                <p className="text-[#64748B] text-xs mt-1">6+ months, was buying before</p>
+              </div>
+            </div>
+            <p className="text-[#64748B] text-sm mt-4">
+              The drawer helps you answer: "What does this customer buy? What did they stop buying? When was their last order?"
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: 'stopped-buying',
+        title: 'Stopped Buying Report',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Stopped Buying report identifies customer-product combinations where a customer used to buy a product but hasn't purchased it in the last 6 months.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Detection Logic</h4>
+              <ul className="space-y-2 text-sm text-[#8FA3BF]">
+                <li><strong className="text-white">Prior Period:</strong> 6-18 months ago (what they used to buy)</li>
+                <li><strong className="text-white">Current Period:</strong> Last 6 months (no purchases = stopped)</li>
+                <li><strong className="text-white">Result:</strong> Products bought in prior period but NOT in current</li>
+              </ul>
+            </div>
+            <h4 className="text-white font-medium mt-4">Two Views</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#A855F7]/20">
+                <h5 className="text-[#A855F7] font-medium mb-2">By Product</h5>
+                <p className="text-[#64748B] text-sm">
+                  "Which products are losing customers?" See products ranked by revenue at risk, with drill-down to affected customers.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#A855F7]/20">
+                <h5 className="text-[#A855F7] font-medium mb-2">By Customer</h5>
+                <p className="text-[#64748B] text-sm">
+                  "Which customers stopped buying what?" See customers ranked by lost revenue, with list of products they dropped.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#A855F7]/10 to-[#38BDF8]/10 rounded-lg p-4 border border-white/[0.06] mt-4">
+              <h4 className="text-white font-medium mb-2">Why This Matters</h4>
+              <p className="text-[#8FA3BF] text-sm">
+                A customer might still be "active" overall but have quietly stopped buying specific products. This report catches those early warning signs before they become full churn.
+              </p>
+            </div>
           </div>
         ),
       },
