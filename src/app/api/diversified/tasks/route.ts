@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, due_date, assignee, section, priority } = body;
+    const { title, description, due_date, assignee, section, priority, source, insight_id, insight_category, customer_name } = body;
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -194,10 +194,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Build task notes with insight metadata footer for tracking
+    let notes = description || '';
+    if (source === 'ai_insight') {
+      // Add structured metadata footer that we can parse later for analytics
+      const metadataFooter = [
+        '',
+        '---',
+        '📊 INSIGHT METADATA (do not edit below)',
+        `source: ai_insight`,
+        `insight_id: ${insight_id || 'unknown'}`,
+        `category: ${insight_category || 'general'}`,
+        `customer: ${customer_name || 'unknown'}`,
+        `created: ${new Date().toISOString()}`,
+      ].join('\n');
+      notes = notes + metadataFooter;
+    }
+
     // Create task in Asana
     const createdTask = await createTask(DIVERSIFIED_PROJECT_ID, {
       name: title,
-      notes: description || undefined,
+      notes: notes || undefined,
       due_on: due_date || undefined,
       assignee: assignee || undefined,
       section: sectionGid || undefined,
@@ -212,6 +229,7 @@ export async function POST(request: NextRequest) {
         title: createdTask.name,
         description: createdTask.notes || '',
         asana_gid: createdTask.gid,
+        source: source || 'manual',
       },
     });
   } catch (error) {

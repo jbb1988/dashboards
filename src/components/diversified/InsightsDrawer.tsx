@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AIRecommendation {
@@ -54,7 +54,20 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: 'General',
 };
 
-type TabType = 'all' | 'quick-wins' | 'executive' | 'action-plan';
+type TabType = 'all' | 'quick-wins' | 'executive' | 'action-plan' | 'analytics';
+
+interface InsightAnalytics {
+  total_insight_tasks: number;
+  completed: number;
+  pending: number;
+  overall_conversion_rate: number;
+  by_category: Array<{
+    category: string;
+    total: number;
+    completed: number;
+    conversion_rate: number;
+  }>;
+}
 
 export default function InsightsDrawer({
   isOpen,
@@ -68,6 +81,22 @@ export default function InsightsDrawer({
   const [expandedInsights, setExpandedInsights] = useState<Set<number>>(new Set([0]));
   const [selectedTasks, setSelectedTasks] = useState<Map<string, SelectedTask>>(new Map());
   const [isAddingTasks, setIsAddingTasks] = useState(false);
+  const [analytics, setAnalytics] = useState<InsightAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  // Fetch analytics when switching to analytics tab
+  useEffect(() => {
+    if (activeTab === 'analytics' && !analytics && !analyticsLoading) {
+      setAnalyticsLoading(true);
+      fetch('/api/diversified/insights/analytics?days=90')
+        .then(res => res.json())
+        .then(data => {
+          if (data.analytics) setAnalytics(data.analytics);
+        })
+        .catch(console.error)
+        .finally(() => setAnalyticsLoading(false));
+    }
+  }, [activeTab, analytics, analyticsLoading]);
 
   // Generate a unique key for an action item
   const getTaskKey = (recIdx: number, actionIdx: number) => `${recIdx}-${actionIdx}`;
@@ -308,6 +337,16 @@ export default function InsightsDrawer({
                     }`}
                   >
                     30-Day Action Plan
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('analytics')}
+                    className={`px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${
+                      activeTab === 'analytics'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'text-[#64748B] hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    ROI Tracking
                   </button>
                 </div>
               </div>
@@ -821,6 +860,76 @@ export default function InsightsDrawer({
                         </svg>
                         Add All Actions to Tasks
                       </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Analytics/ROI Tab */}
+                {activeTab === 'analytics' && (
+                  <div className="space-y-4">
+                    {analyticsLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <svg className="w-6 h-6 animate-spin text-emerald-400" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      </div>
+                    ) : analytics ? (
+                      <>
+                        {/* Overall Stats */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-[#0F1722] border border-white/[0.04] rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-white">{analytics.total_insight_tasks}</div>
+                            <div className="text-[10px] text-[#64748B] uppercase">Tasks Created</div>
+                          </div>
+                          <div className="bg-[#0F1722] border border-white/[0.04] rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-emerald-400">{analytics.completed}</div>
+                            <div className="text-[10px] text-[#64748B] uppercase">Completed</div>
+                          </div>
+                          <div className="bg-[#0F1722] border border-white/[0.04] rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-emerald-400">{analytics.overall_conversion_rate}%</div>
+                            <div className="text-[10px] text-[#64748B] uppercase">Completion Rate</div>
+                          </div>
+                        </div>
+
+                        {/* Conversion by Category */}
+                        {analytics.by_category.length > 0 && (
+                          <div className="bg-[#0F1722] border border-white/[0.04] rounded-xl p-4">
+                            <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-3">
+                              Completion by Insight Type
+                            </h3>
+                            <div className="space-y-3">
+                              {analytics.by_category.map((cat) => (
+                                <div key={cat.category}>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[12px] text-white capitalize">{cat.category.replace('_', ' ')}</span>
+                                    <span className="text-[11px] text-[#64748B]">
+                                      {cat.completed}/{cat.total} ({cat.conversion_rate}%)
+                                    </span>
+                                  </div>
+                                  <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-emerald-500 rounded-full transition-all"
+                                      style={{ width: `${cat.conversion_rate}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Info */}
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
+                          <p className="text-[11px] text-emerald-300/80">
+                            Tracking tasks created from AI insights in the last 90 days. Complete tasks in Asana to improve your conversion rate.
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-[#0F1722] border border-white/[0.04] rounded-xl p-6 text-center">
+                        <p className="text-[#64748B] text-[13px]">No insight tasks tracked yet. Add actions to Asana to start tracking ROI.</p>
+                      </div>
                     )}
                   </div>
                 )}

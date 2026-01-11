@@ -1155,25 +1155,50 @@ export async function generateInsightAlerts(filters?: {
   years?: number[];
 }): Promise<InsightAlert[]> {
   // Use rolling 12-month comparison for accurate alerts (not calendar year YoY)
-  const [attrition, concentration, rolling12Customers] = await Promise.all([
+  // Also fetch customer behaviors to filter out inappropriate alerts
+  const [attrition, concentration, rolling12Customers, customerBehaviors] = await Promise.all([
     calculateCustomerAttrition(filters),
     calculateConcentrationMetrics(filters),
     calculateRolling12Performance('customer'),
+    classifyCustomerBehavior(),
   ]);
+
+  // Create lookup map for behaviors by customer_id
+  const behaviorMap = new Map<string, CustomerBehavior>();
+  for (const behavior of customerBehaviors) {
+    behaviorMap.set(behavior.customer_id || behavior.customer_name, behavior);
+  }
 
   const alerts: InsightAlert[] = [];
 
   // High-priority attrition alerts
+  // IMPORTANT: Only include customers who are attrition_eligible
+  // This excludes project buyers (they're not "at risk" - they're done buying!)
   const highRiskCustomers = attrition
-    .filter(c => c.status === 'at_risk' && c.revenue_at_risk > 100000)
+    .filter(c => {
+      if (c.status !== 'at_risk' || c.revenue_at_risk <= 100000) return false;
+
+      // Check if customer is eligible for attrition alerts
+      const behavior = behaviorMap.get(c.customer_id || c.customer_name);
+      if (behavior && !behavior.attrition_eligible) {
+        // Customer is a project buyer or other non-eligible type - skip
+        return false;
+      }
+      return true;
+    })
     .slice(0, 3);
 
   for (const customer of highRiskCustomers) {
+    const behavior = behaviorMap.get(customer.customer_id || customer.customer_name);
+    const segmentInfo = behavior
+      ? ` [${behavior.segment.replace('_', ' ')}]`
+      : '';
+
     alerts.push({
       id: `attrition-${customer.customer_id}`,
       type: 'attrition',
       priority: 'high',
-      title: `${customer.customer_name} at high churn risk`,
+      title: `${customer.customer_name} at high churn risk${segmentInfo}`,
       message: `Score: ${customer.attrition_score}/100. Last purchase: ${customer.recency_days} days ago. Revenue at risk: $${(customer.revenue_at_risk / 1000).toFixed(0)}K`,
       metric_value: customer.attrition_score,
       metric_label: 'Attrition Score',
@@ -1198,17 +1223,33 @@ export async function generateInsightAlerts(filters?: {
 
   // Rolling 12-month decline alerts (compares last 12 months vs prior 12 months)
   // Only alert on significant declines where prior period had meaningful revenue
+  // Also filter out project buyers - their "decline" is expected!
   const decliningCustomers = rolling12Customers
-    .filter(c => c.revenue_change_pct < -30 && c.prior_revenue > 50000)
+    .filter(c => {
+      if (c.revenue_change_pct >= -30 || c.prior_revenue <= 50000) return false;
+
+      // Check if this decline is relevant (not a project buyer)
+      const behavior = behaviorMap.get(c.entity_id || c.entity_name);
+      if (behavior && behavior.segment === 'project_buyer') {
+        // Project buyers declining is expected - they bought for a project and are done
+        return false;
+      }
+      return true;
+    })
     .sort((a, b) => a.revenue_change_pct - b.revenue_change_pct) // Most declined first
     .slice(0, 3);
 
   for (const customer of decliningCustomers) {
+    const behavior = behaviorMap.get(customer.entity_id || customer.entity_name);
+    const segmentInfo = behavior
+      ? ` [${behavior.segment.replace('_', ' ')}]`
+      : '';
+
     alerts.push({
       id: `rolling12-${customer.entity_id}`,
       type: 'yoy',
       priority: 'medium',
-      title: `${customer.entity_name} down ${Math.abs(customer.revenue_change_pct).toFixed(0)}% (12-mo)`,
+      title: `${customer.entity_name} down ${Math.abs(customer.revenue_change_pct).toFixed(0)}% (12-mo)${segmentInfo}`,
       message: `Rolling 12-month revenue dropped from $${(customer.prior_revenue / 1000).toFixed(0)}K to $${(customer.current_revenue / 1000).toFixed(0)}K`,
       metric_value: customer.revenue_change_pct,
       metric_label: 'Rolling 12-Mo Change %',
@@ -1577,6 +1618,367 @@ function isClassAppropriateForType(
 }
 
 // ============================================
+// CUSTOMER BEHAVIORAL SEGMENTATION
+// ============================================
+
+export interface CustomerBehavior {
+  customer_id: string;
+  customer_name: string;
+
+  // Primary Segment
+  segment: 'steady_repeater' | 'project_buyer' | 'seasonal' | 'new_account' | 'irregular';
+  segment_confidence: number; // 0-100
+  segment_reason: string;     // Explanation for the classification
+
+  // Product Focus
+  product_focus: 'single_product' | 'narrow' | 'diverse';
+  top_class_concentration: number; // % of revenue from top class
+  class_count: number;
+
+  // Metrics
+  order_consistency: number;    // % of months with purchase (last 24mo)
+  revenue_volatility: number;   // coefficient of variation (stdDev/mean)
+  avg_order_frequency_days: number;
+  total_orders: number;
+  total_revenue_24mo: number;
+
+  // Time Patterns
+  first_order_date: string | null;
+  last_order_date: string | null;
+  days_since_first_order: number;
+  days_since_last_order: number;
+
+  // Seasonality
+  is_seasonal: boolean;
+  seasonal_months: number[];    // e.g., [3,4,5] for spring buyer
+  seasonal_confidence: number;
+
+  // Eligibility Flags - determines which insights make sense
+  attrition_eligible: boolean;      // Can we alert on attrition?
+  cross_sell_eligible: boolean;     // Can we recommend other products?
+  repeat_order_eligible: boolean;   // Can we remind about repeat orders?
+}
+
+/**
+ * Classify customer buying behavior to enable relevant insights
+ *
+ * SEGMENTS:
+ * - steady_repeater: Orders regularly, predictable pattern, core business
+ * - project_buyer: 1-3 large orders clustered together, then nothing - EXCLUDE from attrition/repeat
+ * - seasonal: Orders only in certain months/quarters
+ * - new_account: < 6 months since first order OR < 3 orders total
+ * - irregular: Sporadic, unpredictable patterns
+ *
+ * PRODUCT FOCUS:
+ * - single_product: >80% revenue from one class - EXCLUDE from cross-sell
+ * - narrow: 2-3 classes
+ * - diverse: 4+ classes
+ */
+export async function classifyCustomerBehavior(): Promise<CustomerBehavior[]> {
+  const admin = getSupabaseAdmin();
+  const now = new Date();
+
+  // Use 24-month window for behavioral analysis (need history for patterns)
+  const periodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const periodStart = new Date(periodEnd);
+  periodStart.setMonth(periodStart.getMonth() - 24);
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+  // Fetch all transaction data
+  const allData: Array<{
+    customer_id: string;
+    customer_name: string;
+    class_name: string;
+    transaction_date: string;
+    revenue: number;
+  }> = [];
+
+  let offset = 0;
+  const batchSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await admin
+      .from('diversified_sales')
+      .select('customer_id, customer_name, class_name, transaction_date, revenue')
+      .gte('transaction_date', formatDate(periodStart))
+      .lte('transaction_date', formatDate(periodEnd))
+      .range(offset, offset + batchSize - 1);
+
+    if (error) {
+      console.error('Error fetching behavior data:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allData.push(...data);
+      offset += batchSize;
+      hasMore = data.length === batchSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  if (allData.length === 0) {
+    return [];
+  }
+
+  // Group by customer
+  const customerMap = new Map<string, {
+    customer_id: string;
+    customer_name: string;
+    orderDates: Date[];
+    orderValues: number[];
+    classTotals: Map<string, number>;
+    monthlyRevenue: Map<string, number>; // "YYYY-MM" -> revenue
+    totalRevenue: number;
+  }>();
+
+  for (const row of allData) {
+    const key = row.customer_id || row.customer_name;
+    if (!key) continue;
+
+    if (!customerMap.has(key)) {
+      customerMap.set(key, {
+        customer_id: row.customer_id,
+        customer_name: row.customer_name,
+        orderDates: [],
+        orderValues: [],
+        classTotals: new Map(),
+        monthlyRevenue: new Map(),
+        totalRevenue: 0,
+      });
+    }
+
+    const customer = customerMap.get(key)!;
+    const txDate = new Date(row.transaction_date);
+    customer.orderDates.push(txDate);
+    customer.orderValues.push(row.revenue || 0);
+    customer.totalRevenue += row.revenue || 0;
+
+    // Track revenue by class
+    if (row.class_name) {
+      const classTotal = customer.classTotals.get(row.class_name) || 0;
+      customer.classTotals.set(row.class_name, classTotal + (row.revenue || 0));
+    }
+
+    // Track monthly revenue for consistency/seasonality
+    const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+    const monthRevenue = customer.monthlyRevenue.get(monthKey) || 0;
+    customer.monthlyRevenue.set(monthKey, monthRevenue + (row.revenue || 0));
+  }
+
+  // Build results
+  const results: CustomerBehavior[] = [];
+
+  for (const [, customer] of customerMap) {
+    // Sort dates
+    const sortedDates = customer.orderDates.sort((a, b) => a.getTime() - b.getTime());
+    const uniqueDates = [...new Set(sortedDates.map(d => d.toDateString()))].map(ds => new Date(ds));
+
+    const firstOrderDate = uniqueDates.length > 0 ? uniqueDates[0] : null;
+    const lastOrderDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
+    const daysSinceFirst = firstOrderDate ? differenceInDays(now, firstOrderDate) : 999;
+    const daysSinceLast = lastOrderDate ? differenceInDays(now, lastOrderDate) : 999;
+
+    // Calculate average order frequency
+    let avgFrequencyDays = 0;
+    if (uniqueDates.length >= 2) {
+      const gaps: number[] = [];
+      for (let i = 1; i < uniqueDates.length; i++) {
+        gaps.push(differenceInDays(uniqueDates[i], uniqueDates[i - 1]));
+      }
+      avgFrequencyDays = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+    }
+
+    // ORDER CONSISTENCY: % of months with at least one order (last 24 months)
+    const monthsWithOrders = customer.monthlyRevenue.size;
+    const orderConsistency = (monthsWithOrders / 24) * 100;
+
+    // REVENUE VOLATILITY: Coefficient of variation (stdDev / mean)
+    let revenueVolatility = 0;
+    if (customer.orderValues.length > 1) {
+      const mean = customer.orderValues.reduce((a, b) => a + b, 0) / customer.orderValues.length;
+      const variance = customer.orderValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / customer.orderValues.length;
+      const stdDev = Math.sqrt(variance);
+      revenueVolatility = mean > 0 ? stdDev / mean : 0;
+    }
+
+    // PRODUCT FOCUS: concentration in top class
+    let topClassConcentration = 0;
+    let topClassName = '';
+    for (const [className, revenue] of customer.classTotals) {
+      const pct = customer.totalRevenue > 0 ? (revenue / customer.totalRevenue) * 100 : 0;
+      if (pct > topClassConcentration) {
+        topClassConcentration = pct;
+        topClassName = className;
+      }
+    }
+    const classCount = customer.classTotals.size;
+
+    let productFocus: 'single_product' | 'narrow' | 'diverse';
+    if (topClassConcentration > 80 || classCount === 1) {
+      productFocus = 'single_product';
+    } else if (classCount <= 3) {
+      productFocus = 'narrow';
+    } else {
+      productFocus = 'diverse';
+    }
+
+    // SEASONALITY DETECTION: Check if orders cluster in specific months
+    const orderMonths: number[] = sortedDates.map(d => d.getMonth() + 1); // 1-12
+    const monthCounts = new Map<number, number>();
+    for (const month of orderMonths) {
+      monthCounts.set(month, (monthCounts.get(month) || 0) + 1);
+    }
+
+    // Find peak months (where >60% of orders occur in a 4-month window)
+    let isSeasonal = false;
+    let seasonalMonths: number[] = [];
+    let seasonalConfidence = 0;
+
+    if (orderMonths.length >= 4) {
+      // Check each 4-month window
+      for (let startMonth = 1; startMonth <= 12; startMonth++) {
+        let windowCount = 0;
+        const windowMonths: number[] = [];
+        for (let i = 0; i < 4; i++) {
+          const month = ((startMonth - 1 + i) % 12) + 1;
+          windowMonths.push(month);
+          windowCount += monthCounts.get(month) || 0;
+        }
+        const windowPct = (windowCount / orderMonths.length) * 100;
+        if (windowPct >= 60 && orderConsistency < 50) {
+          // High concentration in this window + not ordering every month = seasonal
+          if (windowPct > seasonalConfidence) {
+            isSeasonal = true;
+            seasonalMonths = windowMonths;
+            seasonalConfidence = windowPct;
+          }
+        }
+      }
+    }
+
+    // SEGMENT CLASSIFICATION
+    let segment: CustomerBehavior['segment'];
+    let segmentConfidence = 0;
+    let segmentReason = '';
+
+    // NEW_ACCOUNT: First order < 6 months ago OR < 3 orders
+    if (daysSinceFirst < 180 || uniqueDates.length < 3) {
+      segment = 'new_account';
+      segmentConfidence = 90;
+      segmentReason = daysSinceFirst < 180
+        ? `First order was ${Math.round(daysSinceFirst / 30)} months ago`
+        : `Only ${uniqueDates.length} order(s) to date`;
+    }
+    // PROJECT_BUYER: 1-3 orders, clustered within 90 days, no recent activity, meaningful revenue
+    else if (
+      uniqueDates.length <= 3 &&
+      customer.totalRevenue > 10000 &&
+      daysSinceLast > 180
+    ) {
+      // Check if orders are clustered (all within 90 days of each other)
+      const orderSpan = firstOrderDate && lastOrderDate
+        ? differenceInDays(lastOrderDate, firstOrderDate)
+        : 0;
+
+      if (orderSpan <= 90) {
+        segment = 'project_buyer';
+        segmentConfidence = 85;
+        segmentReason = `${uniqueDates.length} orders totaling $${(customer.totalRevenue / 1000).toFixed(0)}K within ${orderSpan} days, then ${Math.round(daysSinceLast / 30)} months of silence`;
+      } else {
+        segment = 'irregular';
+        segmentConfidence = 50;
+        segmentReason = 'Sporadic ordering pattern';
+      }
+    }
+    // STEADY_REPEATER: Consistent ordering pattern
+    else if (
+      orderConsistency >= 40 &&
+      revenueVolatility < 1.5 &&
+      daysSinceLast < 90
+    ) {
+      segment = 'steady_repeater';
+      segmentConfidence = Math.min(95, 60 + orderConsistency / 2);
+      segmentReason = `Orders in ${Math.round(orderConsistency)}% of months, consistent order sizes`;
+    }
+    // SEASONAL: Orders cluster in specific months
+    else if (isSeasonal) {
+      segment = 'seasonal';
+      segmentConfidence = seasonalConfidence;
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      segmentReason = `${Math.round(seasonalConfidence)}% of orders in ${seasonalMonths.map(m => monthNames[m - 1]).join('-')}`;
+    }
+    // IRREGULAR: Everything else
+    else {
+      segment = 'irregular';
+      segmentConfidence = 60;
+      if (daysSinceLast > 180) {
+        segmentReason = `No orders in ${Math.round(daysSinceLast / 30)} months, inconsistent pattern`;
+      } else {
+        segmentReason = 'Sporadic ordering pattern with no clear cycle';
+      }
+    }
+
+    // ELIGIBILITY FLAGS
+    // Attrition: Only for customers who SHOULD be ordering (not project buyers, not seasonal outside season)
+    const attritionEligible =
+      segment === 'steady_repeater' ||
+      (segment === 'irregular' && daysSinceLast < 365 && orderConsistency > 20);
+
+    // Cross-sell: Only for customers who buy multiple products (not single-product focused)
+    const crossSellEligible = productFocus !== 'single_product';
+
+    // Repeat order: Only for customers with established patterns (not project buyers)
+    const repeatOrderEligible =
+      segment === 'steady_repeater' ||
+      (segment === 'seasonal' && isInSeason(seasonalMonths, now.getMonth() + 1));
+
+    results.push({
+      customer_id: customer.customer_id,
+      customer_name: customer.customer_name,
+      segment,
+      segment_confidence: Math.round(segmentConfidence),
+      segment_reason: segmentReason,
+      product_focus: productFocus,
+      top_class_concentration: Math.round(topClassConcentration),
+      class_count: classCount,
+      order_consistency: Math.round(orderConsistency),
+      revenue_volatility: Math.round(revenueVolatility * 100) / 100,
+      avg_order_frequency_days: avgFrequencyDays,
+      total_orders: uniqueDates.length,
+      total_revenue_24mo: customer.totalRevenue,
+      first_order_date: firstOrderDate?.toISOString() || null,
+      last_order_date: lastOrderDate?.toISOString() || null,
+      days_since_first_order: daysSinceFirst,
+      days_since_last_order: daysSinceLast,
+      is_seasonal: isSeasonal,
+      seasonal_months: seasonalMonths,
+      seasonal_confidence: Math.round(seasonalConfidence),
+      attrition_eligible: attritionEligible,
+      cross_sell_eligible: crossSellEligible,
+      repeat_order_eligible: repeatOrderEligible,
+    });
+  }
+
+  return results.sort((a, b) => b.total_revenue_24mo - a.total_revenue_24mo);
+}
+
+/**
+ * Check if current month is within a customer's buying season
+ */
+function isInSeason(seasonalMonths: number[], currentMonth: number): boolean {
+  if (seasonalMonths.length === 0) return true;
+  // Include the month before season starts (prep time)
+  const expandedSeason = [...seasonalMonths];
+  const firstSeasonMonth = Math.min(...seasonalMonths);
+  const monthBefore = firstSeasonMonth === 1 ? 12 : firstSeasonMonth - 1;
+  expandedSeason.push(monthBefore);
+  return expandedSeason.includes(currentMonth);
+}
+
+// ============================================
 // QUICK WIN OPPORTUNITIES
 // ============================================
 
@@ -1606,18 +2008,42 @@ export interface QuickWinOpportunity {
 /**
  * Generate quick win opportunities from customer context
  * These are actionable items for today's sales calls
+ *
+ * IMPORTANT: Uses customer behavioral segmentation to ensure relevance:
+ * - Repeat orders: ONLY for repeat_order_eligible customers (excludes project buyers, off-season seasonal)
+ * - Cross-sell: ONLY for cross_sell_eligible customers (excludes single-product focused customers)
  */
 export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
-  const customerContexts = await calculateCustomerContext();
+  // Fetch both customer context AND behavioral classification in parallel
+  const [customerContexts, customerBehaviors] = await Promise.all([
+    calculateCustomerContext(),
+    classifyCustomerBehavior(),
+  ]);
+
+  // Create lookup map for behaviors by customer_id
+  const behaviorMap = new Map<string, CustomerBehavior>();
+  for (const behavior of customerBehaviors) {
+    behaviorMap.set(behavior.customer_id || behavior.customer_name, behavior);
+  }
+
   const quickWins: QuickWinOpportunity[] = [];
 
   for (const ctx of customerContexts) {
     // Skip customers with very low revenue (not worth the call)
     if (ctx.total_revenue_12mo < 1000) continue;
 
+    // Get behavioral classification for this customer
+    const behavior = behaviorMap.get(ctx.customer_id || ctx.customer_name);
+
     // REPEAT ORDER OPPORTUNITIES
     // Customer is overdue and has a regular order pattern
-    if (ctx.is_overdue && ctx.avg_order_frequency_days > 0 && ctx.avg_order_frequency_days < 90) {
+    // ONLY if customer is eligible for repeat order insights (not project buyer, not seasonal off-season)
+    if (
+      ctx.is_overdue &&
+      ctx.avg_order_frequency_days > 0 &&
+      ctx.avg_order_frequency_days < 90 &&
+      (!behavior || behavior.repeat_order_eligible) // Allow if no behavior data (backward compatible)
+    ) {
       const daysOverdue = ctx.days_since_last_order - ctx.avg_order_frequency_days;
 
       // Priority based on how overdue and value
@@ -1627,6 +2053,11 @@ export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
       } else if (ctx.avg_order_value > 1000 || daysOverdue > 14) {
         priority = 'medium';
       }
+
+      // Add segment context to the call script if available
+      const segmentNote = behavior
+        ? ` (${behavior.segment.replace('_', ' ')} - orders ${behavior.order_consistency}% of months)`
+        : '';
 
       quickWins.push({
         type: 'repeat_order',
@@ -1638,7 +2069,7 @@ export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
         days_overdue: daysOverdue,
         typical_order_value: Math.round(ctx.avg_order_value),
         typical_products: ctx.top_products.slice(0, 3),
-        action_summary: `Usually orders every ${ctx.avg_order_frequency_days} days, ${daysOverdue} days overdue`,
+        action_summary: `Usually orders every ${ctx.avg_order_frequency_days} days, ${daysOverdue} days overdue${segmentNote}`,
         estimated_value: Math.round(ctx.avg_order_value),
         call_script: `Hi, I noticed it's been about ${Math.round(ctx.days_since_last_order / 7)} weeks since your last order. You usually order ${ctx.top_products.slice(0, 2).join(' and ') || 'your usual items'} around this time. Want me to put together a quote for your standard order?`,
       });
@@ -1646,7 +2077,12 @@ export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
 
     // CROSS-SELL OPPORTUNITIES
     // Customer has missing classes that similar customers buy
-    if (ctx.missing_classes.length > 0 && ctx.cross_sell_potential > 500) {
+    // ONLY if customer is eligible for cross-sell (not single-product focused)
+    if (
+      ctx.missing_classes.length > 0 &&
+      ctx.cross_sell_potential > 500 &&
+      (!behavior || behavior.cross_sell_eligible) // Allow if no behavior data (backward compatible)
+    ) {
       const priority: 'high' | 'medium' | 'low' =
         ctx.cross_sell_potential > 10000 ? 'high' :
         ctx.cross_sell_potential > 3000 ? 'medium' : 'low';
@@ -1654,6 +2090,11 @@ export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
       const typeLabel = ctx.inferred_type === 'distributor' ? 'distributors' :
                         ctx.inferred_type === 'utility' ? 'utilities' :
                         ctx.inferred_type === 'contractor' ? 'contractors' : 'similar customers';
+
+      // Add segment context
+      const focusNote = behavior && behavior.product_focus !== 'single_product'
+        ? ` (buys ${behavior.class_count} product categories)`
+        : '';
 
       quickWins.push({
         type: 'cross_sell',
@@ -1663,7 +2104,7 @@ export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
         customer_type: ctx.inferred_type,
         recommended_products: ctx.missing_classes,
         similar_customers_buy: `Most ${typeLabel} also buy these`,
-        action_summary: `Missing ${ctx.missing_classes.slice(0, 2).join(', ')} that similar ${typeLabel} carry`,
+        action_summary: `Missing ${ctx.missing_classes.slice(0, 2).join(', ')} that similar ${typeLabel} carry${focusNote}`,
         estimated_value: ctx.cross_sell_potential,
         call_script: `I noticed you stock ${ctx.product_classes.slice(0, 2).join(' and ') || 'similar products'} but not ${ctx.missing_classes[0]}. Most ${typeLabel} your size carry both. Would you like me to send over our pricing?`,
       });

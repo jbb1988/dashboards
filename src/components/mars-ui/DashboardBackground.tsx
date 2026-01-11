@@ -137,10 +137,10 @@ function FloatingParticles({
  *
  * @example
  * ```tsx
- * <div className="min-h-screen bg-[#0F1722] relative">
+ * <div className="min-h-screen bg-[#0F1722]">
  *   <DashboardBackground accentColor="#38BDF8" showParticles />
  *   <div className="relative z-10">
- *     // Dashboard content here
+ *     // Dashboard content here (background is fixed and covers entire viewport)
  *   </div>
  * </div>
  * ```
@@ -154,7 +154,7 @@ export function DashboardBackground({
   className = '',
 }: DashboardBackgroundProps) {
   return (
-    <div className={`absolute inset-0 pointer-events-none ${className}`}>
+    <div className={`fixed inset-0 pointer-events-none ${className}`}>
       <GridBackground
         accentColor={accentColor}
         secondaryColor={secondaryColor}

@@ -5,11 +5,13 @@ import {
   generateCrossSellOpportunities,
   calculateConcentrationMetrics,
   generateQuickWins,
+  classifyCustomerBehavior,
   CustomerAttritionScore,
   YoYPerformance,
   CrossSellOpportunity,
   ConcentrationMetrics,
   QuickWinOpportunity,
+  CustomerBehavior,
 } from '@/lib/insights';
 import { generateProductContext, DIVERSIFIED_PRODUCTS } from '@/lib/diversified-business-context';
 
@@ -112,6 +114,33 @@ PRIORITY (in order):
 IGNORE:
 - Low-dollar commodity items are not worth chasing (Zinc Caps, Drill Taps, etc.)
 - If a customer only buys small items, pitch them VEROflow or Strainers instead
+
+CUSTOMER SEGMENTS - Very Important:
+Understanding customer buying patterns helps you recommend the RIGHT action:
+
+- STEADY REPEATER: Orders regularly (every few weeks/months), predictable pattern.
+  → These are your core accounts. If they stop ordering, it's a REAL problem - act fast!
+  → Great for repeat orders, cross-sell, and upsell.
+
+- PROJECT BUYER: Made 1-3 large purchases for a specific project, then stopped.
+  → NOT a churn risk - they're done with their project!
+  → DON'T waste time calling to "win back" - they're not lost.
+  → ONLY reach out if you hear about a new similar project.
+
+- SEASONAL: Only orders during certain months/quarters (e.g., spring construction season).
+  → Don't alert on "no orders" during their off-season.
+  → Contact them BEFORE their buying season starts.
+
+- NEW ACCOUNT: Started buying recently (< 6 months or < 3 orders).
+  → Focus on building relationship and expanding what they buy.
+  → Don't analyze trends yet - not enough history.
+
+- SINGLE-PRODUCT: 80%+ of purchases are one product type.
+  → Low cross-sell potential - they buy what they need.
+  → Don't push products they clearly don't want.
+
+- DIVERSE BUYER: Buys multiple product categories.
+  → Best cross-sell candidates - already open to variety.
 `;
 
 // ============================================================================
@@ -119,10 +148,23 @@ IGNORE:
 // ============================================================================
 
 async function generateAttritionInsights(
-  attrition: CustomerAttritionScore[]
+  attrition: CustomerAttritionScore[],
+  behaviorMap?: Map<string, CustomerBehavior>
 ): Promise<AIRecommendation[]> {
+  // Filter out project buyers and other non-eligible customers BEFORE sending to AI
   const atRiskCustomers = attrition
-    .filter(c => c.status === 'at_risk' || c.status === 'declining')
+    .filter(c => {
+      if (c.status !== 'at_risk' && c.status !== 'declining') return false;
+
+      // If we have behavior data, only include attrition-eligible customers
+      if (behaviorMap) {
+        const behavior = behaviorMap.get(c.customer_id || c.customer_name);
+        if (behavior && !behavior.attrition_eligible) {
+          return false; // Skip project buyers, off-season seasonal, etc.
+        }
+      }
+      return true;
+    })
     .slice(0, 10);
 
   if (atRiskCustomers.length === 0) {
@@ -131,16 +173,24 @@ async function generateAttritionInsights(
 
   const totalRevenueAtRisk = atRiskCustomers.reduce((sum, c) => sum + c.revenue_at_risk, 0);
 
-  const customerSummaries = atRiskCustomers.map(c => ({
-    name: c.customer_name,
-    score: c.attrition_score,
-    status: c.status,
-    days_since_purchase: c.recency_days,
-    revenue_at_risk: c.revenue_at_risk,
-    frequency_change: c.frequency_change_pct,
-    monetary_change: c.monetary_change_pct,
-    product_mix_shrinking: c.product_mix_current < c.product_mix_prior,
-  }));
+  // Include segment information in customer summaries
+  const customerSummaries = atRiskCustomers.map(c => {
+    const behavior = behaviorMap?.get(c.customer_id || c.customer_name);
+    return {
+      name: c.customer_name,
+      segment: behavior?.segment || 'unknown',
+      segment_reason: behavior?.segment_reason || '',
+      score: c.attrition_score,
+      status: c.status,
+      days_since_purchase: c.recency_days,
+      revenue_at_risk: c.revenue_at_risk,
+      frequency_change: c.frequency_change_pct,
+      monetary_change: c.monetary_change_pct,
+      product_mix_shrinking: c.product_mix_current < c.product_mix_prior,
+      product_focus: behavior?.product_focus || 'unknown',
+      order_consistency: behavior?.order_consistency || 0,
+    };
+  });
 
   // Get our sales tactics for win-back
   const { salesTactics } = DIVERSIFIED_PRODUCTS;
@@ -151,10 +201,16 @@ WIN-BACK TACTICS:
 - Lost customer: ${salesTactics.lostCustomer.action}
 - Declining customer: ${salesTactics.decliningCustomer.action}
 
-CUSTOMERS WHO STOPPED OR SLOWED ORDERING:
+CUSTOMERS WHO STOPPED OR SLOWED ORDERING (pre-filtered for relevance):
 ${JSON.stringify(customerSummaries, null, 2)}
 
 Total at risk: ${formatCurrency(totalRevenueAtRisk)}
+
+IMPORTANT CONTEXT:
+- Each customer now includes their SEGMENT (steady_repeater, seasonal, new_account, irregular)
+- STEADY REPEATERS who stop ordering are real churn risks - prioritize them!
+- Segment reason explains why they're classified that way
+- These customers have already been filtered - project buyers excluded
 
 TASK: Give me 2-3 action items, but ONLY for customers who were buying high-value products:
 - VEROflow equipment or calibration services
@@ -164,9 +220,9 @@ TASK: Give me 2-3 action items, but ONLY for customers who were buying high-valu
 SKIP customers who only bought low-dollar items (Zinc Caps, Drill Taps, etc.) - not worth the effort.
 
 For each recommendation:
-- Who to call (only if they bought high-value products)
+- Who to call (include their segment in context)
 - What high-value product they stopped buying
-- What to say or offer
+- What to say or offer (tailor to their segment)
 
 Return JSON:
 {
@@ -174,7 +230,7 @@ Return JSON:
     {
       "priority": "high" | "medium" | "low",
       "title": "Call [Customer] about reorders",
-      "problem": "Short description of the issue",
+      "problem": "Short description of the issue (mention segment if relevant)",
       "recommendation": "Call them and ask why orders stopped. Offer to match pricing.",
       "expected_impact": "Could recover $X in orders",
       "action_items": ["Call [name] at [company]", "Ask about recent orders", "Offer quote on their usual items"],
@@ -370,7 +426,8 @@ Respond ONLY with JSON.`;
 }
 
 async function generateQuickWinInsights(
-  quickWins: QuickWinOpportunity[]
+  quickWins: QuickWinOpportunity[],
+  behaviorMap?: Map<string, CustomerBehavior>
 ): Promise<AIRecommendation[]> {
   if (quickWins.length === 0) {
     return [];
@@ -383,39 +440,59 @@ async function generateQuickWinInsights(
   const totalRepeatValue = repeatOrders.reduce((sum, q) => sum + q.estimated_value, 0);
   const totalCrossSellValue = crossSells.reduce((sum, q) => sum + q.estimated_value, 0);
 
+  // Enrich with segment data if available
+  const enrichRepeat = (q: QuickWinOpportunity) => {
+    const behavior = behaviorMap?.get(q.customer_id || q.customer_name);
+    return {
+      customer: q.customer_name,
+      type: q.customer_type,
+      segment: behavior?.segment || 'unknown',
+      order_consistency: behavior ? `${behavior.order_consistency}% of months` : 'unknown',
+      usual_order_every: `${q.usual_frequency_days} days`,
+      days_overdue: q.days_overdue,
+      typical_order: formatCurrency(q.typical_order_value || 0),
+      products: q.typical_products?.join(', '),
+      script: q.call_script,
+    };
+  };
+
+  const enrichCrossSell = (q: QuickWinOpportunity) => {
+    const behavior = behaviorMap?.get(q.customer_id || q.customer_name);
+    return {
+      customer: q.customer_name,
+      type: q.customer_type,
+      segment: behavior?.segment || 'unknown',
+      product_focus: behavior?.product_focus || 'unknown',
+      buys_categories: behavior?.class_count || 0,
+      missing: q.recommended_products?.slice(0, 3).join(', '),
+      why: q.similar_customers_buy,
+      potential: formatCurrency(q.estimated_value),
+      script: q.call_script,
+    };
+  };
+
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
 
 QUICK WINS - These customers are ready to buy TODAY.
+NOTE: These have been PRE-FILTERED for eligibility based on customer segments.
+- Repeat orders: Only steady repeaters (not project buyers)
+- Cross-sell: Only diverse buyers (not single-product focused)
 
 === REPEAT ORDER OPPORTUNITIES ===
-These customers usually order regularly but are OVERDUE. Easy win - just call and remind them.
-${repeatOrders.length > 0 ? JSON.stringify(repeatOrders.map(q => ({
-  customer: q.customer_name,
-  type: q.customer_type,
-  usual_order_every: `${q.usual_frequency_days} days`,
-  days_overdue: q.days_overdue,
-  typical_order: formatCurrency(q.typical_order_value || 0),
-  products: q.typical_products?.join(', '),
-  script: q.call_script,
-})), null, 2) : 'None found'}
+These are STEADY REPEATERS who usually order regularly but are OVERDUE. Easy win - just call and remind them.
+${repeatOrders.length > 0 ? JSON.stringify(repeatOrders.map(enrichRepeat), null, 2) : 'None found'}
 Total potential: ${formatCurrency(totalRepeatValue)}
 
 === CROSS-SELL OPPORTUNITIES ===
-These customers buy some products but are missing ones that similar customers carry.
+These are DIVERSE BUYERS who buy multiple product categories and are missing ones that similar customers carry.
 IMPORTANT: Distributors get consumables (Flanges, Gaskets), Utilities get equipment (VEROflow).
-${crossSells.length > 0 ? JSON.stringify(crossSells.map(q => ({
-  customer: q.customer_name,
-  type: q.customer_type,
-  missing: q.recommended_products?.slice(0, 3).join(', '),
-  why: q.similar_customers_buy,
-  potential: formatCurrency(q.estimated_value),
-  script: q.call_script,
-})), null, 2) : 'None found'}
+${crossSells.length > 0 ? JSON.stringify(crossSells.map(enrichCrossSell), null, 2) : 'None found'}
 Total potential: ${formatCurrency(totalCrossSellValue)}
 
 TASK: Pick the TOP 3-4 QUICK WINS to call TODAY.
 
 Rules:
+- These customers have already been filtered for relevance - trust the segment classification
 - Repeat orders are easier wins than cross-sell (customer already buys from us)
 - High-value opportunities (>$3K) go first
 - Include the specific call script for each
@@ -427,7 +504,7 @@ Return JSON:
     {
       "priority": "high" | "medium" | "low",
       "title": "Quick Win: [Action] for [Customer]",
-      "problem": "Why this is a quick win",
+      "problem": "Why this is a quick win (reference segment if relevant)",
       "recommendation": "What to do - use the call script",
       "expected_impact": "Expected $ value",
       "action_items": ["Call script line 1", "Call script line 2", "Follow up action"],
@@ -530,6 +607,23 @@ export async function POST(request: NextRequest) {
     console.log(`[AI INSIGHTS] Type: ${type}, Years: ${filters.years.join(', ')}`);
     console.log('='.repeat(60));
 
+    // Fetch customer behavioral classifications upfront
+    // This is used to provide context to AI and filter out irrelevant insights
+    console.log('[AI INSIGHTS] Fetching customer behavior classifications...');
+    const customerBehaviors = await classifyCustomerBehavior();
+    const behaviorMap = new Map<string, CustomerBehavior>();
+    for (const behavior of customerBehaviors) {
+      behaviorMap.set(behavior.customer_id || behavior.customer_name, behavior);
+    }
+    console.log(`[AI INSIGHTS] Classified ${customerBehaviors.length} customers by behavior`);
+
+    // Log segment distribution
+    const segmentCounts = customerBehaviors.reduce((acc, b) => {
+      acc[b.segment] = (acc[b.segment] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log('[AI INSIGHTS] Segment distribution:', JSON.stringify(segmentCounts));
+
     // Fetch required data based on type
     const allRecommendations: AIRecommendation[] = [];
     let atRiskCount = 0;
@@ -541,11 +635,18 @@ export async function POST(request: NextRequest) {
     if (type === 'all' || type === 'attrition') {
       console.log('[AI INSIGHTS] Analyzing attrition...');
       const attrition = await calculateCustomerAttrition(filters);
-      const atRisk = attrition.filter(c => c.status === 'at_risk');
+
+      // Only count attrition-eligible customers as "at risk"
+      const atRisk = attrition.filter(c => {
+        if (c.status !== 'at_risk') return false;
+        const behavior = behaviorMap.get(c.customer_id || c.customer_name);
+        if (behavior && !behavior.attrition_eligible) return false;
+        return true;
+      });
       atRiskCount = atRisk.length;
       atRiskRevenue = atRisk.reduce((sum, c) => sum + c.revenue_at_risk, 0);
 
-      const attritionInsights = await generateAttritionInsights(attrition);
+      const attritionInsights = await generateAttritionInsights(attrition, behaviorMap);
       allRecommendations.push(...attritionInsights);
     }
 
@@ -580,13 +681,14 @@ export async function POST(request: NextRequest) {
 
     // QUICK WINS - This runs by default with 'all' or explicitly with 'quickwins'
     // Quick wins are prioritized and added at the beginning
+    // Note: generateQuickWins() already uses classifyCustomerBehavior internally for filtering
     if (type === 'all' || type === 'quickwins') {
       console.log('[AI INSIGHTS] Analyzing quick wins...');
       const quickWins = await generateQuickWins();
-      console.log(`[AI INSIGHTS] Found ${quickWins.length} quick win opportunities`);
+      console.log(`[AI INSIGHTS] Found ${quickWins.length} quick win opportunities (pre-filtered by segment)`);
 
       if (quickWins.length > 0) {
-        const quickWinInsights = await generateQuickWinInsights(quickWins);
+        const quickWinInsights = await generateQuickWinInsights(quickWins, behaviorMap);
         // Add quick wins at the beginning (they're the most actionable)
         allRecommendations.unshift(...quickWinInsights);
       }

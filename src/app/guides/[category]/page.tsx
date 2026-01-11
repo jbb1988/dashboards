@@ -991,6 +991,264 @@ const guideContent: Record<string, GuideData> = {
           </div>
         ),
       },
+      {
+        id: 'customer-segments',
+        title: 'Customer Behavioral Segmentation',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The system automatically classifies each customer into behavioral segments based on their purchase history. This ensures insights are relevant to each customer type.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Customer Segments</h4>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 bg-[#111827] rounded-lg">
+                  <span className="px-2 py-1 bg-[#22C55E]/20 text-[#22C55E] rounded text-xs font-medium whitespace-nowrap">Steady</span>
+                  <div>
+                    <span className="text-white font-medium">Steady Repeaters</span>
+                    <p className="text-[#64748B] text-sm mt-1">
+                      Orders regularly (5+ months out of 12), consistent order sizes, active in last 90 days.
+                      These are your core accounts—predictable, reliable revenue.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 bg-[#111827] rounded-lg">
+                  <span className="px-2 py-1 bg-[#64748B]/20 text-[#64748B] rounded text-xs font-medium whitespace-nowrap">Project</span>
+                  <div>
+                    <span className="text-white font-medium">Project Buyers</span>
+                    <p className="text-[#64748B] text-sm mt-1">
+                      1-3 orders total, all within 90-day window, no orders in 6+ months, &gt;$10K total.
+                      One-time project purchases—they're done, not "at risk."
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 bg-[#111827] rounded-lg">
+                  <span className="px-2 py-1 bg-[#8B5CF6]/20 text-[#8B5CF6] rounded text-xs font-medium whitespace-nowrap">Seasonal</span>
+                  <div>
+                    <span className="text-white font-medium">Seasonal Buyers</span>
+                    <p className="text-[#64748B] text-sm mt-1">
+                      Orders cluster in specific months (&gt;60% in 4-month window), pattern repeats across years.
+                      Only alert them before their buying season.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 bg-[#111827] rounded-lg">
+                  <span className="px-2 py-1 bg-[#38BDF8]/20 text-[#38BDF8] rounded text-xs font-medium whitespace-nowrap">New</span>
+                  <div>
+                    <span className="text-white font-medium">New Accounts</span>
+                    <p className="text-[#64748B] text-sm mt-1">
+                      First order less than 6 months ago, or fewer than 3 total orders.
+                      Need nurturing, not cross-sell pressure.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 bg-[#111827] rounded-lg">
+                  <span className="px-2 py-1 bg-[#F59E0B]/20 text-[#F59E0B] rounded text-xs font-medium whitespace-nowrap">Irregular</span>
+                  <div>
+                    <span className="text-white font-medium">Irregular Buyers</span>
+                    <p className="text-[#64748B] text-sm mt-1">
+                      Sporadic, unpredictable ordering patterns that don't fit other segments.
+                      May need individual assessment.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <h4 className="text-white font-medium mt-4">Product Focus Classification</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <span className="text-[#EF4444] font-medium">Single Product</span>
+                <p className="text-[#64748B] text-xs mt-1">&gt;80% revenue from one class</p>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <span className="text-[#F59E0B] font-medium">Narrow</span>
+                <p className="text-[#64748B] text-xs mt-1">&gt;60% from one class</p>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <span className="text-[#22C55E] font-medium">Diverse</span>
+                <p className="text-[#64748B] text-xs mt-1">Buys across multiple classes</p>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#A855F7]/10 to-[#38BDF8]/10 rounded-lg p-4 border border-white/[0.06] mt-4">
+              <h4 className="text-white font-medium mb-2">Segment Summary Display</h4>
+              <p className="text-[#8FA3BF] text-sm">
+                The AI Insights panel header shows a live summary of your customer segments with colored badges
+                (e.g., "45 Steady", "12 Project", "8 Seasonal"). This helps you understand your customer base at a glance.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'insight-eligibility',
+        title: 'Insight Eligibility Filtering',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Not every insight applies to every customer. The system automatically filters insights based on customer segment,
+              ensuring you only see relevant, actionable recommendations.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Eligibility Rules</h4>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-1 bg-[#EF4444]/20 text-[#EF4444] rounded text-xs font-medium">Attrition Alerts</span>
+                  </div>
+                  <div className="pl-4 border-l-2 border-[#EF4444]/30">
+                    <p className="text-[#64748B] text-sm">
+                      <strong className="text-white">Only for:</strong> Steady repeaters and diverse buyers
+                    </p>
+                    <p className="text-[#64748B] text-sm mt-1">
+                      <strong className="text-white">Excluded:</strong> Project buyers (they're done, not churning)
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-1 bg-[#22C55E]/20 text-[#22C55E] rounded text-xs font-medium">Cross-Sell</span>
+                  </div>
+                  <div className="pl-4 border-l-2 border-[#22C55E]/30">
+                    <p className="text-[#64748B] text-sm">
+                      <strong className="text-white">Only for:</strong> Narrow and diverse product focus
+                    </p>
+                    <p className="text-[#64748B] text-sm mt-1">
+                      <strong className="text-white">Excluded:</strong> Single-product customers (low conversion rate)
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-1 bg-[#38BDF8]/20 text-[#38BDF8] rounded text-xs font-medium">Repeat Orders</span>
+                  </div>
+                  <div className="pl-4 border-l-2 border-[#38BDF8]/30">
+                    <p className="text-[#64748B] text-sm">
+                      <strong className="text-white">Only for:</strong> Steady repeaters, seasonal, and new accounts
+                    </p>
+                    <p className="text-[#64748B] text-sm mt-1">
+                      <strong className="text-white">Excluded:</strong> Project buyers (won't reorder)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#EF4444]/10 to-transparent rounded-lg p-4 border border-[#EF4444]/20">
+              <h4 className="text-white font-medium mb-2">Why This Matters</h4>
+              <p className="text-[#8FA3BF] text-sm">
+                Before eligibility filtering, the system would flag project buyers as "at risk" (wrong—they're just done)
+                and recommend cross-sell to single-product customers (low conversion). These filters dramatically improve
+                insight relevance and sales team trust.
+              </p>
+            </div>
+            <h4 className="text-white font-medium mt-4">AI Prompt Enhancement</h4>
+            <p className="text-[#64748B] text-sm">
+              When generating AI recommendations, the system now includes customer segment context in the prompt.
+              This means the AI understands <em>why</em> a customer matters and tailors its advice accordingly—
+              different strategies for steady repeaters vs. project buyers vs. seasonal customers.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: 'roi-tracking',
+        title: 'ROI Tracking via Asana',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Track which insights convert into real business results using the integrated Asana task system.
+              When you create a task from an insight, metadata is automatically embedded for analytics.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">How It Works</h4>
+              <ol className="space-y-3 text-sm">
+                <li className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#A855F7]/20 text-[#A855F7] flex items-center justify-center flex-shrink-0 text-xs font-bold">1</span>
+                  <div>
+                    <span className="text-white font-medium">Create Task from Insight</span>
+                    <p className="text-[#64748B]">Click any action item on an AI recommendation to create an Asana task</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#A855F7]/20 text-[#A855F7] flex items-center justify-center flex-shrink-0 text-xs font-bold">2</span>
+                  <div>
+                    <span className="text-white font-medium">Metadata Embedded</span>
+                    <p className="text-[#64748B]">Task notes include: source, insight ID, category, customer name, creation date</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#A855F7]/20 text-[#A855F7] flex items-center justify-center flex-shrink-0 text-xs font-bold">3</span>
+                  <div>
+                    <span className="text-white font-medium">Work the Task</span>
+                    <p className="text-[#64748B]">Complete the task in Asana when the action is done (called, emailed, meeting held, etc.)</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#A855F7]/20 text-[#A855F7] flex items-center justify-center flex-shrink-0 text-xs font-bold">4</span>
+                  <div>
+                    <span className="text-white font-medium">Analytics Calculated</span>
+                    <p className="text-[#64748B]">System parses all insight tasks to calculate conversion rates by category</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+            <h4 className="text-white font-medium mt-4">ROI Tracking Tab</h4>
+            <p className="text-[#8FA3BF] text-sm mb-3">
+              Open the Insights drawer and click the "ROI Tracking" tab to see analytics:
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04] text-center">
+                <div className="text-2xl font-bold text-white">24</div>
+                <div className="text-[#64748B] text-xs">Tasks Created</div>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04] text-center">
+                <div className="text-2xl font-bold text-[#22C55E]">18</div>
+                <div className="text-[#64748B] text-xs">Completed</div>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04] text-center">
+                <div className="text-2xl font-bold text-[#38BDF8]">75%</div>
+                <div className="text-[#64748B] text-xs">Completion Rate</div>
+              </div>
+            </div>
+            <h4 className="text-white font-medium mt-4">By Category Breakdown</h4>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <p className="text-[#64748B] text-sm mb-3">
+                See which insight categories perform best:
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-white text-sm">Repeat Orders</span>
+                  <span className="text-[#22C55E] text-sm">85% completion</span>
+                </div>
+                <div className="w-full bg-[#1E293B] rounded-full h-2">
+                  <div className="bg-[#22C55E] h-2 rounded-full" style={{ width: '85%' }} />
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-white text-sm">Cross-Sell</span>
+                  <span className="text-[#F59E0B] text-sm">62% completion</span>
+                </div>
+                <div className="w-full bg-[#1E293B] rounded-full h-2">
+                  <div className="bg-[#F59E0B] h-2 rounded-full" style={{ width: '62%' }} />
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-white text-sm">Attrition</span>
+                  <span className="text-[#38BDF8] text-sm">45% completion</span>
+                </div>
+                <div className="w-full bg-[#1E293B] rounded-full h-2">
+                  <div className="bg-[#38BDF8] h-2 rounded-full" style={{ width: '45%' }} />
+                </div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#22C55E]/10 to-transparent rounded-lg p-4 border border-[#22C55E]/20 mt-4">
+              <h4 className="text-white font-medium mb-2">Self-Improving System</h4>
+              <p className="text-[#8FA3BF] text-sm">
+                Over time, these analytics reveal which insight types actually convert. Low-performing categories
+                can be refined or deprioritized, while high-performers get more attention. This feedback loop
+                makes the entire insights system smarter.
+              </p>
+            </div>
+          </div>
+        ),
+      },
     ],
   },
 };

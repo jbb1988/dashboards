@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AIRecommendation {
@@ -67,12 +67,33 @@ const CATEGORY_ICONS: Record<string, JSX.Element> = {
   ),
 };
 
+interface SegmentData {
+  total_customers: number;
+  segments: Record<string, number>;
+  eligibility: {
+    attrition_eligible: number;
+    cross_sell_eligible: number;
+    repeat_order_eligible: number;
+  };
+}
+
 export function AIInsightsPanelV2({ onGenerate, initialState = 'idle' }: AIInsightsPanelV2Props) {
   const [state, setState] = useState<'idle' | 'loading' | 'loaded' | 'error'>(initialState);
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
   const [executiveSummary, setExecutiveSummary] = useState<string>('');
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string>('');
+  const [segments, setSegments] = useState<SegmentData | null>(null);
+
+  // Fetch segment data on mount
+  useEffect(() => {
+    fetch('/api/diversified/segments')
+      .then(res => res.json())
+      .then(data => {
+        if (data.total_customers) setSegments(data);
+      })
+      .catch(() => {}); // Silent fail
+  }, []);
 
   const handleGenerate = async () => {
     setState('loading');
@@ -163,6 +184,40 @@ export function AIInsightsPanelV2({ onGenerate, initialState = 'idle' }: AIInsig
             </svg>
             Generate Insights
           </button>
+
+          {/* Segment Summary */}
+          {segments && (
+            <div className="mt-6 pt-4 border-t border-white/[0.06]">
+              <p className="text-[10px] text-[#64748B] uppercase tracking-wider mb-2">Customer Segments</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {segments.segments.steady_repeater && (
+                  <span className="px-2 py-1 text-[10px] bg-emerald-500/10 text-emerald-400 rounded-full">
+                    {segments.segments.steady_repeater} Steady
+                  </span>
+                )}
+                {segments.segments.project_buyer && (
+                  <span className="px-2 py-1 text-[10px] bg-blue-500/10 text-blue-400 rounded-full">
+                    {segments.segments.project_buyer} Project
+                  </span>
+                )}
+                {segments.segments.seasonal && (
+                  <span className="px-2 py-1 text-[10px] bg-amber-500/10 text-amber-400 rounded-full">
+                    {segments.segments.seasonal} Seasonal
+                  </span>
+                )}
+                {segments.segments.new_account && (
+                  <span className="px-2 py-1 text-[10px] bg-purple-500/10 text-purple-400 rounded-full">
+                    {segments.segments.new_account} New
+                  </span>
+                )}
+                {segments.segments.irregular && (
+                  <span className="px-2 py-1 text-[10px] bg-gray-500/10 text-gray-400 rounded-full">
+                    {segments.segments.irregular} Irregular
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

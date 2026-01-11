@@ -1906,15 +1906,21 @@ export default function DiversifiedDashboard() {
         executiveSummary={aiExecutiveSummary}
         onAddToTasks={async (actionItem, recommendation) => {
           try {
+            // Extract customer name from title if present (e.g., "Quick Win: Call ABC Corp about...")
+            const customerMatch = recommendation.title.match(/(?:Call|Contact|Follow up with|Quote)\s+([^-–—]+?)(?:\s+(?:about|on|for|regarding|-|–|—)|$)/i);
+            const customerName = customerMatch ? customerMatch[1].trim() : undefined;
+
             const response = await fetch('/api/diversified/tasks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 title: actionItem,
-                description: `From AI insight: ${recommendation.title}\n\nProblem: ${recommendation.problem}`,
+                description: `From AI insight: ${recommendation.title}\n\nProblem: ${recommendation.problem}\n\nExpected Impact: ${recommendation.expected_impact}`,
                 priority: recommendation.priority === 'high' ? 'high' : recommendation.priority === 'medium' ? 'medium' : 'low',
                 source: 'ai_insight',
                 insight_id: recommendation.title,
+                insight_category: recommendation.category,
+                customer_name: customerName,
               }),
             });
             if (response.ok) {
@@ -1932,19 +1938,25 @@ export default function DiversifiedDashboard() {
         onBulkAddToTasks={async (items) => {
           try {
             // Create all tasks in parallel
-            const promises = items.map(({ action, recommendation }) =>
-              fetch('/api/diversified/tasks', {
+            const promises = items.map(({ action, recommendation }) => {
+              // Extract customer name from title if present
+              const customerMatch = recommendation.title.match(/(?:Call|Contact|Follow up with|Quote)\s+([^-–—]+?)(?:\s+(?:about|on|for|regarding|-|–|—)|$)/i);
+              const customerName = customerMatch ? customerMatch[1].trim() : undefined;
+
+              return fetch('/api/diversified/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   title: action,
-                  description: `From AI insight: ${recommendation.title}\n\nProblem: ${recommendation.problem}\n\nRecommendation: ${recommendation.recommendation}`,
+                  description: `From AI insight: ${recommendation.title}\n\nProblem: ${recommendation.problem}\n\nRecommendation: ${recommendation.recommendation}\n\nExpected Impact: ${recommendation.expected_impact}`,
                   priority: recommendation.priority === 'high' ? 'high' : recommendation.priority === 'medium' ? 'medium' : 'low',
                   source: 'ai_insight',
                   insight_id: recommendation.title,
+                  insight_category: recommendation.category,
+                  customer_name: customerName,
                 }),
-              })
-            );
+              });
+            });
 
             const results = await Promise.all(promises);
             const successCount = results.filter(r => r.ok).length;
