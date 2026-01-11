@@ -4,7 +4,6 @@ import {
   calculateYoYPerformance,
   generateCrossSellOpportunities,
   calculateConcentrationMetrics,
-  getInsightsSummary,
   generateInsightAlerts,
   METRIC_EXPLAINERS,
 } from '@/lib/insights';
@@ -38,16 +37,23 @@ export async function GET(request: NextRequest) {
 
     // Parse query params
     const yearsParam = searchParams.get('years');
-    const insightType = searchParams.get('type') || 'all';
     const bustCache = searchParams.get('bust') === 'true';
     const includeExplainers = searchParams.get('explainers') === 'true';
 
-    const years = yearsParam
-      ? yearsParam.split(',').map(Number)
-      : [new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2];
+    // Parse years - if "3" is passed, use last 3 years
+    let years: number[];
+    if (yearsParam === '3') {
+      const currentYear = new Date().getFullYear();
+      years = [currentYear, currentYear - 1, currentYear - 2];
+    } else if (yearsParam) {
+      years = yearsParam.split(',').map(Number);
+    } else {
+      const currentYear = new Date().getFullYear();
+      years = [currentYear, currentYear - 1, currentYear - 2];
+    }
 
     const filters = { years };
-    const cacheKey = getCacheKey({ years, insightType });
+    const cacheKey = getCacheKey({ years });
 
     // Check cache unless bust=true
     if (!bustCache) {
@@ -61,84 +67,82 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Build response based on requested type
-    let response: Record<string, unknown> = {};
+    // Fetch all data in parallel
+    const [attrition, concentration, crossSell, yoyCustomers, yoyClasses, alerts] = await Promise.all([
+      calculateCustomerAttrition(filters),
+      calculateConcentrationMetrics(filters),
+      generateCrossSellOpportunities(filters),
+      calculateYoYPerformance('customer', { currentYear: years[0] }),
+      calculateYoYPerformance('class', { currentYear: years[0] }),
+      generateInsightAlerts(filters),
+    ]);
 
-    if (insightType === 'all' || insightType === 'summary') {
-      const summary = await getInsightsSummary(filters);
-      response.summary = summary;
-    }
+    // Calculate summary metrics
+    const atRiskCustomers = attrition.filter(c => c.status === 'at_risk').length;
+    const atRiskRevenue = attrition
+      .filter(c => c.status === 'at_risk')
+      .reduce((sum, c) => sum + c.revenue_at_risk, 0);
+    const churnedCustomers = attrition.filter(c => c.status === 'churned').length;
+    const churnedRevenue = attrition
+      .filter(c => c.status === 'churned')
+      .reduce((sum, c) => sum + c.revenue_at_risk, 0);
 
-    if (insightType === 'all' || insightType === 'alerts') {
-      const alerts = await generateInsightAlerts(filters);
-      response.alerts = alerts;
-    }
+    // Calculate overall YoY
+    const totalCurrentRevenue = yoyCustomers.reduce((sum, c) => sum + c.current_revenue, 0);
+    const totalPriorRevenue = yoyCustomers.reduce((sum, c) => sum + c.prior_revenue, 0);
+    const yoyChangePct = totalPriorRevenue > 0
+      ? ((totalCurrentRevenue - totalPriorRevenue) / totalPriorRevenue) * 100
+      : 0;
 
-    if (insightType === 'all' || insightType === 'attrition') {
-      const attrition = await calculateCustomerAttrition(filters);
-      response.attrition = attrition;
+    // Calculate margin change
+    const totalCurrentCost = yoyCustomers.reduce((sum, c) => sum + c.current_cost, 0);
+    const totalPriorCost = yoyCustomers.reduce((sum, c) => sum + c.prior_cost, 0);
+    const currentMarginPct = totalCurrentRevenue > 0
+      ? ((totalCurrentRevenue - totalCurrentCost) / totalCurrentRevenue) * 100
+      : 0;
+    const priorMarginPct = totalPriorRevenue > 0
+      ? ((totalPriorRevenue - totalPriorCost) / totalPriorRevenue) * 100
+      : 0;
+    const yoyMarginChangePct = currentMarginPct - priorMarginPct;
 
-      // Include attrition stats
-      response.attritionStats = {
-        total_customers: attrition.length,
-        active: attrition.filter(c => c.status === 'active').length,
-        declining: attrition.filter(c => c.status === 'declining').length,
-        at_risk: attrition.filter(c => c.status === 'at_risk').length,
-        churned: attrition.filter(c => c.status === 'churned').length,
-        total_revenue_at_risk: attrition
-          .filter(c => c.status === 'at_risk' || c.status === 'churned')
-          .reduce((sum, c) => sum + c.revenue_at_risk, 0),
-      };
-    }
+    // New customers (those with no prior year revenue)
+    const newCustomers = yoyCustomers.filter(c => c.prior_revenue === 0 && c.current_revenue > 0).length;
 
-    if (insightType === 'all' || insightType === 'yoy') {
-      const [yoyCustomers, yoyClasses] = await Promise.all([
-        calculateYoYPerformance('customer', { currentYear: years[0] }),
-        calculateYoYPerformance('class', { currentYear: years[0] }),
-      ]);
-      response.yoyCustomers = yoyCustomers;
-      response.yoyClasses = yoyClasses;
+    // Cross-sell potential
+    const crossSellPotential = crossSell.reduce((sum, o) => sum + o.estimated_revenue, 0);
 
-      // Include YoY stats
-      const totalCurrentRevenue = yoyCustomers.reduce((sum, c) => sum + c.current_revenue, 0);
-      const totalPriorRevenue = yoyCustomers.reduce((sum, c) => sum + c.prior_revenue, 0);
-      response.yoyStats = {
-        total_current_revenue: totalCurrentRevenue,
-        total_prior_revenue: totalPriorRevenue,
-        overall_change_pct: totalPriorRevenue > 0
-          ? ((totalCurrentRevenue - totalPriorRevenue) / totalPriorRevenue) * 100
-          : 0,
-        growing_customers: yoyCustomers.filter(c => c.trend === 'growing').length,
-        stable_customers: yoyCustomers.filter(c => c.trend === 'stable').length,
-        declining_customers: yoyCustomers.filter(c => c.trend === 'declining').length,
-        new_customers: yoyCustomers.filter(c => c.prior_revenue === 0 && c.current_revenue > 0).length,
-      };
-    }
+    // Build summary object that matches dashboard expectations
+    const summary = {
+      at_risk_customers: atRiskCustomers,
+      at_risk_revenue: atRiskRevenue,
+      churned_customers: churnedCustomers,
+      churned_revenue: churnedRevenue,
+      yoy_revenue_change_pct: yoyChangePct,
+      yoy_margin_change_pct: yoyMarginChangePct,
+      cross_sell_potential: crossSellPotential,
+      hhi_index: concentration.hhi_index,
+      hhi_interpretation: concentration.hhi_interpretation,
+      new_customers_12mo: newCustomers,
+    };
 
-    if (insightType === 'all' || insightType === 'crosssell') {
-      const crossSell = await generateCrossSellOpportunities(filters);
-      response.crossSell = crossSell;
+    // Combine yoy data into single array for dashboard
+    const yoy = [
+      ...yoyCustomers.map(c => ({ ...c, entity_type: 'customer' as const })),
+      ...yoyClasses.map(c => ({ ...c, entity_type: 'class' as const })),
+    ];
 
-      // Include cross-sell stats
-      response.crossSellStats = {
-        total_opportunities: crossSell.length,
-        total_potential_revenue: crossSell.reduce((sum, o) => sum + o.estimated_revenue, 0),
-        avg_affinity_score: crossSell.length > 0
-          ? crossSell.reduce((sum, o) => sum + o.affinity_score, 0) / crossSell.length
-          : 0,
-        unique_customers: new Set(crossSell.map(o => o.customer_id)).size,
-        unique_products: new Set(crossSell.map(o => o.recommended_class)).size,
-      };
-    }
-
-    if (insightType === 'all' || insightType === 'concentration') {
-      const concentration = await calculateConcentrationMetrics(filters);
-      response.concentration = concentration;
-    }
+    const response = {
+      summary,
+      alerts,
+      attrition,
+      yoy,
+      crossSell,
+      concentration,
+    };
 
     // Include metric explainers if requested
     if (includeExplainers) {
-      response.explainers = METRIC_EXPLAINERS;
+      (response as Record<string, unknown>).explainers = METRIC_EXPLAINERS;
     }
 
     // Cache the response
@@ -146,7 +150,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ...response,
-      filters: { years, type: insightType },
+      filters: { years },
       fromCache: false,
       lastUpdated: new Date().toISOString(),
     });
