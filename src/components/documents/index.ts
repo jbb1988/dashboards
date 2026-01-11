@@ -5,3 +5,6 @@ export type { DocumentData } from './DocumentRow';
 export { default as DocumentPreviewPanel } from './DocumentPreviewPanel';
 export { default as AddDocumentDropdown } from './AddDocumentDropdown';
 export { default as BundleBanner } from './BundleBanner';
+export { default as DocumentDetailDrawer } from './DocumentDetailDrawer';
+export type { DocumentItem } from './DocumentDetailDrawer';
+export { default as DocumentListView } from './DocumentListView';

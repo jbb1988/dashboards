@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DocumentsProgressView, DocumentData, DocumentPreviewPanel } from '@/components/documents';
+import { DocumentsProgressView, DocumentData, DocumentPreviewPanel, DocumentListView, DocumentItem } from '@/components/documents';
 import {
   tokens,
   colors,
@@ -257,15 +257,15 @@ interface SavedView {
   };
 }
 
-type SmartView = 'needs_attention' | 'closing_soon' | 'budgeted' | 'by_account' | 'recent' | 'all';
+type SmartView = 'list' | 'needs_attention' | 'closing_soon' | 'budgeted' | 'by_account' | 'recent' | 'all';
 
 const SMART_VIEWS: { id: SmartView; label: string; icon: string; description: string }[] = [
+  { id: 'list', label: 'All Documents', icon: 'list', description: 'Simple list with side drawer' },
   { id: 'needs_attention', label: 'Needs Attention', icon: '!', description: 'Missing docs, overdue, or stalled' },
   { id: 'closing_soon', label: 'Closing Soon', icon: 'calendar', description: 'Due in next 90 days' },
   { id: 'budgeted', label: 'Budgeted', icon: 'dollar', description: 'Budgeted/forecasted opportunities' },
   { id: 'by_account', label: 'By Account', icon: 'folder', description: 'Organized by account hierarchy' },
   { id: 'recent', label: 'Recently Updated', icon: 'clock', description: 'Last 7 days activity' },
-  { id: 'all', label: 'All Documents', icon: 'list', description: 'Complete document list' },
 ];
 
 // Required documents for completeness
@@ -1019,7 +1019,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
   // State
   const [data, setData] = useState<DocumentsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<SmartView>('needs_attention');
+  const [activeView, setActiveView] = useState<SmartView>('list');
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1284,6 +1284,59 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
     };
   }, [data]);
 
+  // Transform documents to DocumentItem format for DocumentListView
+  const documentItems: DocumentItem[] = useMemo(() => {
+    if (!data) return [];
+
+    const items: DocumentItem[] = [];
+
+    // Add all existing documents
+    data.documents.filter(d => d.is_current_version).forEach(doc => {
+      items.push({
+        id: doc.id,
+        document_type: doc.document_type,
+        file_name: doc.file_name,
+        file_url: doc.file_url,
+        file_size: doc.file_size || undefined,
+        uploaded_at: doc.uploaded_at,
+        uploaded_by: doc.uploaded_by || undefined,
+        status: (doc.status as DocumentItem['status']) || 'draft',
+        contract_id: doc.contract_id || '',
+        contract_name: doc.opportunity_name || 'Unknown Contract',
+        account_name: doc.account_name,
+        is_required: REQUIRED_DOCUMENT_TYPES.includes(doc.document_type),
+        version: doc.version,
+      });
+    });
+
+    // Add missing required documents as placeholders
+    Object.values(data.byAccount).forEach(account => {
+      Object.values(account.contracts).forEach(contract => {
+        contract.completeness.missingRequired.forEach(docType => {
+          // Only add if not already in items
+          const exists = items.some(
+            item => item.contract_id === contract.contractId && item.document_type === docType
+          );
+          if (!exists) {
+            items.push({
+              id: `missing-${contract.contractId}-${docType}`,
+              document_type: docType,
+              file_name: '',
+              file_url: '',
+              status: 'missing',
+              contract_id: contract.contractId,
+              contract_name: contract.contractName,
+              account_name: account.accountName,
+              is_required: true,
+            });
+          }
+        });
+      });
+    });
+
+    return items;
+  }, [data]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1511,6 +1564,28 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
 
       {/* Content based on active view */}
       <div className="space-y-4">
+        {/* List View - Simple flat list with side drawer */}
+        {activeView === 'list' && (
+          <DocumentListView
+            documents={documentItems}
+            onUpload={(file, documentType, contractId) => {
+              // Find the document item to get contract_name and account_name
+              const docItem = documentItems.find(d => d.contract_id === contractId && d.document_type === documentType);
+              handleUpload(file, documentType, contractId, docItem?.contract_name || '', docItem?.account_name || '');
+            }}
+            onDownload={(doc) => {
+              if (doc.file_url && !doc.file_url.startsWith('#')) {
+                window.open(doc.file_url, '_blank');
+              }
+            }}
+            onDelete={async (doc) => {
+              // TODO: Implement delete API call
+              console.log('Delete document:', doc.id);
+              await fetchDocuments();
+            }}
+          />
+        )}
+
         {activeView === 'needs_attention' && (
           <>
             {filteredData.priorityContracts.length === 0 ? (
