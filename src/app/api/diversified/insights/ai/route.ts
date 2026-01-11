@@ -9,6 +9,7 @@ import {
   CrossSellOpportunity,
   ConcentrationMetrics,
 } from '@/lib/insights';
+import { generateProductContext, DIVERSIFIED_PRODUCTS } from '@/lib/diversified-business-context';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 const MODEL = 'anthropic/claude-sonnet-4';
@@ -88,27 +89,27 @@ function formatCurrency(value: number): string {
 // SALES INTELLIGENCE CONTEXT
 // ============================================================================
 
-const SALES_INTELLIGENCE_CONTEXT = `
-You are a sales assistant for MARS, a commodity industrial products distributor.
+// Generate product context from our business knowledge
+const PRODUCT_CONTEXT = generateProductContext();
 
-BUSINESS CONTEXT:
-- Products: Pipes, fittings, valves, strainers, meters, and general industrial supplies
-- Customers: Contractors, utilities, municipalities, distributors
-- Sales style: Transactional commodity sales, price-competitive, volume-based
-- Focus: Quick reorders, competitive pricing, inventory availability
+const SALES_INTELLIGENCE_CONTEXT = `
+You are a sales rep for MARS Diversified Products - water infrastructure supplies.
+
+${PRODUCT_CONTEXT}
 
 YOUR ROLE:
 - Give simple, practical sales actions a rep can do TODAY
-- Focus on: Who to call, what to quote, which customers need follow-up
-- Keep it simple - no corporate strategy, just "call this customer about X"
-- Use plain language, not business jargon
+- Focus on HIGH-VALUE opportunities only
 - Action items should be specific phone calls, emails, or quotes to send
 
-IMPORTANT:
-- These are commodity products, not complex technical sales
-- Customers buy based on price, availability, and relationships
-- A "win" is getting a reorder or winning back a quote
-- Keep recommendations to 1-2 sentences max
+PRIORITY (in order):
+1. VEROflow equipment sales and calibration services (best margins)
+2. Z-Plate Strainers (equipment-level pricing)
+3. Fabricated Spools (custom work, good margins)
+
+IGNORE:
+- Low-dollar commodity items are not worth chasing (Zinc Caps, Drill Taps, etc.)
+- If a customer only buys small items, pitch them VEROflow or Strainers instead
 `;
 
 // ============================================================================
@@ -139,19 +140,31 @@ async function generateAttritionInsights(
     product_mix_shrinking: c.product_mix_current < c.product_mix_prior,
   }));
 
+  // Get our sales tactics for win-back
+  const { salesTactics } = DIVERSIFIED_PRODUCTS;
+
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
+
+WIN-BACK TACTICS:
+- Lost customer: ${salesTactics.lostCustomer.action}
+- Declining customer: ${salesTactics.decliningCustomer.action}
 
 CUSTOMERS WHO STOPPED OR SLOWED ORDERING:
 ${JSON.stringify(customerSummaries, null, 2)}
 
 Total at risk: ${formatCurrency(totalRevenueAtRisk)}
 
-TASK: Give me 2-3 simple action items. For each one:
-- Who to call
-- Why they stopped buying (guess based on data)
-- What to say or offer
+TASK: Give me 2-3 action items, but ONLY for customers who were buying high-value products:
+- VEROflow equipment or calibration services
+- Strainers (especially larger sizes)
+- Fabricated Spools
 
-Keep it simple. These are commodity sales - probably lost on price or they found another supplier.
+SKIP customers who only bought low-dollar items (Zinc Caps, Drill Taps, etc.) - not worth the effort.
+
+For each recommendation:
+- Who to call (only if they bought high-value products)
+- What high-value product they stopped buying
+- What to say or offer
 
 Return JSON:
 {
@@ -212,9 +225,10 @@ ${JSON.stringify(declining.map(c => ({
   change: c.revenue_change_pct.toFixed(0) + '%',
 })), null, 2)}
 
-TASK: Give me 2-3 simple actions:
-- For growing customers: Thank them, ask what else they need
-- For declining customers: Call and ask what happened, offer to quote
+TASK: Give me 2-3 actions focused on HIGH-VALUE opportunities:
+- Growing customers: Can we sell them VEROflow, Strainers, or Spools?
+- Declining customers: Only chase if they were buying high-value products
+- IGNORE small declines on commodity items - not worth the effort
 
 Return JSON:
 {
@@ -254,7 +268,13 @@ async function generateCrossSellInsights(
 
   const totalPotential = topOpportunities.reduce((sum, o) => sum + o.estimated_revenue, 0);
 
+  // Get our cross-sell rules
+  const crossSellRules = DIVERSIFIED_PRODUCTS.crossSellRules;
+
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
+
+OUR CROSS-SELL RULES:
+${crossSellRules.map(r => `- If buying ${r.when}, suggest ${r.suggest.join(', ')} (${r.reason})`).join('\n')}
 
 CUSTOMERS WHO COULD BUY MORE PRODUCTS:
 ${JSON.stringify(topOpportunities.slice(0, 8).map(o => ({
@@ -266,9 +286,12 @@ ${JSON.stringify(topOpportunities.slice(0, 8).map(o => ({
 
 Total potential: ${formatCurrency(totalPotential)}
 
-TASK: Give me 2-3 customers to call about additional products.
-- Just say "Call X, they buy pipes but not fittings - quote them fittings"
-- Keep it simple and actionable
+TASK: Give me 2-3 customers to call about HIGH-VALUE products.
+- Pitch VEROflow, Strainers, or Spools to customers buying commodity items
+- For Strainer/Spool buyers: cross-sell Flanges and Gaskets
+- VEROflow owners: push annual calibration service
+- DON'T recommend cross-selling low-dollar items
+- Example: "Call X, they buy commodity items - pitch them VEROflow or Strainers"
 
 Return JSON:
 {
