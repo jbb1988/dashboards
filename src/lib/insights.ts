@@ -355,7 +355,209 @@ export async function calculateCustomerAttrition(filters?: {
 }
 
 // ============================================
-// YOY PERFORMANCE
+// ROLLING 12-MONTH PERFORMANCE (Preferred over YoY)
+// ============================================
+
+export interface Rolling12Performance {
+  entity_type: 'customer' | 'class' | 'product';
+  entity_id: string;
+  entity_name: string;
+
+  // Period info
+  current_period_start: string;
+  current_period_end: string;
+  prior_period_start: string;
+  prior_period_end: string;
+
+  current_revenue: number;
+  current_units: number;
+  current_margin_pct: number;
+  current_cost: number;
+
+  prior_revenue: number;
+  prior_units: number;
+  prior_margin_pct: number;
+  prior_cost: number;
+
+  revenue_change: number;
+  revenue_change_pct: number;
+  units_change: number;
+  units_change_pct: number;
+  margin_change_bps: number;
+
+  trend: 'growing' | 'stable' | 'declining';
+}
+
+/**
+ * Calculate rolling 12-month performance comparison
+ * Compares last 12 months vs the 12 months before that
+ * This is more accurate than YoY when we're early in a calendar year
+ */
+export async function calculateRolling12Performance(
+  entityType: 'customer' | 'class'
+): Promise<Rolling12Performance[]> {
+  const admin = getSupabaseAdmin();
+
+  // Calculate date ranges
+  const now = new Date();
+  const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentPeriodStart = new Date(currentPeriodEnd);
+  currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
+
+  const priorPeriodEnd = new Date(currentPeriodStart);
+  priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
+  const priorPeriodStart = new Date(priorPeriodEnd);
+  priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
+
+  // Format dates for SQL
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+  // Fetch all data in the 24-month window
+  const allData: Array<{
+    customer_id: string;
+    customer_name: string;
+    class_name: string;
+    transaction_date: string;
+    revenue: number;
+    cost: number;
+    quantity: number;
+  }> = [];
+
+  let offset = 0;
+  const batchSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await admin
+      .from('diversified_sales')
+      .select('customer_id, customer_name, class_name, transaction_date, revenue, cost, quantity')
+      .gte('transaction_date', formatDate(priorPeriodStart))
+      .lte('transaction_date', formatDate(currentPeriodEnd))
+      .range(offset, offset + batchSize - 1);
+
+    if (error) {
+      console.error('Error fetching rolling 12 data:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allData.push(...data);
+      offset += batchSize;
+      hasMore = data.length === batchSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  // Aggregate by entity and period
+  const entityMap = new Map<string, {
+    id: string;
+    name: string;
+    currentRevenue: number;
+    currentCost: number;
+    currentUnits: number;
+    priorRevenue: number;
+    priorCost: number;
+    priorUnits: number;
+  }>();
+
+  for (const row of allData) {
+    const key = entityType === 'customer'
+      ? row.customer_id || row.customer_name
+      : row.class_name;
+    const name = entityType === 'customer' ? row.customer_name : row.class_name;
+
+    if (!key) continue;
+
+    if (!entityMap.has(key)) {
+      entityMap.set(key, {
+        id: key,
+        name: name || key,
+        currentRevenue: 0,
+        currentCost: 0,
+        currentUnits: 0,
+        priorRevenue: 0,
+        priorCost: 0,
+        priorUnits: 0,
+      });
+    }
+
+    const entity = entityMap.get(key)!;
+    const txDate = new Date(row.transaction_date);
+
+    if (txDate >= currentPeriodStart && txDate <= currentPeriodEnd) {
+      entity.currentRevenue += row.revenue || 0;
+      entity.currentCost += row.cost || 0;
+      entity.currentUnits += row.quantity || 0;
+    } else if (txDate >= priorPeriodStart && txDate <= priorPeriodEnd) {
+      entity.priorRevenue += row.revenue || 0;
+      entity.priorCost += row.cost || 0;
+      entity.priorUnits += row.quantity || 0;
+    }
+  }
+
+  // Calculate metrics
+  const results: Rolling12Performance[] = [];
+
+  for (const [, entity] of entityMap) {
+    const currentMargin = entity.currentRevenue > 0
+      ? ((entity.currentRevenue - entity.currentCost) / entity.currentRevenue) * 100
+      : 0;
+    const priorMargin = entity.priorRevenue > 0
+      ? ((entity.priorRevenue - entity.priorCost) / entity.priorRevenue) * 100
+      : 0;
+
+    const revenueChange = entity.currentRevenue - entity.priorRevenue;
+    const revenueChangePct = entity.priorRevenue > 0
+      ? (revenueChange / entity.priorRevenue) * 100
+      : entity.currentRevenue > 0 ? 100 : 0;
+
+    const unitsChange = entity.currentUnits - entity.priorUnits;
+    const unitsChangePct = entity.priorUnits > 0
+      ? (unitsChange / entity.priorUnits) * 100
+      : entity.currentUnits > 0 ? 100 : 0;
+
+    const marginChangeBps = Math.round((currentMargin - priorMargin) * 100);
+
+    let trend: 'growing' | 'stable' | 'declining';
+    if (revenueChangePct >= 5) {
+      trend = 'growing';
+    } else if (revenueChangePct <= -5) {
+      trend = 'declining';
+    } else {
+      trend = 'stable';
+    }
+
+    results.push({
+      entity_type: entityType,
+      entity_id: entity.id,
+      entity_name: entity.name,
+      current_period_start: formatDate(currentPeriodStart),
+      current_period_end: formatDate(currentPeriodEnd),
+      prior_period_start: formatDate(priorPeriodStart),
+      prior_period_end: formatDate(priorPeriodEnd),
+      current_revenue: entity.currentRevenue,
+      current_units: entity.currentUnits,
+      current_margin_pct: currentMargin,
+      current_cost: entity.currentCost,
+      prior_revenue: entity.priorRevenue,
+      prior_units: entity.priorUnits,
+      prior_margin_pct: priorMargin,
+      prior_cost: entity.priorCost,
+      revenue_change: revenueChange,
+      revenue_change_pct: revenueChangePct,
+      units_change: unitsChange,
+      units_change_pct: unitsChangePct,
+      margin_change_bps: marginChangeBps,
+      trend,
+    });
+  }
+
+  return results.sort((a, b) => b.current_revenue - a.current_revenue);
+}
+
+// ============================================
+// YOY PERFORMANCE (Legacy - use Rolling12 instead)
 // ============================================
 
 export async function calculateYoYPerformance(
