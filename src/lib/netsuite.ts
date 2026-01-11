@@ -482,7 +482,7 @@ export async function getDiversifiedSales(options: {
       tl.costestimate,
       BUILTIN.DF(tl.item) AS item_name,
       tl.item AS item_id,
-      i.salesdescription AS item_description,
+      i.displayname AS item_description,
       t.type AS transaction_type,
       c.parent AS class_parent_id,
       BUILTIN.DF(c.parent) AS class_parent_name
