@@ -15,6 +15,9 @@ import {
   ConcentrationChart,
   CrossSellTable,
 } from '@/components/charts';
+import { CustomerDetailDrawer } from '@/components/diversified/CustomerDetailDrawer';
+import { ProductsTab } from '@/components/diversified/ProductsTab';
+import { StoppedBuyingReport } from '@/components/diversified/StoppedBuyingReport';
 import { AIInsightsPanelV2 } from '@/components/AIInsightsPanelV2';
 import { MetricExplainer, HHIExplainer, YoYChangeExplainer } from '@/components/ui/MetricExplainer';
 
@@ -597,14 +600,17 @@ export default function DiversifiedDashboard() {
   const [syncing, setSyncing] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'insights'>('table');
+  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights'>('table');
   const [budgetData, setBudgetData] = useState<BudgetData[]>([]);
+
+  // Customer detail drawer state
+  const [selectedCustomerForDetail, setSelectedCustomerForDetail] = useState<{ id: string; name: string } | null>(null);
 
   // Insights state
   const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
-  const [insightsSubTab, setInsightsSubTab] = useState<'overview' | 'attrition' | 'growth' | 'opportunities'>('overview');
+  const [insightsSubTab, setInsightsSubTab] = useState<'overview' | 'attrition' | 'growth' | 'opportunities' | 'churn'>('overview');
   // Comparison mode: 'rolling12' (default) or 'yoy' for calendar year comparison
   const [insightsMode, setInsightsMode] = useState<'rolling12' | 'yoy'>('rolling12');
   // For YoY mode: which years to compare
@@ -996,6 +1002,19 @@ export default function DiversifiedDashboard() {
                   Charts
                 </button>
                 <button
+                  onClick={() => setActiveTab('products')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'products'
+                      ? 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30 shadow-[0_0_20px_rgba(34,197,94,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  Products
+                </button>
+                <button
                   onClick={() => setActiveTab('insights')}
                   className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
                     activeTab === 'insights'
@@ -1201,6 +1220,21 @@ export default function DiversifiedDashboard() {
                 </div>
               )}
 
+              {/* Products Tab */}
+              {activeTab === 'products' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ProductsTab
+                    onCustomerClick={(customerId, customerName) => {
+                      setSelectedCustomerForDetail({ id: customerId, name: customerName });
+                    }}
+                  />
+                </motion.div>
+              )}
+
               {/* Insights Tab */}
               {activeTab === 'insights' && (
                 <motion.div
@@ -1237,19 +1271,22 @@ export default function DiversifiedDashboard() {
                     <>
                       {/* Insights Sub-Navigation */}
                       <div className="flex items-center gap-2 -mt-2 mb-4">
-                        {(['overview', 'attrition', 'growth', 'opportunities'] as const).map((tab) => (
+                        {(['overview', 'attrition', 'growth', 'churn', 'opportunities'] as const).map((tab) => (
                           <button
                             key={tab}
                             onClick={() => setInsightsSubTab(tab)}
                             className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
                               insightsSubTab === tab
-                                ? 'bg-[#A855F7]/20 text-[#A855F7] border border-[#A855F7]/30'
+                                ? tab === 'churn'
+                                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                  : 'bg-[#A855F7]/20 text-[#A855F7] border border-[#A855F7]/30'
                                 : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
                             }`}
                           >
                             {tab === 'overview' && 'Overview'}
                             {tab === 'attrition' && 'Attrition'}
                             {tab === 'growth' && (insightsMode === 'rolling12' ? 'R12 Comparison' : 'YoY Comparison')}
+                            {tab === 'churn' && 'Stopped Buying'}
                             {tab === 'opportunities' && 'Opportunities'}
                           </button>
                         ))}
@@ -1568,6 +1605,14 @@ export default function DiversifiedDashboard() {
                       )}
 
                       {/* Opportunities Sub-Tab Content */}
+                      {insightsSubTab === 'churn' && (
+                        <StoppedBuyingReport
+                          onCustomerClick={(customerId, customerName) => {
+                            setSelectedCustomerForDetail({ id: customerId, name: customerName });
+                          }}
+                        />
+                      )}
+
                       {insightsSubTab === 'opportunities' && (
                         <div className="space-y-6">
                           <CrossSellTable data={insightsData.crossSell} />
@@ -1581,6 +1626,13 @@ export default function DiversifiedDashboard() {
           ) : null}
         </div>
       </main>
+
+      {/* Customer Detail Drawer */}
+      <CustomerDetailDrawer
+        customerId={selectedCustomerForDetail?.id || null}
+        customerName={selectedCustomerForDetail?.name}
+        onClose={() => setSelectedCustomerForDetail(null)}
+      />
     </div>
   );
 }
