@@ -71,6 +71,10 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
 
+  // Multi-select state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Task detail drawer state
   const [selectedTask, setSelectedTask] = useState<DiversifiedTask | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -242,6 +246,87 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
       }
     } catch (err) {
       console.error('Error deleting task:', err);
+    }
+  };
+
+  // Toggle task selection
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select all visible tasks
+  const selectAllTasks = () => {
+    if (selectedTaskIds.size === tasks.length) {
+      setSelectedTaskIds(new Set());
+    } else {
+      setSelectedTaskIds(new Set(tasks.map(t => t.id)));
+    }
+  };
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedTaskIds(new Set());
+  };
+
+  // Bulk delete selected tasks
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.size === 0) return;
+    if (!confirm(`Delete ${selectedTaskIds.size} selected task${selectedTaskIds.size > 1 ? 's' : ''}?`)) return;
+
+    setIsDeleting(true);
+    try {
+      // Delete all selected tasks in parallel
+      const deletePromises = Array.from(selectedTaskIds).map(taskId =>
+        fetch(`/api/diversified/tasks?id=${taskId}`, { method: 'DELETE' })
+      );
+
+      await Promise.all(deletePromises);
+
+      // Update local state
+      setTasks(prev => prev.filter(t => !selectedTaskIds.has(t.id)));
+      setSelectedTaskIds(new Set());
+      fetchTasks();
+    } catch (err) {
+      console.error('Error deleting tasks:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Bulk mark as completed
+  const handleBulkComplete = async () => {
+    if (selectedTaskIds.size === 0) return;
+
+    setIsDeleting(true); // reuse loading state
+    try {
+      const updatePromises = Array.from(selectedTaskIds).map(taskId =>
+        fetch('/api/diversified/tasks', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId, status: 'completed' }),
+        })
+      );
+
+      await Promise.all(updatePromises);
+
+      // Update local state
+      setTasks(prev => prev.map(t =>
+        selectedTaskIds.has(t.id) ? { ...t, status: 'completed' as const } : t
+      ));
+      setSelectedTaskIds(new Set());
+      fetchTasks();
+    } catch (err) {
+      console.error('Error completing tasks:', err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -518,6 +603,42 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
             </div>
           ) : (
             <div className="divide-y divide-white/[0.04]">
+              {/* Select All Header */}
+              <div className="px-4 py-3 bg-[#0F172A] flex items-center gap-4 border-b border-white/[0.04]">
+                <button
+                  onClick={selectAllTasks}
+                  className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all border ${
+                    selectedTaskIds.size === tasks.length && tasks.length > 0
+                      ? 'bg-[#38BDF8] border-[#38BDF8] text-white'
+                      : selectedTaskIds.size > 0
+                      ? 'bg-[#38BDF8]/50 border-[#38BDF8] text-white'
+                      : 'bg-white/5 border-white/20 hover:border-white/40'
+                  }`}
+                >
+                  {selectedTaskIds.size === tasks.length && tasks.length > 0 ? (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : selectedTaskIds.size > 0 ? (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
+                    </svg>
+                  ) : null}
+                </button>
+                <span className="text-[12px] text-[#64748B]">
+                  {selectedTaskIds.size > 0
+                    ? `${selectedTaskIds.size} of ${tasks.length} selected`
+                    : `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`}
+                </span>
+                {selectedTaskIds.size > 0 && (
+                  <button
+                    onClick={clearSelection}
+                    className="text-[11px] text-[#38BDF8] hover:text-[#38BDF8]/80 ml-auto"
+                  >
+                    Clear selection
+                  </button>
+                )}
+              </div>
               {tasks.map((task) => {
                 const priorityStyle = PRIORITY_STYLES[task.priority];
                 const statusStyle = STATUS_STYLES[task.status];
@@ -534,6 +655,25 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                     } ${overdue ? 'bg-red-500/5' : ''}`}
                   >
                     <div className="flex items-start gap-4">
+                      {/* Selection Checkbox */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTaskSelection(task.id);
+                        }}
+                        className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-all border ${
+                          selectedTaskIds.has(task.id)
+                            ? 'bg-[#38BDF8] border-[#38BDF8] text-white'
+                            : 'bg-white/5 border-white/20 hover:border-white/40'
+                        }`}
+                      >
+                        {selectedTaskIds.has(task.id) && (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+
                       {/* Status Toggle */}
                       <button
                         onClick={(e) => {
@@ -737,6 +877,65 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
           })}
         </div>
       )}
+
+      {/* Bulk Action Bar */}
+      <AnimatePresence>
+        {selectedTaskIds.size > 0 && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-30"
+          >
+            <div className="flex items-center gap-3 px-6 py-3 bg-[#1E293B] border border-white/10 rounded-2xl shadow-2xl">
+              <div className="flex items-center gap-2 pr-4 border-r border-white/10">
+                <div className="w-8 h-8 rounded-full bg-[#38BDF8]/20 flex items-center justify-center">
+                  <span className="text-[14px] font-bold text-[#38BDF8]">{selectedTaskIds.size}</span>
+                </div>
+                <span className="text-[13px] text-[#94A3B8]">
+                  task{selectedTaskIds.size !== 1 ? 's' : ''} selected
+                </span>
+              </div>
+
+              <button
+                onClick={handleBulkComplete}
+                disabled={isDeleting}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-[13px] font-medium disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Mark Complete
+              </button>
+
+              <button
+                onClick={handleBulkDelete}
+                disabled={isDeleting}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-[13px] font-medium disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <div className="w-4 h-4 border-2 border-red-400/20 border-t-red-400 rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                )}
+                Delete Selected
+              </button>
+
+              <button
+                onClick={clearSelection}
+                className="p-2 text-[#64748B] hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Task Detail Drawer */}
       <AnimatePresence>
