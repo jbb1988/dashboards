@@ -164,48 +164,54 @@ export async function calculateCustomerAttrition(filters?: {
 }): Promise<CustomerAttritionScore[]> {
   const admin = getSupabaseAdmin();
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const priorYear = currentYear - 1;
 
-  // Get the years to analyze (default last 3 years)
-  const yearsToQuery = filters?.years || getYearsToAnalyze(3);
+  // Use rolling 12-month periods instead of calendar years
+  // Current period: last 12 months
+  // Prior period: 12-24 months ago
+  const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentPeriodStart = new Date(currentPeriodEnd);
+  currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
 
-  // Fetch all transaction data with batching
+  const priorPeriodEnd = new Date(currentPeriodStart);
+  priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
+  const priorPeriodStart = new Date(priorPeriodEnd);
+  priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
+
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+  // Fetch all transaction data in the 24-month window
   const allData: Array<{
     customer_id: string;
     customer_name: string;
     class_name: string;
     transaction_date: string;
-    year: number;
-    month: number;
     revenue: number;
     quantity: number;
   }> = [];
 
-  for (const year of yearsToQuery) {
-    let offset = 0;
-    const batchSize = 1000;
-    let hasMore = true;
+  let offset = 0;
+  const batchSize = 1000;
+  let hasMore = true;
 
-    while (hasMore) {
-      const { data, error } = await admin
-        .from('diversified_sales')
-        .select('customer_id, customer_name, class_name, transaction_date, year, month, revenue, quantity')
-        .eq('year', year)
-        .range(offset, offset + batchSize - 1);
+  while (hasMore) {
+    const { data, error } = await admin
+      .from('diversified_sales')
+      .select('customer_id, customer_name, class_name, transaction_date, revenue, quantity')
+      .gte('transaction_date', formatDate(priorPeriodStart))
+      .lte('transaction_date', formatDate(currentPeriodEnd))
+      .range(offset, offset + batchSize - 1);
 
-      if (error) {
-        console.error(`Error fetching year ${year} data:`, error);
-        break;
-      }
+    if (error) {
+      console.error('Error fetching attrition data:', error);
+      break;
+    }
 
-      if (data && data.length > 0) {
-        allData.push(...data);
-        offset += batchSize;
-        hasMore = data.length === batchSize;
-      } else {
-        hasMore = false;
-      }
+    if (data && data.length > 0) {
+      allData.push(...data);
+      offset += batchSize;
+      hasMore = data.length === batchSize;
+    } else {
+      hasMore = false;
     }
   }
 
@@ -213,18 +219,18 @@ export async function calculateCustomerAttrition(filters?: {
     return [];
   }
 
-  // Group by customer
+  // Group by customer using rolling 12-month periods
   const customerMap = new Map<string, {
     customer_id: string;
     customer_name: string;
     transactions: typeof allData;
     lastTransactionDate: Date | null;
-    currentYearRevenue: number;
-    priorYearRevenue: number;
-    currentYearOrders: number;
-    priorYearOrders: number;
-    currentYearClasses: Set<string>;
-    priorYearClasses: Set<string>;
+    currentPeriodRevenue: number;
+    priorPeriodRevenue: number;
+    currentPeriodOrders: number;
+    priorPeriodOrders: number;
+    currentPeriodClasses: Set<string>;
+    priorPeriodClasses: Set<string>;
   }>();
 
   for (const row of allData) {
@@ -237,12 +243,12 @@ export async function calculateCustomerAttrition(filters?: {
         customer_name: row.customer_name,
         transactions: [],
         lastTransactionDate: null,
-        currentYearRevenue: 0,
-        priorYearRevenue: 0,
-        currentYearOrders: 0,
-        priorYearOrders: 0,
-        currentYearClasses: new Set(),
-        priorYearClasses: new Set(),
+        currentPeriodRevenue: 0,
+        priorPeriodRevenue: 0,
+        currentPeriodOrders: 0,
+        priorPeriodOrders: 0,
+        currentPeriodClasses: new Set(),
+        priorPeriodClasses: new Set(),
       });
     }
 
@@ -255,15 +261,15 @@ export async function calculateCustomerAttrition(filters?: {
       customer.lastTransactionDate = txDate;
     }
 
-    // Aggregate by year
-    if (row.year === currentYear) {
-      customer.currentYearRevenue += row.revenue || 0;
-      customer.currentYearOrders += 1;
-      if (row.class_name) customer.currentYearClasses.add(row.class_name);
-    } else if (row.year === priorYear) {
-      customer.priorYearRevenue += row.revenue || 0;
-      customer.priorYearOrders += 1;
-      if (row.class_name) customer.priorYearClasses.add(row.class_name);
+    // Aggregate by rolling 12-month period
+    if (txDate >= currentPeriodStart && txDate <= currentPeriodEnd) {
+      customer.currentPeriodRevenue += row.revenue || 0;
+      customer.currentPeriodOrders += 1;
+      if (row.class_name) customer.currentPeriodClasses.add(row.class_name);
+    } else if (txDate >= priorPeriodStart && txDate <= priorPeriodEnd) {
+      customer.priorPeriodRevenue += row.revenue || 0;
+      customer.priorPeriodOrders += 1;
+      if (row.class_name) customer.priorPeriodClasses.add(row.class_name);
     }
   }
 
@@ -283,21 +289,21 @@ export async function calculateCustomerAttrition(filters?: {
       : 999;
     const recencyScore = Math.min(100, (daysSinceLast / 365) * 100);
 
-    // 2. Frequency Decline Score (0-100)
-    const frequencyChange = customer.priorYearOrders > 0
-      ? ((customer.currentYearOrders - customer.priorYearOrders) / customer.priorYearOrders)
-      : customer.currentYearOrders > 0 ? -1 : 0; // New customer = no decline
+    // 2. Frequency Decline Score (0-100) - using rolling 12-month periods
+    const frequencyChange = customer.priorPeriodOrders > 0
+      ? ((customer.currentPeriodOrders - customer.priorPeriodOrders) / customer.priorPeriodOrders)
+      : customer.currentPeriodOrders > 0 ? -1 : 0; // New customer = no decline
     const frequencyScore = frequencyChange < 0 ? Math.min(100, Math.abs(frequencyChange) * 100) : 0;
 
-    // 3. Monetary Decline Score (0-100)
-    const revenueChange = customer.priorYearRevenue > 0
-      ? ((customer.currentYearRevenue - customer.priorYearRevenue) / customer.priorYearRevenue)
-      : customer.currentYearRevenue > 0 ? -1 : 0;
+    // 3. Monetary Decline Score (0-100) - using rolling 12-month periods
+    const revenueChange = customer.priorPeriodRevenue > 0
+      ? ((customer.currentPeriodRevenue - customer.priorPeriodRevenue) / customer.priorPeriodRevenue)
+      : customer.currentPeriodRevenue > 0 ? -1 : 0;
     const monetaryScore = revenueChange < 0 ? Math.min(100, Math.abs(revenueChange) * 100) : 0;
 
-    // 4. Product Mix Score (0-100) - Narrowing = bad
-    const classesCurrent = customer.currentYearClasses.size;
-    const classesPrior = customer.priorYearClasses.size;
+    // 4. Product Mix Score (0-100) - Narrowing = bad - using rolling 12-month periods
+    const classesCurrent = customer.currentPeriodClasses.size;
+    const classesPrior = customer.priorPeriodClasses.size;
     const productMixScore = classesPrior > classesCurrent
       ? ((classesPrior - classesCurrent) / Math.max(1, classesPrior)) * 100
       : 0;
@@ -328,18 +334,18 @@ export async function calculateCustomerAttrition(filters?: {
       status,
       recency_days: daysSinceLast,
       recency_score: Math.round(recencyScore),
-      frequency_current: customer.currentYearOrders,
-      frequency_prior: customer.priorYearOrders,
+      frequency_current: customer.currentPeriodOrders,
+      frequency_prior: customer.priorPeriodOrders,
       frequency_change_pct: Math.round(frequencyChange * 100),
       frequency_score: Math.round(frequencyScore),
-      monetary_current: customer.currentYearRevenue,
-      monetary_prior: customer.priorYearRevenue,
+      monetary_current: customer.currentPeriodRevenue,
+      monetary_prior: customer.priorPeriodRevenue,
       monetary_change_pct: Math.round(revenueChange * 100),
       monetary_score: Math.round(monetaryScore),
       product_mix_current: classesCurrent,
       product_mix_prior: classesPrior,
       product_mix_score: Math.round(productMixScore),
-      revenue_at_risk: customer.priorYearRevenue > 0 ? customer.priorYearRevenue : customer.currentYearRevenue,
+      revenue_at_risk: customer.priorPeriodRevenue > 0 ? customer.priorPeriodRevenue : customer.currentPeriodRevenue,
       last_purchase_date: customer.lastTransactionDate?.toISOString() || null,
       score_breakdown: {
         recency_weight: weights.recency,
@@ -891,39 +897,44 @@ export async function calculateConcentrationMetrics(filters?: {
   years?: number[];
 }): Promise<ConcentrationMetrics> {
   const admin = getSupabaseAdmin();
-  const yearsToQuery = filters?.years || getYearsToAnalyze(1); // Default to current year
 
-  // Fetch customer revenue data
+  // Use rolling 12 months instead of calendar year for accurate concentration metrics
+  const now = new Date();
+  const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentPeriodStart = new Date(currentPeriodEnd);
+  currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+  // Fetch customer revenue data for rolling 12 months
   const allData: Array<{
     customer_id: string;
     customer_name: string;
     revenue: number;
   }> = [];
 
-  for (const year of yearsToQuery) {
-    let offset = 0;
-    const batchSize = 1000;
-    let hasMore = true;
+  let offset = 0;
+  const batchSize = 1000;
+  let hasMore = true;
 
-    while (hasMore) {
-      const { data, error } = await admin
-        .from('diversified_sales')
-        .select('customer_id, customer_name, revenue')
-        .eq('year', year)
-        .range(offset, offset + batchSize - 1);
+  while (hasMore) {
+    const { data, error } = await admin
+      .from('diversified_sales')
+      .select('customer_id, customer_name, revenue')
+      .gte('transaction_date', formatDate(currentPeriodStart))
+      .lte('transaction_date', formatDate(currentPeriodEnd))
+      .range(offset, offset + batchSize - 1);
 
-      if (error) {
-        console.error(`Error fetching year ${year} data:`, error);
-        break;
-      }
+    if (error) {
+      console.error('Error fetching concentration data:', error);
+      break;
+    }
 
-      if (data && data.length > 0) {
-        allData.push(...data);
-        offset += batchSize;
-        hasMore = data.length === batchSize;
-      } else {
-        hasMore = false;
-      }
+    if (data && data.length > 0) {
+      allData.push(...data);
+      offset += batchSize;
+      hasMore = data.length === batchSize;
+    } else {
+      hasMore = false;
     }
   }
 
@@ -1092,13 +1103,12 @@ export async function calculateConcentrationMetrics(filters?: {
 export async function getInsightsSummary(filters?: {
   years?: number[];
 }): Promise<InsightsSummary> {
-  const [attrition, concentration, crossSell, yoyCustomers] = await Promise.all([
+  // Use rolling 12-month comparison for accurate summary (not calendar year YoY)
+  const [attrition, concentration, crossSell, rolling12Customers] = await Promise.all([
     calculateCustomerAttrition(filters),
     calculateConcentrationMetrics(filters),
     generateCrossSellOpportunities(filters),
-    calculateYoYPerformance('customer', {
-      currentYear: filters?.years?.[0] || new Date().getFullYear()
-    }),
+    calculateRolling12Performance('customer'),
   ]);
 
   const atRiskCustomers = attrition.filter(c => c.status === 'at_risk').length;
@@ -1108,10 +1118,10 @@ export async function getInsightsSummary(filters?: {
   const decliningCustomers = attrition.filter(c => c.status === 'declining').length;
   const churnedCustomers = attrition.filter(c => c.status === 'churned').length;
 
-  // Calculate overall YoY
-  const totalCurrentRevenue = yoyCustomers.reduce((sum, c) => sum + c.current_revenue, 0);
-  const totalPriorRevenue = yoyCustomers.reduce((sum, c) => sum + c.prior_revenue, 0);
-  const yoyChangePct = totalPriorRevenue > 0
+  // Calculate overall rolling 12-month change
+  const totalCurrentRevenue = rolling12Customers.reduce((sum, c) => sum + c.current_revenue, 0);
+  const totalPriorRevenue = rolling12Customers.reduce((sum, c) => sum + c.prior_revenue, 0);
+  const rolling12ChangePct = totalPriorRevenue > 0
     ? ((totalCurrentRevenue - totalPriorRevenue) / totalPriorRevenue) * 100
     : 0;
 
@@ -1125,15 +1135,15 @@ export async function getInsightsSummary(filters?: {
     concentrationRisk = 'low';
   }
 
-  // New customers (those with no prior year revenue)
-  const newCustomers = yoyCustomers.filter(c => c.prior_revenue === 0 && c.current_revenue > 0).length;
+  // New customers (those with no prior period revenue in rolling 12)
+  const newCustomers = rolling12Customers.filter(c => c.prior_revenue === 0 && c.current_revenue > 0).length;
 
   return {
     at_risk_customers: atRiskCustomers,
     at_risk_revenue: atRiskRevenue,
     declining_customers: decliningCustomers,
     churned_customers: churnedCustomers,
-    yoy_revenue_change_pct: yoyChangePct,
+    yoy_revenue_change_pct: rolling12ChangePct, // Now using rolling 12 for accurate comparison
     concentration_risk: concentrationRisk,
     cross_sell_opportunities: crossSell.length,
     cross_sell_potential_revenue: crossSell.reduce((sum, o) => sum + o.estimated_revenue, 0),
@@ -1144,12 +1154,11 @@ export async function getInsightsSummary(filters?: {
 export async function generateInsightAlerts(filters?: {
   years?: number[];
 }): Promise<InsightAlert[]> {
-  const [attrition, concentration, yoyCustomers] = await Promise.all([
+  // Use rolling 12-month comparison for accurate alerts (not calendar year YoY)
+  const [attrition, concentration, rolling12Customers] = await Promise.all([
     calculateCustomerAttrition(filters),
     calculateConcentrationMetrics(filters),
-    calculateYoYPerformance('customer', {
-      currentYear: filters?.years?.[0] || new Date().getFullYear()
-    }),
+    calculateRolling12Performance('customer'),
   ]);
 
   const alerts: InsightAlert[] = [];
@@ -1187,20 +1196,22 @@ export async function generateInsightAlerts(filters?: {
     });
   }
 
-  // YoY decline alerts
-  const decliningCustomers = yoyCustomers
-    .filter(c => c.revenue_change_pct < -20 && c.prior_revenue > 50000)
+  // Rolling 12-month decline alerts (compares last 12 months vs prior 12 months)
+  // Only alert on significant declines where prior period had meaningful revenue
+  const decliningCustomers = rolling12Customers
+    .filter(c => c.revenue_change_pct < -30 && c.prior_revenue > 50000)
+    .sort((a, b) => a.revenue_change_pct - b.revenue_change_pct) // Most declined first
     .slice(0, 3);
 
   for (const customer of decliningCustomers) {
     alerts.push({
-      id: `yoy-${customer.entity_id}`,
+      id: `rolling12-${customer.entity_id}`,
       type: 'yoy',
       priority: 'medium',
-      title: `${customer.entity_name} down ${Math.abs(customer.revenue_change_pct).toFixed(0)}% YoY`,
-      message: `Revenue dropped from $${(customer.prior_revenue / 1000).toFixed(0)}K to $${(customer.current_revenue / 1000).toFixed(0)}K`,
+      title: `${customer.entity_name} down ${Math.abs(customer.revenue_change_pct).toFixed(0)}% (12-mo)`,
+      message: `Rolling 12-month revenue dropped from $${(customer.prior_revenue / 1000).toFixed(0)}K to $${(customer.current_revenue / 1000).toFixed(0)}K`,
       metric_value: customer.revenue_change_pct,
-      metric_label: 'YoY Change %',
+      metric_label: 'Rolling 12-Mo Change %',
       entity_id: customer.entity_id,
       entity_name: customer.entity_name,
     });
