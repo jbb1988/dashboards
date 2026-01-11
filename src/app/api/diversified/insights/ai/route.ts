@@ -89,21 +89,26 @@ function formatCurrency(value: number): string {
 // ============================================================================
 
 const SALES_INTELLIGENCE_CONTEXT = `
-You are a sales intelligence analyst for MARS, a B2B industrial products company specializing in water infrastructure equipment.
+You are a sales assistant for MARS, a commodity industrial products distributor.
 
-COMPANY CONTEXT:
-- Products: Diversified industrial products including VEROflow meters, Spools, Strainers, Valves, and water infrastructure components
-- Customers: Utilities, municipalities, industrial distributors (Ferguson, Core & Main, etc.)
-- Sales model: Direct sales and through distribution partners
-- Typical contract values: $10K - $500K annually per customer
-- Business environment: Long sales cycles, relationship-driven, technical products
+BUSINESS CONTEXT:
+- Products: Pipes, fittings, valves, strainers, meters, and general industrial supplies
+- Customers: Contractors, utilities, municipalities, distributors
+- Sales style: Transactional commodity sales, price-competitive, volume-based
+- Focus: Quick reorders, competitive pricing, inventory availability
 
 YOUR ROLE:
-- Analyze sales data and provide actionable recommendations
-- Focus on: Preventing customer churn, identifying growth opportunities, optimizing product mix, managing revenue concentration risk
-- Be specific with customer names, dollar amounts, and concrete action steps
-- Prioritize recommendations by potential revenue impact
-- Consider seasonality and industry-specific factors
+- Give simple, practical sales actions a rep can do TODAY
+- Focus on: Who to call, what to quote, which customers need follow-up
+- Keep it simple - no corporate strategy, just "call this customer about X"
+- Use plain language, not business jargon
+- Action items should be specific phone calls, emails, or quotes to send
+
+IMPORTANT:
+- These are commodity products, not complex technical sales
+- Customers buy based on price, availability, and relationships
+- A "win" is getting a reorder or winning back a quote
+- Keep recommendations to 1-2 sentences max
 `;
 
 // ============================================================================
@@ -136,39 +141,34 @@ async function generateAttritionInsights(
 
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
 
-ATTRITION RISK DATA:
+CUSTOMERS WHO STOPPED OR SLOWED ORDERING:
 ${JSON.stringify(customerSummaries, null, 2)}
 
-SUMMARY:
-- At-risk/declining customers: ${atRiskCustomers.length}
-- Total revenue at risk: ${formatCurrency(totalRevenueAtRisk)}
-- Highest risk customer: ${atRiskCustomers[0].customer_name} (score: ${atRiskCustomers[0].attrition_score})
+Total at risk: ${formatCurrency(totalRevenueAtRisk)}
 
-TASK:
-Analyze this attrition data and provide 2-3 specific, actionable recommendations.
+TASK: Give me 2-3 simple action items. For each one:
+- Who to call
+- Why they stopped buying (guess based on data)
+- What to say or offer
 
-For each recommendation:
-1. Identify the most critical customer(s) to focus on
-2. Explain the root cause of the decline (based on the data patterns)
-3. Provide specific retention strategies
-4. Include quick wins that could be implemented this week
+Keep it simple. These are commodity sales - probably lost on price or they found another supplier.
 
-Return as JSON:
+Return JSON:
 {
   "recommendations": [
     {
       "priority": "high" | "medium" | "low",
-      "title": "Brief title (max 60 chars)",
-      "problem": "What's the issue - be specific with customer names and numbers",
-      "recommendation": "What to do - specific, actionable steps",
-      "expected_impact": "Quantified impact (e.g., 'Prevent $200K churn')",
-      "action_items": ["Step 1", "Step 2", "Step 3"],
+      "title": "Call [Customer] about reorders",
+      "problem": "Short description of the issue",
+      "recommendation": "Call them and ask why orders stopped. Offer to match pricing.",
+      "expected_impact": "Could recover $X in orders",
+      "action_items": ["Call [name] at [company]", "Ask about recent orders", "Offer quote on their usual items"],
       "category": "attrition"
     }
   ]
 }
 
-Focus on the highest-value opportunities. Respond ONLY with JSON.`;
+Respond ONLY with JSON.`;
 
   try {
     const response = await callAI(prompt, 2000);
@@ -196,42 +196,36 @@ async function generateGrowthInsights(
 
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
 
-YEAR-OVER-YEAR PERFORMANCE DATA:
-
-GROWING CUSTOMERS (replicate success):
+CUSTOMERS BUYING MORE THIS YEAR:
 ${JSON.stringify(growing.map(c => ({
   name: c.entity_name,
-  current_revenue: c.current_revenue,
-  prior_revenue: c.prior_revenue,
-  change_pct: c.revenue_change_pct,
-  margin_change_bps: c.margin_change_bps,
+  this_year: formatCurrency(c.current_revenue),
+  last_year: formatCurrency(c.prior_revenue),
+  change: c.revenue_change_pct.toFixed(0) + '%',
 })), null, 2)}
 
-DECLINING CUSTOMERS (investigate and reverse):
+CUSTOMERS BUYING LESS THIS YEAR:
 ${JSON.stringify(declining.map(c => ({
   name: c.entity_name,
-  current_revenue: c.current_revenue,
-  prior_revenue: c.prior_revenue,
-  change_pct: c.revenue_change_pct,
-  margin_change_bps: c.margin_change_bps,
+  this_year: formatCurrency(c.current_revenue),
+  last_year: formatCurrency(c.prior_revenue),
+  change: c.revenue_change_pct.toFixed(0) + '%',
 })), null, 2)}
 
-TASK:
-Provide 2-3 recommendations focusing on:
-1. How to replicate success from growing customers
-2. How to reverse decline in declining customers
-3. Specific talking points for sales conversations
+TASK: Give me 2-3 simple actions:
+- For growing customers: Thank them, ask what else they need
+- For declining customers: Call and ask what happened, offer to quote
 
-Return as JSON:
+Return JSON:
 {
   "recommendations": [
     {
       "priority": "high" | "medium" | "low",
-      "title": "Brief title (max 60 chars)",
-      "problem": "What's the issue or opportunity",
-      "recommendation": "What to do",
-      "expected_impact": "Quantified impact",
-      "action_items": ["Step 1", "Step 2", "Step 3"],
+      "title": "Follow up with [Customer]",
+      "problem": "Brief issue",
+      "recommendation": "Simple action to take",
+      "expected_impact": "Potential $ impact",
+      "action_items": ["Call X", "Send quote for Y", "Check on order Z"],
       "category": "growth"
     }
   ]
@@ -262,40 +256,30 @@ async function generateCrossSellInsights(
 
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
 
-CROSS-SELL OPPORTUNITIES:
-${JSON.stringify(topOpportunities.map(o => ({
+CUSTOMERS WHO COULD BUY MORE PRODUCTS:
+${JSON.stringify(topOpportunities.slice(0, 8).map(o => ({
   customer: o.customer_name,
-  currently_buys: o.current_classes.slice(0, 3).join(', '),
-  recommended_product: o.recommended_class,
-  affinity_score: o.affinity_score,
-  estimated_revenue: o.estimated_revenue,
-  similar_customers: o.similar_customer_count,
+  buys: o.current_classes.slice(0, 3).join(', '),
+  should_also_buy: o.recommended_class,
+  potential: formatCurrency(o.estimated_revenue),
 })), null, 2)}
 
-SUMMARY:
-- Total opportunities: ${topOpportunities.length}
-- Potential revenue: ${formatCurrency(totalPotential)}
-- Top recommendation: ${topOpportunities[0].customer_name} for ${topOpportunities[0].recommended_class}
+Total potential: ${formatCurrency(totalPotential)}
 
-TASK:
-Provide 2-3 recommendations for the highest-value cross-sell opportunities.
+TASK: Give me 2-3 customers to call about additional products.
+- Just say "Call X, they buy pipes but not fittings - quote them fittings"
+- Keep it simple and actionable
 
-Include:
-1. Which customers to approach first
-2. Specific talking points for the sales conversation
-3. Why this product makes sense for them (based on what similar customers buy)
-4. Timing recommendations
-
-Return as JSON:
+Return JSON:
 {
   "recommendations": [
     {
       "priority": "high" | "medium" | "low",
-      "title": "Brief title (max 60 chars)",
-      "problem": "The opportunity (e.g., 'Customer X only buys Y, missing Z')",
-      "recommendation": "How to approach this opportunity",
-      "expected_impact": "Quantified impact",
-      "action_items": ["Step 1", "Step 2", "Step 3"],
+      "title": "Quote [Customer] on [Product]",
+      "problem": "They buy X but not Y",
+      "recommendation": "Send them a quote on Y",
+      "expected_impact": "Could add $X/year",
+      "action_items": ["Call customer", "Send quote on product", "Follow up next week"],
       "category": "crosssell"
     }
   ]
@@ -322,34 +306,27 @@ async function generateConcentrationInsights(
 
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
 
-REVENUE CONCENTRATION DATA:
-- HHI Index: ${concentration.hhi_index} (${concentration.hhi_interpretation})
-- Top customer: ${concentration.top_customer_name} (${concentration.top_customer_pct.toFixed(1)}% of revenue)
-- Top 3 concentration: ${concentration.top_3_concentration.toFixed(1)}% (${concentration.top_3_names.join(', ')})
-- Customers for 80% of revenue: ${concentration.customers_for_80_pct}
-- Single customer risk: ${concentration.single_customer_risk ? 'YES - HIGH RISK' : 'No'}
+CUSTOMER CONCENTRATION:
+- Top customer: ${concentration.top_customer_name} (${concentration.top_customer_pct.toFixed(1)}% of sales)
+- Top 3 customers: ${concentration.top_3_concentration.toFixed(1)}% of sales (${concentration.top_3_names.join(', ')})
+- Need ${concentration.customers_for_80_pct} customers to make 80% of revenue
 
-CUSTOMER SEGMENTS:
-${JSON.stringify(concentration.segments, null, 2)}
+${concentration.single_customer_risk ? 'WARNING: Too much revenue from one customer!' : ''}
 
-TASK:
-Provide 1-2 recommendations for managing concentration risk.
+TASK: Give 1-2 simple actions to grow smaller accounts and reduce risk.
+- Focus on which mid-size customers to call and grow
+- Keep it practical
 
-Focus on:
-1. Diversification strategies (without alienating top customers)
-2. Risk mitigation if a top customer leaves
-3. Growing mid-tier customers to reduce concentration
-
-Return as JSON:
+Return JSON:
 {
   "recommendations": [
     {
       "priority": "high" | "medium" | "low",
-      "title": "Brief title (max 60 chars)",
-      "problem": "The concentration risk",
-      "recommendation": "How to address it",
-      "expected_impact": "Risk mitigation benefit",
-      "action_items": ["Step 1", "Step 2", "Step 3"],
+      "title": "Grow [Customer] account",
+      "problem": "Too dependent on top customers",
+      "recommendation": "Focus on growing mid-tier accounts",
+      "expected_impact": "Reduce risk, add revenue",
+      "action_items": ["Call mid-tier customer", "Offer volume discount", "Set up regular orders"],
       "category": "concentration"
     }
   ]
@@ -379,25 +356,30 @@ async function generateExecutiveSummary(
 ): Promise<string> {
   const highPriority = recommendations.filter(r => r.priority === 'high');
 
-  const prompt = `${SALES_INTELLIGENCE_CONTEXT}
+  const prompt = `You are a sales strategist advising a VP of Sales at a commodity industrial distributor.
 
-SALES INTELLIGENCE SUMMARY:
-- Customers at risk: ${summary.atRiskCount} (${formatCurrency(summary.atRiskRevenue)} at risk)
-- YoY Revenue Change: ${summary.yoyChange > 0 ? '+' : ''}${summary.yoyChange.toFixed(1)}%
-- Concentration Risk: ${summary.concentrationRisk}
-- Cross-sell Potential: ${formatCurrency(summary.crossSellPotential)}
-- High Priority Actions: ${highPriority.length}
+CURRENT BUSINESS STATE:
+- Revenue at risk from declining customers: ${formatCurrency(summary.atRiskRevenue)} (${summary.atRiskCount} accounts)
+- Year-over-year growth: ${summary.yoyChange > 0 ? '+' : ''}${summary.yoyChange.toFixed(1)}%
+- Customer concentration: ${summary.concentrationRisk}
+- Untapped cross-sell opportunity: ${formatCurrency(summary.crossSellPotential)}
+- Urgent actions needed: ${highPriority.length}
 
-TOP RECOMMENDATIONS:
-${highPriority.slice(0, 3).map(r => `- ${r.title}: ${r.problem}`).join('\n')}
+TOP ISSUES:
+${highPriority.slice(0, 3).map(r => `- ${r.title}`).join('\n')}
 
 TASK:
-Write a 2-3 sentence executive summary for the VP of Sales.
-Be direct, quantify the opportunity, and state the #1 priority action.
+Write a 3-4 sentence executive summary for scaling this business.
+Focus on:
+1. The biggest growth lever (cross-sell, win-back, or new customers)
+2. The main risk to address
+3. A specific revenue target to aim for
 
-Return as JSON:
+Be strategic but practical. This is commodity sales - growth comes from more volume, more products per customer, and winning back lost accounts.
+
+Return JSON:
 {
-  "executive_summary": "Your 2-3 sentence summary"
+  "executive_summary": "Your strategic summary here"
 }
 
 Respond ONLY with JSON.`;
