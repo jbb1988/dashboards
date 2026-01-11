@@ -113,94 +113,83 @@ export function ConcentrationChart({ data, index = 0 }: ConcentrationChartProps)
       height={380}
     >
       <div className="flex h-full">
-        {/* Donut Chart */}
-        <div className="flex-1 relative">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={activeIndex !== null ? 110 : 100}
-                paddingAngle={2}
-                dataKey="value"
-                animationDuration={800}
-                animationEasing="ease-out"
-                onClick={(_, idx) => handleSegmentClick(pieData[idx], idx)}
-                onMouseEnter={(_, idx) => setActiveIndex(idx)}
-                onMouseLeave={() => setActiveIndex(null)}
-                style={{ cursor: 'pointer' }}
-              >
-                {pieData.map((entry, idx) => (
-                  <Cell
-                    key={`cell-${idx}`}
-                    fill={entry.color}
-                    fillOpacity={selectedTier && selectedTier !== entry.tier ? 0.3 : 0.85}
-                    stroke={selectedTier === entry.tier ? entry.color : 'rgba(0,0,0,0.3)'}
-                    strokeWidth={selectedTier === entry.tier ? 3 : 1}
-                    style={{
-                      transform: activeIndex === idx ? 'scale(1.05)' : 'scale(1)',
-                      transformOrigin: 'center',
-                      transition: 'all 0.2s ease-out',
-                    }}
-                  />
-                ))}
-              </Pie>
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload || !payload.length) return null;
-                  const entry = payload[0].payload;
-                  return (
-                    <div className="bg-[#1B1F39] border border-white/10 rounded-xl p-4 shadow-xl z-50">
-                      <p className="text-white font-semibold mb-2 flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                        {entry.name} Tier
-                      </p>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between gap-4">
-                          <span className="text-[#64748B]">Revenue:</span>
-                          <span className="text-white font-medium">{formatChartCurrency(entry.value)}</span>
-                        </div>
-                        <div className="flex justify-between gap-4">
-                          <span className="text-[#64748B]">% of Total:</span>
-                          <span className="text-white">{entry.pct.toFixed(1)}%</span>
-                        </div>
-                        <div className="flex justify-between gap-4">
-                          <span className="text-[#64748B]">Customers:</span>
-                          <span className="text-white">{entry.count}</span>
-                        </div>
-                        <p className="text-[#64748B] text-[11px] pt-1 border-t border-white/10">
-                          {entry.description}
+        {/* Donut Chart with center label */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="relative" style={{ width: 220, height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={activeIndex !== null ? 105 : 95}
+                  paddingAngle={2}
+                  dataKey="value"
+                  animationDuration={800}
+                  animationEasing="ease-out"
+                  onClick={(_, idx) => handleSegmentClick(pieData[idx], idx)}
+                  onMouseEnter={(_, idx) => setActiveIndex(idx)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {pieData.map((entry, idx) => (
+                    <Cell
+                      key={`cell-${idx}`}
+                      fill={entry.color}
+                      fillOpacity={selectedTier && selectedTier !== entry.tier ? 0.3 : 0.85}
+                      stroke={selectedTier === entry.tier ? entry.color : 'rgba(0,0,0,0.3)'}
+                      strokeWidth={selectedTier === entry.tier ? 3 : 1}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const entry = payload[0].payload;
+                    return (
+                      <div className="bg-[#1B1F39] border border-white/10 rounded-xl p-4 shadow-xl z-50">
+                        <p className="text-white font-semibold mb-2 flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                          {entry.name} Tier
                         </p>
-                        <p className="text-cyan-400 text-[10px] pt-1">
-                          Click to view customers
-                        </p>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-[#64748B]">Revenue:</span>
+                            <span className="text-white font-medium">{formatChartCurrency(entry.value)}</span>
+                          </div>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-[#64748B]">% of Total:</span>
+                            <span className="text-white">{entry.pct.toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-[#64748B]">Customers:</span>
+                            <span className="text-white">{entry.count}</span>
+                          </div>
+                          <p className="text-[#64748B] text-[11px] pt-1 border-t border-white/10">
+                            {entry.description}
+                          </p>
+                          <p className="text-cyan-400 text-[10px] pt-1">
+                            Click to view details
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                }}
-                wrapperStyle={{ zIndex: 100 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+                    );
+                  }}
+                  wrapperStyle={{ zIndex: 100 }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
 
-          {/* Center HHI Display - positioned relative to chart center */}
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              marginLeft: '-22px' // Offset for stats panel
-            }}
-          >
-            <div className="text-center bg-[#0F1123]/80 rounded-lg px-3 py-2">
-              <div className="text-2xl font-bold" style={{ color: hhiColor }}>
-                {data.hhi_index.toLocaleString()}
-              </div>
-              <div className={`text-[11px] ${riskLevel.color}`}>
-                {riskLevel.text}
+            {/* Center HHI Display - absolutely centered in the donut hole */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <div className="text-3xl font-bold" style={{ color: hhiColor }}>
+                  {data.hhi_index.toLocaleString()}
+                </div>
+                <div className={`text-xs font-medium ${riskLevel.color}`}>
+                  {riskLevel.text}
+                </div>
               </div>
             </div>
           </div>
