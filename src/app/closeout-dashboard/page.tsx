@@ -296,6 +296,7 @@ export default function CloseoutDashboard() {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('projects');
 
   // Fetch data
   const fetchData = async (bust = false) => {
@@ -570,7 +571,63 @@ export default function CloseoutDashboard() {
             </div>
           </div>
 
+          {/* Tabs */}
+          <div className="flex gap-1 mb-6 p-1 bg-[#111827] rounded-lg w-fit border border-white/[0.04]">
+            <button
+              onClick={() => setActiveTab('projects')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === 'projects'
+                  ? 'bg-[#22C55E] text-white shadow-lg'
+                  : 'text-[#8FA3BF] hover:text-white hover:bg-white/5'
+              }`}
+            >
+              Projects
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === 'analytics'
+                  ? 'bg-[#22C55E] text-white shadow-lg'
+                  : 'text-[#8FA3BF] hover:text-white hover:bg-white/5'
+              }`}
+            >
+              Analytics
+            </button>
+          </div>
 
+          {activeTab === 'analytics' ? (
+            /* Analytics Tab - Charts */
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <ProfitabilityTrendChart data={data?.monthly || []} height={350} />
+                <ProfitabilityMatrix
+                  projects={filteredProjects}
+                  height={350}
+                  onProjectSelect={(project) => {
+                    if (project) {
+                      setSelectedProject(project as Project);
+                      setActiveTab('projects');
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Type Breakdown Full Width */}
+              {data?.types && data.types.length > 0 && (
+                <div className="rounded-xl bg-[#111827] border border-white/[0.04] shadow-[0_4px_16px_rgba(0,0,0,0.2)] p-6">
+                  <h3 className="text-[12px] font-semibold text-[#475569] uppercase tracking-[0.08em] mb-6">
+                    Revenue & GPM by Project Type
+                  </h3>
+                  <div className="grid grid-cols-2 gap-8">
+                    {data.types.map(type => (
+                      <TypeBreakdownBar key={type.project_type} type={type} maxRevenue={maxTypeRevenue} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+          /* Projects Tab */
           <div className="grid grid-cols-4 gap-6">
             {/* Main Content - Project List */}
             <div className="col-span-3">
@@ -810,6 +867,7 @@ export default function CloseoutDashboard() {
               )}
             </div>
           </div>
+          )}
         </main>
       </motion.div>
     </div>
