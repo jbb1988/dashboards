@@ -576,10 +576,11 @@ export async function getDiversifiedSales(options: {
         };
       }
 
-      // Add revenue (netamount should be positive for sales)
-      // Note: NetSuite netamount is typically negative for credits, positive for sales
-      grouped[groupKey].revenue += Math.abs(netamount);
-      grouped[groupKey].cost += costestimate;
+      // Add revenue - preserve sign so credit memos (negative) properly reduce total
+      // Note: NetSuite netamount is positive for sales, negative for credits/returns
+      grouped[groupKey].revenue += netamount;
+      // Cost should also be sign-aware for credit memos
+      grouped[groupKey].cost += netamount < 0 ? -costestimate : costestimate;
     }
 
     // Convert to array and calculate gross profit
@@ -713,6 +714,8 @@ export async function getProjectProfitability(options: {
   // Query TransactionLine for Test Bench class ONLY (class_id = 1)
   // This filters out Diversified Products and brings in TB/MCC/M3 project data
   // Revenue from netamount on 4xxx accounts, COGS from costestimate field (like Diversified)
+  // Query includes both CustInvc (mainline='F') and Journal (mainline='T') transactions
+  // For JEs, customer is on line level (tl.entity), not header (t.entity)
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -721,8 +724,8 @@ export async function getProjectProfitability(options: {
       t.trandate,
       BUILTIN.DF(t.postingperiod) AS posting_period,
       t.type AS transaction_type,
-      t.entity AS customer_id,
-      BUILTIN.DF(t.entity) AS customer_name,
+      COALESCE(t.entity, tl.entity) AS customer_id,
+      COALESCE(BUILTIN.DF(t.entity), BUILTIN.DF(tl.entity)) AS customer_name,
       tl.class AS class_id,
       BUILTIN.DF(tl.class) AS class_name,
       tl.account AS account_id,
@@ -738,7 +741,7 @@ export async function getProjectProfitability(options: {
     INNER JOIN TransactionLine tl ON tl.transaction = t.id
     LEFT JOIN Account a ON a.id = tl.account
     WHERE t.posting = 'T'
-      AND tl.mainline = 'F'
+      AND ((tl.mainline = 'F' AND t.type != 'Journal') OR (tl.mainline = 'T' AND t.type = 'Journal'))
       AND tl.class = 1
       AND tl.netamount IS NOT NULL
       AND tl.netamount != 0
