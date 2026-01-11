@@ -1234,7 +1234,7 @@ export default function DiversifiedDashboard() {
                           >
                             {tab === 'overview' && 'Overview'}
                             {tab === 'attrition' && 'Attrition'}
-                            {tab === 'growth' && 'YoY Growth'}
+                            {tab === 'growth' && 'Rolling 12'}
                             {tab === 'opportunities' && 'Opportunities'}
                           </button>
                         ))}
@@ -1293,9 +1293,9 @@ export default function DiversifiedDashboard() {
                             delay={0}
                           />
                           <KPICard
-                            title="YoY Revenue"
+                            title="Rolling 12-Mo"
                             value={`${insightsData.summary.yoy_revenue_change_pct >= 0 ? '+' : ''}${insightsData.summary.yoy_revenue_change_pct.toFixed(1)}%`}
-                            subtitle="vs prior year"
+                            subtitle="vs prior 12 months"
                             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
                             color={insightsData.summary.yoy_revenue_change_pct >= 0 ? '#22C55E' : '#EF4444'}
                             trend={insightsData.summary.yoy_revenue_change_pct >= 0 ? 'up' : 'down'}
@@ -1453,7 +1453,7 @@ export default function DiversifiedDashboard() {
                         </div>
                       )}
 
-                      {/* Growth Sub-Tab Content */}
+                      {/* Growth Sub-Tab Content (now Rolling 12 Month) */}
                       {insightsSubTab === 'growth' && (
                         <div className="space-y-6">
                           <div className="grid grid-cols-2 gap-6">
@@ -1463,6 +1463,7 @@ export default function DiversifiedDashboard() {
                               priorYear={new Date().getFullYear() - 1}
                               viewMode="customer"
                               index={0}
+                              isRolling12={true}
                             />
                             <YoYComparisonChart
                               data={insightsData.yoy}
@@ -1470,6 +1471,7 @@ export default function DiversifiedDashboard() {
                               priorYear={new Date().getFullYear() - 1}
                               viewMode="class"
                               index={1}
+                              isRolling12={true}
                             />
                           </div>
                         </div>

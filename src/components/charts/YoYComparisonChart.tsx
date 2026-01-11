@@ -34,6 +34,7 @@ interface YoYComparisonChartProps {
   index?: number;
   viewMode?: 'customer' | 'class';
   onEntityClick?: (entityId: string, entityType: 'customer' | 'class') => void;
+  isRolling12?: boolean; // If true, use "Current 12 Mo" / "Prior 12 Mo" labels
 }
 
 function truncateName(name: string, maxLength: number = 18): string {
@@ -48,9 +49,14 @@ export function YoYComparisonChart({
   index = 0,
   viewMode = 'customer',
   onEntityClick,
+  isRolling12 = false,
 }: YoYComparisonChartProps) {
   const [showGrowing, setShowGrowing] = useState(true);
   const [showDeclining, setShowDeclining] = useState(true);
+
+  // Labels for rolling 12 vs calendar year
+  const currentLabel = isRolling12 ? 'Current 12 Mo' : String(currentYear);
+  const priorLabel = isRolling12 ? 'Prior 12 Mo' : String(priorYear);
 
   const chartData = useMemo(() => {
     let filtered = data.filter(d => d.entity_type === viewMode);
@@ -111,11 +117,11 @@ export function YoYComparisonChart({
         <p className="text-white font-semibold mb-2">{entry.name}</p>
         <div className="space-y-1 text-sm">
           <div className="flex justify-between gap-4">
-            <span className="text-[#64748B]">{currentYear}:</span>
+            <span className="text-[#64748B]">{currentLabel}:</span>
             <span className="text-cyan-400 font-medium">{formatChartCurrency(entry.current)}</span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-[#64748B]">{priorYear}:</span>
+            <span className="text-[#64748B]">{priorLabel}:</span>
             <span className="text-purple-400 font-medium">{formatChartCurrency(entry.prior)}</span>
           </div>
           <div className="flex justify-between gap-4 pt-1 border-t border-white/10">
@@ -125,11 +131,11 @@ export function YoYComparisonChart({
             </span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-[#64748B]">Margin {currentYear}:</span>
+            <span className="text-[#64748B]">Margin {currentLabel}:</span>
             <span className="text-white">{entry.currentMargin.toFixed(1)}%</span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-[#64748B]">Margin {priorYear}:</span>
+            <span className="text-[#64748B]">Margin {priorLabel}:</span>
             <span className="text-white">{entry.priorMargin.toFixed(1)}%</span>
           </div>
         </div>
@@ -137,9 +143,13 @@ export function YoYComparisonChart({
     );
   };
 
+  const chartTitle = isRolling12
+    ? `Rolling 12 Month by ${viewMode === 'customer' ? 'Customer' : 'Class'}`
+    : `Year-over-Year by ${viewMode === 'customer' ? 'Customer' : 'Class'}`;
+
   return (
     <ChartContainer
-      title={`Year-over-Year by ${viewMode === 'customer' ? 'Customer' : 'Class'}`}
+      title={chartTitle}
       subtitle={`Overall: ${stats.overallChange >= 0 ? '+' : ''}${stats.overallChange.toFixed(1)}% • ${stats.growing} growing, ${stats.declining} declining`}
       icon={
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -201,7 +211,7 @@ export function YoYComparisonChart({
             height={30}
             formatter={(value) => (
               <span style={{ color: '#94A3B8', fontSize: 11 }}>
-                {value === 'current' ? currentYear : priorYear}
+                {value === 'current' ? currentLabel : priorLabel}
               </span>
             )}
           />
