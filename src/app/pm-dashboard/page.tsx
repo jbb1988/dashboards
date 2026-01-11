@@ -633,6 +633,22 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: ASANA_COLORS.placeholder }} /> Placeholder</span>
           </div>
           <span className="text-[11px] text-[#64748B]">{calendarData.allTasks.length} tasks</span>
+          {data?.project?.gid && (
+            <>
+              <div className="h-4 w-px bg-white/10" />
+              <a
+                href={`https://app.asana.com/0/${data.project.gid}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open in Asana
+              </a>
+            </>
+          )}
         </div>
       </div>
 
@@ -745,6 +761,7 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
         {selectedTask && (
           <TaskDetailDrawer
             task={selectedTask}
+            projectId={data?.project?.gid}
             onClose={() => setSelectedTask(null)}
             onComplete={onTaskComplete ? handleTaskComplete : undefined}
             isCompleting={completingTaskId === selectedTask.gid}
@@ -1056,7 +1073,25 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
             <button key={s} onClick={() => setSortBy(s)} className={`text-[11px] px-3 py-1.5 rounded-lg capitalize ${sortBy === s ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>{s}</button>
           ))}
         </div>
-        <span className="ml-auto text-[11px] text-[#64748B]">{filteredTasks.length} MCCs</span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-[11px] text-[#64748B]">{filteredTasks.length} MCCs</span>
+          {data?.project?.gid && (
+            <>
+              <div className="h-4 w-px bg-white/10" />
+              <a
+                href={`https://app.asana.com/0/${data.project.gid}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open in Asana
+              </a>
+            </>
+          )}
+        </div>
       </div>
 
       {/* MCC Table */}
@@ -1127,6 +1162,7 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
         {selectedTask && (
           <TaskDetailDrawer
             task={selectedTask}
+            projectId={data?.project?.gid}
             onClose={() => setSelectedTask(null)}
             onComplete={onTaskComplete ? handleTaskComplete : undefined}
             isCompleting={completingTaskId === selectedTask.gid}
@@ -1194,11 +1230,27 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
         </div>
       </div>
 
-      {/* Toggle */}
-      <div className="flex justify-end mb-4">
-        <button onClick={() => setShowCompleted(!showCompleted)} className={`text-[11px] px-3 py-1.5 rounded-lg ${showCompleted ? 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
-          {showCompleted ? 'Hide Completed' : 'Show Completed'}
-        </button>
+      {/* Controls */}
+      <div className="flex justify-between items-center mb-4">
+        <div />
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowCompleted(!showCompleted)} className={`text-[11px] px-3 py-1.5 rounded-lg ${showCompleted ? 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
+            {showCompleted ? 'Hide Completed' : 'Show Completed'}
+          </button>
+          {data?.project?.gid && (
+            <a
+              href={`https://app.asana.com/0/${data.project.gid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Open in Asana
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Grouped Tasks */}
@@ -1231,6 +1283,7 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
         {selectedTask && (
           <TaskDetailDrawer
             task={selectedTask}
+            projectId={data?.project?.gid}
             onClose={() => setSelectedTask(null)}
             onComplete={onTaskComplete ? handleTaskComplete : undefined}
             isCompleting={completingTaskId === selectedTask.gid}

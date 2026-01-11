@@ -487,18 +487,34 @@ export default function SmartProjectsTab({
           />
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search projects..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 text-[13px] rounded-lg bg-[#0F1722] border border-white/[0.06] text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#E16259]/50 focus:ring-1 focus:ring-[#E16259]/20 w-64"
-          />
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 text-[13px] rounded-lg bg-[#0F1722] border border-white/[0.06] text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#E16259]/50 focus:ring-1 focus:ring-[#E16259]/20 w-64"
+            />
+          </div>
+          {/* Open in Asana */}
+          {data?.project?.gid && (
+            <a
+              href={`https://app.asana.com/0/${data.project.gid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] px-3 py-2 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Open in Asana
+            </a>
+          )}
         </div>
       </div>
 
@@ -688,6 +704,7 @@ export default function SmartProjectsTab({
         {selectedTask && (
           <TaskDetailDrawer
             task={selectedTask}
+            projectId={data?.project?.gid}
             onClose={() => setSelectedTask(null)}
             onComplete={handleComplete}
             onUpdate={() => {

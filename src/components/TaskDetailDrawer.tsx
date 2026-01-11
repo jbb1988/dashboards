@@ -113,6 +113,7 @@ function formatNotesWithLinks(notes: string): React.ReactNode[] {
 
 interface TaskDetailDrawerProps {
   task: AsanaTask;
+  projectId?: string; // Asana project ID for "Open in Asana" link
   onClose: () => void;
   onComplete?: (taskId: string) => void;
   onUpdate?: () => void; // Callback to refresh data after edit
@@ -122,6 +123,7 @@ interface TaskDetailDrawerProps {
 
 export default function TaskDetailDrawer({
   task,
+  projectId,
   onClose,
   onComplete,
   onUpdate,
@@ -260,15 +262,31 @@ export default function TaskDetailDrawer({
           </h2>
           <div className="flex items-center gap-2">
             {!isEditing && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="p-2 rounded-lg hover:bg-white/5 text-[#38BDF8] hover:text-[#38BDF8] transition-colors"
-                title="Edit task"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
+              <>
+                <a
+                  href={projectId
+                    ? `https://app.asana.com/0/${projectId}/${task.gid}`
+                    : `https://app.asana.com/0/0/${task.gid}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg hover:bg-white/5 text-[#F06A6A] hover:text-[#F06A6A] transition-colors"
+                  title="Open in Asana"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="p-2 rounded-lg hover:bg-white/5 text-[#38BDF8] hover:text-[#38BDF8] transition-colors"
+                  title="Edit task"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              </>
             )}
             <button
               onClick={onClose}
