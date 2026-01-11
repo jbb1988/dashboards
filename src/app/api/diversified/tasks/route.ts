@@ -5,6 +5,7 @@ import {
   createTask,
   updateTask,
   calculateTaskStats,
+  getSubtasks,
   AsanaTask,
 } from '@/lib/asana';
 
@@ -68,10 +69,24 @@ export async function GET(request: NextRequest) {
       completedSince: includeCompleted ? undefined : 'now',
     });
 
-    // Transform Asana tasks to our format
+    // Fetch subtasks for all tasks in parallel
+    const subtasksMap = new Map<string, AsanaTask[]>();
+    const subtaskPromises = asanaTasks.map(async (task) => {
+      try {
+        const subtasks = await getSubtasks(task.gid);
+        subtasksMap.set(task.gid, subtasks);
+      } catch (err) {
+        console.error(`Error fetching subtasks for task ${task.gid}:`, err);
+        subtasksMap.set(task.gid, []);
+      }
+    });
+    await Promise.all(subtaskPromises);
+
+    // Transform Asana tasks to our format (including subtasks)
     const tasks = asanaTasks.map(task => {
       const sectionGid = task.memberships?.[0]?.section?.gid;
       const sectionName = sectionGid ? sectionMap.get(sectionGid) || 'No Section' : 'No Section';
+      const taskSubtasks = subtasksMap.get(task.gid) || [];
 
       return {
         id: task.gid,
@@ -91,6 +106,16 @@ export async function GET(request: NextRequest) {
         created_at: task.created_at || new Date().toISOString(),
         updated_at: task.modified_at || new Date().toISOString(),
         asana_gid: task.gid,
+        // Include subtasks
+        subtasks: taskSubtasks.map(st => ({
+          id: st.gid,
+          title: st.name,
+          completed: st.completed,
+          due_date: st.due_on || null,
+          assignee_name: st.assignee?.name || null,
+        })),
+        subtask_count: taskSubtasks.length,
+        subtasks_completed: taskSubtasks.filter(st => st.completed).length,
       };
     });
 

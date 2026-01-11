@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+  due_date?: string | null;
+  assignee_name?: string | null;
+}
+
 interface DiversifiedTask {
   id: string;
   title: string;
@@ -21,6 +29,10 @@ interface DiversifiedTask {
   asana_gid?: string;
   created_at: string;
   updated_at: string;
+  // Subtasks
+  subtasks?: Subtask[];
+  subtask_count?: number;
+  subtasks_completed?: number;
 }
 
 interface TaskSummary {
@@ -742,7 +754,46 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                               {task.section}
                             </span>
                           )}
+                          {/* Subtask count indicator */}
+                          {task.subtask_count && task.subtask_count > 0 && (
+                            <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                              </svg>
+                              {task.subtasks_completed}/{task.subtask_count} subtasks
+                            </span>
+                          )}
                         </div>
+
+                        {/* Subtasks List */}
+                        {task.subtasks && task.subtasks.length > 0 && (
+                          <div className="mt-2 pl-3 border-l-2 border-purple-500/20 space-y-1">
+                            {task.subtasks.map((subtask) => (
+                              <div key={subtask.id} className="flex items-center gap-2">
+                                <div className={`w-3 h-3 rounded flex items-center justify-center flex-shrink-0 ${
+                                  subtask.completed ? 'bg-green-500/30 text-green-400' : 'bg-white/10'
+                                }`}>
+                                  {subtask.completed && (
+                                    <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <span className={`text-[11px] ${subtask.completed ? 'text-[#64748B] line-through' : 'text-[#94A3B8]'}`}>
+                                  {subtask.title}
+                                </span>
+                                {subtask.assignee_name && (
+                                  <span className="text-[9px] text-[#64748B]">({subtask.assignee_name})</span>
+                                )}
+                                {subtask.due_date && (
+                                  <span className="text-[9px] text-[#64748B]">
+                                    Due: {new Date(subtask.due_date).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Right Side: Due Date & Actions */}
@@ -1112,6 +1163,67 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                         </span>
                       </div>
                     </div>
+
+                    {/* Subtasks Section */}
+                    {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
+                      <div className="pt-4 border-t border-white/10">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-[10px] text-[#64748B] uppercase tracking-wider">
+                            Subtasks ({selectedTask.subtasks_completed}/{selectedTask.subtask_count})
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-purple-500 rounded-full transition-all"
+                                style={{ width: `${((selectedTask.subtasks_completed || 0) / (selectedTask.subtask_count || 1)) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-purple-400">
+                              {Math.round(((selectedTask.subtasks_completed || 0) / (selectedTask.subtask_count || 1)) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          {selectedTask.subtasks.map((subtask) => (
+                            <div
+                              key={subtask.id}
+                              className={`flex items-start gap-3 p-3 rounded-lg ${
+                                subtask.completed ? 'bg-green-500/5 border border-green-500/10' : 'bg-white/[0.02] border border-white/[0.04]'
+                              }`}
+                            >
+                              <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                                subtask.completed ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-[#64748B]'
+                              }`}>
+                                {subtask.completed ? (
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                ) : (
+                                  <div className="w-2 h-2 rounded-full bg-current" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-[13px] ${subtask.completed ? 'text-[#64748B] line-through' : 'text-white'}`}>
+                                  {subtask.title}
+                                </p>
+                                <div className="flex items-center gap-3 mt-1">
+                                  {subtask.assignee_name && (
+                                    <span className="text-[10px] text-[#64748B]">
+                                      {subtask.assignee_name}
+                                    </span>
+                                  )}
+                                  {subtask.due_date && (
+                                    <span className="text-[10px] text-[#64748B]">
+                                      Due: {new Date(subtask.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Quick Actions */}
                     <div className="pt-4 border-t border-white/10">
