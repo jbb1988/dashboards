@@ -1528,13 +1528,22 @@ export default function ContractsDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('tasks')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
                   activeTab === 'tasks'
                     ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
                     : 'text-[#8FA3BF] hover:text-white hover:bg-white/5'
                 }`}
               >
                 Tasks
+                {taskStats && taskStats.overdue > 0 ? (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[18px] text-center">
+                    {taskStats.overdue}
+                  </span>
+                ) : taskStats && taskStats.pending > 0 ? (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#38BDF8]/20 text-[#38BDF8] rounded-full min-w-[18px] text-center">
+                    {taskStats.pending}
+                  </span>
+                ) : null}
               </button>
               <button
                 onClick={() => setActiveTab('documents')}
