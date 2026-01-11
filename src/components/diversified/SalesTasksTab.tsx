@@ -162,7 +162,7 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
   };
 
   // Fetch tasks
-  const fetchTasks = async () => {
+  const fetchTasks = async (bustCache = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -170,6 +170,7 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (priorityFilter !== 'all') params.set('priority', priorityFilter);
       if (sourceFilter !== 'all') params.set('source', sourceFilter);
+      if (bustCache) params.set('bust', 'true');
 
       const response = await fetch(`/api/diversified/tasks?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch tasks');
@@ -186,7 +187,8 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
   };
 
   useEffect(() => {
-    fetchTasks();
+    // Bust cache on initial load to ensure we get fresh data with subtasks
+    fetchTasks(true);
   }, [statusFilter, priorityFilter, sourceFilter]);
 
   // Create task
@@ -407,7 +409,7 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
 
       {/* Controls Bar */}
       <div className="flex items-center justify-between gap-4">
-        {/* View Toggle */}
+        {/* View Toggle + Refresh */}
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg overflow-hidden border border-white/[0.04]">
             <button
@@ -435,6 +437,17 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
               </svg>
             </button>
           </div>
+          {/* Refresh Button */}
+          <button
+            onClick={() => fetchTasks(true)}
+            disabled={loading}
+            className="px-3 py-1.5 rounded-lg bg-[#1E293B] border border-white/[0.04] text-[#94A3B8] hover:text-white hover:bg-[#2D3B4F] transition-all disabled:opacity-50"
+            title="Refresh tasks from Asana"
+          >
+            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
 
         {/* Filters */}
@@ -592,7 +605,7 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
           <p className="font-medium mb-2">Error loading tasks</p>
           <p className="text-[13px] opacity-80">{error}</p>
           <button
-            onClick={fetchTasks}
+            onClick={() => fetchTasks(true)}
             className="mt-4 px-4 py-2 rounded-lg bg-[#EF4444]/20 hover:bg-[#EF4444]/30 transition-colors"
           >
             Retry
