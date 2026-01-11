@@ -53,6 +53,8 @@ interface StoppedBuyingData {
 
 interface StoppedBuyingReportProps {
   onCustomerClick?: (customerId: string, customerName: string) => void;
+  selectedYears?: number[];
+  selectedMonths?: number[];
 }
 
 function formatCurrency(value: number): string {
@@ -70,7 +72,7 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function StoppedBuyingReport({ onCustomerClick }: StoppedBuyingReportProps) {
+export function StoppedBuyingReport({ onCustomerClick, selectedYears, selectedMonths }: StoppedBuyingReportProps) {
   const [data, setData] = useState<StoppedBuyingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +84,15 @@ export function StoppedBuyingReport({ onCustomerClick }: StoppedBuyingReportProp
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/diversified/insights/stopped-buying');
+        const params = new URLSearchParams();
+        if (selectedYears && selectedYears.length > 0) {
+          params.set('years', selectedYears.join(','));
+        }
+        if (selectedMonths && selectedMonths.length > 0) {
+          params.set('months', selectedMonths.join(','));
+        }
+        const url = `/api/diversified/insights/stopped-buying${params.toString() ? `?${params.toString()}` : ''}`;
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Failed to fetch stopped buying data');
         }
@@ -96,7 +106,7 @@ export function StoppedBuyingReport({ onCustomerClick }: StoppedBuyingReportProp
     };
 
     fetchData();
-  }, []);
+  }, [selectedYears, selectedMonths]);
 
   if (loading) {
     return (

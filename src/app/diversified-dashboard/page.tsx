@@ -789,17 +789,17 @@ export default function DiversifiedDashboard() {
     };
   }, [selectedYears, selectedMonths, selectedClass, selectedCustomer, viewMode, activeTab]);
 
-  // Fetch budget data on mount
+  // Fetch budget data on mount and when year filter changes
   useEffect(() => {
     fetchBudgetData();
-  }, []);
+  }, [selectedYears]);
 
-  // Fetch insights when switching to insights tab (only if not already loaded)
+  // Fetch insights when switching to insights tab or when filters change
   useEffect(() => {
-    if (activeTab === 'insights' && !insightsData && !insightsLoading) {
+    if (activeTab === 'insights') {
       fetchInsightsData();
     }
-  }, [activeTab]);
+  }, [activeTab, selectedYears, selectedMonths]);
 
   // Handle row expansion
   const handleRowExpand = (rowId: string, type: 'class' | 'customer') => {
@@ -1606,12 +1606,14 @@ export default function DiversifiedDashboard() {
                         </div>
                       )}
 
-                      {/* Opportunities Sub-Tab Content */}
+                      {/* Stopped Buying Sub-Tab Content */}
                       {insightsSubTab === 'churn' && (
                         <StoppedBuyingReport
                           onCustomerClick={(customerId, customerName) => {
                             setSelectedCustomerForDetail({ id: customerId, name: customerName });
                           }}
+                          selectedYears={selectedYears}
+                          selectedMonths={selectedMonths}
                         />
                       )}
 
