@@ -239,12 +239,12 @@ export function ProductsTab({ onCustomerClick }: ProductsTabProps) {
                 />
                 <YAxis
                   type="category"
-                  dataKey="item_name"
+                  dataKey="item_description"
                   tick={{ fill: '#94A3B8', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
-                  width={120}
-                  tickFormatter={(val) => val.length > 18 ? `${val.slice(0, 18)}...` : val}
+                  width={140}
+                  tickFormatter={(val) => val && val.length > 22 ? `${val.slice(0, 22)}...` : (val || 'Unknown')}
                 />
                 <Tooltip
                   contentStyle={{
@@ -288,7 +288,10 @@ export function ProductsTab({ onCustomerClick }: ProductsTabProps) {
                       border: '1px solid rgba(255,255,255,0.1)',
                       borderRadius: '8px',
                       padding: '8px 12px',
+                      color: '#fff',
                     }}
+                    itemStyle={{ color: '#fff' }}
+                    labelStyle={{ color: '#94A3B8' }}
                     formatter={(value) => [formatCurrency(value as number), 'Revenue']}
                   />
                 </PieChart>
@@ -406,7 +409,7 @@ export function ProductsTab({ onCustomerClick }: ProductsTabProps) {
                   onClick={() => setExpandedProduct(isExpanded ? null : product.item_id)}
                 >
                   <div>
-                    <div className="text-[13px] text-white font-medium">{product.item_name}</div>
+                    <div className="text-[13px] text-white font-medium">{product.item_description || product.item_name}</div>
                     <div className="text-[11px] text-[#64748B]">{product.class_name}</div>
                   </div>
                   <div className="text-right text-[13px] text-white font-medium">
