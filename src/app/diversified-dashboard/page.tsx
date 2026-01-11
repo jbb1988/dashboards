@@ -19,6 +19,8 @@ import { CustomerDetailDrawer } from '@/components/diversified/CustomerDetailDra
 import { ProductsTab } from '@/components/diversified/ProductsTab';
 import { StoppedBuyingReport } from '@/components/diversified/StoppedBuyingReport';
 import { AIInsightsPanelV2 } from '@/components/AIInsightsPanelV2';
+import InsightsDrawer from '@/components/diversified/InsightsDrawer';
+import { SalesTasksTab } from '@/components/diversified/SalesTasksTab';
 import { MetricExplainer, HHIExplainer, YoYChangeExplainer } from '@/components/ui/MetricExplainer';
 
 interface ClassSummary {
@@ -600,7 +602,7 @@ export default function DiversifiedDashboard() {
   const [syncing, setSyncing] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights'>('table');
+  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights' | 'tasks'>('table');
   const [budgetData, setBudgetData] = useState<BudgetData[]>([]);
 
   // Customer detail drawer state
@@ -616,6 +618,19 @@ export default function DiversifiedDashboard() {
   // For YoY mode: which years to compare
   const [yoyCurrentYear, setYoyCurrentYear] = useState(new Date().getFullYear() - 1); // Default to 2025 for comparing full years
   const [yoyPriorYear, setYoyPriorYear] = useState(new Date().getFullYear() - 2); // Default to 2024
+
+  // AI Insights drawer state
+  const [insightsDrawerOpen, setInsightsDrawerOpen] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<Array<{
+    priority: 'high' | 'medium' | 'low';
+    title: string;
+    problem: string;
+    recommendation: string;
+    expected_impact: string;
+    action_items: string[];
+    category: 'attrition' | 'growth' | 'crosssell' | 'concentration' | 'general';
+  }>>([]);
+  const [aiExecutiveSummary, setAiExecutiveSummary] = useState('');
 
   // Filter state
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
@@ -1026,6 +1041,19 @@ export default function DiversifiedDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
                   Insights
+                </button>
+                <button
+                  onClick={() => setActiveTab('tasks')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'tasks'
+                      ? 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  Tasks
                 </button>
               </motion.div>
 
@@ -1473,17 +1501,41 @@ export default function DiversifiedDashboard() {
                           </div>
 
                           {/* AI Insights Panel */}
-                          <AIInsightsPanelV2
-                            onGenerate={async () => {
-                              const response = await fetch('/api/diversified/insights/ai', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(insightsData),
-                              });
-                              if (!response.ok) throw new Error('Failed to generate AI insights');
-                              return response.json();
-                            }}
-                          />
+                          <div className="space-y-4">
+                            <AIInsightsPanelV2
+                              onGenerate={async () => {
+                                const response = await fetch('/api/diversified/insights/ai', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify(insightsData),
+                                });
+                                if (!response.ok) throw new Error('Failed to generate AI insights');
+                                const result = await response.json();
+                                // Store the recommendations for the drawer
+                                setAiRecommendations(result.recommendations || []);
+                                setAiExecutiveSummary(result.executive_summary || '');
+                                return result;
+                              }}
+                            />
+
+                            {/* Open Insights Drawer Button - only show if we have recommendations */}
+                            {aiRecommendations.length > 0 && (
+                              <motion.button
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                onClick={() => setInsightsDrawerOpen(true)}
+                                className="w-full py-3 px-4 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-xl text-purple-400 font-medium text-[13px] transition-all flex items-center justify-center gap-2"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                View Full Analysis & Action Plan
+                                <span className="text-[11px] text-purple-400/70">
+                                  ({aiRecommendations.length} recommendations)
+                                </span>
+                              </motion.button>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -1626,6 +1678,21 @@ export default function DiversifiedDashboard() {
                   ) : null}
                 </motion.div>
               )}
+
+              {/* Tasks Tab */}
+              {activeTab === 'tasks' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <SalesTasksTab
+                    onCustomerClick={(customerId, customerName) => {
+                      setSelectedCustomerForDetail({ id: customerId, name: customerName });
+                    }}
+                  />
+                </motion.div>
+              )}
             </>
           ) : null}
         </div>
@@ -1636,6 +1703,39 @@ export default function DiversifiedDashboard() {
         customerId={selectedCustomerForDetail?.id || null}
         customerName={selectedCustomerForDetail?.name}
         onClose={() => setSelectedCustomerForDetail(null)}
+      />
+
+      {/* AI Insights Drawer */}
+      <InsightsDrawer
+        isOpen={insightsDrawerOpen}
+        onClose={() => setInsightsDrawerOpen(false)}
+        recommendations={aiRecommendations}
+        executiveSummary={aiExecutiveSummary}
+        onAddToTasks={async (actionItem, recommendation) => {
+          try {
+            const response = await fetch('/api/diversified/tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: actionItem,
+                description: `From AI insight: ${recommendation.title}\n\nProblem: ${recommendation.problem}`,
+                priority: recommendation.priority === 'high' ? 'high' : recommendation.priority === 'medium' ? 'medium' : 'low',
+                source: 'ai_insight',
+                insight_id: recommendation.title,
+              }),
+            });
+            if (response.ok) {
+              // Show brief confirmation
+              const toast = document.createElement('div');
+              toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-[100] animate-pulse';
+              toast.textContent = 'Task added!';
+              document.body.appendChild(toast);
+              setTimeout(() => toast.remove(), 2000);
+            }
+          } catch (err) {
+            console.error('Error adding task:', err);
+          }
+        }}
       />
     </div>
   );

@@ -229,7 +229,7 @@ export function AIInsightsPanelV2({ onGenerate, initialState = 'idle' }: AIInsig
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: idx * 0.1 }}
-                  className={`${styles.bg} border ${styles.border} rounded-xl overflow-hidden`}
+                  className="bg-[#151F2E] border border-white/[0.06] rounded-xl overflow-hidden"
                 >
                   {/* Card Header - Always visible */}
                   <button

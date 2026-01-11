@@ -256,6 +256,69 @@ export async function getSubtasks(taskId: string): Promise<AsanaTask[]> {
   return asanaFetch<AsanaTask[]>(`/tasks/${taskId}/subtasks?opt_fields=${fields}`, { allPages: true });
 }
 
+// Create a new task in a project
+export async function createTask(
+  projectId: string,
+  task: {
+    name: string;
+    notes?: string;
+    due_on?: string | null;
+    assignee?: string | null;
+    section?: string; // section gid
+  }
+): Promise<AsanaTask> {
+  const url = `${ASANA_BASE_URL}/tasks`;
+
+  const taskData: Record<string, unknown> = {
+    name: task.name,
+    projects: [projectId],
+  };
+
+  if (task.notes) taskData.notes = task.notes;
+  if (task.due_on) taskData.due_on = task.due_on;
+  if (task.assignee) taskData.assignee = task.assignee;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ data: taskData }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Asana API error (${response.status}): ${error}`);
+  }
+
+  const result = await response.json();
+  const createdTask = result.data as AsanaTask;
+
+  // If section is specified, move task to that section
+  if (task.section) {
+    await addTaskToSection(createdTask.gid, task.section);
+  }
+
+  return createdTask;
+}
+
+// Add a task to a section
+export async function addTaskToSection(
+  taskId: string,
+  sectionId: string
+): Promise<void> {
+  const url = `${ASANA_BASE_URL}/sections/${sectionId}/addTask`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ data: { task: taskId } }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Asana API error (${response.status}): ${error}`);
+  }
+}
+
 // Update task (e.g., mark as complete)
 export async function updateTask(
   taskId: string,
