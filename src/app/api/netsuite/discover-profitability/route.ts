@@ -129,27 +129,28 @@ export async function GET() {
     }));
     console.log(`Found ${results.cogsAccounts.length} COGS accounts`);
 
-    // Query 4: Sample transactions to understand data patterns
-    console.log('Fetching sample transactions...');
+    // Query 4: Sample transactions - look at 5xxx account transactions with ANY amount
+    console.log('Fetching sample COGS transactions...');
     const sampleQuery = `
       SELECT
         t.id AS transaction_id,
         t.tranid,
         t.trandate,
+        t.type AS tran_type,
         BUILTIN.DF(t.entity) AS customer_name,
+        tl.class AS class_id,
         BUILTIN.DF(tl.class) AS class_name,
         a.acctnumber AS account_number,
         a.fullname AS account_name,
-        tl.netamount AS amount
+        tl.netamount AS net_amount,
+        tl.amount AS line_amount,
+        tl.debitforeignamount AS debit_amt,
+        tl.creditforeignamount AS credit_amt
       FROM Transaction t
       INNER JOIN TransactionLine tl ON tl.transaction = t.id
       LEFT JOIN Account a ON a.id = tl.account
-      LEFT JOIN Classification c ON c.id = tl.class
-      WHERE t.posting = 'T'
-        AND tl.mainline = 'F'
-        AND tl.netamount IS NOT NULL
-        AND tl.netamount != 0
-        AND (a.acctnumber LIKE '4%' OR a.acctnumber LIKE '5%')
+      WHERE a.acctnumber LIKE '5%'
+        AND (tl.netamount IS NOT NULL OR tl.amount IS NOT NULL)
       ORDER BY t.trandate DESC
     `;
 
@@ -166,11 +167,16 @@ export async function GET() {
       transaction_id: row.transaction_id?.toString() || '',
       tranid: row.tranid || '',
       trandate: row.trandate || '',
+      tran_type: row.tran_type || '',
       customer_name: row.customer_name || '',
+      class_id: row.class_id?.toString() || '',
       class_name: row.class_name || '',
       account_number: row.account_number || '',
       account_name: row.account_name || '',
-      amount: parseFloat(row.amount) || 0,
+      net_amount: parseFloat(row.net_amount) || 0,
+      line_amount: parseFloat(row.line_amount) || 0,
+      debit_amt: parseFloat(row.debit_amt) || 0,
+      credit_amt: parseFloat(row.credit_amt) || 0,
     }));
     console.log(`Found ${results.sampleTransactions.length} sample transactions`);
 

@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets, KPICard } from '@/components/mars-ui';
-import AIInsightsPanel from '@/components/AIInsightsPanel';
 import ProfitabilityTrendChart from '@/components/ProfitabilityTrendChart';
 import ProfitabilityMatrix from '@/components/ProfitabilityMatrix';
+
+type TabType = 'projects' | 'analytics';
 
 interface Project {
   customer_name: string;
@@ -569,34 +570,6 @@ export default function CloseoutDashboard() {
             </div>
           </div>
 
-          {/* Charts Row - Trend Chart + AI Insights */}
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            <div className="col-span-2">
-              <ProfitabilityTrendChart data={data?.monthly || []} height={280} />
-            </div>
-            <div className="col-span-1">
-              <AIInsightsPanel
-                projects={filteredProjects}
-                types={data?.types || []}
-                monthly={data?.monthly || []}
-                totalRevenue={filteredKpis.totalRevenue}
-                grossProfitPct={filteredKpis.grossProfitPct}
-              />
-            </div>
-          </div>
-
-          {/* Profitability Matrix */}
-          <div className="mb-6">
-            <ProfitabilityMatrix
-              projects={filteredProjects}
-              height={300}
-              onProjectSelect={(project) => {
-                if (project) {
-                  setSelectedProject(project as Project);
-                }
-              }}
-            />
-          </div>
 
           <div className="grid grid-cols-4 gap-6">
             {/* Main Content - Project List */}

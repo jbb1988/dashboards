@@ -284,6 +284,28 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Escape key handler for fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
+  // Lock body scroll when fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isFullscreen]);
 
   const handleTaskComplete = useCallback(async (taskId: string) => {
     if (!onTaskComplete || completingTaskId) return;
@@ -638,9 +660,21 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
                 </button>
               )}
             </div>
-            <button onClick={() => navigateMonth('next')} className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigateMonth('next')} className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+              <div className="w-px h-4 bg-white/10" />
+              <button
+                onClick={() => setIsFullscreen(true)}
+                className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors"
+                title="Fullscreen (Esc to exit)"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Weekday Headers */}
@@ -796,6 +830,123 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
           )}
         </>
       )}
+
+      {/* Fullscreen Calendar Overlay */}
+      <AnimatePresence>
+        {isFullscreen && viewMode === 'calendar' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 bg-[#0B1220]"
+          >
+            {/* Fullscreen Header */}
+            <div className="px-6 py-4 bg-[#0F1722] border-b border-white/[0.06] flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button onClick={() => navigateMonth('prev')} className="p-2 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <span className="font-semibold text-[#EAF2FF] text-[18px]">
+                  {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </span>
+                <button onClick={() => navigateMonth('next')} className="p-2 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </button>
+                {!isCurrentMonth && (
+                  <button
+                    onClick={jumpToToday}
+                    className="text-[11px] px-3 py-1.5 rounded bg-[#E16259]/20 text-[#E16259] hover:bg-[#E16259]/30 transition-colors flex items-center gap-1.5"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Today
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[12px] text-[#64748B]">Press Esc to exit</span>
+                <button
+                  onClick={() => setIsFullscreen(false)}
+                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-[#8FA3BF] hover:text-white transition-colors"
+                  title="Exit fullscreen"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Fullscreen Calendar Content */}
+            <div className="h-[calc(100vh-65px)] overflow-auto p-6">
+              <div className="max-w-[2000px] mx-auto rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
+                {/* Weekday Headers */}
+                <div className="grid grid-cols-7 border-b border-white/[0.06]">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="px-3 py-3 text-center text-[11px] font-semibold text-[#475569] uppercase">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Weeks with Gantt Bars */}
+                {calendarData.weeks.map((week, weekIdx) => {
+                  const weekTasks = getWeekTasks(week.days);
+                  const tasksWithRows = assignRows(weekTasks);
+                  const maxRow = Math.max(0, ...tasksWithRows.map(t => t.row));
+                  const rowHeight = Math.max(160, 70 + (maxRow + 1) * 28);
+
+                  return (
+                    <div key={weekIdx} className="relative border-b border-white/[0.04]" style={{ minHeight: `${rowHeight}px` }}>
+                      {/* Day cells grid */}
+                      <div className="grid grid-cols-7 absolute inset-0">
+                        {week.days.map((day, dayIdx) => {
+                          if (!day) {
+                            return <div key={`empty-${weekIdx}-${dayIdx}`} className="border-r border-white/[0.04] bg-[#0F1722]/60" />;
+                          }
+
+                          const isToday = new Date().toDateString() === day.toDateString();
+                          const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+
+                          return (
+                            <div
+                              key={day.toISOString()}
+                              className={`border-r border-white/[0.04] p-2 ${isPast ? 'bg-[#0F1722]/40' : ''} ${isToday ? 'bg-[#E16259]/5 ring-1 ring-inset ring-[#E16259]/20' : ''}`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <span className={`text-[13px] font-medium ${isToday ? 'text-[#E16259]' : isPast ? 'text-[#475569]' : 'text-[#8FA3BF]'}`}>
+                                  {day.getDate()}
+                                </span>
+                                {isToday && (
+                                  <span className="text-[9px] font-bold text-[#E16259] bg-[#E16259]/20 px-1.5 py-0.5 rounded">TODAY</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Gantt bars overlay */}
+                      {tasksWithRows.map(({ task, startCol, spanCols, row }) => (
+                        <GanttBar
+                          key={task.gid}
+                          task={task}
+                          startCol={startCol}
+                          spanCols={spanCols}
+                          row={row}
+                          onClick={handleTaskClick}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
