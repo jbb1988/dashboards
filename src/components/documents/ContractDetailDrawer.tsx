@@ -24,6 +24,12 @@ export interface ContractItem {
   account_name: string;
   contract_type?: string;
   salesforce_id?: string;
+  // Filter fields
+  status?: string;
+  contract_date?: string | null;
+  close_date?: string | null;
+  budgeted?: boolean;
+  value?: number;
   documents: ContractDocument[];
   completeness: {
     uploaded: number;

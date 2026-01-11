@@ -72,6 +72,7 @@ interface Contract {
   awardDate?: string | null;
   budgeted?: boolean;
   contractType?: string[];
+  salesRep?: string;
 }
 
 interface DocumentsData {
@@ -233,6 +234,12 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           account_name: account.accountName,
           contract_type: matchingContract?.contractType?.join(', ') || undefined,
           salesforce_id: matchingContract?.salesforceId,
+          // Filter fields
+          status: matchingContract?.status,
+          contract_date: matchingContract?.contractDate,
+          close_date: matchingContract?.closeDate,
+          budgeted: matchingContract?.budgeted,
+          value: matchingContract?.value,
           documents: uploadedDocs,
           completeness: {
             uploaded: contract.completeness.required,
