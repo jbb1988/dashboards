@@ -264,11 +264,11 @@ function GanttBar({
       }}
       onClick={() => onClick(task)}
     >
-      <span className="text-[10px] text-white font-medium truncate">
+      <span className="text-[10px] text-[#1E293B] font-medium truncate">
         {task.name}
       </span>
       {spanCols >= 2 && task.assignee && (
-        <span className="text-[9px] text-white/70 ml-auto truncate hidden group-hover:block">
+        <span className="text-[9px] text-[#1E293B]/70 ml-auto truncate hidden group-hover:block">
           {task.assignee.name.split(' ')[0]}
         </span>
       )}
@@ -667,7 +667,7 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
               <div className="w-px h-4 bg-white/10" />
               <button
                 onClick={() => setIsFullscreen(true)}
-                className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors"
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[#8FA3BF] hover:text-white transition-colors"
                 title="Fullscreen (Esc to exit)"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
