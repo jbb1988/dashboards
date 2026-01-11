@@ -1258,6 +1258,28 @@ export interface CustomerContext {
   cross_sell_potential: number;        // Estimated $ if they bought missing classes
 }
 
+/**
+ * Check if customer owns VEROflow equipment
+ * IMPORTANT: If they buy calibration services, they MUST own a VEROflow
+ * because calibration = sending us their equipment to calibrate!
+ */
+function customerOwnsVeroflow(classes: Set<string>): boolean {
+  const classArray = Array.from(classes);
+  return classArray.some(c => {
+    const cl = c.toLowerCase();
+    // Direct VEROflow purchase
+    if (cl.includes('veroflow') || cl.includes('vf-1') || cl.includes('vf-4') ||
+        cl.includes('vf1') || cl.includes('vf4') || cl.includes('field tester')) {
+      return true;
+    }
+    // If they buy calibration, they MUST own VEROflow (that's what we're calibrating!)
+    if (cl.includes('calibration')) {
+      return true;
+    }
+    return false;
+  });
+}
+
 // Infer customer type from purchase patterns
 function inferCustomerType(
   classes: Set<string>,
@@ -1265,6 +1287,12 @@ function inferCustomerType(
   orderCount: number
 ): 'utility' | 'distributor' | 'contractor' | 'unknown' {
   const classArray = Array.from(classes);
+
+  // FIRST: If they buy calibration or VEROflow, they're definitely a utility
+  // Calibration = they own VEROflow and send it to us for service
+  if (customerOwnsVeroflow(classes)) {
+    return 'utility';
+  }
 
   // Distributors: High volume, broad product mix, consumables focus
   const distributorIndicators = [
@@ -1274,9 +1302,9 @@ function inferCustomerType(
     distributorIndicators.some(d => c.toLowerCase().includes(d.toLowerCase()))
   ).length;
 
-  // Utilities: Equipment buyers (VEROflow, Strainers, Spools, Calibration)
+  // Utilities: Equipment buyers (Strainers, Spools, Meter-related)
   const utilityIndicators = [
-    'VEROflow', 'Strainer', 'Spool', 'Calibration', 'Meter', 'Testing'
+    'Strainer', 'Spool', 'Meter', 'Testing'
   ];
   const utilityMatches = classArray.filter(c =>
     utilityIndicators.some(u => c.toLowerCase().includes(u.toLowerCase()))
@@ -1508,6 +1536,7 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
  * - Calibration services can ONLY be sold to customers who own VEROflow testers
  * - Calibration is an in-house service where customers send us their equipment
  * - No VEROflow = nothing to calibrate!
+ * - NOTE: If they already BUY calibration, they definitely own VEROflow!
  */
 function isClassAppropriateForType(
   className: string,
@@ -1517,14 +1546,9 @@ function isClassAppropriateForType(
   const lower = className.toLowerCase();
 
   // CALIBRATION RULE: Can only sell calibration to VEROflow owners
-  // They need a tester (VF-1, VF-4, VEROflow-1, VEROflow-4) to calibrate
+  // Use our helper that also checks if they buy calibration (which proves ownership)
   if (lower.includes('calibration')) {
-    const ownsVeroflow = Array.from(customerClasses).some(c => {
-      const cl = c.toLowerCase();
-      return cl.includes('veroflow') || cl.includes('vf-1') || cl.includes('vf-4') ||
-             cl.includes('vf1') || cl.includes('vf4') || cl.includes('field tester');
-    });
-    if (!ownsVeroflow) {
+    if (!customerOwnsVeroflow(customerClasses)) {
       return false; // Can't sell calibration without a tester!
     }
   }
