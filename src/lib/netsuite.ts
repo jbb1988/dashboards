@@ -463,9 +463,9 @@ export async function getDiversifiedSales(options: {
     dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
   }
 
-  // Query TransactionLine filtered by Diversified Products class hierarchy
-  // Diversified Products (class_id=18) and children (parent=18), plus RCM (class_id=17 for AMR-RCMS)
-  // Revenue accounts: 4131 (AMR-RCMS), 4140-4148 (Diversified Products)
+  // Query TransactionLine for customer/item detail
+  // Filtered by Diversified Products class hierarchy
+  // Note: Totals may vary ~5% from Income Statement due to GL adjustments
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -492,13 +492,10 @@ export async function getDiversifiedSales(options: {
     LEFT JOIN Item i ON i.id = tl.item
     WHERE t.posting = 'T'
       AND tl.mainline = 'F'
+      AND tl.item IS NOT NULL
       AND tl.netamount IS NOT NULL
       AND tl.netamount != 0
-      AND (
-        tl.class = 18
-        OR c.parent = 18
-        OR tl.class = 17
-      )
+      AND (tl.class = 18 OR c.parent = 18 OR tl.class = 17)
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.id
   `;
@@ -534,15 +531,15 @@ export async function getDiversifiedSales(options: {
       const className = row.class_name || 'Diversified Products';
       const { category, parent } = parseClassName(className);
 
-      // Revenue from TransactionLine.netamount (negative for sales credits, positive for sales)
+      // Revenue from TL netamount - negate since sales are stored as negative
       const netamount = parseFloat(row.netamount) || 0;
+      const revenue = -netamount;
       const quantity = Math.abs(parseInt(row.quantity) || 0);
       // Cost from TransactionLine.costestimate (actual COGS)
       const costestimate = Math.abs(parseFloat(row.costestimate) || 0);
 
-      // Group key by transaction + item + quantity + amount to avoid duplicates
-      // NetSuite sometimes returns the same logical line with different internal line IDs
-      const groupKey = `${row.transaction_id}-${row.item_id}-${quantity}-${netamount}`;
+      // Group key by transaction + line to avoid duplicates
+      const groupKey = `${row.transaction_id}-${row.line_id}`;
 
       // Determine parent class from hierarchy
       const parentClassName = row.class_parent_name || 'Diversified Products';
@@ -576,11 +573,10 @@ export async function getDiversifiedSales(options: {
         };
       }
 
-      // Add revenue - preserve sign so credit memos (negative) properly reduce total
-      // Note: NetSuite netamount is positive for sales, negative for credits/returns
-      grouped[groupKey].revenue += netamount;
-      // Cost should also be sign-aware for credit memos
-      grouped[groupKey].cost += netamount < 0 ? -costestimate : costestimate;
+      // Add revenue (already positive from GL credit - debit)
+      grouped[groupKey].revenue += revenue;
+      // Cost should be positive for sales, negative for returns
+      grouped[groupKey].cost += revenue >= 0 ? costestimate : -costestimate;
     }
 
     // Convert to array and calculate gross profit

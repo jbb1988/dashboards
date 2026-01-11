@@ -31,8 +31,12 @@ export async function GET(request: NextRequest) {
     // Get filter options (always include these)
     const filterOptions = await getDiversifiedFilterOptions();
 
-    // Get summary KPIs
-    const summary = await getDiversifiedDashboardSummary({ years, months });
+    // Get summary KPIs - always show totals (filtered by year/month only)
+    // Don't filter by className so KPIs show overall totals even when drilling into a class
+    const summary = await getDiversifiedDashboardSummary({
+      years,
+      months,
+    });
 
     // Get aggregated data based on view
     let byClass;
@@ -262,6 +266,7 @@ export async function GET(request: NextRequest) {
       },
       details,
       chartData,
+      dataNote: 'Revenue from invoice line items. May vary slightly from Income Statement due to GL adjustments.',
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
