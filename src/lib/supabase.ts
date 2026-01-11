@@ -1637,9 +1637,10 @@ export async function getProjectProfitabilityData(filters?: {
 }): Promise<ProjectProfitability[]> {
   const admin = getSupabaseAdmin();
 
+  // If no years specified, query all years from 2020-2030 to catch all data
   const yearsToQuery = filters?.years && filters.years.length > 0
     ? filters.years
-    : [2024, 2025, 2026];
+    : [2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030];
 
   const allData: ProjectProfitability[] = [];
 
