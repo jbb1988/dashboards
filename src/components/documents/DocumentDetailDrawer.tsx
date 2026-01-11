@@ -17,6 +17,11 @@ export interface DocumentItem {
   account_name: string;
   is_required: boolean;
   version?: number;
+  // Salesforce sync fields
+  salesforce_id?: string;
+  sf_content_document_id?: string;
+  sf_synced_at?: string;
+  sf_sync_error?: string;
 }
 
 interface DocumentDetailDrawerProps {
@@ -26,6 +31,7 @@ interface DocumentDetailDrawerProps {
   onDownload?: (doc: DocumentItem) => void;
   onDelete?: (doc: DocumentItem) => void;
   onReplace?: (doc: DocumentItem, file: File) => void;
+  onSfSync?: (doc: DocumentItem) => void;
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -63,17 +69,51 @@ export default function DocumentDetailDrawer({
   onDownload,
   onDelete,
   onReplace,
+  onSfSync,
 }: DocumentDetailDrawerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [previewError, setPreviewError] = useState(false);
+  const [isSyncingToSf, setIsSyncingToSf] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (document) {
       setIsLoading(true);
       setPreviewError(false);
+      setSyncResult(null);
     }
   }, [document?.id]);
+
+  // Push document to Salesforce
+  const handlePushToSalesforce = async () => {
+    if (!document || isSyncingToSf) return;
+
+    setIsSyncingToSf(true);
+    setSyncResult(null);
+
+    try {
+      const response = await fetch('/api/contracts/documents/push-to-sf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId: document.id }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSyncResult({ success: true, message: 'Document pushed to Salesforce successfully!' });
+        // Notify parent to refresh document data
+        onSfSync?.(document);
+      } else {
+        setSyncResult({ success: false, message: data.error || 'Failed to sync to Salesforce' });
+      }
+    } catch (error) {
+      setSyncResult({ success: false, message: 'Network error. Please try again.' });
+    } finally {
+      setIsSyncingToSf(false);
+    }
+  };
 
   // Escape key handler
   useEffect(() => {
@@ -327,6 +367,49 @@ export default function DocumentDetailDrawer({
                       </div>
                     )}
                   </div>
+
+                  {/* Salesforce Sync Status */}
+                  {document.salesforce_id && (
+                    <div className="mt-3 pt-3 border-t border-white/[0.04]">
+                      <span className="text-[#64748B] block text-[10px] uppercase tracking-wider font-medium mb-2">Salesforce</span>
+                      {document.sf_content_document_id ? (
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-green-400 text-xs">Synced to Account Files</span>
+                          {document.sf_synced_at && (
+                            <span className="text-[#64748B] text-[10px]">
+                              ({formatDate(document.sf_synced_at)})
+                            </span>
+                          )}
+                        </div>
+                      ) : document.sf_sync_error ? (
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-red-400 text-xs" title={document.sf_sync_error}>Sync failed</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          <span className="text-[#64748B] text-xs">Not synced to Salesforce</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Sync Result Message */}
+                  {syncResult && (
+                    <div className={`mt-3 p-2 rounded-lg text-xs ${
+                      syncResult.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                    }`}>
+                      {syncResult.message}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -379,6 +462,28 @@ export default function DocumentDetailDrawer({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   </button>
+
+                  {/* Push to Salesforce Button */}
+                  {document.salesforce_id && !document.sf_content_document_id && (
+                    <button
+                      onClick={handlePushToSalesforce}
+                      disabled={isSyncingToSf}
+                      className={`p-2.5 rounded-lg transition-colors ${
+                        isSyncingToSf
+                          ? 'text-[#64748B] cursor-not-allowed'
+                          : 'text-[#00A1E0] hover:bg-[#00A1E0]/10'
+                      }`}
+                      title="Push to Salesforce"
+                    >
+                      {isSyncingToSf ? (
+                        <div className="w-5 h-5 border-2 border-[#00A1E0] border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12.5 2c1.9 0 3.5 1.1 4.3 2.7.8-.4 1.6-.7 2.5-.7 2.9 0 5.2 2.3 5.2 5.2 0 1.1-.3 2.1-.9 3-.1.1-.1.2-.1.3 0 .2.1.4.3.5.3.2.5.5.7.8.2.4.3.9.3 1.4 0 1.8-1.5 3.3-3.3 3.3h-4.7c-.3 0-.5-.2-.5-.5v-6.2l1.6 1.6c.2.2.5.2.7 0 .2-.2.2-.5 0-.7l-2.5-2.5c-.1-.1-.2-.1-.4-.1s-.3 0-.4.1l-2.5 2.5c-.2.2-.2.5 0 .7.2.2.5.2.7 0l1.6-1.6v6.2c0 .3-.2.5-.5.5H8.8c-3.5 0-6.3-2.8-6.3-6.3 0-3.1 2.3-5.7 5.3-6.2.6-2.4 2.8-4.1 5.2-4.1l-.5-.1z"/>
+                        </svg>
+                      )}
+                    </button>
+                  )}
 
                   {/* Delete Button */}
                   <button

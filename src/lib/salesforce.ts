@@ -662,3 +662,199 @@ export async function batchUpdateOpportunities(
     errors: res.httpStatusCode >= 400 ? [JSON.stringify(res.body)] : undefined,
   }));
 }
+
+// ============================================
+// SALESFORCE FILES API - Document Sync
+// ============================================
+
+export interface FileUploadResult {
+  success: boolean;
+  contentVersionId?: string;
+  contentDocumentId?: string;
+  errors?: string[];
+}
+
+export interface FileLinkResult {
+  success: boolean;
+  contentDocumentLinkId?: string;
+  errors?: string[];
+}
+
+/**
+ * Get AccountId from an Opportunity
+ * Documents are linked to the Account, not the Opportunity
+ */
+export async function getAccountIdFromOpportunity(opportunityId: string): Promise<string | null> {
+  try {
+    const result = await salesforceQuery(
+      `SELECT AccountId FROM Opportunity WHERE Id = '${opportunityId}' LIMIT 1`
+    );
+
+    if (result.records.length > 0 && result.records[0].AccountId) {
+      return result.records[0].AccountId;
+    }
+    return null;
+  } catch (err) {
+    console.error('Error getting AccountId from Opportunity:', err);
+    return null;
+  }
+}
+
+/**
+ * Upload a file to Salesforce as ContentVersion
+ * Returns the ContentDocumentId for linking to records
+ */
+export async function uploadFileToSalesforce(
+  fileBuffer: Buffer,
+  fileName: string,
+  title?: string
+): Promise<FileUploadResult> {
+  const { token, instanceUrl } = await getSalesforceToken();
+
+  // Convert file to base64
+  const base64Data = fileBuffer.toString('base64');
+
+  // Create ContentVersion (Salesforce's file storage object)
+  const response = await fetch(
+    `${instanceUrl}/services/data/v59.0/sobjects/ContentVersion`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        Title: title || fileName,
+        PathOnClient: fileName,
+        VersionData: base64Data,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Salesforce file upload error:', errorText);
+    let errors: string[] = [];
+    try {
+      const errorJson = JSON.parse(errorText);
+      errors = Array.isArray(errorJson)
+        ? errorJson.map((e: any) => e.message || e.errorCode)
+        : [errorJson.message || errorText];
+    } catch {
+      errors = [errorText];
+    }
+    return { success: false, errors };
+  }
+
+  const result = await response.json();
+  const contentVersionId = result.id;
+
+  // Query to get the ContentDocumentId from the ContentVersion
+  const docQuery = await salesforceQuery(
+    `SELECT ContentDocumentId FROM ContentVersion WHERE Id = '${contentVersionId}' LIMIT 1`
+  );
+
+  if (docQuery.records.length === 0) {
+    return {
+      success: false,
+      contentVersionId,
+      errors: ['Failed to retrieve ContentDocumentId'],
+    };
+  }
+
+  const contentDocumentId = docQuery.records[0].ContentDocumentId;
+
+  return {
+    success: true,
+    contentVersionId,
+    contentDocumentId,
+  };
+}
+
+/**
+ * Link a ContentDocument to an Account
+ * This makes the file visible in the Account's Files related list
+ */
+export async function linkFileToAccount(
+  contentDocumentId: string,
+  accountId: string
+): Promise<FileLinkResult> {
+  const { token, instanceUrl } = await getSalesforceToken();
+
+  const response = await fetch(
+    `${instanceUrl}/services/data/v59.0/sobjects/ContentDocumentLink`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ContentDocumentId: contentDocumentId,
+        LinkedEntityId: accountId,
+        ShareType: 'V', // Viewer permission
+        Visibility: 'AllUsers',
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Salesforce file link error:', errorText);
+    let errors: string[] = [];
+    try {
+      const errorJson = JSON.parse(errorText);
+      errors = Array.isArray(errorJson)
+        ? errorJson.map((e: any) => e.message || e.errorCode)
+        : [errorJson.message || errorText];
+    } catch {
+      errors = [errorText];
+    }
+    return { success: false, errors };
+  }
+
+  const result = await response.json();
+  return {
+    success: true,
+    contentDocumentLinkId: result.id,
+  };
+}
+
+/**
+ * Upload a file and link it to an Account in one operation
+ * Convenience function that combines upload + link
+ */
+export async function uploadFileToAccount(
+  fileBuffer: Buffer,
+  fileName: string,
+  accountId: string,
+  title?: string
+): Promise<FileUploadResult & FileLinkResult> {
+  // Step 1: Upload the file
+  const uploadResult = await uploadFileToSalesforce(fileBuffer, fileName, title);
+
+  if (!uploadResult.success || !uploadResult.contentDocumentId) {
+    return {
+      ...uploadResult,
+      success: false,
+    };
+  }
+
+  // Step 2: Link to Account
+  const linkResult = await linkFileToAccount(uploadResult.contentDocumentId, accountId);
+
+  if (!linkResult.success) {
+    return {
+      ...uploadResult,
+      ...linkResult,
+      success: false,
+    };
+  }
+
+  return {
+    success: true,
+    contentVersionId: uploadResult.contentVersionId,
+    contentDocumentId: uploadResult.contentDocumentId,
+    contentDocumentLinkId: linkResult.contentDocumentLinkId,
+  };
+}
