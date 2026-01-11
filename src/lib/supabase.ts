@@ -1702,14 +1702,15 @@ export async function getProjectProfitabilityByProject(filters?: {
   gross_profit_pct: number;
   transaction_count: number;
 }>> {
-  const admin = getSupabaseAdmin();
   const data = await getProjectProfitabilityData(filters);
 
-  // Aggregate revenue by customer from NetSuite data
+  // Aggregate revenue and COGS by customer from NetSuite data
+  // COGS now comes from costestimate field (like Diversified Products)
   const byCustomer = new Map<string, {
     customer_name: string;
     project_type: string;
     total_revenue: number;
+    total_cogs: number;
     transaction_ids: Set<string>;
   }>();
 
@@ -1720,6 +1721,7 @@ export async function getProjectProfitabilityByProject(filters?: {
         customer_name: row.customer_name,
         project_type: row.project_type || 'Unknown',
         total_revenue: 0,
+        total_cogs: 0,
         transaction_ids: new Set(),
       });
     }
@@ -1728,65 +1730,14 @@ export async function getProjectProfitabilityByProject(filters?: {
     if (row.is_revenue) {
       agg.total_revenue += Math.abs(row.amount);
     }
+    // COGS from costestimate field (NetSuite line item cost)
+    agg.total_cogs += row.costestimate || 0;
     agg.transaction_ids.add(row.netsuite_transaction_id);
-  }
-
-  // Get COGS from project_budgets table (Excel import)
-  const yearsToQuery = filters?.years && filters.years.length > 0
-    ? filters.years
-    : [2022, 2023, 2024, 2025];
-
-  const { data: budgetData } = await admin
-    .from('project_budgets')
-    .select('customer_name, year, actual_cogs, actual_revenue')
-    .in('year', yearsToQuery);
-
-  // Create a map of customer -> total COGS from Excel data
-  const cogsMap = new Map<string, number>();
-  const excelRevenueMap = new Map<string, number>();
-  for (const b of budgetData || []) {
-    const key = b.customer_name;
-    cogsMap.set(key, (cogsMap.get(key) || 0) + (b.actual_cogs || 0));
-    excelRevenueMap.set(key, (excelRevenueMap.get(key) || 0) + (b.actual_revenue || 0));
-  }
-
-  // Match customers between NetSuite and Excel (normalize names)
-  const normalizeCustomerName = (name: string): string => {
-    return name
-      .toLowerCase()
-      .replace(/,?\s*(city of|county|water|district|authority|works|inc\.?|corp\.?|llc)/gi, '')
-      .replace(/[^a-z0-9]/g, '')
-      .trim();
-  };
-
-  // Build normalized lookup
-  const normalizedCogsMap = new Map<string, number>();
-  for (const [name, cogs] of cogsMap.entries()) {
-    normalizedCogsMap.set(normalizeCustomerName(name), cogs);
   }
 
   return Array.from(byCustomer.values())
     .map(agg => {
-      // Try to find matching COGS from Excel data
-      const normalizedName = normalizeCustomerName(agg.customer_name);
-      let total_cogs = normalizedCogsMap.get(normalizedName) || 0;
-
-      // If no exact match, try partial match
-      if (total_cogs === 0) {
-        for (const [excelNorm, cogs] of normalizedCogsMap.entries()) {
-          if (normalizedName.includes(excelNorm) || excelNorm.includes(normalizedName)) {
-            total_cogs = cogs;
-            break;
-          }
-        }
-      }
-
-      // If still no COGS, estimate based on average GPM of 70%
-      if (total_cogs === 0 && agg.total_revenue > 0) {
-        total_cogs = agg.total_revenue * 0.30; // Assume 30% COGS = 70% GPM
-      }
-
-      const gross_profit = agg.total_revenue - total_cogs;
+      const gross_profit = agg.total_revenue - agg.total_cogs;
       const gross_profit_pct = agg.total_revenue > 0
         ? (gross_profit / agg.total_revenue) * 100
         : 0;
@@ -1795,7 +1746,7 @@ export async function getProjectProfitabilityByProject(filters?: {
         customer_name: agg.customer_name,
         project_type: agg.project_type,
         total_revenue: agg.total_revenue,
-        total_cogs,
+        total_cogs: agg.total_cogs,
         gross_profit,
         gross_profit_pct,
         transaction_count: agg.transaction_ids.size,
@@ -1882,7 +1833,8 @@ export async function getProjectProfitabilityMonthly(filters?: {
     }
     const agg = monthly.get(key)!;
     if (row.is_revenue) agg.revenue += Math.abs(row.amount);
-    if (row.is_cogs) agg.cogs += Math.abs(row.amount);
+    // COGS from costestimate field (NetSuite line item cost)
+    agg.cogs += row.costestimate || 0;
   }
 
   return Array.from(monthly.values())
