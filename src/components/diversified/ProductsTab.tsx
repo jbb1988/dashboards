@@ -233,7 +233,7 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
         {/* Top 10 Products Bar Chart */}
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wide mb-4">Top 10 Products by Revenue</h3>
-          <div className="h-[280px]">
+          <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={top10Products}
@@ -253,6 +253,7 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
                   axisLine={false}
                   tickLine={false}
                   width={110}
+                  interval={0}
                   tick={(props) => {
                     const { x, y, payload } = props;
                     const text = payload.value || 'Unknown';
@@ -291,7 +292,7 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
         {/* Class Breakdown Pie Chart */}
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wide mb-4">Revenue by Product Class</h3>
-          <div className="h-[280px] flex items-center">
+          <div className="h-[320px] flex items-center">
             <div className="w-1/2 h-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
