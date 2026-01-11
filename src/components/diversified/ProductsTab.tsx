@@ -250,11 +250,27 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
                 <YAxis
                   type="category"
                   dataKey="item_description"
-                  tick={{ fill: '#94A3B8', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
-                  width={100}
-                  tickFormatter={(val) => val && val.length > 12 ? `${val.slice(0, 12)}...` : (val || 'Unknown')}
+                  width={110}
+                  tick={(props) => {
+                    const { x, y, payload } = props;
+                    const text = payload.value || 'Unknown';
+                    const truncated = text.length > 14 ? `${text.slice(0, 14)}...` : text;
+                    return (
+                      <text
+                        x={x}
+                        y={y}
+                        dy={4}
+                        textAnchor="end"
+                        fill="#94A3B8"
+                        fontSize={10}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        {truncated}
+                      </text>
+                    );
+                  }}
                 />
                 <Tooltip
                   contentStyle={{
