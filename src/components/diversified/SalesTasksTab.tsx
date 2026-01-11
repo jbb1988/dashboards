@@ -767,46 +767,16 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                               {task.section}
                             </span>
                           )}
-                          {/* Subtask count indicator */}
+                          {/* Subtask count indicator - just shows count, details in drawer */}
                           {task.subtask_count && task.subtask_count > 0 && (
                             <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                               </svg>
-                              {task.subtasks_completed}/{task.subtask_count} subtasks
+                              {task.subtasks_completed}/{task.subtask_count}
                             </span>
                           )}
                         </div>
-
-                        {/* Subtasks List */}
-                        {task.subtasks && task.subtasks.length > 0 && (
-                          <div className="mt-2 pl-3 border-l-2 border-purple-500/20 space-y-1">
-                            {task.subtasks.map((subtask) => (
-                              <div key={subtask.id} className="flex items-center gap-2">
-                                <div className={`w-3 h-3 rounded flex items-center justify-center flex-shrink-0 ${
-                                  subtask.completed ? 'bg-green-500/30 text-green-400' : 'bg-white/10'
-                                }`}>
-                                  {subtask.completed && (
-                                    <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  )}
-                                </div>
-                                <span className={`text-[11px] ${subtask.completed ? 'text-[#64748B] line-through' : 'text-[#94A3B8]'}`}>
-                                  {subtask.title}
-                                </span>
-                                {subtask.assignee_name && (
-                                  <span className="text-[9px] text-[#64748B]">({subtask.assignee_name})</span>
-                                )}
-                                {subtask.due_date && (
-                                  <span className="text-[9px] text-[#64748B]">
-                                    Due: {new Date(subtask.due_date).toLocaleDateString()}
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
 
                       {/* Right Side: Due Date & Actions */}
