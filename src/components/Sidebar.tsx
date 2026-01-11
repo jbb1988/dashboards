@@ -18,16 +18,6 @@ export const SidebarContext = createContext<{
 
 export const useSidebar = () => useContext(SidebarContext);
 
-// Dashboard access by role
-const DASHBOARD_ACCESS: Record<string, string[]> = {
-  admin: ['/contracts-dashboard', '/mcc-dashboard', '/closeout-dashboard', '/pm-dashboard', '/diversified-dashboard', '/contracts/review', '/admin', '/guides'],
-  sales: ['/contracts-dashboard', '/diversified-dashboard', '/guides'],
-  finance: ['/mcc-dashboard', '/closeout-dashboard', '/diversified-dashboard', '/guides'],
-  pm: ['/closeout-dashboard', '/pm-dashboard', '/guides'],
-  legal: ['/contracts/review', '/guides'],
-  viewer: ['/guides'],
-};
-
 interface NavItem {
   name: string;
   href: string;
@@ -41,6 +31,7 @@ interface NavCategory {
   items: NavItem[];
 }
 
+// Static nav structure - will be filtered by permissions
 const navCategories: NavCategory[] = [
   {
     name: 'Contracts',
@@ -198,36 +189,51 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string>('viewer');
+  const [accessibleRoutes, setAccessibleRoutes] = useState<string[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   // Use controlled or internal state
   const isCollapsed = controlledCollapsed ?? internalCollapsed;
 
-  // Load user and role on mount
+  // Load user and permissions on mount
   useEffect(() => {
-    const getUser = async () => {
+    const loadUserAndPermissions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
       if (user) {
-        // Get user role from user_roles table
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
+        // Fetch permissions from API
+        try {
+          const response = await fetch('/api/user/permissions');
+          const data = await response.json();
 
-        setUserRole(roleData?.role || 'viewer');
+          if (!data.error) {
+            setUserRole(data.role || 'viewer');
+            setAccessibleRoutes(data.accessibleRoutes || []);
+          }
+        } catch (err) {
+          console.error('Error fetching user permissions:', err);
+          // Fallback: user has no access
+          setUserRole('viewer');
+          setAccessibleRoutes([]);
+        }
       }
+      setPermissionsLoaded(true);
     };
 
-    getUser();
+    loadUserAndPermissions();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (!session?.user) {
         setUserRole('viewer');
+        setAccessibleRoutes([]);
+        setPermissionsLoaded(true);
+      } else {
+        // Reload permissions on auth change
+        loadUserAndPermissions();
       }
     });
 
@@ -244,13 +250,17 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
     }
   }, []);
 
-  // Filter nav items based on user role
-  const allowedPaths = DASHBOARD_ACCESS[userRole] || [];
+  // Filter nav items based on accessible routes from database
   const filteredNavCategories = navCategories.map(category => ({
     ...category,
-    items: category.items.filter(item =>
-      item.disabled || allowedPaths.some(path => item.href.startsWith(path) || item.href === path)
-    ),
+    items: category.items.filter(item => {
+      // Always show disabled items
+      if (item.disabled) return true;
+      // Check if route is in accessible routes
+      return accessibleRoutes.some(route =>
+        item.href === route || item.href.startsWith(route + '/')
+      );
+    }),
   })).filter(category => category.items.length > 0);
 
   const handleLogout = async () => {
@@ -375,7 +385,16 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
           </Link>
         </div>
 
-        {filteredNavCategories.map((category) => (
+        {/* Show loading skeleton while permissions load */}
+        {!permissionsLoaded && user && (
+          <div className="space-y-2 px-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-10 bg-[#1E293B]/50 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {permissionsLoaded && filteredNavCategories.map((category) => (
           <div key={category.name}>
             <AnimatePresence>
               {!isCollapsed && (

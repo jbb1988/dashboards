@@ -1,24 +1,21 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-// Routes that require authentication
+// Routes that require authentication (excluding public routes)
 const protectedRoutes = [
   '/contracts-dashboard',
   '/mcc-dashboard',
   '/closeout-dashboard',
   '/pm-dashboard',
   '/contracts/review',
+  '/diversified-dashboard',
+  '/admin',
 ];
 
-// Dashboard access by role
-const DASHBOARD_ACCESS: Record<string, string[]> = {
-  admin: ['contracts-dashboard', 'mcc-dashboard', 'closeout-dashboard', 'pm-dashboard', 'contracts/review'],
-  sales: ['contracts-dashboard'],
-  finance: ['mcc-dashboard', 'closeout-dashboard'],
-  pm: ['closeout-dashboard', 'pm-dashboard'],
-  legal: ['contracts/review'],
-  viewer: [],
-};
+// Routes accessible to everyone (including unauthenticated)
+const publicRoutes = [
+  '/guides',
+];
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -54,6 +51,15 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Check if this is a public route (allow without auth)
+  const isPublicRoute = publicRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
+
+  if (isPublicRoute) {
+    return supabaseResponse;
+  }
+
   // Check if this is a protected route
   const isProtectedRoute = protectedRoutes.some((route) =>
     pathname.startsWith(route)
@@ -67,20 +73,68 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If authenticated, check role-based access
+  // If authenticated and on a protected route, check database permissions
   if (isProtectedRoute && user) {
-    // Get user role from user_roles table
-    const { data: roleData } = await supabase
+    // Get user's role and role_id
+    const { data: userRole } = await supabase
       .from('user_roles')
-      .select('role')
+      .select('role_id, role')
       .eq('user_id', user.id)
       .single();
 
-    const role = roleData?.role || 'viewer';
+    if (!userRole) {
+      // No role assigned, redirect to home
+      const url = request.nextUrl.clone();
+      url.pathname = '/';
+      return NextResponse.redirect(url);
+    }
 
-    // Check if user has access to this dashboard
-    const allowedDashboards = DASHBOARD_ACCESS[role] || [];
-    const hasAccess = allowedDashboards.some((d) => pathname.includes(d));
+    // Get role's dashboard access (routes from dashboards table)
+    let roleDashboardRoutes: string[] = [];
+
+    if (userRole.role_id) {
+      // Use role_id for database-driven permissions
+      const { data: roleAccess } = await supabase
+        .from('role_dashboard_access')
+        .select('dashboard_id, dashboards(route)')
+        .eq('role_id', userRole.role_id);
+
+      if (roleAccess) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const ra of roleAccess as any[]) {
+          if (ra.dashboards?.route) {
+            roleDashboardRoutes.push(ra.dashboards.route);
+          }
+        }
+      }
+    }
+
+    // Get user's dashboard overrides
+    const { data: overrides } = await supabase
+      .from('user_dashboard_overrides')
+      .select('dashboard_id, access_type, dashboards(route)')
+      .eq('user_id', user.id);
+
+    // Build final accessible routes
+    const grantedRoutes = new Set(roleDashboardRoutes);
+
+    if (overrides) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const override of overrides as any[]) {
+        if (!override.dashboards?.route) continue;
+
+        if (override.access_type === 'grant') {
+          grantedRoutes.add(override.dashboards.route);
+        } else if (override.access_type === 'revoke') {
+          grantedRoutes.delete(override.dashboards.route);
+        }
+      }
+    }
+
+    // Check if user has access to the current path
+    const hasAccess = Array.from(grantedRoutes).some((route) =>
+      pathname.startsWith(route)
+    );
 
     if (!hasAccess) {
       // Redirect to home if no access
@@ -90,10 +144,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Redirect to dashboard if already logged in and trying to access login
+  // Redirect to first accessible dashboard if already logged in and trying to access login
   if (pathname === '/login' && user) {
     const url = request.nextUrl.clone();
-    url.pathname = '/contracts-dashboard';
+    url.pathname = '/';
     return NextResponse.redirect(url);
   }
 
