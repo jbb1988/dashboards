@@ -59,6 +59,10 @@ export const DIVERSIFIED_PRODUCTS = {
         'Only NIST traceable field test calibration',
       ],
       targetCustomer: 'All VEROflow owners - annual service',
+      // IMPORTANT: Can ONLY sell to customers who own VEROflow testers!
+      // This is an in-house service - they send us their equipment to calibrate.
+      // No tester = nothing to calibrate!
+      prerequisite: 'Must own VEROflow-1 (VF-1) or VEROflow-4 (VF-4)',
     },
     'Z-Plate Strainers': {
       category: 'Strainers',
@@ -107,6 +111,8 @@ export const DIVERSIFIED_PRODUCTS = {
   crossSellRules: [
     { when: 'VEROflow-4', suggest: ['Calibration Service', 'Cart Kit', 'ThrustBuster', 'Hose Accessories'], reason: 'Complete testing solution' },
     { when: 'VEROflow-1', suggest: ['Calibration Service'], reason: 'Annual service revenue' },
+    // NOTE: Calibration Service can ONLY be sold to VEROflow owners - it's an in-house service
+    // where they send us their tester to calibrate. No tester = nothing to calibrate!
     { when: 'Strainers', suggest: ['Flanges', 'Gaskets', 'Flange Kits'], reason: 'Strainers need flanges to install' },
     { when: 'Spools', suggest: ['Flanges', 'Gaskets'], reason: 'Spools connect with flanges' },
     { when: 'Flanges', suggest: ['Gaskets', 'Flange Kits'], reason: 'Every flange needs gaskets' },
@@ -152,6 +158,7 @@ export const DIVERSIFIED_PRODUCTS = {
     calibrationUpsell: {
       reason: 'Every VEROflow owner needs annual calibration',
       action: 'Check calibration dates. Proactive outreach before due date.',
+      prerequisite: 'Customer must own VEROflow tester (VF-1 or VF-4) - this is in-house service where they send us their equipment',
     },
   },
 };

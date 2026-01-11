@@ -1463,8 +1463,9 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
 
     for (const [className, count] of classCustomerCount) {
       if (count >= popularThreshold && !customer.classes.has(className)) {
-        // Check if this class is appropriate for customer type
-        const isAppropriate = isClassAppropriateForType(className, customerType);
+        // Check if this class is appropriate for customer type and their existing purchases
+        // (e.g., can't sell calibration to someone without a VEROflow tester)
+        const isAppropriate = isClassAppropriateForType(className, customerType, customer.classes);
         if (isAppropriate) {
           missingClasses.push(className);
           // Estimate revenue from avg revenue per customer for this class
@@ -1502,12 +1503,34 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
  * Distributors: consumables only (no $20K VEROflow testers)
  * Utilities: equipment + consumables
  * Contractors: tools + job items
+ *
+ * IMPORTANT BUSINESS RULE:
+ * - Calibration services can ONLY be sold to customers who own VEROflow testers
+ * - Calibration is an in-house service where customers send us their equipment
+ * - No VEROflow = nothing to calibrate!
  */
-function isClassAppropriateForType(className: string, customerType: 'utility' | 'distributor' | 'contractor' | 'unknown'): boolean {
+function isClassAppropriateForType(
+  className: string,
+  customerType: 'utility' | 'distributor' | 'contractor' | 'unknown',
+  customerClasses: Set<string>
+): boolean {
   const lower = className.toLowerCase();
 
+  // CALIBRATION RULE: Can only sell calibration to VEROflow owners
+  // They need a tester (VF-1, VF-4, VEROflow-1, VEROflow-4) to calibrate
+  if (lower.includes('calibration')) {
+    const ownsVeroflow = Array.from(customerClasses).some(c => {
+      const cl = c.toLowerCase();
+      return cl.includes('veroflow') || cl.includes('vf-1') || cl.includes('vf-4') ||
+             cl.includes('vf1') || cl.includes('vf4') || cl.includes('field tester');
+    });
+    if (!ownsVeroflow) {
+      return false; // Can't sell calibration without a tester!
+    }
+  }
+
   // Equipment classes (high-value, not for distributors to stock)
-  const equipmentClasses = ['veroflow', 'strainer', 'calibration', 'tester'];
+  const equipmentClasses = ['veroflow', 'strainer', 'tester'];
   const isEquipment = equipmentClasses.some(e => lower.includes(e));
 
   // Consumables (appropriate for all)
@@ -1519,7 +1542,7 @@ function isClassAppropriateForType(className: string, customerType: 'utility' | 
       // Distributors should only get consumable cross-sell, not equipment
       return isConsumable && !isEquipment;
     case 'utility':
-      // Utilities can buy anything
+      // Utilities can buy anything (if they pass the calibration check above)
       return true;
     case 'contractor':
       // Contractors get tools and consumables
