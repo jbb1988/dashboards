@@ -632,6 +632,7 @@ export interface ProjectProfitabilityRecord {
   isRevenue: boolean;
   isCogs: boolean;
   amount: number;
+  costestimate: number; // COGS from NetSuite costestimate field
   quantity: number;
   itemId: string;
   itemName: string;
@@ -711,7 +712,7 @@ export async function getProjectProfitability(options: {
 
   // Query TransactionLine for Test Bench class ONLY (class_id = 1)
   // This filters out Diversified Products and brings in TB/MCC/M3 project data
-  // Revenue accounts: 4xxx, COGS accounts: 5xxx
+  // Revenue from netamount on 4xxx accounts, COGS from costestimate field (like Diversified)
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -729,6 +730,7 @@ export async function getProjectProfitability(options: {
       a.fullname AS account_name,
       a.accttype AS account_type,
       tl.netamount AS amount,
+      tl.costestimate,
       tl.quantity,
       tl.item AS item_id,
       BUILTIN.DF(tl.item) AS item_name
@@ -740,7 +742,7 @@ export async function getProjectProfitability(options: {
       AND tl.class = 1
       AND tl.netamount IS NOT NULL
       AND tl.netamount != 0
-      AND (a.acctnumber LIKE '4%' OR a.acctnumber LIKE '5%')
+      AND a.acctnumber LIKE '4%'
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.id
   `;
@@ -773,7 +775,8 @@ export async function getProjectProfitability(options: {
 
       const accountNumber = row.account_number || '';
       const isRevenue = accountNumber.startsWith('4');
-      const isCogs = accountNumber.startsWith('5');
+      // COGS now comes from costestimate field, not 5xxx accounts
+      const costestimate = Math.abs(parseFloat(row.costestimate) || 0);
 
       const className = row.class_name || '';
       const accountName = row.account_name || '';
@@ -798,8 +801,9 @@ export async function getProjectProfitability(options: {
         accountName: row.account_name || '',
         accountType: row.account_type || '',
         isRevenue,
-        isCogs,
+        isCogs: false, // No longer using 5xxx accounts for COGS
         amount: parseFloat(row.amount) || 0,
+        costestimate, // COGS from costestimate field
         quantity: parseFloat(row.quantity) || 0,
         itemId: row.item_id?.toString() || '',
         itemName: row.item_name || '',
@@ -807,8 +811,8 @@ export async function getProjectProfitability(options: {
     });
 
     // Log summary for validation
-    const totalRevenue = records.filter(r => r.isRevenue).reduce((sum, r) => sum + r.amount, 0);
-    const totalCogs = records.filter(r => r.isCogs).reduce((sum, r) => sum + Math.abs(r.amount), 0);
+    const totalRevenue = records.filter(r => r.isRevenue).reduce((sum, r) => sum + Math.abs(r.amount), 0);
+    const totalCogs = records.reduce((sum, r) => sum + (r.costestimate || 0), 0);
     console.log(`Processed ${records.length} records`);
     console.log(`Total Revenue: $${totalRevenue.toFixed(2)}`);
     console.log(`Total COGS: $${totalCogs.toFixed(2)}`);

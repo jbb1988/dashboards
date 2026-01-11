@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
         is_revenue: r.isRevenue,
         is_cogs: r.isCogs,
         amount: r.amount,
+        costestimate: r.costestimate, // COGS from NetSuite costestimate field
         quantity: r.quantity,
         item_id: r.itemId,
         item_name: r.itemName,
@@ -160,9 +161,9 @@ export async function POST(request: NextRequest) {
 
     // Calculate summary stats
     const revenueRecords = allRecords.filter(r => r.is_revenue);
-    const cogsRecords = allRecords.filter(r => r.is_cogs);
     const totalRevenue = revenueRecords.reduce((sum, r) => sum + Math.abs(r.amount), 0);
-    const totalCogs = cogsRecords.reduce((sum, r) => sum + Math.abs(r.amount), 0);
+    // COGS now comes from costestimate field, not is_cogs filtering
+    const totalCogs = allRecords.reduce((sum, r) => sum + (r.costestimate || 0), 0);
 
     return NextResponse.json({
       success: true,
@@ -174,7 +175,6 @@ export async function POST(request: NextRequest) {
         pagesProcessed: pageCount,
         hasMoreInNetSuite: hasMore,
         revenueRecords: revenueRecords.length,
-        cogsRecords: cogsRecords.length,
         totalRevenue,
         totalCogs,
         grossProfit: totalRevenue - totalCogs,

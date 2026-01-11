@@ -1561,6 +1561,7 @@ export interface ProjectProfitability {
   is_revenue: boolean;
   is_cogs: boolean;
   amount: number;
+  costestimate: number; // COGS from NetSuite costestimate field
   quantity: number;
   item_id: string;
   item_name: string;
