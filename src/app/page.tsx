@@ -304,7 +304,7 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="text-lg text-[#8FA3BF] max-w-2xl mx-auto mb-8"
           >
-            Real-time insights across contracts, projects, and financial operations.
+            Real-time insights across MARS Company Business Units.
           </motion.p>
 
           {/* Data Sources */}
@@ -350,7 +350,7 @@ export default function Home() {
       >
         <div className="max-w-7xl mx-auto px-8 flex items-center justify-between">
           <p className="text-sm text-[#64748B]">
-            MARS Company - Business Intelligence Platform
+            MARS Company - Executive Intelligence Platform
           </p>
           <div className="flex items-center gap-6">
             <Link href="/admin" className="text-sm text-[#64748B] hover:text-white transition-colors">
