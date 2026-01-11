@@ -27,11 +27,16 @@ interface DiscoveryResult {
     transaction_id: string;
     tranid: string;
     trandate: string;
+    tran_type: string;
     customer_name: string;
+    class_id: string;
     class_name: string;
     account_number: string;
     account_name: string;
-    amount: number;
+    net_amount: number;
+    line_amount: number;
+    debit_amt: number;
+    credit_amt: number;
   }>;
 }
 
