@@ -71,6 +71,16 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
 
+  // Task detail drawer state
+  const [selectedTask, setSelectedTask] = useState<DiversifiedTask | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditingInDrawer, setIsEditingInDrawer] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPriority, setEditPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editStatus, setEditStatus] = useState<DiversifiedTask['status']>('pending');
+
   // Add/Edit task state
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [editingTask, setEditingTask] = useState<DiversifiedTask | null>(null);
@@ -79,6 +89,61 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
   const [newTaskPriority, setNewTaskPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Open task drawer
+  const openTaskDrawer = (task: DiversifiedTask) => {
+    setSelectedTask(task);
+    setEditTitle(task.title);
+    setEditDescription(task.description || '');
+    setEditPriority(task.priority);
+    setEditDueDate(task.due_date || '');
+    setEditStatus(task.status);
+    setIsEditingInDrawer(false);
+    setIsDrawerOpen(true);
+  };
+
+  // Close task drawer
+  const closeTaskDrawer = () => {
+    setIsDrawerOpen(false);
+    setSelectedTask(null);
+    setIsEditingInDrawer(false);
+  };
+
+  // Save task edits from drawer
+  const handleSaveTaskEdit = async () => {
+    if (!selectedTask || !editTitle.trim()) return;
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/diversified/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedTask.id,
+          title: editTitle.trim(),
+          notes: editDescription.trim() || null,
+          due_date: editDueDate || null,
+          status: editStatus,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setTasks(prev => prev.map(t =>
+          t.id === selectedTask.id
+            ? { ...t, title: editTitle.trim(), description: editDescription.trim(), due_date: editDueDate || undefined, status: editStatus }
+            : t
+        ));
+        setSelectedTask(prev => prev ? { ...prev, title: editTitle.trim(), description: editDescription.trim(), due_date: editDueDate || undefined, status: editStatus } : null);
+        setIsEditingInDrawer(false);
+        fetchTasks(); // Refresh to get updated data
+      }
+    } catch (err) {
+      console.error('Error updating task:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Fetch tasks
   const fetchTasks = async () => {
@@ -463,17 +528,18 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                     key={task.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className={`p-4 hover:bg-white/[0.02] transition-colors ${
+                    onClick={() => openTaskDrawer(task)}
+                    className={`p-4 hover:bg-white/[0.02] transition-colors cursor-pointer ${
                       task.status === 'completed' ? 'opacity-60' : ''
                     } ${overdue ? 'bg-red-500/5' : ''}`}
                   >
                     <div className="flex items-start gap-4">
                       {/* Status Toggle */}
                       <button
-                        onClick={() => handleStatusChange(
-                          task.id,
-                          task.status === 'completed' ? 'pending' : 'completed'
-                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStatusChange(task.id, task.status === 'completed' ? 'pending' : 'completed');
+                        }}
                         className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-all hover:scale-110 ${
                           task.status === 'completed'
                             ? 'bg-green-500/20 text-green-400'
@@ -517,7 +583,10 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                         <div className="flex items-center gap-3 mt-1">
                           {task.customer_name && (
                             <button
-                              onClick={() => onCustomerClick?.(task.customer_id || '', task.customer_name || '')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCustomerClick?.(task.customer_id || '', task.customer_name || '');
+                              }}
                               className="text-[11px] text-cyan-400 hover:text-cyan-300"
                             >
                               {task.customer_name}
@@ -548,7 +617,11 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                         {/* Status Dropdown */}
                         <select
                           value={task.status}
-                          onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleStatusChange(task.id, e.target.value);
+                          }}
                           className="px-2 py-1 rounded bg-[#0F172A] border border-white/10 text-[11px] text-[#94A3B8] cursor-pointer"
                         >
                           <option value="pending">Pending</option>
@@ -559,7 +632,10 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
 
                         {/* Delete */}
                         <button
-                          onClick={() => handleDeleteTask(task.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTask(task.id);
+                          }}
                           className="p-1.5 text-[#64748B] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -613,7 +689,8 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                           key={task.id}
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          className={`bg-[#151F2E] border border-white/[0.04] rounded-lg p-3 ${
+                          onClick={() => openTaskDrawer(task)}
+                          className={`bg-[#151F2E] border border-white/[0.04] rounded-lg p-3 cursor-pointer hover:border-white/10 transition-colors ${
                             overdue ? 'border-red-500/30' : ''
                           }`}
                         >
@@ -639,7 +716,10 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                               {SOURCE_LABELS[task.source]}
                             </span>
                             <button
-                              onClick={() => handleDeleteTask(task.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTask(task.id);
+                              }}
                               className="p-1 text-[#475569] hover:text-red-400 transition-colors"
                             >
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -657,6 +737,310 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
           })}
         </div>
       )}
+
+      {/* Task Detail Drawer */}
+      <AnimatePresence>
+        {isDrawerOpen && selectedTask && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeTaskDrawer}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            />
+
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 h-full w-[480px] bg-[#0F172A] border-l border-white/10 shadow-2xl z-50 flex flex-col"
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${PRIORITY_STYLES[selectedTask.priority].dot}`} />
+                  <span className={`text-[11px] font-semibold uppercase px-2 py-1 rounded ${PRIORITY_STYLES[selectedTask.priority].bg} ${PRIORITY_STYLES[selectedTask.priority].text}`}>
+                    {selectedTask.priority}
+                  </span>
+                  <span className={`text-[11px] px-2 py-1 rounded ${STATUS_STYLES[selectedTask.status].bg} ${STATUS_STYLES[selectedTask.status].text}`}>
+                    {STATUS_STYLES[selectedTask.status].label}
+                  </span>
+                </div>
+                <button
+                  onClick={closeTaskDrawer}
+                  className="p-2 text-[#64748B] hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Drawer Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                {isEditingInDrawer ? (
+                  /* Edit Mode */
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] text-[#64748B] uppercase tracking-wider mb-1.5 block">Title</label>
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-[#1E293B] border border-white/10 text-white text-[14px] focus:outline-none focus:border-[#38BDF8]"
+                        autoFocus
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-[#64748B] uppercase tracking-wider mb-1.5 block">Description</label>
+                      <textarea
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        rows={4}
+                        className="w-full px-3 py-2 rounded-lg bg-[#1E293B] border border-white/10 text-white text-[14px] focus:outline-none focus:border-[#38BDF8] resize-none"
+                        placeholder="Add a description..."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] text-[#64748B] uppercase tracking-wider mb-1.5 block">Status</label>
+                        <select
+                          value={editStatus}
+                          onChange={(e) => setEditStatus(e.target.value as DiversifiedTask['status'])}
+                          className="w-full px-3 py-2 rounded-lg bg-[#1E293B] border border-white/10 text-white text-[14px] cursor-pointer focus:outline-none focus:border-[#38BDF8]"
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-[#64748B] uppercase tracking-wider mb-1.5 block">Due Date</label>
+                        <input
+                          type="date"
+                          value={editDueDate}
+                          onChange={(e) => setEditDueDate(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-[#1E293B] border border-white/10 text-white text-[14px] cursor-pointer focus:outline-none focus:border-[#38BDF8]"
+                          style={{ colorScheme: 'dark' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* View Mode */
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-xl font-semibold text-white mb-2">{selectedTask.title}</h2>
+                      {selectedTask.description ? (
+                        <p className="text-[14px] text-[#94A3B8] leading-relaxed">{selectedTask.description}</p>
+                      ) : (
+                        <p className="text-[14px] text-[#475569] italic">No description</p>
+                      )}
+                    </div>
+
+                    {/* Task Details */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between py-2 border-b border-white/[0.04]">
+                        <span className="text-[12px] text-[#64748B]">Status</span>
+                        <span className={`text-[12px] px-2 py-1 rounded ${STATUS_STYLES[selectedTask.status].bg} ${STATUS_STYLES[selectedTask.status].text}`}>
+                          {STATUS_STYLES[selectedTask.status].label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between py-2 border-b border-white/[0.04]">
+                        <span className="text-[12px] text-[#64748B]">Priority</span>
+                        <span className={`text-[12px] px-2 py-1 rounded ${PRIORITY_STYLES[selectedTask.priority].bg} ${PRIORITY_STYLES[selectedTask.priority].text}`}>
+                          {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between py-2 border-b border-white/[0.04]">
+                        <span className="text-[12px] text-[#64748B]">Source</span>
+                        <span className="text-[12px] text-white">{SOURCE_LABELS[selectedTask.source]}</span>
+                      </div>
+
+                      {selectedTask.due_date && (
+                        <div className="flex items-center justify-between py-2 border-b border-white/[0.04]">
+                          <span className="text-[12px] text-[#64748B]">Due Date</span>
+                          <span className={`text-[12px] ${isOverdue(selectedTask) ? 'text-red-400' : 'text-white'}`}>
+                            {isOverdue(selectedTask) && '⚠ '}
+                            {new Date(selectedTask.due_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+                      )}
+
+                      {selectedTask.assignee_name && (
+                        <div className="flex items-center justify-between py-2 border-b border-white/[0.04]">
+                          <span className="text-[12px] text-[#64748B]">Assignee</span>
+                          <span className="text-[12px] text-white">{selectedTask.assignee_name}</span>
+                        </div>
+                      )}
+
+                      {selectedTask.customer_name && (
+                        <div className="flex items-center justify-between py-2 border-b border-white/[0.04]">
+                          <span className="text-[12px] text-[#64748B]">Customer</span>
+                          <button
+                            onClick={() => {
+                              onCustomerClick?.(selectedTask.customer_id || '', selectedTask.customer_name || '');
+                              closeTaskDrawer();
+                            }}
+                            className="text-[12px] text-cyan-400 hover:text-cyan-300"
+                          >
+                            {selectedTask.customer_name}
+                          </button>
+                        </div>
+                      )}
+
+                      {selectedTask.section && selectedTask.section !== 'No Section' && (
+                        <div className="flex items-center justify-between py-2 border-b border-white/[0.04]">
+                          <span className="text-[12px] text-[#64748B]">Section</span>
+                          <span className="text-[12px] text-white">{selectedTask.section}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between py-2">
+                        <span className="text-[12px] text-[#64748B]">Created</span>
+                        <span className="text-[12px] text-[#94A3B8]">
+                          {new Date(selectedTask.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="pt-4 border-t border-white/10">
+                      <h3 className="text-[10px] text-[#64748B] uppercase tracking-wider mb-3">Quick Actions</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selectedTask.status !== 'completed' && (
+                          <button
+                            onClick={() => {
+                              handleStatusChange(selectedTask.id, 'completed');
+                              setSelectedTask(prev => prev ? { ...prev, status: 'completed' } : null);
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-[13px] font-medium"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Mark Complete
+                          </button>
+                        )}
+
+                        {selectedTask.status === 'pending' && (
+                          <button
+                            onClick={() => {
+                              handleStatusChange(selectedTask.id, 'in_progress');
+                              setSelectedTask(prev => prev ? { ...prev, status: 'in_progress' } : null);
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors text-[13px] font-medium"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Start Task
+                          </button>
+                        )}
+
+                        {selectedTask.status === 'completed' && (
+                          <button
+                            onClick={() => {
+                              handleStatusChange(selectedTask.id, 'pending');
+                              setSelectedTask(prev => prev ? { ...prev, status: 'pending' } : null);
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors text-[13px] font-medium"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Reopen Task
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => setIsEditingInDrawer(true)}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 text-white rounded-lg hover:bg-white/10 transition-colors text-[13px] font-medium"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit Task
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Asana Link */}
+                    {selectedTask.asana_gid && (
+                      <div className="pt-4 border-t border-white/10">
+                        <a
+                          href={`https://app.asana.com/0/0/${selectedTask.asana_gid}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#F06A6A]/10 text-[#F06A6A] rounded-lg hover:bg-[#F06A6A]/20 transition-colors text-[13px] font-medium"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+                            <circle cx="16" cy="6.5" r="3.5" fill="currentColor"/>
+                            <circle cx="6.5" cy="24" r="3.5" fill="currentColor"/>
+                            <circle cx="25.5" cy="24" r="3.5" fill="currentColor"/>
+                          </svg>
+                          Open in Asana
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-white/10">
+                {isEditingInDrawer ? (
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        setIsEditingInDrawer(false);
+                        setEditTitle(selectedTask.title);
+                        setEditDescription(selectedTask.description || '');
+                        setEditStatus(selectedTask.status);
+                        setEditDueDate(selectedTask.due_date || '');
+                      }}
+                      className="px-4 py-2 text-[13px] text-[#94A3B8] hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveTaskEdit}
+                      disabled={!editTitle.trim() || isSaving}
+                      className="px-6 py-2 text-[13px] bg-[#38BDF8] text-white rounded-lg hover:bg-[#38BDF8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {isSaving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      handleDeleteTask(selectedTask.id);
+                      closeTaskDrawer();
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors text-[13px] font-medium"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Task
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
