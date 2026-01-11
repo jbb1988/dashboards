@@ -631,6 +631,8 @@ export default function DiversifiedDashboard() {
     category: 'attrition' | 'growth' | 'crosssell' | 'concentration' | 'general';
   }>>([]);
   const [aiExecutiveSummary, setAiExecutiveSummary] = useState('');
+  const [insightsGeneratedAt, setInsightsGeneratedAt] = useState<string | null>(null);
+  const [loadingSavedInsights, setLoadingSavedInsights] = useState(false);
 
   // Filter state
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
@@ -777,9 +779,47 @@ export default function DiversifiedDashboard() {
     }
   };
 
+  // Load saved AI insights from Supabase
+  const loadSavedInsights = async () => {
+    setLoadingSavedInsights(true);
+    try {
+      const response = await fetch('/api/diversified/insights/saved');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.insights) {
+          setAiRecommendations(result.insights.recommendations || []);
+          setAiExecutiveSummary(result.insights.executive_summary || '');
+          setInsightsGeneratedAt(result.insights.generated_at || result.insights.created_at || null);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading saved insights:', err);
+    } finally {
+      setLoadingSavedInsights(false);
+    }
+  };
+
+  // Save AI insights to Supabase
+  const saveInsights = async (recommendations: typeof aiRecommendations, executiveSummary: string, generatedAt: string) => {
+    try {
+      await fetch('/api/diversified/insights/saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recommendations,
+          executive_summary: executiveSummary,
+          generated_at: generatedAt,
+        }),
+      });
+    } catch (err) {
+      console.error('Error saving insights:', err);
+    }
+  };
+
   // Initial load
   useEffect(() => {
     fetchData(true);
+    loadSavedInsights(); // Load any previously saved AI insights
   }, []);
 
   // Debounced refresh on filter/tab change
@@ -1514,26 +1554,52 @@ export default function DiversifiedDashboard() {
                                 // Store the recommendations for the drawer
                                 setAiRecommendations(result.recommendations || []);
                                 setAiExecutiveSummary(result.executive_summary || '');
+                                setInsightsGeneratedAt(result.generated_at || new Date().toISOString());
+                                // Auto-save to Supabase so insights persist
+                                await saveInsights(
+                                  result.recommendations || [],
+                                  result.executive_summary || '',
+                                  result.generated_at || new Date().toISOString()
+                                );
                                 return result;
                               }}
                             />
 
                             {/* Open Insights Drawer Button - only show if we have recommendations */}
                             {aiRecommendations.length > 0 && (
-                              <motion.button
+                              <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                onClick={() => setInsightsDrawerOpen(true)}
-                                className="w-full py-3 px-4 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-xl text-purple-400 font-medium text-[13px] transition-all flex items-center justify-center gap-2"
+                                className="space-y-2"
                               >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                                View Full Analysis & Action Plan
-                                <span className="text-[11px] text-purple-400/70">
-                                  ({aiRecommendations.length} recommendations)
-                                </span>
-                              </motion.button>
+                                <button
+                                  onClick={() => setInsightsDrawerOpen(true)}
+                                  className="w-full py-3 px-4 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-xl text-purple-400 font-medium text-[13px] transition-all flex items-center justify-center gap-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                  View Full Analysis & Action Plan
+                                  <span className="text-[11px] text-purple-400/70">
+                                    ({aiRecommendations.length} recommendations)
+                                  </span>
+                                </button>
+                                {insightsGeneratedAt && (
+                                  <div className="flex items-center justify-center gap-2 text-[11px] text-[#64748B]">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span>
+                                      Saved {new Date(insightsGeneratedAt).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: 'numeric',
+                                        minute: '2-digit'
+                                      })}
+                                    </span>
+                                  </div>
+                                )}
+                              </motion.div>
                             )}
                           </div>
                         </div>
