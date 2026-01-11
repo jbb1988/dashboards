@@ -348,6 +348,21 @@ export async function updateTask(
   return result.data;
 }
 
+// Delete a task (works for subtasks too)
+export async function deleteTask(taskId: string): Promise<void> {
+  const url = `${ASANA_BASE_URL}/tasks/${taskId}`;
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Asana API error (${response.status}): ${error}`);
+  }
+}
+
 // Helper to extract custom field value
 export function getCustomFieldValue(
   task: AsanaTask,

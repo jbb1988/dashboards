@@ -106,6 +106,10 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Subtask editing state
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState('');
+
   // Open task drawer
   const openTaskDrawer = (task: DiversifiedTask) => {
     setSelectedTask(task);
@@ -158,6 +162,129 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
       console.error('Error updating task:', err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Toggle subtask completion
+  const handleToggleSubtask = async (subtaskId: string, currentCompleted: boolean) => {
+    if (!selectedTask) return;
+    try {
+      const response = await fetch('/api/diversified/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: subtaskId,
+          completed: !currentCompleted,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setSelectedTask(prev => {
+          if (!prev || !prev.subtasks) return prev;
+          const updatedSubtasks = prev.subtasks.map(st =>
+            st.id === subtaskId ? { ...st, completed: !currentCompleted } : st
+          );
+          return {
+            ...prev,
+            subtasks: updatedSubtasks,
+            subtasks_completed: updatedSubtasks.filter(st => st.completed).length,
+          };
+        });
+        // Also update in main tasks list
+        setTasks(prev => prev.map(t => {
+          if (t.id !== selectedTask.id || !t.subtasks) return t;
+          const updatedSubtasks = t.subtasks.map(st =>
+            st.id === subtaskId ? { ...st, completed: !currentCompleted } : st
+          );
+          return {
+            ...t,
+            subtasks: updatedSubtasks,
+            subtasks_completed: updatedSubtasks.filter(st => st.completed).length,
+          };
+        }));
+      }
+    } catch (err) {
+      console.error('Error toggling subtask:', err);
+    }
+  };
+
+  // Save subtask edit
+  const handleSaveSubtaskEdit = async (subtaskId: string) => {
+    if (!editingSubtaskTitle.trim()) return;
+    try {
+      const response = await fetch('/api/diversified/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: subtaskId,
+          title: editingSubtaskTitle.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setSelectedTask(prev => {
+          if (!prev || !prev.subtasks) return prev;
+          return {
+            ...prev,
+            subtasks: prev.subtasks.map(st =>
+              st.id === subtaskId ? { ...st, title: editingSubtaskTitle.trim() } : st
+            ),
+          };
+        });
+        setTasks(prev => prev.map(t => {
+          if (t.id !== selectedTask?.id || !t.subtasks) return t;
+          return {
+            ...t,
+            subtasks: t.subtasks.map(st =>
+              st.id === subtaskId ? { ...st, title: editingSubtaskTitle.trim() } : st
+            ),
+          };
+        }));
+        setEditingSubtaskId(null);
+        setEditingSubtaskTitle('');
+      }
+    } catch (err) {
+      console.error('Error updating subtask:', err);
+    }
+  };
+
+  // Delete subtask
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    if (!selectedTask) return;
+    if (!confirm('Delete this subtask? This cannot be undone.')) return;
+
+    try {
+      const response = await fetch(`/api/diversified/tasks?id=${subtaskId}&permanent=true`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Update local state
+        setSelectedTask(prev => {
+          if (!prev || !prev.subtasks) return prev;
+          const updatedSubtasks = prev.subtasks.filter(st => st.id !== subtaskId);
+          return {
+            ...prev,
+            subtasks: updatedSubtasks,
+            subtask_count: updatedSubtasks.length,
+            subtasks_completed: updatedSubtasks.filter(st => st.completed).length,
+          };
+        });
+        setTasks(prev => prev.map(t => {
+          if (t.id !== selectedTask.id || !t.subtasks) return t;
+          const updatedSubtasks = t.subtasks.filter(st => st.id !== subtaskId);
+          return {
+            ...t,
+            subtasks: updatedSubtasks,
+            subtask_count: updatedSubtasks.length,
+            subtasks_completed: updatedSubtasks.filter(st => st.completed).length,
+          };
+        }));
+      }
+    } catch (err) {
+      console.error('Error deleting subtask:', err);
     }
   };
 
@@ -1170,13 +1297,17 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                           {selectedTask.subtasks.map((subtask) => (
                             <div
                               key={subtask.id}
-                              className={`flex items-start gap-3 p-3 rounded-lg ${
+                              className={`flex items-start gap-3 p-3 rounded-lg group ${
                                 subtask.completed ? 'bg-green-500/5 border border-green-500/10' : 'bg-white/[0.02] border border-white/[0.04]'
                               }`}
                             >
-                              <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                                subtask.completed ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-[#64748B]'
-                              }`}>
+                              {/* Clickable checkbox */}
+                              <button
+                                onClick={() => handleToggleSubtask(subtask.id, subtask.completed)}
+                                className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-all hover:scale-110 ${
+                                  subtask.completed ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-white/10 text-[#64748B] hover:bg-white/20'
+                                }`}
+                              >
                                 {subtask.completed ? (
                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -1184,24 +1315,92 @@ export function SalesTasksTab({ onCustomerClick }: SalesTasksTabProps) {
                                 ) : (
                                   <div className="w-2 h-2 rounded-full bg-current" />
                                 )}
-                              </div>
+                              </button>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-[13px] ${subtask.completed ? 'text-[#64748B] line-through' : 'text-white'}`}>
-                                  {subtask.title}
-                                </p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  {subtask.assignee_name && (
-                                    <span className="text-[10px] text-[#64748B]">
-                                      {subtask.assignee_name}
-                                    </span>
-                                  )}
-                                  {subtask.due_date && (
-                                    <span className="text-[10px] text-[#64748B]">
-                                      Due: {new Date(subtask.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                    </span>
-                                  )}
-                                </div>
+                                {editingSubtaskId === subtask.id ? (
+                                  /* Edit mode */
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={editingSubtaskTitle}
+                                      onChange={(e) => setEditingSubtaskTitle(e.target.value)}
+                                      className="flex-1 px-2 py-1 rounded bg-[#1E293B] border border-white/20 text-white text-[13px] focus:outline-none focus:border-[#38BDF8]"
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSaveSubtaskEdit(subtask.id);
+                                        if (e.key === 'Escape') {
+                                          setEditingSubtaskId(null);
+                                          setEditingSubtaskTitle('');
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      onClick={() => handleSaveSubtaskEdit(subtask.id)}
+                                      className="p-1.5 text-green-400 hover:bg-green-500/20 rounded transition-colors"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingSubtaskId(null);
+                                        setEditingSubtaskTitle('');
+                                      }}
+                                      className="p-1.5 text-[#64748B] hover:text-white hover:bg-white/10 rounded transition-colors"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  /* View mode */
+                                  <>
+                                    <p className={`text-[13px] ${subtask.completed ? 'text-[#64748B] line-through' : 'text-white'}`}>
+                                      {subtask.title}
+                                    </p>
+                                    <div className="flex items-center gap-3 mt-1">
+                                      {subtask.assignee_name && (
+                                        <span className="text-[10px] text-[#64748B]">
+                                          {subtask.assignee_name}
+                                        </span>
+                                      )}
+                                      {subtask.due_date && (
+                                        <span className="text-[10px] text-[#64748B]">
+                                          Due: {new Date(subtask.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
                               </div>
+                              {/* Edit/Delete buttons - show on hover when not editing */}
+                              {editingSubtaskId !== subtask.id && (
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => {
+                                      setEditingSubtaskId(subtask.id);
+                                      setEditingSubtaskTitle(subtask.title);
+                                    }}
+                                    className="p-1.5 text-[#64748B] hover:text-white hover:bg-white/10 rounded transition-colors"
+                                    title="Edit subtask"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteSubtask(subtask.id)}
+                                    className="p-1.5 text-[#64748B] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                    title="Delete subtask"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

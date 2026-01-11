@@ -4,6 +4,7 @@ import {
   listSections,
   createTask,
   updateTask,
+  deleteTask,
   calculateTaskStats,
   getSubtasks,
   AsanaTask,
@@ -274,18 +275,24 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE - Mark task as completed in Asana (we don't actually delete)
+// DELETE - Delete or complete a task/subtask in Asana
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('id');
+    const permanent = searchParams.get('permanent') === 'true'; // For subtasks, delete permanently
 
     if (!taskId) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
     }
 
-    // Mark as completed instead of deleting
-    await updateTask(taskId, { completed: true });
+    if (permanent) {
+      // Permanently delete (for subtasks)
+      await deleteTask(taskId);
+    } else {
+      // Mark as completed instead of deleting (for main tasks)
+      await updateTask(taskId, { completed: true });
+    }
 
     // Invalidate cache
     cachedData = null;
