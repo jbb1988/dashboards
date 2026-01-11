@@ -12,6 +12,7 @@ import TaskBadge from './components/TaskBadge';
 import TasksTabSupabase from './components/TasksTabSupabase';
 import BundleModal from './components/BundleModal';
 import { DashboardBackground, backgroundPresets, KPICard, AnimatedCounter } from '@/components/mars-ui';
+import ContractDetailDrawer from '@/components/contracts/ContractDetailDrawer';
 
 // Types
 interface BundleInfo {
@@ -309,7 +310,7 @@ interface NotionTask {
   assignee: string | null;
 }
 
-// Contract Row Component with Inline Editing
+// Contract Row Component - Simplified (details in drawer)
 function ContractRow({
   contract,
   index,
@@ -318,6 +319,7 @@ function ContractRow({
   pendingStatus,
   onPendingStatusChange,
   openBundleModal,
+  onClick,
 }: {
   contract: Contract;
   index: number;
@@ -326,29 +328,9 @@ function ContractRow({
   pendingStatus?: string;
   onPendingStatusChange?: (contractId: string, salesforceId: string | undefined, contractName: string, notionName: string | undefined, newStatus: string, originalStatus: string) => void;
   openBundleModal?: (contract: Contract, mode: 'create' | 'add') => void;
+  onClick?: () => void;
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editedStatus, setEditedStatus] = useState(contract.status);
-  const [editedAwardDate, setEditedAwardDate] = useState(contract.awardDate || '');
-  const [editedContractDate, setEditedContractDate] = useState(contract.contractDate || '');
-  const [editedDeliverDate, setEditedDeliverDate] = useState(contract.deliverDate || '');
-  const [editedInstallDate, setEditedInstallDate] = useState(contract.installDate || '');
-  const [editedCashDate, setEditedCashDate] = useState(contract.cashDate || '');
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [tasks, setTasks] = useState<NotionTask[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(false);
-  const [tasksFetched, setTasksFetched] = useState(false);
-  const [isAddingTask, setIsAddingTask] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDueDate, setNewTaskDueDate] = useState('');
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [showQuickAddTask, setShowQuickAddTask] = useState(false);
-  const [quickTaskTitle, setQuickTaskTitle] = useState('');
-  const [quickTaskDueDate, setQuickTaskDueDate] = useState('');
-  const [isCreatingQuickTask, setIsCreatingQuickTask] = useState(false);
-  const quickTaskRef = useRef<HTMLDivElement>(null);
   const [showDateTooltip, setShowDateTooltip] = useState(false);
   const dateTooltipRef = useRef<HTMLDivElement>(null);
 
@@ -356,36 +338,6 @@ function ContractRow({
   const effectiveStatus = pendingStatus || contract.status;
   const hasPendingChange = pendingStatus !== undefined && pendingStatus !== contract.status;
   const statusColor = stageColors[effectiveStatus] || getStatusColor(effectiveStatus);
-
-  // Close quick add popover when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (quickTaskRef.current && !quickTaskRef.current.contains(event.target as Node)) {
-        setShowQuickAddTask(false);
-        setQuickTaskTitle('');
-        setQuickTaskDueDate('');
-      }
-    }
-    if (showQuickAddTask) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showQuickAddTask]);
-
-  // Fetch tasks when expanded
-  useEffect(() => {
-    if (isExpanded && !tasksFetched) {
-      setTasksLoading(true);
-      fetch(`/api/contracts/tasks?contractName=${encodeURIComponent(contract.name)}`)
-        .then(res => res.json())
-        .then(data => {
-          setTasks(data.tasks || []);
-          setTasksFetched(true);
-        })
-        .catch(err => console.error('Error fetching tasks:', err))
-        .finally(() => setTasksLoading(false));
-    }
-  }, [isExpanded, tasksFetched, contract.name]);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—';
@@ -402,118 +354,12 @@ function ContractRow({
     return `${month}/${day}/${year}`;
   };
 
-  const formatDateForInput = (dateStr: string | null) => {
-    if (!dateStr) return '';
-    return dateStr.split('T')[0];
-  };
-
-  const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsEditing(true);
-    setEditedStatus(contract.status);
-    setEditedAwardDate(formatDateForInput(contract.awardDate));
-    setEditedContractDate(formatDateForInput(contract.contractDate));
-    setEditedDeliverDate(formatDateForInput(contract.deliverDate));
-    setEditedInstallDate(formatDateForInput(contract.installDate));
-    setEditedCashDate(formatDateForInput(contract.cashDate));
-  };
-
-  const handleCancel = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsEditing(false);
-    setSaveMessage(null);
-  };
-
-  const handleSave = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsSaving(true);
-    setSaveMessage(null);
-
-    try {
-      const updates: Record<string, any> = {};
-      if (editedStatus !== contract.status) updates.status = editedStatus;
-      if (editedAwardDate !== formatDateForInput(contract.awardDate)) updates.awardDate = editedAwardDate || null;
-      if (editedContractDate !== formatDateForInput(contract.contractDate)) updates.contractDate = editedContractDate || null;
-      if (editedDeliverDate !== formatDateForInput(contract.deliverDate)) updates.deliverDate = editedDeliverDate || null;
-      if (editedInstallDate !== formatDateForInput(contract.installDate)) updates.installDate = editedInstallDate || null;
-      if (editedCashDate !== formatDateForInput(contract.cashDate)) updates.cashDate = editedCashDate || null;
-
-      if (Object.keys(updates).length === 0) {
-        setIsEditing(false);
-        return;
-      }
-
-      const response = await fetch('/api/contracts/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          salesforceId: contract.salesforceId || contract.id,
-          contractName: contract.notionName || contract.name,
-          updates,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setSaveMessage({ type: 'success', text: 'Synced to Notion!' });
-        setTimeout(() => {
-          setIsEditing(false);
-          setSaveMessage(null);
-          onUpdate?.();
-        }, 1500);
-      } else {
-        setSaveMessage({ type: 'error', text: result.error || 'Failed to update' });
-      }
-    } catch (err) {
-      setSaveMessage({ type: 'error', text: 'Network error' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // Construct Salesforce Lightning URL
   const salesforceUrl = contract.salesforceUrl || `https://marscompany.lightning.force.com/lightning/r/Opportunity/${contract.salesforceId}/view`;
 
   const handleSalesforceClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     window.open(salesforceUrl, '_blank');
-  };
-
-  // Toggle task status (quick action)
-  const handleToggleTaskStatus = async (task: NotionTask) => {
-    const isComplete = task.status.toLowerCase().includes('done') || task.status.toLowerCase().includes('complete');
-    const newStatus = isComplete ? 'To Do' : 'Done';
-
-    // Optimistic update
-    setTasks(prev => prev.map(t =>
-      t.id === task.id ? { ...t, status: newStatus } : t
-    ));
-
-    try {
-      const response = await fetch('/api/contracts/tasks', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId: task.id,
-          updates: { status: newStatus }
-        }),
-      });
-
-      if (!response.ok) {
-        // Revert on failure
-        setTasks(prev => prev.map(t =>
-          t.id === task.id ? { ...t, status: task.status } : t
-        ));
-        console.error('Failed to update task');
-      }
-    } catch (err) {
-      // Revert on error
-      setTasks(prev => prev.map(t =>
-        t.id === task.id ? { ...t, status: task.status } : t
-      ));
-      console.error('Error updating task:', err);
-    }
   };
 
   // Quick status change - batch mode (pending) or immediate save
@@ -565,110 +411,6 @@ function ContractRow({
     }
   };
 
-  // Create new task
-  const handleCreateTask = async () => {
-    if (!newTaskTitle.trim()) return;
-
-    setIsCreatingTask(true);
-    try {
-      const response = await fetch('/api/contracts/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractName: contract.name,
-          title: newTaskTitle.trim(),
-          dueDate: newTaskDueDate || undefined,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Add the new task to the list
-        setTasks(prev => [{
-          id: data.taskId,
-          title: newTaskTitle.trim(),
-          status: 'To Do',
-          dueDate: newTaskDueDate || null,
-          priority: null,
-          assignee: null,
-        }, ...prev]);
-        // Reset form
-        setNewTaskTitle('');
-        setNewTaskDueDate('');
-        setIsAddingTask(false);
-      } else {
-        console.error('Failed to create task');
-      }
-    } catch (err) {
-      console.error('Error creating task:', err);
-    } finally {
-      setIsCreatingTask(false);
-    }
-  };
-
-  // Delete task
-  const handleDeleteTask = async (taskId: string) => {
-    if (!confirm('Delete this task?')) return;
-
-    try {
-      const response = await fetch(`/api/contracts/tasks?taskId=${taskId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setTasks(prev => prev.filter(t => t.id !== taskId));
-      } else {
-        console.error('Failed to delete task');
-      }
-    } catch (err) {
-      console.error('Error deleting task:', err);
-    }
-  };
-
-  // Quick add task (from row action)
-  const handleQuickAddTask = async () => {
-    if (!quickTaskTitle.trim()) return;
-
-    setIsCreatingQuickTask(true);
-    try {
-      const response = await fetch('/api/contracts/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractName: contract.name,
-          title: quickTaskTitle.trim(),
-          dueDate: quickTaskDueDate || undefined,
-          priority: 'medium',
-        }),
-      });
-
-      if (response.ok) {
-        // Reset form and close popover
-        setQuickTaskTitle('');
-        setQuickTaskDueDate('');
-        setShowQuickAddTask(false);
-        // If already fetched tasks, add to list
-        if (tasksFetched) {
-          const data = await response.json();
-          setTasks(prev => [{
-            id: data.taskId,
-            title: quickTaskTitle.trim(),
-            status: 'To Do',
-            dueDate: quickTaskDueDate || null,
-            priority: 'medium',
-            assignee: null,
-          }, ...prev]);
-        }
-      } else {
-        console.error('Failed to create quick task');
-      }
-    } catch (err) {
-      console.error('Error creating quick task:', err);
-    } finally {
-      setIsCreatingQuickTask(false);
-    }
-  };
-
   // Alternating row background
   const isEvenRow = index % 2 === 0;
 
@@ -684,40 +426,19 @@ function ContractRow({
       transition={{ delay: 0.02 * Math.min(index, 20) }}
     >
       <div
-        className={`group transition-all duration-150 ${
-          isExpanded
-            ? 'bg-[#1E293B] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
-            : isEvenRow
-              ? 'bg-[#151F2E] hover:bg-[#1a2740]'
-              : 'bg-[#131B28] hover:bg-[#182437]'
-        } ${isEditing ? 'bg-[#1E293B] border-l-2 border-[#38BDF8]' : contract.budgeted ? 'border-l-2 border-[#22C55E]/40' : ''}
+        onClick={onClick}
+        className={`group transition-all duration-150 cursor-pointer ${
+          isEvenRow
+            ? 'bg-[#151F2E] hover:bg-[#1a2740]'
+            : 'bg-[#131B28] hover:bg-[#182437]'
+        } ${contract.budgeted ? 'border-l-2 border-[#22C55E]/40' : ''}
         ${focusMode && !isCritical ? 'opacity-40' : ''}
         ${focusMode && isCritical ? 'ring-1 ring-[#F59E0B]/30 bg-[#F59E0B]/5' : ''}
         hover:shadow-[0_0_20px_rgba(56,189,248,0.05)]`}
       >
         <div className="grid gap-4 px-6 py-[14px] items-center" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
-          {/* Name with Expand Chevron */}
+          {/* Name Column */}
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-            {/* Expand/Collapse Chevron */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isEditing) setIsExpanded(!isExpanded);
-              }}
-              className={`p-1 -ml-1 rounded hover:bg-white/10 transition-all flex-shrink-0 ${
-                isExpanded ? 'text-[#38BDF8]' : 'text-[#64748B] hover:text-white'
-              }`}
-              title={isExpanded ? 'Collapse' : 'Expand'}
-            >
-              <svg
-                className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
             <div
               className={`w-1.5 h-1.5 rounded-full flex-shrink-0`}
               style={{ background: contract.isOverdue ? '#ef4444' : statusColor }}
@@ -830,37 +551,21 @@ function ContractRow({
             )}
           </div>
 
-          {/* Close Date - Editable with Date Timeline Tooltip */}
+          {/* Close Date - with Date Timeline Tooltip */}
           <div
             className="text-center relative"
             onClick={e => e.stopPropagation()}
-            onMouseEnter={() => !isEditing && setShowDateTooltip(true)}
+            onMouseEnter={() => setShowDateTooltip(true)}
             onMouseLeave={() => setShowDateTooltip(false)}
             ref={dateTooltipRef}
           >
-            {isEditing ? (
-              <input
-                type="date"
-                value={editedContractDate}
-                onChange={e => setEditedContractDate(e.target.value)}
-                onClick={e => {
-                  e.stopPropagation();
-                  (e.target as HTMLInputElement).showPicker?.();
-                }}
-                onMouseDown={e => e.stopPropagation()}
-                onFocus={e => (e.target as HTMLInputElement).showPicker?.()}
-                className="w-full px-2 py-1 rounded bg-[#1E293B] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer pointer-events-auto relative z-10"
-                style={{ colorScheme: 'dark' }}
-              />
-            ) : (
-              <span className="text-[14px] text-[#8FA3BF] cursor-pointer hover:text-[#38BDF8] transition-colors">
-                {formatDate(contract.contractDate)}
-              </span>
-            )}
+            <span className="text-[14px] text-[#8FA3BF] cursor-pointer hover:text-[#38BDF8] transition-colors">
+              {formatDate(contract.contractDate)}
+            </span>
 
             {/* Sophisticated Date Timeline Tooltip */}
             <AnimatePresence>
-              {showDateTooltip && !isEditing && (
+              {showDateTooltip && (
                 <motion.div
                   initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -968,466 +673,7 @@ function ContractRow({
               <span className="text-[#475569] text-[11px]">—</span>
             )}
           </div>
-
-          </div>
-
-        {/* Edit Mode Panel - for editing dates that sync to Salesforce */}
-        <AnimatePresence>
-          {isEditing && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden bg-[#1E293B] border-b border-[#38BDF8]/30"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="px-6 py-4">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[11px] text-[#38BDF8] uppercase tracking-wider font-semibold">Edit Dates (Syncs to Salesforce)</span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleCancel}
-                      className="px-3 py-1.5 text-xs text-[#8FA3BF] hover:text-white transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className="px-4 py-1.5 text-xs bg-[#22C55E] text-white rounded hover:bg-[#16A34A] transition-colors disabled:opacity-50 flex items-center gap-1"
-                    >
-                      {isSaving ? (
-                        <>
-                          <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save'
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-5 gap-4">
-                  <div>
-                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Award</label>
-                    <input
-                      type="date"
-                      value={editedAwardDate}
-                      onChange={e => setEditedAwardDate(e.target.value)}
-                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
-                      style={{ colorScheme: 'dark' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Contract</label>
-                    <input
-                      type="date"
-                      value={editedContractDate}
-                      onChange={e => setEditedContractDate(e.target.value)}
-                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
-                      style={{ colorScheme: 'dark' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Delivery</label>
-                    <input
-                      type="date"
-                      value={editedDeliverDate}
-                      onChange={e => setEditedDeliverDate(e.target.value)}
-                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
-                      style={{ colorScheme: 'dark' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Install</label>
-                    <input
-                      type="date"
-                      value={editedInstallDate}
-                      onChange={e => setEditedInstallDate(e.target.value)}
-                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
-                      style={{ colorScheme: 'dark' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Cash</label>
-                    <input
-                      type="date"
-                      value={editedCashDate}
-                      onChange={e => setEditedCashDate(e.target.value)}
-                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      className="w-full px-2 py-2 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
-                      style={{ colorScheme: 'dark' }}
-                    />
-                  </div>
-                </div>
-                {saveMessage && (
-                  <div className={`mt-3 text-xs ${saveMessage.type === 'success' ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-                    {saveMessage.text}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Expanded Details */}
-        <AnimatePresence>
-          {isExpanded && !isEditing && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden bg-[#0F1722] border-b border-white/[0.04]"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="px-6 py-4 grid grid-cols-6 gap-4">
-                <div>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Contract Type</span>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {contract.contractType.length > 0 ? (
-                      contract.contractType.map(type => (
-                        <span key={type} className="px-2 py-0.5 rounded text-xs bg-[#1a2d4a] text-gray-300 border-l-2 border-[#0189CB]">
-                          {type}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-gray-600 text-sm">—</span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Award Date</span>
-                  <div className="mt-1 text-sm text-gray-300">
-                    {formatDate(contract.awardDate)}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Sales Rep</span>
-                  <div className="mt-1 text-sm text-gray-300">
-                    {contract.salesRep || '—'}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Probability</span>
-                  <div className="mt-1 text-lg font-semibold text-white">
-                    {contract.probability || 0}%
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Salesforce</span>
-                  <div className="mt-1">
-                    <button
-                      onClick={handleSalesforceClick}
-                      className="text-sm text-[#00A1E0] hover:text-[#00c2ff] transition-colors flex items-center gap-1"
-                    >
-                      Open
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Bundle</span>
-                  <div className="mt-1">
-                    {contract.bundleInfo ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-[#8B5CF6]" title={contract.bundleInfo.bundleName}>
-                          {contract.bundleInfo.bundleName.substring(0, 15)}{contract.bundleInfo.bundleName.length > 15 ? '...' : ''}
-                        </span>
-                        <span className="text-[9px] text-[#64748B] bg-[#8B5CF6]/10 px-1.5 py-0.5 rounded">
-                          {contract.bundleInfo.contractCount}
-                        </span>
-                      </div>
-                    ) : openBundleModal ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openBundleModal(contract, 'create');
-                        }}
-                        className="text-sm text-[#8B5CF6] hover:text-[#A78BFA] transition-colors flex items-center gap-1"
-                      >
-                        Create
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    ) : (
-                      <span className="text-sm text-[#475569]">-</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Edit Dates Button */}
-              <div className="px-6 py-3 border-t border-white/[0.04] flex justify-end">
-                <button
-                  onClick={handleEdit}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#38BDF8]/10 text-[#38BDF8] text-xs font-medium hover:bg-[#38BDF8]/20 transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                  Edit Dates
-                </button>
-              </div>
-
-              {/* Latest Review Summary */}
-              {contract.redlines && parseLatestSummary(contract.redlines).length > 0 && (
-                <div className="px-6 py-4 border-t border-white/[0.04]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <svg className="w-3.5 h-3.5 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Latest Review Summary</span>
-                    {contract.lastRedlineDate && (
-                      <span className="text-[9px] text-[#64748B] bg-[#1E293B] px-2 py-0.5 rounded-full">
-                        {new Date(contract.lastRedlineDate).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                  <ul className="space-y-1.5 pl-1">
-                    {parseLatestSummary(contract.redlines).map((item, i) => (
-                      <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                        <span className="text-[#22C55E] mt-0.5">•</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Tasks Section */}
-              <div className="px-6 py-4 border-t border-white/[0.04]">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold flex items-center gap-2">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                    Tasks
-                  </span>
-                    <div className="flex items-center gap-2">
-                      {tasks.length > 0 && (
-                        <span className="text-[10px] text-[#64748B] bg-[#1E293B] px-2 py-0.5 rounded-full">
-                          {tasks.filter(t => !t.status.toLowerCase().includes('done') && !t.status.toLowerCase().includes('complete')).length} pending
-                        </span>
-                      )}
-                      {!isAddingTask && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsAddingTask(true);
-                          }}
-                          className="text-[10px] text-[#38BDF8] hover:text-[#7dd3fc] transition-colors flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                          Add Task
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Add Task Form */}
-                  {isAddingTask && (
-                    <div className="mb-3 p-3 rounded-lg bg-[#1E293B]/80 border border-[#38BDF8]/20">
-                      <div className="flex gap-2 items-end">
-                        <div className="flex-1">
-                          <label className="text-[9px] text-[#64748B] uppercase tracking-wider mb-1 block">Task Title</label>
-                          <input
-                            type="text"
-                            value={newTaskTitle}
-                            onChange={e => setNewTaskTitle(e.target.value)}
-                            placeholder="Enter task title..."
-                            className="w-full px-3 py-1.5 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] placeholder:text-[#475569]"
-                            autoFocus
-                            onKeyDown={e => {
-                              if (e.key === 'Enter' && newTaskTitle.trim()) {
-                                handleCreateTask();
-                              } else if (e.key === 'Escape') {
-                                setIsAddingTask(false);
-                                setNewTaskTitle('');
-                                setNewTaskDueDate('');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="w-32">
-                          <label className="text-[9px] text-[#64748B] uppercase tracking-wider mb-1 block">Due Date</label>
-                          <input
-                            type="date"
-                            value={newTaskDueDate}
-                            onChange={e => setNewTaskDueDate(e.target.value)}
-                            onClick={e => {
-                              e.stopPropagation();
-                              (e.target as HTMLInputElement).showPicker?.();
-                            }}
-                            onMouseDown={e => e.stopPropagation()}
-                            onFocus={e => (e.target as HTMLInputElement).showPicker?.()}
-                            className="w-full px-2 py-1.5 rounded bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer pointer-events-auto relative z-10"
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCreateTask();
-                          }}
-                          disabled={!newTaskTitle.trim() || isCreatingTask}
-                          className="px-3 py-1.5 rounded bg-[#38BDF8] text-white text-xs font-medium hover:bg-[#38BDF8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isCreatingTask ? '...' : 'Add'}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsAddingTask(false);
-                            setNewTaskTitle('');
-                            setNewTaskDueDate('');
-                          }}
-                          className="px-2 py-1.5 rounded text-[#64748B] hover:text-white text-xs transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {tasksLoading ? (
-                    <div className="flex items-center gap-2 text-[#64748B] text-xs">
-                      <div className="w-3 h-3 border border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin" />
-                      Loading tasks...
-                    </div>
-                  ) : tasks.length > 0 ? (
-                    <div className="space-y-2">
-                      {tasks.map(task => {
-                        const isComplete = task.status.toLowerCase().includes('done') || task.status.toLowerCase().includes('complete');
-                        const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !isComplete;
-
-                        return (
-                          <div
-                            key={task.id}
-                            className={`
-                              group/task flex items-center justify-between p-2.5 rounded-lg
-                              ${isComplete ? 'bg-[#22C55E]/5' : isOverdue ? 'bg-[#EF4444]/5' : 'bg-[#1E293B]/50'}
-                            `}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              {/* Status indicator - Clickable to toggle */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleTaskStatus(task);
-                                }}
-                                className={`
-                                  w-5 h-5 rounded flex items-center justify-center flex-shrink-0
-                                  transition-all duration-200 hover:scale-110 cursor-pointer
-                                  ${isComplete
-                                    ? 'bg-[#22C55E]/20 text-[#22C55E] hover:bg-[#22C55E]/30'
-                                    : isOverdue
-                                      ? 'bg-[#EF4444]/20 text-[#EF4444] hover:bg-[#EF4444]/30'
-                                      : 'bg-[#38BDF8]/20 text-[#38BDF8] hover:bg-[#38BDF8]/30'
-                                  }
-                                `}
-                                title={isComplete ? 'Mark as To Do' : 'Mark as Done'}
-                              >
-                                {isComplete ? (
-                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                ) : (
-                                  <div className="w-2 h-2 rounded-full bg-current" />
-                                )}
-                              </button>
-
-                              {/* Task title */}
-                              <span className={`text-xs truncate ${isComplete ? 'text-[#64748B] line-through' : 'text-[#EAF2FF]'}`}>
-                                {task.title}
-                              </span>
-
-                              {/* Priority badge */}
-                              {task.priority && !isComplete && (
-                                <span className={`
-                                  text-[9px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0
-                                  ${task.priority.toLowerCase() === 'high'
-                                    ? 'bg-[#EF4444]/15 text-[#EF4444]'
-                                    : task.priority.toLowerCase() === 'medium'
-                                      ? 'bg-[#F59E0B]/15 text-[#F59E0B]'
-                                      : 'bg-[#64748B]/15 text-[#64748B]'
-                                  }
-                                `}>
-                                  {task.priority}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              {/* Assignee */}
-                              {task.assignee && (
-                                <span className="text-[10px] text-[#64748B]">
-                                  {task.assignee}
-                                </span>
-                              )}
-
-                              {/* Due date */}
-                              {task.dueDate && (
-                                <span className={`text-[10px] tabular-nums ${
-                                  isComplete
-                                    ? 'text-[#64748B]'
-                                    : isOverdue
-                                      ? 'text-[#EF4444]'
-                                      : 'text-[#64748B]'
-                                }`}>
-                                  {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </span>
-                              )}
-
-                              {/* Status badge */}
-                              <span className={`
-                                text-[9px] font-medium px-1.5 py-0.5 rounded
-                                ${isComplete
-                                  ? 'bg-[#22C55E]/15 text-[#22C55E]'
-                                  : 'bg-[#38BDF8]/15 text-[#38BDF8]'
-                                }
-                              `}>
-                                {task.status}
-                              </span>
-
-                              {/* Delete button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteTask(task.id);
-                                }}
-                                className="p-1 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-all"
-                                title="Delete task"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-[#64748B] flex items-center gap-2">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                      </svg>
-                      No tasks linked to this contract
-                    </div>
-                  )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        </div>
       </div>
     </motion.div>
   );
@@ -1462,6 +708,9 @@ export default function ContractsDashboard() {
   const [selectedContractIndex, setSelectedContractIndex] = useState(0);
   const [taskStats, setTaskStats] = useState<{ pending: number; overdue: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Contract detail drawer state
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
 
   // Bundle modal state
   const [bundleModalOpen, setBundleModalOpen] = useState(false);
@@ -2815,6 +2064,7 @@ export default function ContractsDashboard() {
                         pendingStatus={pendingChanges[contract.id]?.newStatus}
                         onPendingStatusChange={handlePendingStatusChange}
                         openBundleModal={openBundleModal}
+                        onClick={() => setSelectedContract(contract)}
                       />
                     ))
                   ) : (
@@ -2987,6 +2237,14 @@ export default function ContractsDashboard() {
           existingBundleId={selectedContractForBundle.bundleInfo?.bundleId}
         />
       )}
+
+      {/* Contract Detail Drawer */}
+      <ContractDetailDrawer
+        contract={selectedContract}
+        onClose={() => setSelectedContract(null)}
+        onUpdate={fetchData}
+        openBundleModal={openBundleModal}
+      />
     </div>
   );
 }
