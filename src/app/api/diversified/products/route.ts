@@ -8,6 +8,12 @@ export async function GET(request: NextRequest) {
     const admin = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
 
+    // Parse year/month filters
+    const yearsParam = searchParams.get('years');
+    const monthsParam = searchParams.get('months');
+    const years = yearsParam ? yearsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
+    const months = monthsParam ? monthsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
+
     // Calculate date ranges for R12 comparison
     const now = new Date();
     const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -31,6 +37,8 @@ export async function GET(request: NextRequest) {
       customer_id: string;
       customer_name: string;
       transaction_date: string;
+      year: number;
+      month: number;
       revenue: number;
       cost: number;
       quantity: number;
@@ -41,10 +49,22 @@ export async function GET(request: NextRequest) {
     let hasMore = true;
 
     while (hasMore) {
-      const { data, error } = await admin
+      let query = admin
         .from('diversified_sales')
-        .select('item_id, item_name, item_description, class_name, class_category, customer_id, customer_name, transaction_date, revenue, cost, quantity')
-        .gte('transaction_date', formatDate(priorPeriodStart))
+        .select('item_id, item_name, item_description, class_name, class_category, customer_id, customer_name, transaction_date, year, month, revenue, cost, quantity');
+
+      // Apply year/month filters if provided
+      if (years.length > 0) {
+        query = query.in('year', years);
+      } else {
+        query = query.gte('transaction_date', formatDate(priorPeriodStart));
+      }
+
+      if (months.length > 0) {
+        query = query.in('month', months);
+      }
+
+      const { data, error } = await query
         .order('transaction_date', { ascending: false })
         .range(offset, offset + batchSize - 1);
 

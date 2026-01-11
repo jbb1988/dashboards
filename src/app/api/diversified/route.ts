@@ -28,15 +28,11 @@ export async function GET(request: NextRequest) {
     const years = yearsParam ? yearsParam.split(',').map(Number) : undefined;
     const months = monthsParam ? monthsParam.split(',').map(Number) : undefined;
 
-    // Get filter options (always include these)
-    const filterOptions = await getDiversifiedFilterOptions();
-
-    // Get summary KPIs - always show totals (filtered by year/month only)
-    // Don't filter by className so KPIs show overall totals even when drilling into a class
-    const summary = await getDiversifiedDashboardSummary({
-      years,
-      months,
-    });
+    // Run initial queries in parallel for better performance
+    const [filterOptions, summary] = await Promise.all([
+      getDiversifiedFilterOptions(),
+      getDiversifiedDashboardSummary({ years, months }),
+    ]);
 
     // Get aggregated data based on view
     let byClass;

@@ -1231,6 +1231,8 @@ export default function DiversifiedDashboard() {
                     onCustomerClick={(customerId, customerName) => {
                       setSelectedCustomerForDetail({ id: customerId, name: customerName });
                     }}
+                    selectedYears={selectedYears}
+                    selectedMonths={selectedMonths}
                   />
                 </motion.div>
               )}

@@ -57,6 +57,8 @@ interface ProductsResponse {
 
 interface ProductsTabProps {
   onCustomerClick?: (customerId: string, customerName: string) => void;
+  selectedYears?: number[];
+  selectedMonths?: number[];
 }
 
 const TREND_CONFIG = {
@@ -82,7 +84,7 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function ProductsTab({ onCustomerClick }: ProductsTabProps) {
+export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: ProductsTabProps) {
   const [data, setData] = useState<ProductsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +100,15 @@ export function ProductsTab({ onCustomerClick }: ProductsTabProps) {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/diversified/products');
+        const params = new URLSearchParams();
+        if (selectedYears && selectedYears.length > 0) {
+          params.set('years', selectedYears.join(','));
+        }
+        if (selectedMonths && selectedMonths.length > 0) {
+          params.set('months', selectedMonths.join(','));
+        }
+        const url = `/api/diversified/products${params.toString() ? `?${params.toString()}` : ''}`;
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Failed to fetch products data');
         }
@@ -112,7 +122,7 @@ export function ProductsTab({ onCustomerClick }: ProductsTabProps) {
     };
 
     fetchData();
-  }, []);
+  }, [selectedYears, selectedMonths]);
 
   const filteredAndSortedProducts = useMemo(() => {
     if (!data) return [];
