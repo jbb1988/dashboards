@@ -10,7 +10,13 @@ import {
   ClassBarChart,
   BudgetVarianceChart,
   CustomerDonut,
+  AttritionBarChart,
+  YoYComparisonChart,
+  ConcentrationChart,
+  CrossSellTable,
 } from '@/components/charts';
+import { AIInsightsPanelV2 } from '@/components/AIInsightsPanelV2';
+import { MetricExplainer, HHIExplainer, YoYChangeExplainer } from '@/components/ui/MetricExplainer';
 
 interface ClassSummary {
   class_name: string;
@@ -98,6 +104,99 @@ interface BudgetData {
 interface ChartData {
   monthly: MonthlyChartData[];
   classMonthly: ClassMonthlyData[];
+}
+
+// Insights data types
+interface InsightsSummary {
+  at_risk_customers: number;
+  at_risk_revenue: number;
+  churned_customers: number;
+  churned_revenue: number;
+  yoy_revenue_change_pct: number;
+  yoy_margin_change_pct: number;
+  cross_sell_potential: number;
+  hhi_index: number;
+  hhi_interpretation: 'diversified' | 'moderate' | 'concentrated';
+  new_customers_12mo: number;
+}
+
+interface AttritionData {
+  customer_id: string;
+  customer_name: string;
+  attrition_score: number;
+  status: 'active' | 'declining' | 'at_risk' | 'churned';
+  revenue_at_risk: number;
+  recency_days: number;
+  frequency_change_pct: number;
+  monetary_change_pct: number;
+  current_12mo_revenue?: number;
+  prior_12mo_revenue?: number;
+  score_components?: {
+    recency: number;
+    frequency: number;
+    monetary: number;
+    productMix: number;
+  };
+}
+
+interface YoYData {
+  entity_type: 'customer' | 'class';
+  entity_id: string;
+  entity_name: string;
+  current_revenue: number;
+  prior_revenue: number;
+  revenue_change_pct: number;
+  current_margin_pct: number;
+  prior_margin_pct: number;
+  trend: 'growing' | 'stable' | 'declining';
+}
+
+interface CrossSellOpportunity {
+  customer_id: string;
+  customer_name: string;
+  current_classes: string[];
+  recommended_class: string;
+  affinity_score: number;
+  similar_customer_count: number;
+  similar_customer_coverage_pct: number;
+  estimated_revenue: number;
+  avg_margin_pct: number;
+  reasoning: string;
+}
+
+interface ConcentrationData {
+  hhi_index: number;
+  hhi_interpretation: 'diversified' | 'moderate' | 'concentrated';
+  top_customer_pct: number;
+  top_customer_name: string;
+  top_3_concentration: number;
+  top_3_names: string[];
+  customers_for_80_pct: number;
+  total_customers: number;
+  total_revenue: number;
+  segments: {
+    tier: 'platinum' | 'gold' | 'silver' | 'bronze';
+    customer_count: number;
+    total_revenue: number;
+    pct_of_total: number;
+    threshold_description: string;
+  }[];
+}
+
+interface InsightAlert {
+  type: 'danger' | 'warning' | 'info';
+  title: string;
+  message: string;
+  metric?: string;
+}
+
+interface InsightsData {
+  summary: InsightsSummary;
+  alerts: InsightAlert[];
+  attrition: AttritionData[];
+  yoy: YoYData[];
+  crossSell: CrossSellOpportunity[];
+  concentration: ConcentrationData;
 }
 
 interface DashboardData {
@@ -498,8 +597,14 @@ export default function DiversifiedDashboard() {
   const [syncing, setSyncing] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'table' | 'charts'>('table');
+  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'insights'>('table');
   const [budgetData, setBudgetData] = useState<BudgetData[]>([]);
+
+  // Insights state
+  const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [insightsSubTab, setInsightsSubTab] = useState<'overview' | 'attrition' | 'growth' | 'opportunities'>('overview');
 
   // Filter state
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
@@ -563,6 +668,27 @@ export default function DiversifiedDashboard() {
       }
     } catch (err) {
       console.error('Error fetching budget data:', err);
+    }
+  };
+
+  // Fetch insights data
+  const fetchInsightsData = async (bustCache = false) => {
+    setInsightsLoading(true);
+    setInsightsError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('years', '3'); // Last 3 years
+      if (bustCache) params.set('bust', 'true');
+
+      const response = await fetch(`/api/diversified/insights?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch insights data');
+
+      const result = await response.json();
+      setInsightsData(result);
+    } catch (err) {
+      setInsightsError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setInsightsLoading(false);
     }
   };
 
@@ -646,6 +772,13 @@ export default function DiversifiedDashboard() {
   useEffect(() => {
     fetchBudgetData();
   }, []);
+
+  // Fetch insights when switching to insights tab (only if not already loaded)
+  useEffect(() => {
+    if (activeTab === 'insights' && !insightsData && !insightsLoading) {
+      fetchInsightsData();
+    }
+  }, [activeTab]);
 
   // Handle row expansion
   const handleRowExpand = (rowId: string, type: 'class' | 'customer') => {
@@ -847,6 +980,19 @@ export default function DiversifiedDashboard() {
                   </svg>
                   Charts
                 </button>
+                <button
+                  onClick={() => setActiveTab('insights')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'insights'
+                      ? 'bg-[#A855F7]/20 text-[#A855F7] border border-[#A855F7]/30 shadow-[0_0_20px_rgba(168,85,247,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  Insights
+                </button>
               </motion.div>
 
               {/* Filters */}
@@ -1038,6 +1184,306 @@ export default function DiversifiedDashboard() {
                     Please wait while we fetch the visualization data
                   </p>
                 </div>
+              )}
+
+              {/* Insights Tab */}
+              {activeTab === 'insights' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  {insightsLoading ? (
+                    <div className="p-12 text-center">
+                      <div className="flex items-center justify-center gap-3 mb-4">
+                        <svg className="w-6 h-6 animate-spin text-[#A855F7]" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span className="text-[#A855F7] font-medium">Analyzing sales intelligence...</span>
+                      </div>
+                      <p className="text-[#475569] text-[12px]">
+                        Computing attrition scores, cross-sell opportunities, and concentration metrics
+                      </p>
+                    </div>
+                  ) : insightsError ? (
+                    <div className="p-8 rounded-xl bg-[#EF4444]/10 border border-[#EF4444]/30 text-[#EF4444] text-center">
+                      <p className="font-medium mb-2">Error loading insights</p>
+                      <p className="text-[13px] opacity-80">{insightsError}</p>
+                      <button
+                        onClick={() => fetchInsightsData(true)}
+                        className="mt-4 px-4 py-2 rounded-lg bg-[#EF4444]/20 hover:bg-[#EF4444]/30 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : insightsData ? (
+                    <>
+                      {/* Insights Sub-Navigation */}
+                      <div className="flex items-center gap-2 -mt-2 mb-4">
+                        {(['overview', 'attrition', 'growth', 'opportunities'] as const).map((tab) => (
+                          <button
+                            key={tab}
+                            onClick={() => setInsightsSubTab(tab)}
+                            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                              insightsSubTab === tab
+                                ? 'bg-[#A855F7]/20 text-[#A855F7] border border-[#A855F7]/30'
+                                : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                            }`}
+                          >
+                            {tab === 'overview' && 'Overview'}
+                            {tab === 'attrition' && 'Attrition'}
+                            {tab === 'growth' && 'YoY Growth'}
+                            {tab === 'opportunities' && 'Opportunities'}
+                          </button>
+                        ))}
+
+                        <div className="flex-1" />
+
+                        <button
+                          onClick={() => fetchInsightsData(true)}
+                          className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[#64748B] bg-[#1E293B] border border-white/[0.04] hover:bg-[#334155] hover:text-white transition-all flex items-center gap-1.5"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Refresh
+                        </button>
+                      </div>
+
+                      {/* Alerts Banner */}
+                      {insightsData.alerts.length > 0 && insightsSubTab === 'overview' && (
+                        <div className="space-y-2">
+                          {insightsData.alerts.slice(0, 3).map((alert, idx) => (
+                            <motion.div
+                              key={idx}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: idx * 0.1 }}
+                              className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
+                                alert.type === 'danger'
+                                  ? 'bg-[#EF4444]/10 border-[#EF4444]/30 text-[#EF4444]'
+                                  : alert.type === 'warning'
+                                  ? 'bg-[#F59E0B]/10 border-[#F59E0B]/30 text-[#F59E0B]'
+                                  : 'bg-[#38BDF8]/10 border-[#38BDF8]/30 text-[#38BDF8]'
+                              }`}
+                            >
+                              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                              <div className="flex-1">
+                                <span className="font-medium">{alert.title}:</span>
+                                <span className="ml-1 opacity-90">{alert.message}</span>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Insights KPI Cards */}
+                      {insightsSubTab === 'overview' && (
+                        <div className="grid grid-cols-6 gap-4">
+                          <KPICard
+                            title="At-Risk Customers"
+                            value={insightsData.summary.at_risk_customers.toString()}
+                            subtitle={`${formatCurrencyCompact(insightsData.summary.at_risk_revenue)} at risk`}
+                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>}
+                            color="#EF4444"
+                            delay={0}
+                          />
+                          <KPICard
+                            title="YoY Revenue"
+                            value={`${insightsData.summary.yoy_revenue_change_pct >= 0 ? '+' : ''}${insightsData.summary.yoy_revenue_change_pct.toFixed(1)}%`}
+                            subtitle="vs prior year"
+                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+                            color={insightsData.summary.yoy_revenue_change_pct >= 0 ? '#22C55E' : '#EF4444'}
+                            trend={insightsData.summary.yoy_revenue_change_pct >= 0 ? 'up' : 'down'}
+                            delay={0.05}
+                          />
+                          <KPICard
+                            title="Cross-Sell Potential"
+                            value={formatCurrencyCompact(insightsData.summary.cross_sell_potential)}
+                            subtitle={`${insightsData.crossSell.length} opportunities`}
+                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                            color="#A855F7"
+                            delay={0.1}
+                          />
+                          <KPICard
+                            title="Concentration"
+                            value={insightsData.summary.hhi_interpretation.charAt(0).toUpperCase() + insightsData.summary.hhi_interpretation.slice(1)}
+                            subtitle={`HHI: ${insightsData.summary.hhi_index.toLocaleString()}`}
+                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /></svg>}
+                            color={insightsData.summary.hhi_interpretation === 'diversified' ? '#22C55E' : insightsData.summary.hhi_interpretation === 'moderate' ? '#F59E0B' : '#EF4444'}
+                            delay={0.15}
+                          />
+                          <KPICard
+                            title="New Customers"
+                            value={insightsData.summary.new_customers_12mo.toString()}
+                            subtitle="last 12 months"
+                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>}
+                            color="#22C55E"
+                            delay={0.2}
+                          />
+                          <KPICard
+                            title="Churned Revenue"
+                            value={formatCurrencyCompact(insightsData.summary.churned_revenue)}
+                            subtitle={`${insightsData.summary.churned_customers} customers`}
+                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>}
+                            color="#EF4444"
+                            delay={0.25}
+                          />
+                        </div>
+                      )}
+
+                      {/* Overview Sub-Tab Content */}
+                      {insightsSubTab === 'overview' && (
+                        <div className="space-y-6">
+                          {/* Row 1: Attrition + Concentration */}
+                          <div className="grid grid-cols-2 gap-6">
+                            <AttritionBarChart
+                              data={insightsData.attrition.slice(0, 10)}
+                              index={0}
+                            />
+                            <ConcentrationChart
+                              data={insightsData.concentration}
+                              index={1}
+                            />
+                          </div>
+
+                          {/* AI Insights Panel */}
+                          <AIInsightsPanelV2
+                            onGenerate={async () => {
+                              const response = await fetch('/api/diversified/insights/ai', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(insightsData),
+                              });
+                              if (!response.ok) throw new Error('Failed to generate AI insights');
+                              return response.json();
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Attrition Sub-Tab Content */}
+                      {insightsSubTab === 'attrition' && (
+                        <div className="space-y-6">
+                          <AttritionBarChart
+                            data={insightsData.attrition}
+                            index={0}
+                          />
+
+                          {/* Detailed Attrition Table */}
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="bg-[#0F1123]/80 rounded-2xl p-6 border border-white/[0.08]"
+                          >
+                            <div className="flex items-center gap-2 mb-4">
+                              <h3 className="text-white font-semibold">Customer Attrition Details</h3>
+                              <MetricExplainer
+                                title="Attrition Score"
+                                description="How likely this customer is to stop buying. Based on: how recently they ordered (35%), if order frequency is dropping (30%), if spend is declining (25%), and if they're buying fewer product types (10%). Score 0-100 where higher = more risk."
+                                calculation="(Recency × 35%) + (Frequency Change × 30%) + (Spend Change × 25%) + (Product Mix × 10%)"
+                                thresholds={[
+                                  { label: 'Active', range: '0-40', description: 'Healthy, no immediate risk' },
+                                  { label: 'Declining', range: '40-70', description: 'Negative trends, needs attention' },
+                                  { label: 'At-Risk', range: '70+', description: 'High churn probability' },
+                                  { label: 'Churned', range: 'N/A', description: 'No purchase in 12+ months' },
+                                ]}
+                              />
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="border-b border-white/10">
+                                    <th className="text-left py-2 px-3 text-[11px] font-medium text-[#64748B] uppercase">Customer</th>
+                                    <th className="text-center py-2 px-3 text-[11px] font-medium text-[#64748B] uppercase">Status</th>
+                                    <th className="text-center py-2 px-3 text-[11px] font-medium text-[#64748B] uppercase">Score</th>
+                                    <th className="text-right py-2 px-3 text-[11px] font-medium text-[#64748B] uppercase">Last Purchase</th>
+                                    <th className="text-right py-2 px-3 text-[11px] font-medium text-[#64748B] uppercase">Revenue at Risk</th>
+                                    <th className="text-right py-2 px-3 text-[11px] font-medium text-[#64748B] uppercase">Change</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {insightsData.attrition.slice(0, 20).map((customer, idx) => (
+                                    <tr key={customer.customer_id} className="border-b border-white/[0.05] hover:bg-white/[0.02]">
+                                      <td className="py-2.5 px-3 text-[13px] text-white">{customer.customer_name}</td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                          customer.status === 'churned' ? 'bg-[#64748B]/20 text-[#64748B]' :
+                                          customer.status === 'at_risk' ? 'bg-[#EF4444]/20 text-[#EF4444]' :
+                                          customer.status === 'declining' ? 'bg-[#F59E0B]/20 text-[#F59E0B]' :
+                                          'bg-[#22C55E]/20 text-[#22C55E]'
+                                        }`}>
+                                          {customer.status.replace('_', ' ').toUpperCase()}
+                                        </span>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        <span className={`text-[13px] font-medium ${
+                                          customer.attrition_score >= 70 ? 'text-[#EF4444]' :
+                                          customer.attrition_score >= 50 ? 'text-[#F59E0B]' :
+                                          customer.attrition_score >= 30 ? 'text-[#FBBF24]' :
+                                          'text-[#22C55E]'
+                                        }`}>
+                                          {customer.attrition_score}
+                                        </span>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right text-[13px] text-[#94A3B8]">
+                                        {customer.recency_days} days ago
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right text-[13px] text-white font-medium">
+                                        {formatCurrencyCompact(customer.revenue_at_risk)}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right">
+                                        <span className={`text-[13px] font-medium ${
+                                          customer.monetary_change_pct >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'
+                                        }`}>
+                                          {customer.monetary_change_pct >= 0 ? '+' : ''}{customer.monetary_change_pct.toFixed(1)}%
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </motion.div>
+                        </div>
+                      )}
+
+                      {/* Growth Sub-Tab Content */}
+                      {insightsSubTab === 'growth' && (
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-2 gap-6">
+                            <YoYComparisonChart
+                              data={insightsData.yoy}
+                              currentYear={new Date().getFullYear()}
+                              priorYear={new Date().getFullYear() - 1}
+                              viewMode="customer"
+                              index={0}
+                            />
+                            <YoYComparisonChart
+                              data={insightsData.yoy}
+                              currentYear={new Date().getFullYear()}
+                              priorYear={new Date().getFullYear() - 1}
+                              viewMode="class"
+                              index={1}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Opportunities Sub-Tab Content */}
+                      {insightsSubTab === 'opportunities' && (
+                        <div className="space-y-6">
+                          <CrossSellTable data={insightsData.crossSell} />
+                        </div>
+                      )}
+                    </>
+                  ) : null}
+                </motion.div>
               )}
             </>
           ) : null}

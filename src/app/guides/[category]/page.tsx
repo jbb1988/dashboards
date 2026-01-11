@@ -667,6 +667,253 @@ const guideContent: Record<string, GuideData> = {
       },
     ],
   },
+  insights: {
+    title: 'Sales Insights Guide',
+    description: 'Customer intelligence, attrition analysis, and AI-powered recommendations for sales leadership.',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    ),
+    color: '#A855F7',
+    topics: [
+      {
+        id: 'getting-started',
+        title: 'Getting Started with Insights',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Insights tab in the Diversified Products dashboard provides sales intelligence to help managers and VPs identify opportunities and risks without manually analyzing sales data.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Sub-tabs</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-[#111827] rounded-lg">
+                  <span className="text-[#A855F7] font-medium">Overview</span>
+                  <p className="text-[#64748B] text-xs mt-1">KPI cards, alerts, and quick charts</p>
+                </div>
+                <div className="p-3 bg-[#111827] rounded-lg">
+                  <span className="text-[#A855F7] font-medium">Attrition</span>
+                  <p className="text-[#64748B] text-xs mt-1">At-risk customer analysis</p>
+                </div>
+                <div className="p-3 bg-[#111827] rounded-lg">
+                  <span className="text-[#A855F7] font-medium">YoY Growth</span>
+                  <p className="text-[#64748B] text-xs mt-1">Year-over-year comparisons</p>
+                </div>
+                <div className="p-3 bg-[#111827] rounded-lg">
+                  <span className="text-[#A855F7] font-medium">Opportunities</span>
+                  <p className="text-[#64748B] text-xs mt-1">Cross-sell recommendations</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-[#64748B] text-sm">
+              Data is analyzed from the last 3 years of sales transactions. Click the Refresh button to recalculate metrics.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: 'attrition',
+        title: 'Customer Attrition Analysis',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Attrition Score predicts how likely a customer is to stop buying. Higher scores mean more risk.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Score Components (0-100)</h4>
+              <ul className="space-y-2 text-sm">
+                <li className="flex justify-between text-[#8FA3BF]">
+                  <span><strong className="text-white">Recency (35%)</strong> - Days since last purchase</span>
+                </li>
+                <li className="flex justify-between text-[#8FA3BF]">
+                  <span><strong className="text-white">Frequency (30%)</strong> - Order count change vs prior year</span>
+                </li>
+                <li className="flex justify-between text-[#8FA3BF]">
+                  <span><strong className="text-white">Monetary (25%)</strong> - Revenue change vs prior year</span>
+                </li>
+                <li className="flex justify-between text-[#8FA3BF]">
+                  <span><strong className="text-white">Product Mix (10%)</strong> - Change in product variety</span>
+                </li>
+              </ul>
+            </div>
+            <h4 className="text-white font-medium mt-4">Customer Status</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-[#0B1220] rounded-lg border-l-4 border-[#22C55E]">
+                <span className="text-[#22C55E] font-medium">Active (0-40)</span>
+                <p className="text-[#64748B] text-xs mt-1">Healthy engagement, no risk</p>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border-l-4 border-[#F59E0B]">
+                <span className="text-[#F59E0B] font-medium">Declining (40-70)</span>
+                <p className="text-[#64748B] text-xs mt-1">Negative trends, needs attention</p>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border-l-4 border-[#EF4444]">
+                <span className="text-[#EF4444] font-medium">At-Risk (70+)</span>
+                <p className="text-[#64748B] text-xs mt-1">High churn probability, act now</p>
+              </div>
+              <div className="p-3 bg-[#0B1220] rounded-lg border-l-4 border-[#64748B]">
+                <span className="text-[#64748B] font-medium">Churned</span>
+                <p className="text-[#64748B] text-xs mt-1">No purchase in 12+ months</p>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'yoy',
+        title: 'Year-over-Year Performance',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Compare current year revenue and margins against the prior year to identify growth and decline trends.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Chart Features</h4>
+              <ul className="space-y-2 text-sm text-[#8FA3BF]">
+                <li>• <strong className="text-white">Grouped bars:</strong> Current year (cyan) vs Prior year (purple)</li>
+                <li>• <strong className="text-white">Toggle filters:</strong> Show/hide growing or declining entities</li>
+                <li>• <strong className="text-white">View switch:</strong> Compare by Customer or by Product Class</li>
+                <li>• <strong className="text-white">Hover tooltip:</strong> See exact revenue, change %, and margin details</li>
+              </ul>
+            </div>
+            <div className="flex gap-4 mt-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#22C55E]" />
+                <span className="text-[#8FA3BF] text-sm">Growing (&gt;5% increase)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#EF4444]" />
+                <span className="text-[#8FA3BF] text-sm">Declining (&gt;5% decrease)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#64748B]" />
+                <span className="text-[#8FA3BF] text-sm">Stable (within 5%)</span>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'cross-sell',
+        title: 'Cross-Sell Opportunities',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Cross-Sell table recommends products that similar customers buy but the target customer hasn't purchased yet.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">How Recommendations Work</h4>
+              <ol className="space-y-2 text-sm text-[#8FA3BF] list-decimal list-inside">
+                <li>System finds customers with similar purchase patterns (Jaccard similarity)</li>
+                <li>Identifies products that 30%+ of similar customers buy</li>
+                <li>Filters out products the target already purchases</li>
+                <li>Scores by coverage rate and margin potential</li>
+              </ol>
+            </div>
+            <h4 className="text-white font-medium mt-4">Table Columns</h4>
+            <ul className="space-y-2 text-sm text-[#8FA3BF]">
+              <li><strong className="text-white">Customer:</strong> Target customer name</li>
+              <li><strong className="text-white">Recommended Product:</strong> Product class to pitch</li>
+              <li><strong className="text-white">Affinity Score:</strong> 0-100, higher = stronger match</li>
+              <li><strong className="text-white">Est. Revenue:</strong> Projected annual revenue if sold</li>
+              <li><strong className="text-white">Margin:</strong> Average gross margin % for this product</li>
+            </ul>
+            <p className="text-[#64748B] text-sm mt-4">
+              Click the expand arrow to see which products the customer currently buys and why this recommendation was made.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: 'concentration',
+        title: 'Revenue Concentration',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Concentration chart shows how revenue is distributed across customers, helping identify dependency risk.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">HHI Index (Herfindahl-Hirschman Index)</h4>
+              <p className="text-[#64748B] text-sm mb-3">
+                Measures revenue concentration. Calculated as the sum of squared revenue percentages.
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="px-2 py-1 bg-[#22C55E]/20 text-[#22C55E] rounded text-xs font-medium">&lt; 1,500</span>
+                  <span className="text-[#8FA3BF] text-sm">Diversified - Low Risk</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="px-2 py-1 bg-[#F59E0B]/20 text-[#F59E0B] rounded text-xs font-medium">1,500-2,500</span>
+                  <span className="text-[#8FA3BF] text-sm">Moderate - Some concentration</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="px-2 py-1 bg-[#EF4444]/20 text-[#EF4444] rounded text-xs font-medium">&gt; 2,500</span>
+                  <span className="text-[#8FA3BF] text-sm">Concentrated - High Risk</span>
+                </div>
+              </div>
+            </div>
+            <h4 className="text-white font-medium mt-4">Customer Tiers</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2 p-3 bg-[#0B1220] rounded-lg">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#E5E4E2' }} />
+                <span className="text-white text-sm">Platinum (Top 5%)</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-[#0B1220] rounded-lg">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FFD700' }} />
+                <span className="text-white text-sm">Gold (Next 15%)</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-[#0B1220] rounded-lg">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#C0C0C0' }} />
+                <span className="text-white text-sm">Silver (Next 30%)</span>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-[#0B1220] rounded-lg">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#CD7F32' }} />
+                <span className="text-white text-sm">Bronze (Bottom 50%)</span>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'ai-insights',
+        title: 'AI-Powered Recommendations',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Click "Generate AI Insights" to get AI-powered recommendations based on your current data.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">What AI Analyzes</h4>
+              <ul className="space-y-2 text-sm text-[#8FA3BF]">
+                <li>• At-risk customers and potential retention strategies</li>
+                <li>• Revenue concentration and diversification suggestions</li>
+                <li>• Top cross-sell opportunities with talking points</li>
+                <li>• YoY trends and growth opportunities</li>
+              </ul>
+            </div>
+            <h4 className="text-white font-medium mt-4">Recommendation Cards</h4>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 p-3 bg-[#0B1220] rounded-lg">
+                <span className="px-2 py-1 bg-[#EF4444]/20 text-[#EF4444] rounded text-xs font-medium">HIGH</span>
+                <span className="text-[#8FA3BF] text-sm">Immediate action needed - material revenue impact</span>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-[#0B1220] rounded-lg">
+                <span className="px-2 py-1 bg-[#F59E0B]/20 text-[#F59E0B] rounded text-xs font-medium">MEDIUM</span>
+                <span className="text-[#8FA3BF] text-sm">Should address soon - meaningful opportunity</span>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-[#0B1220] rounded-lg">
+                <span className="px-2 py-1 bg-[#38BDF8]/20 text-[#38BDF8] rounded text-xs font-medium">LOW</span>
+                <span className="text-[#8FA3BF] text-sm">Nice to have - lower priority</span>
+              </div>
+            </div>
+            <p className="text-[#64748B] text-sm mt-4">
+              Each recommendation includes: the problem identified, specific actions to take, and expected impact.
+            </p>
+          </div>
+        ),
+      },
+    ],
+  },
 };
 
 export default function GuideCategoryPage() {

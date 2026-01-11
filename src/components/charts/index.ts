@@ -3,3 +3,7 @@ export { RevenueAreaChart } from './RevenueAreaChart';
 export { ClassBarChart } from './ClassBarChart';
 export { BudgetVarianceChart } from './BudgetVarianceChart';
 export { CustomerDonut } from './CustomerDonut';
+export { AttritionBarChart } from './AttritionBarChart';
+export { YoYComparisonChart } from './YoYComparisonChart';
+export { ConcentrationChart } from './ConcentrationChart';
+export { CrossSellTable } from './CrossSellTable';
