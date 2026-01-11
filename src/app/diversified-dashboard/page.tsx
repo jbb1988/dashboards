@@ -633,6 +633,14 @@ export default function DiversifiedDashboard() {
   const [aiExecutiveSummary, setAiExecutiveSummary] = useState('');
   const [insightsGeneratedAt, setInsightsGeneratedAt] = useState<string | null>(null);
   const [loadingSavedInsights, setLoadingSavedInsights] = useState(false);
+  const [currentInsightId, setCurrentInsightId] = useState<string | null>(null);
+  const [insightsHistory, setInsightsHistory] = useState<Array<{
+    id: string;
+    generated_at: string;
+    created_at: string;
+    executive_summary: string;
+  }>>([]);
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
 
   // Filter state
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
@@ -790,8 +798,11 @@ export default function DiversifiedDashboard() {
           setAiRecommendations(result.insights.recommendations || []);
           setAiExecutiveSummary(result.insights.executive_summary || '');
           setInsightsGeneratedAt(result.insights.generated_at || result.insights.created_at || null);
+          setCurrentInsightId(result.insights.id || null);
         }
       }
+      // Also load history
+      await loadInsightsHistory();
     } catch (err) {
       console.error('Error loading saved insights:', err);
     } finally {
@@ -799,10 +810,45 @@ export default function DiversifiedDashboard() {
     }
   };
 
+  // Load insights history list
+  const loadInsightsHistory = async () => {
+    try {
+      const response = await fetch('/api/diversified/insights/saved?history=true');
+      if (response.ok) {
+        const result = await response.json();
+        setInsightsHistory(result.history || []);
+      }
+    } catch (err) {
+      console.error('Error loading insights history:', err);
+    }
+  };
+
+  // Load a specific historical insight
+  const loadHistoricalInsight = async (id: string) => {
+    setLoadingSavedInsights(true);
+    try {
+      const response = await fetch(`/api/diversified/insights/saved?id=${id}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.insights) {
+          setAiRecommendations(result.insights.recommendations || []);
+          setAiExecutiveSummary(result.insights.executive_summary || '');
+          setInsightsGeneratedAt(result.insights.generated_at || result.insights.created_at || null);
+          setCurrentInsightId(result.insights.id || null);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading historical insight:', err);
+    } finally {
+      setLoadingSavedInsights(false);
+      setShowHistoryDropdown(false);
+    }
+  };
+
   // Save AI insights to Supabase
   const saveInsights = async (recommendations: typeof aiRecommendations, executiveSummary: string, generatedAt: string) => {
     try {
-      await fetch('/api/diversified/insights/saved', {
+      const response = await fetch('/api/diversified/insights/saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -811,6 +857,14 @@ export default function DiversifiedDashboard() {
           generated_at: generatedAt,
         }),
       });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.insights) {
+          setCurrentInsightId(result.insights.id);
+        }
+        // Refresh history after saving
+        await loadInsightsHistory();
+      }
     } catch (err) {
       console.error('Error saving insights:', err);
     }
@@ -1584,21 +1638,94 @@ export default function DiversifiedDashboard() {
                                     ({aiRecommendations.length} recommendations)
                                   </span>
                                 </button>
-                                {insightsGeneratedAt && (
-                                  <div className="flex items-center justify-center gap-2 text-[11px] text-[#64748B]">
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    <span>
-                                      Saved {new Date(insightsGeneratedAt).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        hour: 'numeric',
-                                        minute: '2-digit'
-                                      })}
-                                    </span>
-                                  </div>
-                                )}
+
+                                {/* Timestamp and History */}
+                                <div className="flex items-center justify-between">
+                                  {insightsGeneratedAt && (
+                                    <div className="flex items-center gap-2 text-[11px] text-[#64748B]">
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                      <span>
+                                        {new Date(insightsGeneratedAt).toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: 'numeric',
+                                          minute: '2-digit'
+                                        })}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* History Dropdown */}
+                                  {insightsHistory.length > 1 && (
+                                    <div className="relative">
+                                      <button
+                                        onClick={() => setShowHistoryDropdown(!showHistoryDropdown)}
+                                        className="flex items-center gap-1 text-[11px] text-[#64748B] hover:text-purple-400 transition-colors"
+                                      >
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        History ({insightsHistory.length})
+                                        <svg className={`w-3 h-3 transition-transform ${showHistoryDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                      </button>
+
+                                      {showHistoryDropdown && (
+                                        <>
+                                          <div
+                                            className="fixed inset-0 z-10"
+                                            onClick={() => setShowHistoryDropdown(false)}
+                                          />
+                                          <div className="absolute right-0 mt-2 w-72 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden">
+                                            <div className="px-3 py-2 border-b border-white/10">
+                                              <span className="text-[10px] text-[#64748B] uppercase tracking-wider font-semibold">
+                                                Previous Insights
+                                              </span>
+                                            </div>
+                                            <div className="max-h-64 overflow-y-auto">
+                                              {insightsHistory.map((item) => (
+                                                <button
+                                                  key={item.id}
+                                                  onClick={() => loadHistoricalInsight(item.id)}
+                                                  className={`w-full px-3 py-2.5 text-left hover:bg-white/5 transition-colors border-b border-white/[0.04] last:border-b-0 ${
+                                                    currentInsightId === item.id ? 'bg-purple-500/10' : ''
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-[12px] text-white font-medium">
+                                                      {new Date(item.generated_at || item.created_at).toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric'
+                                                      })}
+                                                    </span>
+                                                    <span className="text-[10px] text-[#64748B]">
+                                                      {new Date(item.generated_at || item.created_at).toLocaleTimeString('en-US', {
+                                                        hour: 'numeric',
+                                                        minute: '2-digit'
+                                                      })}
+                                                    </span>
+                                                  </div>
+                                                  <p className="text-[11px] text-[#94A3B8] line-clamp-2">
+                                                    {item.executive_summary.slice(0, 100)}...
+                                                  </p>
+                                                  {currentInsightId === item.id && (
+                                                    <span className="text-[9px] text-purple-400 uppercase mt-1 inline-block">
+                                                      Currently viewing
+                                                    </span>
+                                                  )}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </motion.div>
                             )}
                           </div>
