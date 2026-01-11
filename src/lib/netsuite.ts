@@ -709,12 +709,9 @@ export async function getProjectProfitability(options: {
     dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
   }
 
-  // Query TransactionLine with TB/MCC/M3 specific accounts only
-  // Revenue accounts: 4010-4019 (TB Equip), 4021 (TB Components), 4031-4039 (TB Install),
-  //   4041-4049 (M3 Install), 4051-4059 (M3 Subscription), 4071-4079 (TB Service),
-  //   4080-4099 (M3 Software), 4100-4119 (MCC Services)
-  // COGS accounts: Corresponding 5xxx accounts
-  // EXCLUDES: 4050 (Other/Shipping), 4120+ (AMR/Diversified)
+  // Query TransactionLine for Test Bench class ONLY (class_id = 1)
+  // This filters out Diversified Products and brings in TB/MCC/M3 project data
+  // Revenue accounts: 4xxx, COGS accounts: 5xxx
   const suiteQL = `
     SELECT
       t.id AS transaction_id,
@@ -740,33 +737,10 @@ export async function getProjectProfitability(options: {
     LEFT JOIN Account a ON a.id = tl.account
     WHERE t.posting = 'T'
       AND tl.mainline = 'F'
+      AND tl.class = 1
       AND tl.netamount IS NOT NULL
       AND tl.netamount != 0
-      AND (
-        -- Test Bench Equipment (Revenue & COGS)
-        (a.acctnumber >= '4010' AND a.acctnumber <= '4019')
-        OR (a.acctnumber >= '5010' AND a.acctnumber <= '5019')
-        -- Test Bench Components
-        OR a.acctnumber = '4021' OR a.acctnumber = '5021'
-        -- TB Install & Training
-        OR (a.acctnumber >= '4031' AND a.acctnumber <= '4039')
-        OR (a.acctnumber >= '5031' AND a.acctnumber <= '5039')
-        -- M3 Install & Training
-        OR (a.acctnumber >= '4041' AND a.acctnumber <= '4049')
-        OR (a.acctnumber >= '5041' AND a.acctnumber <= '5049')
-        -- M3 Software Subscription
-        OR (a.acctnumber >= '4051' AND a.acctnumber <= '4059')
-        OR (a.acctnumber >= '5051' AND a.acctnumber <= '5059')
-        -- TB Service/Maintenance
-        OR (a.acctnumber >= '4071' AND a.acctnumber <= '4079')
-        OR (a.acctnumber >= '5071' AND a.acctnumber <= '5079')
-        -- M3 Software
-        OR (a.acctnumber >= '4080' AND a.acctnumber <= '4099')
-        OR (a.acctnumber >= '5080' AND a.acctnumber <= '5099')
-        -- MCC Services
-        OR (a.acctnumber >= '4100' AND a.acctnumber <= '4119')
-        OR (a.acctnumber >= '5100' AND a.acctnumber <= '5119')
-      )
+      AND (a.acctnumber LIKE '4%' OR a.acctnumber LIKE '5%')
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.id
   `;
