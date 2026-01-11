@@ -231,6 +231,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           id: contract.contractId,
           contract_name: contract.contractName,
           account_name: account.accountName,
+          contract_type: matchingContract?.contractType?.join(', ') || undefined,
           salesforce_id: matchingContract?.salesforceId,
           documents: uploadedDocs,
           completeness: {

@@ -22,6 +22,7 @@ export interface ContractItem {
   id: string;
   contract_name: string;
   account_name: string;
+  contract_type?: string;
   salesforce_id?: string;
   documents: ContractDocument[];
   completeness: {

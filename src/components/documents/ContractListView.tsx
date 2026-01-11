@@ -81,7 +81,7 @@ function ContractRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[15px] font-medium text-white truncate">
-            {contract.contract_name}
+            {contract.account_name}
           </span>
           {hasMissingRequired && (
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium uppercase flex-shrink-0">
@@ -90,7 +90,7 @@ function ContractRow({
           )}
         </div>
         <div className="flex items-center gap-2 text-[13px] text-[#8FA3BF]">
-          <span className="truncate">{contract.account_name}</span>
+          <span className="truncate">{contract.contract_type || contract.contract_name}</span>
         </div>
       </div>
 
@@ -151,7 +151,8 @@ export default function ContractListView({
       const query = searchQuery.toLowerCase();
       result = result.filter(c =>
         c.contract_name.toLowerCase().includes(query) ||
-        c.account_name.toLowerCase().includes(query)
+        c.account_name.toLowerCase().includes(query) ||
+        (c.contract_type?.toLowerCase().includes(query) ?? false)
       );
     }
 
@@ -300,7 +301,11 @@ export default function ContractListView({
         onDownload={onDownload}
         onShare={onShare}
         onView={onView}
-        onDelete={onDelete}
+        onDelete={(doc) => {
+          // Close drawer first, then delete - this ensures UI refreshes properly
+          setSelectedContract(null);
+          onDelete?.(doc);
+        }}
       />
     </div>
   );
