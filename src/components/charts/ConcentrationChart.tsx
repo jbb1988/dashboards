@@ -1,15 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
-import { ChartContainer, formatChartCurrency, CHART_COLORS } from './ChartContainer';
+import { useMemo } from 'react';
+import { ChartContainer, formatChartCurrency } from './ChartContainer';
 
 interface ConcentrationMetrics {
   hhi_index: number;
@@ -21,6 +13,7 @@ interface ConcentrationMetrics {
   customers_for_80_pct: number;
   total_customers: number;
   total_revenue: number;
+  single_customer_risk?: boolean;
   segments: {
     tier: 'platinum' | 'gold' | 'silver' | 'bronze';
     customer_count: number;
@@ -34,290 +27,189 @@ interface ConcentrationMetrics {
 interface ConcentrationChartProps {
   data: ConcentrationMetrics;
   index?: number;
+  onCustomerClick?: (customerId: string, customerName: string) => void;
 }
 
-const TIER_COLORS = {
-  platinum: '#E5E4E2',
-  gold: '#FFD700',
-  silver: '#C0C0C0',
-  bronze: '#CD7F32',
-};
+export function ConcentrationChart({ data, index = 0, onCustomerClick }: ConcentrationChartProps) {
+  // Calculate key dollar figures
+  const topCustomerRevenue = Math.round(data.total_revenue * data.top_customer_pct / 100);
+  const isHighRisk = data.top_customer_pct > 25 || data.single_customer_risk;
+  const isModerateRisk = data.top_customer_pct > 15;
 
-const TIER_LABELS = {
-  platinum: 'Platinum',
-  gold: 'Gold',
-  silver: 'Silver',
-  bronze: 'Bronze',
-};
+  // Find growth targets (Gold + Silver tier customers)
+  const growthTargets = useMemo(() => {
+    const goldSegment = data.segments.find(s => s.tier === 'gold');
+    const silverSegment = data.segments.find(s => s.tier === 'silver');
+    const targets: Array<{ name: string; revenue: number; growthTarget: number; newPct: number }> = [];
 
-function getHHIColor(hhi: number): string {
-  if (hhi < 1500) return CHART_COLORS.emerald;
-  if (hhi < 2500) return CHART_COLORS.amber;
-  return CHART_COLORS.red;
-}
-
-function getHHIRiskLevel(interpretation: string): { text: string; color: string } {
-  switch (interpretation) {
-    case 'diversified':
-      return { text: 'Low Risk', color: 'text-green-400' };
-    case 'moderate':
-      return { text: 'Medium Risk', color: 'text-amber-400' };
-    case 'concentrated':
-      return { text: 'High Risk', color: 'text-red-400' };
-    default:
-      return { text: 'Unknown', color: 'text-gray-400' };
-  }
-}
-
-export function ConcentrationChart({ data, index = 0 }: ConcentrationChartProps) {
-  const [selectedTier, setSelectedTier] = useState<string | null>(null);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-
-  const pieData = useMemo(() => {
-    return data.segments.map(segment => ({
-      name: TIER_LABELS[segment.tier],
-      value: segment.total_revenue,
-      pct: segment.pct_of_total,
-      count: segment.customer_count,
-      tier: segment.tier,
-      description: segment.threshold_description,
-      color: TIER_COLORS[segment.tier],
-      customers: segment.customers || [],
-    }));
-  }, [data.segments]);
-
-  const hhiColor = getHHIColor(data.hhi_index);
-  const riskLevel = getHHIRiskLevel(data.hhi_interpretation);
-
-  const selectedSegment = selectedTier ? pieData.find(p => p.tier === selectedTier) : null;
-
-  const handleSegmentClick = (entry: typeof pieData[0], idx: number) => {
-    if (selectedTier === entry.tier) {
-      setSelectedTier(null);
-    } else {
-      setSelectedTier(entry.tier);
+    // Silver customers - highest growth potential
+    if (silverSegment?.customers) {
+      silverSegment.customers.slice(0, 3).forEach(c => {
+        const growthTarget = Math.round(c.revenue * 0.5); // 50% growth = realistic
+        const newRevenue = c.revenue + growthTarget;
+        const newPct = (newRevenue / (data.total_revenue + growthTarget)) * 100;
+        targets.push({ name: c.name, revenue: c.revenue, growthTarget, newPct });
+      });
     }
-  };
+
+    // Gold customers - moderate growth
+    if (goldSegment?.customers) {
+      goldSegment.customers.slice(0, 2).forEach(c => {
+        const growthTarget = Math.round(c.revenue * 0.25); // 25% growth
+        const newRevenue = c.revenue + growthTarget;
+        const newPct = (newRevenue / (data.total_revenue + growthTarget)) * 100;
+        targets.push({ name: c.name, revenue: c.revenue, growthTarget, newPct });
+      });
+    }
+
+    return targets.sort((a, b) => b.growthTarget - a.growthTarget).slice(0, 4);
+  }, [data.segments, data.total_revenue]);
+
+  const totalGrowthTarget = growthTargets.reduce((sum, t) => sum + t.growthTarget, 0);
+
+  // Calculate new concentration if targets achieved
+  const newTotalRevenue = data.total_revenue + totalGrowthTarget;
+  const newTopPct = (topCustomerRevenue / newTotalRevenue) * 100;
+  const concentrationReduction = data.top_customer_pct - newTopPct;
 
   return (
     <ChartContainer
-      title="Revenue Concentration"
-      subtitle={`HHI: ${data.hhi_index.toLocaleString()} • ${data.hhi_interpretation}`}
+      title="Revenue Risk & Opportunity"
+      subtitle={`${data.total_customers} customers • ${formatChartCurrency(data.total_revenue)} total`}
       icon={
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       }
       index={index}
       height={380}
     >
-      <div className="flex h-full">
-        {/* Donut Chart with center label */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="relative" style={{ width: 220, height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={activeIndex !== null ? 105 : 95}
-                  paddingAngle={2}
-                  dataKey="value"
-                  animationDuration={800}
-                  animationEasing="ease-out"
-                  onClick={(_, idx) => handleSegmentClick(pieData[idx], idx)}
-                  onMouseEnter={(_, idx) => setActiveIndex(idx)}
-                  onMouseLeave={() => setActiveIndex(null)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {pieData.map((entry, idx) => (
-                    <Cell
-                      key={`cell-${idx}`}
-                      fill={entry.color}
-                      fillOpacity={selectedTier && selectedTier !== entry.tier ? 0.3 : 0.85}
-                      stroke={selectedTier === entry.tier ? entry.color : 'rgba(0,0,0,0.3)'}
-                      strokeWidth={selectedTier === entry.tier ? 3 : 1}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload || !payload.length) return null;
-                    const entry = payload[0].payload;
-                    return (
-                      <div className="bg-[#1B1F39] border border-white/10 rounded-xl p-4 shadow-xl z-50">
-                        <p className="text-white font-semibold mb-2 flex items-center gap-2">
-                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                          {entry.name} Tier
-                        </p>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between gap-4">
-                            <span className="text-[#64748B]">Revenue:</span>
-                            <span className="text-white font-medium">{formatChartCurrency(entry.value)}</span>
-                          </div>
-                          <div className="flex justify-between gap-4">
-                            <span className="text-[#64748B]">% of Total:</span>
-                            <span className="text-white">{entry.pct.toFixed(1)}%</span>
-                          </div>
-                          <div className="flex justify-between gap-4">
-                            <span className="text-[#64748B]">Customers:</span>
-                            <span className="text-white">{entry.count}</span>
-                          </div>
-                          <p className="text-[#64748B] text-[11px] pt-1 border-t border-white/10">
-                            {entry.description}
-                          </p>
-                          <p className="text-cyan-400 text-[10px] pt-1">
-                            Click to view details
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }}
-                  position={{ x: 10, y: 10 }}
-                  wrapperStyle={{ zIndex: 100 }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-
-            {/* Center HHI Display - absolutely centered in the donut hole */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center">
-                <div className="text-3xl font-bold" style={{ color: hhiColor }}>
-                  {data.hhi_index.toLocaleString()}
-                </div>
-                <div className={`text-xs font-medium ${riskLevel.color}`}>
-                  {riskLevel.text}
-                </div>
-              </div>
+      <div className="space-y-4">
+        {/* THE RISK - What you could lose */}
+        <div className={`rounded-xl p-4 ${
+          isHighRisk ? 'bg-gradient-to-r from-red-500/20 to-red-500/5 border border-red-500/30' :
+          isModerateRisk ? 'bg-gradient-to-r from-amber-500/15 to-amber-500/5 border border-amber-500/25' :
+          'bg-gradient-to-r from-green-500/15 to-green-500/5 border border-green-500/25'
+        }`}>
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                isHighRisk ? 'text-red-400' : isModerateRisk ? 'text-amber-400' : 'text-green-400'
+              }`}>
+                {isHighRisk ? '⚠️ HIGH RISK' : isModerateRisk ? '⚡ WATCH' : '✓ HEALTHY'}
+              </span>
             </div>
+            <div className={`text-3xl font-bold ${
+              isHighRisk ? 'text-red-400' : isModerateRisk ? 'text-amber-400' : 'text-green-400'
+            }`}>
+              {data.top_customer_pct.toFixed(0)}%
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <div
+              className="text-white font-semibold text-[14px] hover:text-cyan-400 cursor-pointer transition-colors truncate"
+              title={data.top_customer_name}
+              onClick={() => onCustomerClick?.(data.top_customer_name, data.top_customer_name)}
+            >
+              {data.top_customer_name}
+            </div>
+            <div className="text-[#94A3B8] text-[12px]">
+              = <span className="text-white font-bold">{formatChartCurrency(topCustomerRevenue)}</span> of your revenue
+            </div>
+          </div>
+
+          <div className={`text-[12px] p-2 rounded-lg ${
+            isHighRisk ? 'bg-red-500/10' : 'bg-white/5'
+          }`}>
+            {isHighRisk ? (
+              <span className="text-red-300">
+                <strong>Board concern:</strong> Losing this customer wipes out {data.top_customer_pct.toFixed(0)}% of revenue overnight.
+              </span>
+            ) : isModerateRisk ? (
+              <span className="text-amber-300">
+                <strong>Watch:</strong> Getting close to single-customer dependency. Target: &lt;15%
+              </span>
+            ) : (
+              <span className="text-green-300">
+                <strong>Good:</strong> No single customer dominates. Revenue is diversified.
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Stats Panel / Drill-down Panel */}
-        <div className="w-44 pl-4 flex flex-col justify-center gap-3">
-          <AnimatePresence mode="wait">
-            {selectedSegment ? (
-              /* Drill-down view */
-              <motion.div
-                key="drilldown"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-2"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedSegment.color }} />
-                    <span className="text-white font-semibold text-sm">{selectedSegment.name}</span>
-                  </div>
-                  <button
-                    onClick={() => setSelectedTier(null)}
-                    className="text-[#64748B] hover:text-white text-xs"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="bg-white/[0.03] rounded-lg p-2 text-center">
-                  <div className="text-[10px] text-[#64748B] uppercase">Revenue</div>
-                  <div className="text-white font-bold">{formatChartCurrency(selectedSegment.value)}</div>
-                  <div className="text-cyan-400 text-sm font-medium">{selectedSegment.pct.toFixed(1)}%</div>
-                </div>
-
-                <div className="text-[10px] text-[#64748B] uppercase mt-2">
-                  {selectedSegment.count} Customers
-                </div>
-
-                {/* Customer list from segment data or top 3 names if available */}
-                <div className="space-y-1 max-h-[140px] overflow-y-auto">
-                  {selectedSegment.tier === 'platinum' && data.top_3_names ? (
-                    data.top_3_names.map((name, idx) => (
-                      <div key={idx} className="bg-white/[0.02] rounded px-2 py-1.5">
-                        <div className="text-white text-[11px] truncate" title={name}>{name}</div>
-                      </div>
-                    ))
-                  ) : selectedSegment.customers && selectedSegment.customers.length > 0 ? (
-                    selectedSegment.customers.slice(0, 5).map((customer, idx) => (
-                      <div key={idx} className="bg-white/[0.02] rounded px-2 py-1.5">
-                        <div className="text-white text-[11px] truncate" title={customer.name}>{customer.name}</div>
-                        <div className="text-[#64748B] text-[10px]">{formatChartCurrency(customer.revenue)}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-[#64748B] text-[11px] italic py-2">
-                      {selectedSegment.description}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ) : (
-              /* Default stats view */
-              <motion.div
-                key="stats"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="space-y-3"
-              >
-                {/* Top Customer */}
-                <div className="bg-white/[0.03] rounded-lg p-3">
-                  <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Top Customer</div>
-                  <div className="text-white text-sm font-medium truncate" title={data.top_customer_name}>
-                    {data.top_customer_name}
-                  </div>
-                  <div className={`text-lg font-bold ${data.top_customer_pct > 25 ? 'text-red-400' : data.top_customer_pct > 15 ? 'text-amber-400' : 'text-green-400'}`}>
-                    {data.top_customer_pct.toFixed(1)}%
-                  </div>
-                </div>
-
-                {/* Top 3 */}
-                <div className="bg-white/[0.03] rounded-lg p-3">
-                  <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Top 3 Customers</div>
-                  <div className={`text-lg font-bold ${data.top_3_concentration > 50 ? 'text-red-400' : data.top_3_concentration > 35 ? 'text-amber-400' : 'text-green-400'}`}>
-                    {data.top_3_concentration.toFixed(1)}%
-                  </div>
-                  <div className="text-[10px] text-[#64748B] mt-1">
-                    of total revenue
-                  </div>
-                </div>
-
-                {/* Pareto */}
-                <div className="bg-white/[0.03] rounded-lg p-3">
-                  <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">80% Revenue From</div>
-                  <div className="text-lg font-bold text-cyan-400">
-                    {data.customers_for_80_pct}
-                  </div>
-                  <div className="text-[10px] text-[#64748B] mt-1">
-                    of {data.total_customers} customers
-                  </div>
-                </div>
-              </motion.div>
+        {/* THE SOLUTION - What to do about it */}
+        <div className="rounded-xl p-4 bg-gradient-to-r from-cyan-500/10 to-transparent border border-cyan-500/20">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-cyan-400">
+              📈 GROWTH ACTION PLAN
+            </div>
+            {totalGrowthTarget > 0 && (
+              <div className="text-right">
+                <div className="text-green-400 font-bold text-lg">+{formatChartCurrency(totalGrowthTarget)}</div>
+                <div className="text-[10px] text-[#64748B]">potential revenue</div>
+              </div>
             )}
-          </AnimatePresence>
-        </div>
-      </div>
+          </div>
 
-      {/* Tier Legend - clickable */}
-      <div className="flex items-center justify-center gap-4 mt-2 text-[10px]">
-        {pieData.map(tier => (
-          <button
-            key={tier.tier}
-            onClick={() => handleSegmentClick(tier, pieData.indexOf(tier))}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded transition-all ${
-              selectedTier === tier.tier
-                ? 'bg-white/10 ring-1 ring-white/20'
-                : 'hover:bg-white/5'
-            }`}
-          >
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tier.color }} />
-            <span className={selectedTier === tier.tier ? 'text-white' : 'text-[#64748B]'}>
-              {tier.name} ({tier.count})
+          {growthTargets.length > 0 ? (
+            <>
+              <div className="space-y-2 mb-3">
+                {growthTargets.map((target, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-all group"
+                    onClick={() => onCustomerClick?.(target.name, target.name)}
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-bold flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-white text-[12px] font-medium truncate group-hover:text-cyan-400" title={target.name}>
+                          {target.name}
+                        </div>
+                        <div className="text-[10px] text-[#64748B]">
+                          {formatChartCurrency(target.revenue)} → <span className="text-green-400">{formatChartCurrency(target.revenue + target.growthTarget)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-green-400 text-[11px] font-semibold">
+                      +{formatChartCurrency(target.growthTarget)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Impact projection */}
+              {isHighRisk && concentrationReduction > 0 && (
+                <div className="p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="text-[11px] text-green-300">
+                    <strong>Impact:</strong> Growing these accounts reduces top customer dependency
+                    from <span className="text-red-400">{data.top_customer_pct.toFixed(0)}%</span> →
+                    <span className="text-green-400"> {newTopPct.toFixed(0)}%</span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-4 text-[#64748B]">
+              <p className="text-[12px]">Customer tier data needed for growth targets</p>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Stats Footer */}
+        <div className="flex justify-between text-[10px] px-1">
+          <div className="text-[#64748B]">
+            Top 3: <span className={`font-bold ${data.top_3_concentration > 50 ? 'text-red-400' : 'text-white'}`}>
+              {data.top_3_concentration.toFixed(0)}%
             </span>
-          </button>
-        ))}
+          </div>
+          <div className="text-[#64748B]">
+            80% from: <span className="font-bold text-cyan-400">{data.customers_for_80_pct}</span> customers
+          </div>
+        </div>
       </div>
     </ChartContainer>
   );
