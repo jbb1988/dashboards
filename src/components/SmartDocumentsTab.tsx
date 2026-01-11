@@ -326,8 +326,18 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           }
         }}
         onDelete={async (doc) => {
-          console.log('Delete document:', doc.id);
-          await fetchDocuments();
+          try {
+            const response = await fetch(`/api/contracts/documents?documentId=${doc.id}&hardDelete=true`, {
+              method: 'DELETE',
+            });
+            if (response.ok) {
+              await fetchDocuments();
+            } else {
+              console.error('Failed to delete document');
+            }
+          } catch (err) {
+            console.error('Delete failed:', err);
+          }
         }}
       />
     </div>
