@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   calculateCustomerAttrition,
   calculateRolling12Performance,
+  calculateYoYPerformance,
   generateCrossSellOpportunities,
   calculateConcentrationMetrics,
   generateInsightAlerts,
@@ -39,6 +40,11 @@ export async function GET(request: NextRequest) {
     const yearsParam = searchParams.get('years');
     const bustCache = searchParams.get('bust') === 'true';
     const includeExplainers = searchParams.get('explainers') === 'true';
+    // Mode: 'rolling12' (default) or 'yoy' for calendar year comparison
+    const mode = searchParams.get('mode') || 'rolling12';
+    // For YoY mode: specify which years to compare (e.g., currentYear=2025&priorYear=2024)
+    const currentYearParam = searchParams.get('currentYear');
+    const priorYearParam = searchParams.get('priorYear');
 
     // Parse years - if "3" is passed, use last 3 years
     let years: number[];
@@ -53,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     const filters = { years };
-    const cacheKey = getCacheKey({ years });
+    const cacheKey = getCacheKey({ years, mode, currentYearParam, priorYearParam });
 
     // Check cache unless bust=true
     if (!bustCache) {
@@ -67,18 +73,135 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch all data in parallel
-    // Using rolling 12-month comparison instead of YoY (more accurate when early in calendar year)
-    const [attrition, concentration, crossSell, rolling12Customers, rolling12Classes, alerts] = await Promise.all([
+    // Determine which years to use for YoY comparison
+    const currentYear = currentYearParam ? parseInt(currentYearParam) : new Date().getFullYear();
+    const priorYear = priorYearParam ? parseInt(priorYearParam) : currentYear - 1;
+
+    // Fetch all data in parallel based on mode
+    const [attrition, concentration, crossSell, alerts] = await Promise.all([
       calculateCustomerAttrition(filters),
       calculateConcentrationMetrics(filters),
       generateCrossSellOpportunities(filters),
-      calculateRolling12Performance('customer'),
-      calculateRolling12Performance('class'),
       generateInsightAlerts(filters),
     ]);
 
-    // Calculate summary metrics
+    let comparisonData: {
+      customers: Array<{
+        entity_type: 'customer' | 'class';
+        entity_id: string;
+        entity_name: string;
+        current_revenue: number;
+        current_cost: number;
+        prior_revenue: number;
+        prior_cost: number;
+        revenue_change_pct: number;
+        trend: 'growing' | 'stable' | 'declining';
+        current_margin_pct: number;
+        prior_margin_pct: number;
+      }>;
+      classes: Array<{
+        entity_type: 'customer' | 'class';
+        entity_id: string;
+        entity_name: string;
+        current_revenue: number;
+        current_cost: number;
+        prior_revenue: number;
+        prior_cost: number;
+        revenue_change_pct: number;
+        trend: 'growing' | 'stable' | 'declining';
+        current_margin_pct: number;
+        prior_margin_pct: number;
+      }>;
+      comparisonType: string;
+      currentPeriod: { start: string; end: string } | { year: number };
+      priorPeriod: { start: string; end: string } | { year: number };
+    };
+
+    if (mode === 'yoy') {
+      // Calendar Year YoY comparison (e.g., 2024 vs 2025)
+      const [yoyCustomers, yoyClasses] = await Promise.all([
+        calculateYoYPerformance('customer', { currentYear, priorYear }),
+        calculateYoYPerformance('class', { currentYear, priorYear }),
+      ]);
+
+      comparisonData = {
+        customers: yoyCustomers.map(c => ({
+          entity_type: 'customer' as const,
+          entity_id: c.entity_id,
+          entity_name: c.entity_name,
+          current_revenue: c.current_revenue,
+          current_cost: c.current_cost,
+          prior_revenue: c.prior_revenue,
+          prior_cost: c.prior_cost,
+          revenue_change_pct: c.revenue_change_pct,
+          trend: c.trend,
+          current_margin_pct: c.current_margin_pct,
+          prior_margin_pct: c.prior_margin_pct,
+        })),
+        classes: yoyClasses.map(c => ({
+          entity_type: 'class' as const,
+          entity_id: c.entity_id,
+          entity_name: c.entity_name,
+          current_revenue: c.current_revenue,
+          current_cost: c.current_cost,
+          prior_revenue: c.prior_revenue,
+          prior_cost: c.prior_cost,
+          revenue_change_pct: c.revenue_change_pct,
+          trend: c.trend,
+          current_margin_pct: c.current_margin_pct,
+          prior_margin_pct: c.prior_margin_pct,
+        })),
+        comparisonType: 'calendar_year_yoy',
+        currentPeriod: { year: currentYear },
+        priorPeriod: { year: priorYear },
+      };
+    } else {
+      // Rolling 12-month comparison (default)
+      const [rolling12Customers, rolling12Classes] = await Promise.all([
+        calculateRolling12Performance('customer'),
+        calculateRolling12Performance('class'),
+      ]);
+
+      comparisonData = {
+        customers: rolling12Customers.map(c => ({
+          entity_type: 'customer' as const,
+          entity_id: c.entity_id,
+          entity_name: c.entity_name,
+          current_revenue: c.current_revenue,
+          current_cost: c.current_cost,
+          prior_revenue: c.prior_revenue,
+          prior_cost: c.prior_cost,
+          revenue_change_pct: c.revenue_change_pct,
+          trend: c.trend,
+          current_margin_pct: c.current_margin_pct,
+          prior_margin_pct: c.prior_margin_pct,
+        })),
+        classes: rolling12Classes.map(c => ({
+          entity_type: 'class' as const,
+          entity_id: c.entity_id,
+          entity_name: c.entity_name,
+          current_revenue: c.current_revenue,
+          current_cost: c.current_cost,
+          prior_revenue: c.prior_revenue,
+          prior_cost: c.prior_cost,
+          revenue_change_pct: c.revenue_change_pct,
+          trend: c.trend,
+          current_margin_pct: c.current_margin_pct,
+          prior_margin_pct: c.prior_margin_pct,
+        })),
+        comparisonType: 'rolling_12_months',
+        currentPeriod: rolling12Customers[0] ? {
+          start: rolling12Customers[0].current_period_start,
+          end: rolling12Customers[0].current_period_end,
+        } : { start: '', end: '' },
+        priorPeriod: rolling12Customers[0] ? {
+          start: rolling12Customers[0].prior_period_start,
+          end: rolling12Customers[0].prior_period_end,
+        } : { start: '', end: '' },
+      };
+    }
+
+    // Calculate summary metrics from comparison data
     const atRiskCustomers = attrition.filter(c => c.status === 'at_risk').length;
     const atRiskRevenue = attrition
       .filter(c => c.status === 'at_risk')
@@ -88,74 +211,73 @@ export async function GET(request: NextRequest) {
       .filter(c => c.status === 'churned')
       .reduce((sum, c) => sum + c.revenue_at_risk, 0);
 
-    // Calculate overall rolling 12-month change
-    const totalCurrentRevenue = rolling12Customers.reduce((sum, c) => sum + c.current_revenue, 0);
-    const totalPriorRevenue = rolling12Customers.reduce((sum, c) => sum + c.prior_revenue, 0);
-    const rolling12ChangePct = totalPriorRevenue > 0
+    // Calculate overall change from comparison data
+    const totalCurrentRevenue = comparisonData.customers.reduce((sum, c) => sum + c.current_revenue, 0);
+    const totalPriorRevenue = comparisonData.customers.reduce((sum, c) => sum + c.prior_revenue, 0);
+    const revenueChangePct = totalPriorRevenue > 0
       ? ((totalCurrentRevenue - totalPriorRevenue) / totalPriorRevenue) * 100
       : 0;
 
     // Calculate margin change
-    const totalCurrentCost = rolling12Customers.reduce((sum, c) => sum + c.current_cost, 0);
-    const totalPriorCost = rolling12Customers.reduce((sum, c) => sum + c.prior_cost, 0);
+    const totalCurrentCost = comparisonData.customers.reduce((sum, c) => sum + c.current_cost, 0);
+    const totalPriorCost = comparisonData.customers.reduce((sum, c) => sum + c.prior_cost, 0);
     const currentMarginPct = totalCurrentRevenue > 0
       ? ((totalCurrentRevenue - totalCurrentCost) / totalCurrentRevenue) * 100
       : 0;
     const priorMarginPct = totalPriorRevenue > 0
       ? ((totalPriorRevenue - totalPriorCost) / totalPriorRevenue) * 100
       : 0;
-    const rolling12MarginChangePct = currentMarginPct - priorMarginPct;
+    const marginChangePct = currentMarginPct - priorMarginPct;
 
     // New customers (those with no prior period revenue)
-    const newCustomers = rolling12Customers.filter(c => c.prior_revenue === 0 && c.current_revenue > 0).length;
+    const newCustomers = comparisonData.customers.filter(c => c.prior_revenue === 0 && c.current_revenue > 0).length;
 
     // Cross-sell potential
     const crossSellPotential = crossSell.reduce((sum, o) => sum + o.estimated_revenue, 0);
 
-    // Build summary object that matches dashboard expectations
-    // Note: Using rolling 12-month comparison (not calendar year YoY)
+    // Build summary object
     const summary = {
       at_risk_customers: atRiskCustomers,
       at_risk_revenue: atRiskRevenue,
       churned_customers: churnedCustomers,
       churned_revenue: churnedRevenue,
-      rolling12_revenue_change_pct: rolling12ChangePct,
-      rolling12_margin_change_pct: rolling12MarginChangePct,
+      rolling12_revenue_change_pct: revenueChangePct,
+      rolling12_margin_change_pct: marginChangePct,
       // Keep legacy names for backward compatibility
-      yoy_revenue_change_pct: rolling12ChangePct,
-      yoy_margin_change_pct: rolling12MarginChangePct,
+      yoy_revenue_change_pct: revenueChangePct,
+      yoy_margin_change_pct: marginChangePct,
       cross_sell_potential: crossSellPotential,
       hhi_index: concentration.hhi_index,
       hhi_interpretation: concentration.hhi_interpretation,
       new_customers_12mo: newCustomers,
-      // Add period info for clarity
-      comparison_type: 'rolling_12_months',
-      current_period: rolling12Customers[0] ? {
-        start: rolling12Customers[0].current_period_start,
-        end: rolling12Customers[0].current_period_end,
-      } : null,
-      prior_period: rolling12Customers[0] ? {
-        start: rolling12Customers[0].prior_period_start,
-        end: rolling12Customers[0].prior_period_end,
-      } : null,
+      // Period info
+      comparison_type: comparisonData.comparisonType,
+      current_period: comparisonData.currentPeriod,
+      prior_period: comparisonData.priorPeriod,
     };
 
-    // Combine rolling 12 data into single array for dashboard
-    // Map to yoy structure for backward compatibility
-    const rolling12 = [
-      ...rolling12Customers.map(c => ({ ...c, entity_type: 'customer' as const })),
-      ...rolling12Classes.map(c => ({ ...c, entity_type: 'class' as const })),
+    // Combine comparison data into single array for dashboard
+    const combinedComparison = [
+      ...comparisonData.customers,
+      ...comparisonData.classes,
     ];
 
     const response = {
       summary,
       alerts,
       attrition,
-      rolling12,
-      // Keep 'yoy' key for backward compatibility with existing dashboard
-      yoy: rolling12,
+      rolling12: combinedComparison,
+      // Keep 'yoy' key for backward compatibility
+      yoy: combinedComparison,
       crossSell,
       concentration,
+      // Include mode info
+      mode,
+      comparisonPeriods: {
+        type: comparisonData.comparisonType,
+        current: comparisonData.currentPeriod,
+        prior: comparisonData.priorPeriod,
+      },
     };
 
     // Include metric explainers if requested
@@ -168,7 +290,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ...response,
-      filters: { years },
+      filters: { years, mode, currentYear, priorYear },
       fromCache: false,
       lastUpdated: new Date().toISOString(),
     });

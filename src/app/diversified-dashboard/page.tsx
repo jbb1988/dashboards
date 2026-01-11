@@ -605,6 +605,11 @@ export default function DiversifiedDashboard() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
   const [insightsSubTab, setInsightsSubTab] = useState<'overview' | 'attrition' | 'growth' | 'opportunities'>('overview');
+  // Comparison mode: 'rolling12' (default) or 'yoy' for calendar year comparison
+  const [insightsMode, setInsightsMode] = useState<'rolling12' | 'yoy'>('rolling12');
+  // For YoY mode: which years to compare
+  const [yoyCurrentYear, setYoyCurrentYear] = useState(new Date().getFullYear() - 1); // Default to 2025 for comparing full years
+  const [yoyPriorYear, setYoyPriorYear] = useState(new Date().getFullYear() - 2); // Default to 2024
 
   // Filter state
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
@@ -672,13 +677,23 @@ export default function DiversifiedDashboard() {
   };
 
   // Fetch insights data
-  const fetchInsightsData = async (bustCache = false) => {
+  const fetchInsightsData = async (bustCache = false, mode?: 'rolling12' | 'yoy') => {
     setInsightsLoading(true);
     setInsightsError(null);
     try {
       const params = new URLSearchParams();
       params.set('years', '3'); // Last 3 years
       if (bustCache) params.set('bust', 'true');
+
+      // Set comparison mode
+      const compareMode = mode || insightsMode;
+      params.set('mode', compareMode);
+
+      // For YoY mode, set the years to compare
+      if (compareMode === 'yoy') {
+        params.set('currentYear', yoyCurrentYear.toString());
+        params.set('priorYear', yoyPriorYear.toString());
+      }
 
       const response = await fetch(`/api/diversified/insights?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch insights data');
@@ -1234,12 +1249,79 @@ export default function DiversifiedDashboard() {
                           >
                             {tab === 'overview' && 'Overview'}
                             {tab === 'attrition' && 'Attrition'}
-                            {tab === 'growth' && 'Rolling 12'}
+                            {tab === 'growth' && (insightsMode === 'rolling12' ? 'R12 Comparison' : 'YoY Comparison')}
                             {tab === 'opportunities' && 'Opportunities'}
                           </button>
                         ))}
 
                         <div className="flex-1" />
+
+                        {/* R12 / YoY Mode Toggle */}
+                        <div className="flex items-center gap-1 bg-[#0F172A] rounded-lg p-0.5 border border-white/[0.04]">
+                          <button
+                            onClick={() => {
+                              setInsightsMode('rolling12');
+                              fetchInsightsData(true, 'rolling12');
+                            }}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                              insightsMode === 'rolling12'
+                                ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                                : 'text-[#64748B] hover:text-white'
+                            }`}
+                            title="Rolling 12-month comparison (current 12 mo vs prior 12 mo)"
+                          >
+                            R12
+                          </button>
+                          <button
+                            onClick={() => {
+                              setInsightsMode('yoy');
+                              fetchInsightsData(true, 'yoy');
+                            }}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                              insightsMode === 'yoy'
+                                ? 'bg-[#A855F7]/20 text-[#A855F7]'
+                                : 'text-[#64748B] hover:text-white'
+                            }`}
+                            title="Calendar year comparison (full year vs full year)"
+                          >
+                            YoY
+                          </button>
+                        </div>
+
+                        {/* Year selectors for YoY mode */}
+                        {insightsMode === 'yoy' && (
+                          <div className="flex items-center gap-1 text-[11px]">
+                            <select
+                              value={yoyCurrentYear}
+                              onChange={(e) => {
+                                const newYear = parseInt(e.target.value);
+                                setYoyCurrentYear(newYear);
+                                setYoyPriorYear(newYear - 1);
+                              }}
+                              className="px-2 py-1 rounded-md bg-[#1E293B] border border-white/[0.04] text-white text-[11px] cursor-pointer"
+                            >
+                              {[2025, 2024, 2023, 2022].map(year => (
+                                <option key={year} value={year}>{year}</option>
+                              ))}
+                            </select>
+                            <span className="text-[#64748B]">vs</span>
+                            <select
+                              value={yoyPriorYear}
+                              onChange={(e) => setYoyPriorYear(parseInt(e.target.value))}
+                              className="px-2 py-1 rounded-md bg-[#1E293B] border border-white/[0.04] text-white text-[11px] cursor-pointer"
+                            >
+                              {[2024, 2023, 2022, 2021].map(year => (
+                                <option key={year} value={year}>{year}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => fetchInsightsData(true, 'yoy')}
+                              className="ml-1 px-2 py-1 rounded-md bg-[#A855F7]/20 text-[#A855F7] hover:bg-[#A855F7]/30 transition-all"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        )}
 
                         <button
                           onClick={() => fetchInsightsData(true)}
@@ -1293,9 +1375,9 @@ export default function DiversifiedDashboard() {
                             delay={0}
                           />
                           <KPICard
-                            title="Rolling 12-Mo"
+                            title={insightsMode === 'rolling12' ? 'R12 Revenue' : `${yoyCurrentYear} vs ${yoyPriorYear}`}
                             value={`${insightsData.summary.yoy_revenue_change_pct >= 0 ? '+' : ''}${insightsData.summary.yoy_revenue_change_pct.toFixed(1)}%`}
-                            subtitle="vs prior 12 months"
+                            subtitle={insightsMode === 'rolling12' ? 'vs prior 12 months' : 'full year comparison'}
                             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
                             color={insightsData.summary.yoy_revenue_change_pct >= 0 ? '#22C55E' : '#EF4444'}
                             trend={insightsData.summary.yoy_revenue_change_pct >= 0 ? 'up' : 'down'}
@@ -1453,25 +1535,33 @@ export default function DiversifiedDashboard() {
                         </div>
                       )}
 
-                      {/* Growth Sub-Tab Content (now Rolling 12 Month) */}
+                      {/* Growth Sub-Tab Content - R12 or YoY comparison */}
                       {insightsSubTab === 'growth' && (
                         <div className="space-y-6">
+                          {/* Period indicator */}
+                          <div className="text-[12px] text-[#64748B] bg-[#0F172A] rounded-lg px-3 py-2 inline-block">
+                            {insightsMode === 'rolling12' ? (
+                              <>Comparing <span className="text-white">last 12 months</span> vs <span className="text-white">prior 12 months</span></>
+                            ) : (
+                              <>Comparing <span className="text-white">{yoyCurrentYear}</span> vs <span className="text-white">{yoyPriorYear}</span> (full calendar years)</>
+                            )}
+                          </div>
                           <div className="grid grid-cols-2 gap-6">
                             <YoYComparisonChart
                               data={insightsData.yoy}
-                              currentYear={new Date().getFullYear()}
-                              priorYear={new Date().getFullYear() - 1}
+                              currentYear={insightsMode === 'yoy' ? yoyCurrentYear : new Date().getFullYear()}
+                              priorYear={insightsMode === 'yoy' ? yoyPriorYear : new Date().getFullYear() - 1}
                               viewMode="customer"
                               index={0}
-                              isRolling12={true}
+                              isRolling12={insightsMode === 'rolling12'}
                             />
                             <YoYComparisonChart
                               data={insightsData.yoy}
-                              currentYear={new Date().getFullYear()}
-                              priorYear={new Date().getFullYear() - 1}
+                              currentYear={insightsMode === 'yoy' ? yoyCurrentYear : new Date().getFullYear()}
+                              priorYear={insightsMode === 'yoy' ? yoyPriorYear : new Date().getFullYear() - 1}
                               viewMode="class"
                               index={1}
-                              isRolling12={true}
+                              isRolling12={insightsMode === 'rolling12'}
                             />
                           </div>
                         </div>
