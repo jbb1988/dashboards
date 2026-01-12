@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -25,6 +25,30 @@ export function ContinuousCalendar({
   onEventMove,
   loading = false,
 }: CalendarProps) {
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Escape key handler for fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
+  // Lock body scroll when fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isFullscreen]);
+
   // Sensors for drag detection
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -67,7 +91,18 @@ export function ContinuousCalendar({
   }
 
   return (
-    <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
+    <div className={`
+      rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden
+      ${isFullscreen ? 'fixed inset-4 z-50 rounded-xl' : ''}
+    `}>
+      {/* Fullscreen backdrop */}
+      {isFullscreen && (
+        <div
+          className="fixed inset-0 bg-black/60 -z-10"
+          onClick={() => setIsFullscreen(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="px-4 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -96,6 +131,23 @@ export function ContinuousCalendar({
             </svg>
             Drag to reschedule
           </div>
+
+          {/* Fullscreen toggle */}
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="text-[11px] p-1.5 rounded-lg bg-white/5 text-[#64748B] hover:bg-white/10 hover:text-white transition-colors"
+            title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
+          >
+            {isFullscreen ? (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
 
@@ -126,9 +178,9 @@ export function ContinuousCalendar({
         <div
           ref={scrollContainerRef}
           className={`
-            h-[600px] min-h-[400px] max-h-[calc(100vh-280px)] overflow-y-scroll overflow-x-hidden
-            scroll-smooth relative
+            overflow-y-scroll overflow-x-hidden scroll-smooth relative
             ${isDragging ? 'cursor-grabbing' : ''}
+            ${isFullscreen ? 'h-[calc(100vh-180px)]' : 'h-[600px] min-h-[400px] max-h-[calc(100vh-280px)]'}
           `}
         >
           {/* Top sentinel for loading past months */}

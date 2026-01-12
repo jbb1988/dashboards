@@ -8,9 +8,26 @@ import { CalendarEventCard } from './CalendarEventCard';
 interface CalendarDayCellProps {
   day: CalendarDay | null;
   onEventClick: (event: CalendarEvent) => void;
+  singleDayEventsOnly?: boolean;
 }
 
-export function CalendarDayCell({ day, onEventClick }: CalendarDayCellProps) {
+// Filter to get only single-day events
+function getSingleDayEvents(events: CalendarEvent[]): CalendarEvent[] {
+  return events.filter(event => {
+    const eventStart = event.startOn ? new Date(event.startOn) : null;
+    const eventEnd = event.dueOn ? new Date(event.dueOn) : null;
+
+    if (eventStart && eventEnd) {
+      eventStart.setHours(0, 0, 0, 0);
+      eventEnd.setHours(0, 0, 0, 0);
+      const duration = Math.ceil((eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      return duration <= 1;
+    }
+    return true;
+  });
+}
+
+export function CalendarDayCell({ day, onEventClick, singleDayEventsOnly = false }: CalendarDayCellProps) {
   const { setNodeRef, isOver, active } = useDroppable({
     id: day?.dateKey ?? 'empty',
     disabled: !day,
@@ -19,21 +36,24 @@ export function CalendarDayCell({ day, onEventClick }: CalendarDayCellProps) {
   // Empty cell (days outside the month)
   if (!day) {
     return (
-      <div className="min-h-[120px] bg-[#0B1220]/60 border-r border-white/[0.02]" />
+      <div className="min-h-[90px] bg-[#0B1220]/60 border-r border-white/[0.02]" />
     );
   }
 
+  // Filter events if singleDayEventsOnly is true
+  const displayEvents = singleDayEventsOnly ? getSingleDayEvents(day.events) : day.events;
+
   const maxVisibleEvents = 3;
-  const hasMoreEvents = day.events.length > maxVisibleEvents;
-  const visibleEvents = day.events.slice(0, maxVisibleEvents);
-  const hiddenCount = day.events.length - maxVisibleEvents;
+  const hasMoreEvents = displayEvents.length > maxVisibleEvents;
+  const visibleEvents = displayEvents.slice(0, maxVisibleEvents);
+  const hiddenCount = displayEvents.length - maxVisibleEvents;
 
   return (
     <motion.div
       ref={setNodeRef}
       id={day.isToday ? 'calendar-today' : undefined}
       className={`
-        min-h-[120px] p-1.5 border-r border-white/[0.03] transition-colors duration-150
+        min-h-[90px] p-1.5 border-r border-white/[0.03] transition-colors duration-150
         ${day.isToday ? 'bg-[#E16259]/8 ring-1 ring-inset ring-[#E16259]/20' : ''}
         ${day.isPast && !day.isToday ? 'bg-[#0B1220]/40' : ''}
         ${!day.isPast && !day.isToday ? 'bg-[#151F2E]' : ''}
