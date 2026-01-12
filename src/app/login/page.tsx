@@ -21,6 +21,41 @@ function LoginForm() {
       // Check if this is a magic link callback
       const isInvited = searchParams.get('invited') === 'true';
 
+      // Check for hash tokens (magic link/invite tokens come in URL hash)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      const tokenType = hashParams.get('type');
+
+      // If we have tokens in the hash, set the session manually
+      if (accessToken && refreshToken) {
+        setSuccess('Processing your invitation...');
+
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setError('Failed to process invitation. Please try again or contact support.');
+          setCheckingSession(false);
+          return;
+        }
+
+        if (data.session) {
+          // Clear the hash from URL
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+          setSuccess('Welcome! Your account is ready. Redirecting...');
+          setTimeout(() => {
+            router.push('/');
+            router.refresh();
+          }, 1500);
+          return;
+        }
+      }
+
       // Get current session
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -36,26 +71,10 @@ function LoginForm() {
           router.push('/');
           router.refresh();
         }
-      } else if (isInvited) {
-        // User arrived via magic link but not authenticated yet
-        // Supabase handles the token exchange automatically
-        setSuccess('Processing your invitation...');
-
-        // Listen for auth state change (happens when magic link is processed)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-          if (event === 'SIGNED_IN' && session) {
-            setSuccess('Welcome! Your account is ready. Redirecting...');
-            setTimeout(() => {
-              router.push('/');
-              router.refresh();
-            }, 1500);
-          }
-        });
-
-        // Clean up subscription on unmount
-        return () => subscription.unsubscribe();
+        return;
       }
 
+      // No session and no tokens - show login form
       setCheckingSession(false);
     };
 
