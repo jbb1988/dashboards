@@ -825,6 +825,7 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
 function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | null; loading: boolean; onTaskComplete?: (taskId: string, completed: boolean) => Promise<void> }) {
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [yearFilter, setYearFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'region' | 'status'>('date');
   const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
@@ -841,17 +842,29 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
   }, [onTaskComplete, completingTaskId]);
 
   // Get unique values for filters
-  const { regions, categories } = useMemo(() => {
-    if (!data) return { regions: [], categories: [] };
+  const { regions, categories, years } = useMemo(() => {
+    if (!data) return { regions: [], categories: [], years: [] };
     const r = new Set<string>();
     const c = new Set<string>();
+    const y = new Set<number>();
     data.tasks.forEach(t => {
       const region = getCustomField(t, 'Region');
       const category = getCustomField(t, 'Catagory'); // Note: typo in Asana
       if (region) r.add(region);
       if (category) c.add(category);
+
+      // Extract year from startOn or dueOn
+      const date = t.startOn || t.dueOn;
+      if (date) {
+        const year = new Date(date).getFullYear();
+        if (!isNaN(year)) y.add(year);
+      }
     });
-    return { regions: Array.from(r).sort(), categories: Array.from(c).sort() };
+    return {
+      regions: Array.from(r).sort(),
+      categories: Array.from(c).sort(),
+      years: Array.from(y).sort((a, b) => b - a) // Sort years descending (newest first)
+    };
   }, [data]);
 
   // Filter and sort tasks
@@ -865,6 +878,14 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
     }
     if (categoryFilter !== 'all') {
       tasks = tasks.filter(t => getCustomField(t, 'Catagory') === categoryFilter);
+    }
+    if (yearFilter !== 'all') {
+      tasks = tasks.filter(t => {
+        const date = t.startOn || t.dueOn;
+        if (!date) return false;
+        const year = new Date(date).getFullYear();
+        return year.toString() === yearFilter;
+      });
     }
 
     // Sort
@@ -884,7 +905,7 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
     });
 
     return tasks;
-  }, [data, regionFilter, categoryFilter, sortBy]);
+  }, [data, regionFilter, categoryFilter, yearFilter, sortBy]);
 
   if (loading || !data) {
     return <LoadingState />;
@@ -918,6 +939,13 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white">
             <option value="all">All Categories</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold text-[#475569] uppercase">Year:</span>
+          <select value={yearFilter} onChange={e => setYearFilter(e.target.value)} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white">
+            <option value="all">All Years</option>
+            {years.map(y => <option key={y} value={y.toString()}>{y}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2">
