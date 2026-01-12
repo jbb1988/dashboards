@@ -122,7 +122,7 @@ export function ContinuousCalendar({
 
       <div className={`
         rounded-xl bg-[#1E293B] border border-[#334155] shadow-xl overflow-hidden
-        ${isFullscreen ? 'fixed inset-4 z-[9999] flex flex-col' : ''}
+        ${isFullscreen ? 'fixed inset-0 z-[9999] flex flex-col rounded-none' : ''}
       `}>
 
       {/* Header */}
