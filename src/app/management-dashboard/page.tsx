@@ -5,6 +5,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/components/mars-ui';
 import { FilterBar, PillarCard, InitiativeRow, InitiativeDetailDrawer, ChartsTab, BoardView, OwnerDetailDrawer } from '@/components/management';
+import { usePersistedFilters, FILTER_STORAGE_KEYS } from '@/hooks';
+
+// Filter state type for Strategic Initiatives
+interface InitiativeFilters {
+  selectedPillar: string | null;
+  selectedStatus: string | null;
+  selectedTimeframe: string | null;
+  selectedOwner: string | null;
+  selectedSiLevel: string | null;
+  searchQuery: string;
+}
+
+const DEFAULT_INITIATIVE_FILTERS: InitiativeFilters = {
+  selectedPillar: null,
+  selectedStatus: null,
+  selectedTimeframe: null,
+  selectedOwner: null,
+  selectedSiLevel: null,
+  searchQuery: '',
+};
 
 interface Initiative {
   id: number;
@@ -89,13 +109,22 @@ export default function ManagementDashboard() {
   const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
   const [selectedChartOwner, setSelectedChartOwner] = useState<string | null>(null);
 
-  // Filters
-  const [selectedPillar, setSelectedPillar] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<string | null>(null);
-  const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
-  const [selectedSiLevel, setSelectedSiLevel] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Persisted filters - automatically saves to localStorage
+  const [filters, setFilters, clearFilters] = usePersistedFilters<InitiativeFilters>(
+    FILTER_STORAGE_KEYS.STRATEGIC_INITIATIVES,
+    DEFAULT_INITIATIVE_FILTERS
+  );
+
+  // Destructure filters for easier access
+  const { selectedPillar, selectedStatus, selectedTimeframe, selectedOwner, selectedSiLevel, searchQuery } = filters;
+
+  // Filter setters
+  const setSelectedPillar = (value: string | null) => setFilters(f => ({ ...f, selectedPillar: value }));
+  const setSelectedStatus = (value: string | null) => setFilters(f => ({ ...f, selectedStatus: value }));
+  const setSelectedTimeframe = (value: string | null) => setFilters(f => ({ ...f, selectedTimeframe: value }));
+  const setSelectedOwner = (value: string | null) => setFilters(f => ({ ...f, selectedOwner: value }));
+  const setSelectedSiLevel = (value: string | null) => setFilters(f => ({ ...f, selectedSiLevel: value }));
+  const setSearchQuery = (value: string) => setFilters(f => ({ ...f, searchQuery: value }));
 
   const marginLeft = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
@@ -154,15 +183,8 @@ export default function ManagementDashboard() {
     }
   };
 
-  // Clear all filters
-  const clearAllFilters = () => {
-    setSelectedPillar(null);
-    setSelectedStatus(null);
-    setSelectedTimeframe(null);
-    setSelectedOwner(null);
-    setSelectedSiLevel(null);
-    setSearchQuery('');
-  };
+  // Clear all filters (uses the persisted hook's clear function)
+  const clearAllFilters = clearFilters;
 
   // Filter options from meta
   const pillarOptions = useMemo(() =>

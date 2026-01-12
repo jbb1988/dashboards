@@ -4,6 +4,17 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContractDetailDrawer, { ContractItem, ContractDocument } from './ContractDetailDrawer';
 import FilterDrawer, { FilterState } from './FilterDrawer';
+import { usePersistedFilters, FILTER_STORAGE_KEYS } from '@/hooks';
+
+// Default filter values
+const DEFAULT_FILTERS: FilterState = {
+  searchQuery: '',
+  selectedStatuses: [],
+  dateFilter: 'all',
+  budgetedFilter: 'all',
+  completenessFilter: 'all',
+  sortBy: 'name',
+};
 
 // Contract status stages
 const CONTRACT_STATUSES = [
@@ -223,15 +234,11 @@ export default function ContractListView({
   const [selectedContract, setSelectedContract] = useState<ContractItem | null>(null);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
-  // Filter state
-  const [filters, setFilters] = useState<FilterState>({
-    searchQuery: '',
-    selectedStatuses: [],
-    dateFilter: 'all',
-    budgetedFilter: 'all',
-    completenessFilter: 'all',
-    sortBy: 'name',
-  });
+  // Persisted filter state - automatically saves to localStorage
+  const [filters, setFilters, clearPersistedFilters] = usePersistedFilters<FilterState>(
+    FILTER_STORAGE_KEYS.DOCUMENTS,
+    DEFAULT_FILTERS
+  );
 
   // Count contracts per status
   const statusCounts = useMemo(() => {
@@ -258,17 +265,8 @@ export default function ContractListView({
     filters.searchQuery !== '',
   ].filter(Boolean).length;
 
-  // Clear all filters
-  const clearFilters = () => {
-    setFilters({
-      searchQuery: '',
-      selectedStatuses: [],
-      dateFilter: 'all',
-      budgetedFilter: 'all',
-      completenessFilter: 'all',
-      sortBy: 'name',
-    });
-  };
+  // Clear all filters (uses the persisted hook's clear function)
+  const clearFilters = clearPersistedFilters;
 
   // Filter and sort contracts
   const filteredContracts = useMemo(() => {

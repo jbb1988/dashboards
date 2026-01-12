@@ -13,6 +13,40 @@ import TasksTabSupabase from './components/TasksTabSupabase';
 import BundleModal from './components/BundleModal';
 import { DashboardBackground, backgroundPresets, KPICard, AnimatedCounter } from '@/components/mars-ui';
 import ContractDetailDrawer from '@/components/contracts/ContractDetailDrawer';
+import { usePersistedFilters, FILTER_STORAGE_KEYS } from '@/hooks';
+
+// Persisted filter state for Contracts Pipeline
+interface ContractsPipelineFilters {
+  activeFilter: string;
+  statusFilter: string[];
+  dateFilter: string;
+  sortField: 'name' | 'value' | 'contractDate' | 'daysInStage';
+  sortDirection: 'asc' | 'desc';
+  yearFilter: string;
+  contractTypeFilter: 'all' | 'renewal' | 'new';
+  hideMidContract: boolean;
+  contractYearFilter: number[];
+  budgetedFilter: boolean;
+  probabilityMin: number;
+  probabilityMax: number;
+  activeTab: 'pipeline' | 'tasks' | 'documents';
+}
+
+const DEFAULT_CONTRACTS_FILTERS: ContractsPipelineFilters = {
+  activeFilter: 'all',
+  statusFilter: [],
+  dateFilter: 'all',
+  sortField: 'contractDate',
+  sortDirection: 'asc',
+  yearFilter: new Date().getFullYear().toString(),
+  contractTypeFilter: 'all',
+  hideMidContract: true,
+  contractYearFilter: [],
+  budgetedFilter: false,
+  probabilityMin: 0,
+  probabilityMax: 100,
+  activeTab: 'pipeline',
+};
 
 // Types
 interface BundleInfo {
@@ -685,24 +719,57 @@ export default function ContractsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<string[]>([]); // Empty array = all statuses
-  const [dateFilter, setDateFilter] = useState<string>('all');
-  const [sortField, setSortField] = useState<'name' | 'value' | 'contractDate' | 'daysInStage'>('contractDate');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString()); // Default to current year
-  const [contractTypeFilter, setContractTypeFilter] = useState<'all' | 'renewal' | 'new'>('all');
-  const [hideMidContract, setHideMidContract] = useState(true); // Default ON - only show actionable contracts
-  const [contractYearFilter, setContractYearFilter] = useState<number[]>([]); // Filter by specific contract years (multi-select)
+
+  // Persisted filters - automatically saves to localStorage
+  const [filters, setFilters] = usePersistedFilters<ContractsPipelineFilters>(
+    FILTER_STORAGE_KEYS.CONTRACTS_PIPELINE,
+    DEFAULT_CONTRACTS_FILTERS
+  );
+
+  // Destructure persisted filters
+  const {
+    activeFilter,
+    statusFilter,
+    dateFilter,
+    sortField,
+    sortDirection,
+    yearFilter,
+    contractTypeFilter,
+    hideMidContract,
+    contractYearFilter,
+    budgetedFilter,
+    probabilityMin,
+    probabilityMax,
+    activeTab,
+  } = filters;
+
+  // Filter setters that update persisted state (support both direct values and callbacks)
+  const setActiveFilter = (value: ActiveFilter) => setFilters(f => ({ ...f, activeFilter: value }));
+  const setStatusFilter = (value: string[]) => setFilters(f => ({ ...f, statusFilter: value }));
+  const setDateFilter = (value: string) => setFilters(f => ({ ...f, dateFilter: value }));
+  const setSortField = (value: 'name' | 'value' | 'contractDate' | 'daysInStage') => setFilters(f => ({ ...f, sortField: value }));
+  const setSortDirection = (value: 'asc' | 'desc' | ((prev: 'asc' | 'desc') => 'asc' | 'desc')) => {
+    if (typeof value === 'function') {
+      setFilters(f => ({ ...f, sortDirection: value(f.sortDirection) }));
+    } else {
+      setFilters(f => ({ ...f, sortDirection: value }));
+    }
+  };
+  const setYearFilter = (value: string) => setFilters(f => ({ ...f, yearFilter: value }));
+  const setContractTypeFilter = (value: 'all' | 'renewal' | 'new') => setFilters(f => ({ ...f, contractTypeFilter: value }));
+  const setHideMidContract = (value: boolean) => setFilters(f => ({ ...f, hideMidContract: value }));
+  const setContractYearFilter = (value: number[]) => setFilters(f => ({ ...f, contractYearFilter: value }));
+  const setBudgetedFilter = (value: boolean) => setFilters(f => ({ ...f, budgetedFilter: value }));
+  const setProbabilityMin = (value: number) => setFilters(f => ({ ...f, probabilityMin: value }));
+  const setProbabilityMax = (value: number) => setFilters(f => ({ ...f, probabilityMax: value }));
+  const setActiveTab = (value: 'pipeline' | 'tasks' | 'documents') => setFilters(f => ({ ...f, activeTab: value }));
+
+  // Non-persisted UI state
   const [contractYearDropdownOpen, setContractYearDropdownOpen] = useState(false); // Dropdown open state
   const [focusMode, setFocusMode] = useState(false); // Focus Mode - highlight critical items
   const [filterPanelOpen, setFilterPanelOpen] = useState(false); // Slide-out filter panel
-  const [budgetedFilter, setBudgetedFilter] = useState(false); // Show only budgeted/forecasted
-  const [probabilityMin, setProbabilityMin] = useState<number>(0); // Min probability filter
-  const [probabilityMax, setProbabilityMax] = useState<number>(100); // Max probability filter
   const [dataSource, setDataSource] = useState<DataSource>('supabase');
   const [salesforceStatus, setSalesforceStatus] = useState<'connected' | 'needs_auth' | 'not_configured'>('connected');
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'tasks' | 'documents'>('pipeline');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [selectedContractIndex, setSelectedContractIndex] = useState(0);
