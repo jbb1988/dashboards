@@ -20,7 +20,7 @@ interface ConcentrationMetrics {
     total_revenue: number;
     pct_of_total: number;
     threshold_description: string;
-    customers?: Array<{ name: string; revenue: number; pct: number }>;
+    customers?: Array<{ name: string; revenue: number; pct: number; top_classes?: string[] }>;
   }[];
 }
 
@@ -36,11 +36,18 @@ export function ConcentrationChart({ data, index = 0, onCustomerClick }: Concent
   const isHighRisk = data.top_customer_pct > 25 || data.single_customer_risk;
   const isModerateRisk = data.top_customer_pct > 15;
 
+  // Get top customer's product classes (what's at risk)
+  const topCustomerClasses = useMemo(() => {
+    const platinumSegment = data.segments.find(s => s.tier === 'platinum');
+    const topCustomer = platinumSegment?.customers?.find(c => c.name === data.top_customer_name);
+    return topCustomer?.top_classes || [];
+  }, [data.segments, data.top_customer_name]);
+
   // Find growth targets (Gold + Silver tier customers)
   const growthTargets = useMemo(() => {
     const goldSegment = data.segments.find(s => s.tier === 'gold');
     const silverSegment = data.segments.find(s => s.tier === 'silver');
-    const targets: Array<{ name: string; revenue: number; growthTarget: number; newPct: number }> = [];
+    const targets: Array<{ name: string; revenue: number; growthTarget: number; newPct: number; topClasses: string[] }> = [];
 
     // Silver customers - highest growth potential
     if (silverSegment?.customers) {
@@ -48,7 +55,7 @@ export function ConcentrationChart({ data, index = 0, onCustomerClick }: Concent
         const growthTarget = Math.round(c.revenue * 0.5); // 50% growth = realistic
         const newRevenue = c.revenue + growthTarget;
         const newPct = (newRevenue / (data.total_revenue + growthTarget)) * 100;
-        targets.push({ name: c.name, revenue: c.revenue, growthTarget, newPct });
+        targets.push({ name: c.name, revenue: c.revenue, growthTarget, newPct, topClasses: c.top_classes || [] });
       });
     }
 
@@ -58,7 +65,7 @@ export function ConcentrationChart({ data, index = 0, onCustomerClick }: Concent
         const growthTarget = Math.round(c.revenue * 0.25); // 25% growth
         const newRevenue = c.revenue + growthTarget;
         const newPct = (newRevenue / (data.total_revenue + growthTarget)) * 100;
-        targets.push({ name: c.name, revenue: c.revenue, growthTarget, newPct });
+        targets.push({ name: c.name, revenue: c.revenue, growthTarget, newPct, topClasses: c.top_classes || [] });
       });
     }
 
@@ -117,6 +124,21 @@ export function ConcentrationChart({ data, index = 0, onCustomerClick }: Concent
             <div className="text-[#94A3B8] text-[12px]">
               = <span className="text-white font-bold">{formatChartCurrency(topCustomerRevenue)}</span> of your revenue
             </div>
+            {/* What they buy - revenue at risk by product */}
+            {topCustomerClasses.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                <span className="text-[9px] text-[#64748B] mr-1">Buys:</span>
+                {topCustomerClasses.slice(0, 3).map((cls, i) => (
+                  <span
+                    key={i}
+                    className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.08] text-white/80"
+                    title={cls}
+                  >
+                    {cls.length > 18 ? cls.slice(0, 16) + '...' : cls}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className={`text-[12px] p-2 rounded-lg ${
@@ -158,25 +180,41 @@ export function ConcentrationChart({ data, index = 0, onCustomerClick }: Concent
                 {growthTargets.map((target, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-all group"
+                    className="p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-all group"
                     onClick={() => onCustomerClick?.(target.name, target.name)}
                   >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-bold flex items-center justify-center">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-white text-[12px] font-medium truncate group-hover:text-cyan-400" title={target.name}>
-                          {target.name}
-                        </div>
-                        <div className="text-[10px] text-[#64748B]">
-                          {formatChartCurrency(target.revenue)} → <span className="text-green-400">{formatChartCurrency(target.revenue + target.growthTarget)}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-white text-[12px] font-medium truncate group-hover:text-cyan-400" title={target.name}>
+                            {target.name}
+                          </div>
+                          <div className="text-[10px] text-[#64748B]">
+                            {formatChartCurrency(target.revenue)} → <span className="text-green-400">{formatChartCurrency(target.revenue + target.growthTarget)}</span>
+                          </div>
                         </div>
                       </div>
+                      <div className="text-green-400 text-[11px] font-semibold shrink-0">
+                        +{formatChartCurrency(target.growthTarget)}
+                      </div>
                     </div>
-                    <div className="text-green-400 text-[11px] font-semibold">
-                      +{formatChartCurrency(target.growthTarget)}
-                    </div>
+                    {/* What they buy - actionable context */}
+                    {target.topClasses.length > 0 && (
+                      <div className="mt-1.5 ml-7 flex flex-wrap gap-1">
+                        {target.topClasses.slice(0, 3).map((cls, i) => (
+                          <span
+                            key={i}
+                            className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-[#94A3B8]"
+                            title={cls}
+                          >
+                            {cls.length > 20 ? cls.slice(0, 18) + '...' : cls}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

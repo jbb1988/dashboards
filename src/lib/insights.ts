@@ -110,6 +110,13 @@ export interface ConcentrationMetrics {
     total_revenue: number;
     pct_of_total: number;
     threshold_description: string;
+    customers?: Array<{
+      id: string;
+      name: string;
+      revenue: number;
+      pct: number;
+      top_classes: string[]; // What they buy
+    }>;
   }[];
 
   // Total customers
@@ -921,10 +928,11 @@ export async function calculateConcentrationMetrics(filters?: {
   currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
-  // Fetch customer revenue data for rolling 12 months
+  // Fetch customer revenue data for rolling 12 months (including class for product mix)
   const allData: Array<{
     customer_id: string;
     customer_name: string;
+    class_name: string;
     revenue: number;
   }> = [];
 
@@ -935,7 +943,7 @@ export async function calculateConcentrationMetrics(filters?: {
   while (hasMore) {
     const { data, error } = await admin
       .from('diversified_sales')
-      .select('customer_id, customer_name, revenue')
+      .select('customer_id, customer_name, class_name, revenue')
       .gte('transaction_date', formatDate(currentPeriodStart))
       .lte('transaction_date', formatDate(currentPeriodEnd))
       .range(offset, offset + batchSize - 1);
@@ -954,8 +962,13 @@ export async function calculateConcentrationMetrics(filters?: {
     }
   }
 
-  // Aggregate by customer
-  const customerRevenue = new Map<string, { id: string; name: string; revenue: number }>();
+  // Aggregate by customer (tracking revenue by class for product mix)
+  const customerRevenue = new Map<string, {
+    id: string;
+    name: string;
+    revenue: number;
+    classesByRevenue: Map<string, number>; // Track revenue per class
+  }>();
   let totalRevenue = 0;
 
   for (const row of allData) {
@@ -967,13 +980,32 @@ export async function calculateConcentrationMetrics(filters?: {
         id: row.customer_id,
         name: row.customer_name || key,
         revenue: 0,
+        classesByRevenue: new Map(),
       });
     }
-    customerRevenue.get(key)!.revenue += row.revenue || 0;
+    const customer = customerRevenue.get(key)!;
+    customer.revenue += row.revenue || 0;
     totalRevenue += row.revenue || 0;
+
+    // Track class revenue for this customer
+    if (row.class_name) {
+      const currentClassRevenue = customer.classesByRevenue.get(row.class_name) || 0;
+      customer.classesByRevenue.set(row.class_name, currentClassRevenue + (row.revenue || 0));
+    }
   }
 
+  // Convert to sorted array with top classes
   const customers = Array.from(customerRevenue.values())
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      revenue: c.revenue,
+      // Get top 3 classes by revenue
+      topClasses: Array.from(c.classesByRevenue.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([className]) => className),
+    }))
     .sort((a, b) => b.revenue - a.revenue);
 
   const totalCustomers = customers.length;
@@ -1043,6 +1075,16 @@ export async function calculateConcentrationMetrics(filters?: {
   // Customer segments (Platinum/Gold/Silver/Bronze)
   const segments: ConcentrationMetrics['segments'] = [];
 
+  // Helper to map customers with their product mix
+  const mapCustomerDetails = (customerList: typeof customers) =>
+    customerList.map(c => ({
+      id: c.id,
+      name: c.name,
+      revenue: c.revenue,
+      pct: (c.revenue / totalRevenue) * 100,
+      top_classes: c.topClasses,
+    }));
+
   // Platinum: Top 5% of customers
   const platinumCount = Math.max(1, Math.ceil(totalCustomers * 0.05));
   const platinumCustomers = customers.slice(0, platinumCount);
@@ -1053,6 +1095,7 @@ export async function calculateConcentrationMetrics(filters?: {
     total_revenue: platinumRevenue,
     pct_of_total: (platinumRevenue / totalRevenue) * 100,
     threshold_description: 'Top 5% of customers',
+    customers: mapCustomerDetails(platinumCustomers),
   });
 
   // Gold: Next 15% (5-20%)
@@ -1066,6 +1109,7 @@ export async function calculateConcentrationMetrics(filters?: {
     total_revenue: goldRevenue,
     pct_of_total: (goldRevenue / totalRevenue) * 100,
     threshold_description: 'Top 6-20% of customers',
+    customers: mapCustomerDetails(goldCustomers.slice(0, 10)), // Top 10 in tier
   });
 
   // Silver: Next 30% (20-50%)
@@ -1079,6 +1123,7 @@ export async function calculateConcentrationMetrics(filters?: {
     total_revenue: silverRevenue,
     pct_of_total: (silverRevenue / totalRevenue) * 100,
     threshold_description: 'Top 21-50% of customers',
+    customers: mapCustomerDetails(silverCustomers.slice(0, 10)), // Top 10 in tier
   });
 
   // Bronze: Bottom 50%
@@ -1091,6 +1136,7 @@ export async function calculateConcentrationMetrics(filters?: {
     total_revenue: bronzeRevenue,
     pct_of_total: (bronzeRevenue / totalRevenue) * 100,
     threshold_description: 'Bottom 50% of customers',
+    // No individual customers for bronze - too many
   });
 
   return {
