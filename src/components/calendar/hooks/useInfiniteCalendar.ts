@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { CalendarEvent, CalendarMonth, CalendarDay, CalendarWeek, formatDateKey, isSameDay } from '../types';
 
 interface UseInfiniteCalendarOptions {
@@ -108,7 +108,6 @@ function generateMonthData(year: number, month: number, events: CalendarEvent[])
 
 export function useInfiniteCalendar({
   events,
-  initialMonthsToLoad = 3,
 }: UseInfiniteCalendarOptions): UseInfiniteCalendarReturn {
   const [loadedMonths, setLoadedMonths] = useState<CalendarMonth[]>([]);
   const [loadingDirection, setLoadingDirection] = useState<'past' | 'future' | null>(null);
@@ -119,15 +118,6 @@ export function useInfiniteCalendar({
   const todayRef = useRef<HTMLDivElement>(null);
 
   const isLoadingRef = useRef(false);
-  const initialScrollDone = useRef(false);
-
-  // Reset scroll flag on mount
-  useEffect(() => {
-    initialScrollDone.current = false;
-    return () => {
-      initialScrollDone.current = false;
-    };
-  }, []);
 
   // Initialize with months around current date
   useEffect(() => {
@@ -142,8 +132,6 @@ export function useInfiniteCalendar({
     }
 
     setLoadedMonths(initialMonths);
-    // Reset scroll flag when events change so we scroll to today again
-    initialScrollDone.current = false;
   }, [events]);
 
   // Load more months in a direction
@@ -232,29 +220,31 @@ export function useInfiniteCalendar({
     };
   }, [loadMoreMonths]);
 
-  // Scroll to today on initial load
-  useEffect(() => {
-    if (loadedMonths.length > 0 && !initialScrollDone.current && scrollContainerRef.current) {
-      initialScrollDone.current = true;
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
-        scrollToToday();
-      }, 100);
-    }
-  }, [loadedMonths]);
-
-  // Scroll to today function
+  // Scroll to today function - robust implementation
   const scrollToToday = useCallback(() => {
     const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Try to find the today element
     const todayElement = document.getElementById('calendar-today');
 
-    if (container && todayElement) {
+    if (todayElement) {
+      // Calculate position relative to container
       const containerRect = container.getBoundingClientRect();
       const todayRect = todayElement.getBoundingClientRect();
-      const scrollOffset = todayRect.top - containerRect.top - 120; // 120px from top
+
+      // Scroll so today is about 100px from the top
+      const scrollOffset = todayRect.top - containerRect.top - 100;
 
       container.scrollTo({
         top: container.scrollTop + scrollOffset,
+        behavior: 'smooth',
+      });
+    } else {
+      // Fallback: scroll to middle of content (current month should be there)
+      const scrollMiddle = (container.scrollHeight - container.clientHeight) / 3;
+      container.scrollTo({
+        top: scrollMiddle,
         behavior: 'smooth',
       });
     }

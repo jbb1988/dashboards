@@ -8,26 +8,9 @@ import { CalendarEventCard } from './CalendarEventCard';
 interface CalendarDayCellProps {
   day: CalendarDay | null;
   onEventClick: (event: CalendarEvent) => void;
-  singleDayEventsOnly?: boolean;
 }
 
-// Filter to get only single-day events
-function getSingleDayEvents(events: CalendarEvent[]): CalendarEvent[] {
-  return events.filter(event => {
-    const eventStart = event.startOn ? new Date(event.startOn) : null;
-    const eventEnd = event.dueOn ? new Date(event.dueOn) : null;
-
-    if (eventStart && eventEnd) {
-      eventStart.setHours(0, 0, 0, 0);
-      eventEnd.setHours(0, 0, 0, 0);
-      const duration = Math.ceil((eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      return duration <= 1;
-    }
-    return true;
-  });
-}
-
-export function CalendarDayCell({ day, onEventClick, singleDayEventsOnly = false }: CalendarDayCellProps) {
+export function CalendarDayCell({ day, onEventClick }: CalendarDayCellProps) {
   const { setNodeRef, isOver, active } = useDroppable({
     id: day?.dateKey ?? 'empty',
     disabled: !day,
@@ -36,52 +19,66 @@ export function CalendarDayCell({ day, onEventClick, singleDayEventsOnly = false
   // Empty cell (days outside the month)
   if (!day) {
     return (
-      <div className="min-h-[90px] bg-[#0B1220]/60 border-r border-white/[0.02]" />
+      <div className="min-h-[120px] bg-[#0F172A]/80 border-r border-[#1E293B]" />
     );
   }
 
-  // Filter events if singleDayEventsOnly is true
-  const displayEvents = singleDayEventsOnly ? getSingleDayEvents(day.events) : day.events;
-
   const maxVisibleEvents = 3;
-  const hasMoreEvents = displayEvents.length > maxVisibleEvents;
-  const visibleEvents = displayEvents.slice(0, maxVisibleEvents);
-  const hiddenCount = displayEvents.length - maxVisibleEvents;
+  const hasMoreEvents = day.events.length > maxVisibleEvents;
+  const visibleEvents = day.events.slice(0, maxVisibleEvents);
+  const hiddenCount = day.events.length - maxVisibleEvents;
 
   return (
     <motion.div
       ref={setNodeRef}
       id={day.isToday ? 'calendar-today' : undefined}
       className={`
-        min-h-[90px] p-1.5 border-r border-white/[0.03] transition-colors duration-150
-        ${day.isToday ? 'bg-[#E16259]/8 ring-1 ring-inset ring-[#E16259]/20' : ''}
-        ${day.isPast && !day.isToday ? 'bg-[#0B1220]/40' : ''}
-        ${!day.isPast && !day.isToday ? 'bg-[#151F2E]' : ''}
-        ${isOver && active ? 'bg-[#38BDF8]/10 ring-2 ring-inset ring-[#38BDF8]/40' : ''}
+        min-h-[120px] p-2 border-r border-[#1E293B] transition-all duration-150 relative
+        ${day.isToday
+          ? 'bg-[#E16259]/10 ring-2 ring-inset ring-[#E16259]'
+          : day.isPast
+            ? 'bg-[#0F172A]/60'
+            : 'bg-[#0F172A] hover:bg-[#1E293B]/50'
+        }
+        ${isOver && active ? 'bg-[#38BDF8]/15 ring-2 ring-inset ring-[#38BDF8]' : ''}
       `}
       animate={{
-        scale: isOver && active ? 1.01 : 1,
+        scale: isOver && active ? 1.02 : 1,
       }}
       transition={{ duration: 0.15 }}
     >
-      {/* Day Header */}
-      <div className={`
-        flex items-center gap-1.5 mb-2
-        ${day.isToday ? 'text-[#E16259]' : day.isPast ? 'text-[#475569]' : 'text-[#8FA3BF]'}
-      `}>
-        <span className={`
-          text-[12px] font-semibold
-          ${day.isToday ? 'bg-[#E16259] text-white w-6 h-6 rounded-full flex items-center justify-center' : ''}
+      {/* Day Number - Large and readable */}
+      <div className="flex items-start justify-between mb-2">
+        <div className={`
+          flex items-center gap-2
+          ${day.isToday ? 'text-[#E16259]' : day.isPast ? 'text-[#475569]' : 'text-[#E2E8F0]'}
         `}>
-          {day.date.getDate()}
-        </span>
-        {day.isToday && (
-          <span className="text-[8px] uppercase font-bold tracking-wider">Today</span>
+          <span className={`
+            text-[16px] font-bold
+            ${day.isToday
+              ? 'bg-[#E16259] text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg'
+              : ''
+            }
+          `}>
+            {day.date.getDate()}
+          </span>
+          {day.isToday && (
+            <span className="text-[9px] uppercase font-bold tracking-wider bg-[#E16259]/20 text-[#E16259] px-2 py-0.5 rounded">
+              Today
+            </span>
+          )}
+        </div>
+
+        {/* Event count badge if there are events */}
+        {day.events.length > 0 && !day.isToday && (
+          <span className="text-[9px] text-[#64748B] bg-[#334155] px-1.5 py-0.5 rounded">
+            {day.events.length}
+          </span>
         )}
       </div>
 
       {/* Events */}
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <AnimatePresence mode="popLayout">
           {visibleEvents.map((event, index) => (
             <motion.div
@@ -104,13 +101,10 @@ export function CalendarDayCell({ day, onEventClick, singleDayEventsOnly = false
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className={`
-              w-full text-[9px] py-1 rounded text-center
-              ${day.isPast ? 'text-[#475569]' : 'text-[#64748B]'}
-              hover:text-white hover:bg-white/5 transition-colors
-            `}
+            className="w-full text-[10px] py-1.5 rounded text-center font-medium
+              text-[#94A3B8] bg-[#334155]/50 hover:bg-[#334155] hover:text-white
+              transition-colors border border-[#334155]"
             onClick={() => {
-              // Could open a modal with all events for this day
               if (day.events.length > 0) {
                 onEventClick(day.events[maxVisibleEvents]);
               }
@@ -128,7 +122,7 @@ export function CalendarDayCell({ day, onEventClick, singleDayEventsOnly = false
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-1 rounded border-2 border-dashed border-[#38BDF8]/50 pointer-events-none"
+            className="absolute inset-1 rounded-lg border-2 border-dashed border-[#38BDF8] pointer-events-none bg-[#38BDF8]/5"
           />
         )}
       </AnimatePresence>
