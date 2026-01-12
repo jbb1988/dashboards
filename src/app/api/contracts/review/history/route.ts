@@ -17,7 +17,18 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || undefined;
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
 
-    const reviews = await getContractReviews({ contractId, status, limit });
+    let reviews;
+    try {
+      reviews = await getContractReviews({ contractId, status, limit });
+    } catch (dbError) {
+      // Table might not exist yet
+      console.error('Database error (table may not exist):', dbError);
+      return NextResponse.json({
+        history: [],
+        tableExists: false,
+        message: 'contract_reviews table does not exist. Please run migration.'
+      });
+    }
 
     // Transform to match the frontend ReviewHistory interface
     const history = reviews.map(review => ({
