@@ -826,6 +826,7 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [yearFilter, setYearFilter] = useState<string>('all');
+  const [kpiFilter, setKpiFilter] = useState<'all' | 'active' | 'completed' | 'overdue' | 'thisMonth'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'region' | 'status'>('date');
   const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
@@ -871,7 +872,25 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
   const filteredTasks = useMemo(() => {
     if (!data) return [];
 
-    let tasks = [...data.tasks].filter(t => !t.completed);
+    let tasks = [...data.tasks];
+
+    // Apply KPI filter first
+    if (kpiFilter === 'active') {
+      tasks = tasks.filter(t => !t.completed);
+    } else if (kpiFilter === 'completed') {
+      tasks = tasks.filter(t => t.completed);
+    } else if (kpiFilter === 'overdue') {
+      tasks = tasks.filter(t => !t.completed && isOverdue(t.dueOn));
+    } else if (kpiFilter === 'thisMonth') {
+      const now = new Date();
+      tasks = tasks.filter(t => {
+        const d = new Date(t.startOn || t.dueOn || '');
+        return !t.completed && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      });
+    } else {
+      // 'all' - show only incomplete by default
+      tasks = tasks.filter(t => !t.completed);
+    }
 
     if (regionFilter !== 'all') {
       tasks = tasks.filter(t => getCustomField(t, 'Region') === regionFilter);
@@ -905,24 +924,58 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
     });
 
     return tasks;
-  }, [data, regionFilter, categoryFilter, yearFilter, sortBy]);
+  }, [data, kpiFilter, regionFilter, categoryFilter, yearFilter, sortBy]);
 
   if (loading || !data) {
     return <LoadingState />;
   }
 
+  // Calculate This Month count from all tasks (not filtered)
+  const thisMonthCount = useMemo(() => {
+    if (!data) return 0;
+    const now = new Date();
+    return data.tasks.filter(t => {
+      const d = new Date(t.startOn || t.dueOn || '');
+      return !t.completed && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length;
+  }, [data]);
+
   return (
     <div>
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <KPICard title="Active MCCs" value={data.stats.incomplete} subtitle="Scheduled" color="#38BDF8" />
-        <KPICard title="Completed" value={data.stats.completed} subtitle="This period" color="#22C55E" />
-        <KPICard title="Overdue" value={data.stats.overdue} subtitle="Past due date" color="#EF4444" />
-        <KPICard title="This Month" value={filteredTasks.filter(t => {
-          const d = new Date(t.startOn || t.dueOn || '');
-          const now = new Date();
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        }).length} subtitle="Scheduled" color="#F59E0B" />
+        <KPICard
+          title="Active MCCs"
+          value={data.stats.incomplete}
+          subtitle="Scheduled"
+          color="#38BDF8"
+          isActive={kpiFilter === 'active'}
+          onClick={() => setKpiFilter(kpiFilter === 'active' ? 'all' : 'active')}
+        />
+        <KPICard
+          title="Completed"
+          value={data.stats.completed}
+          subtitle="This period"
+          color="#22C55E"
+          isActive={kpiFilter === 'completed'}
+          onClick={() => setKpiFilter(kpiFilter === 'completed' ? 'all' : 'completed')}
+        />
+        <KPICard
+          title="Overdue"
+          value={data.stats.overdue}
+          subtitle="Past due date"
+          color="#EF4444"
+          isActive={kpiFilter === 'overdue'}
+          onClick={() => setKpiFilter(kpiFilter === 'overdue' ? 'all' : 'overdue')}
+        />
+        <KPICard
+          title="This Month"
+          value={thisMonthCount}
+          subtitle="Scheduled"
+          color="#F59E0B"
+          isActive={kpiFilter === 'thisMonth'}
+          onClick={() => setKpiFilter(kpiFilter === 'thisMonth' ? 'all' : 'thisMonth')}
+        />
       </div>
 
       {/* Filters */}
@@ -1057,7 +1110,7 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
 
 // Punch List Tab
 function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | null; loading: boolean; onTaskComplete?: (taskId: string, completed: boolean) => Promise<void> }) {
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [kpiFilter, setKpiFilter] = useState<'all' | 'incomplete' | 'completed' | 'overdue' | 'unassigned'>('all');
   const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
@@ -1074,16 +1127,33 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
 
   const { groupedTasks, progress } = useMemo(() => {
     if (!data) return { groupedTasks: {}, progress: 0 };
-    const tasks = showCompleted ? data.tasks : data.tasks.filter(t => !t.completed);
+
+    let tasks = [...data.tasks];
+
+    // Apply KPI filter
+    if (kpiFilter === 'incomplete') {
+      tasks = tasks.filter(t => !t.completed);
+    } else if (kpiFilter === 'completed') {
+      tasks = tasks.filter(t => t.completed);
+    } else if (kpiFilter === 'overdue') {
+      tasks = tasks.filter(t => !t.completed && isOverdue(t.dueOn));
+    } else if (kpiFilter === 'unassigned') {
+      tasks = tasks.filter(t => !t.completed && !t.assignee);
+    } else {
+      // 'all' - show only incomplete by default
+      tasks = tasks.filter(t => !t.completed);
+    }
+
     const groups: Record<string, AsanaTask[]> = {};
     tasks.forEach(t => {
       const section = t.section || 'No Section';
       if (!groups[section]) groups[section] = [];
       groups[section].push(t);
     });
+
     const prog = data.stats.total > 0 ? Math.round((data.stats.completed / data.stats.total) * 100) : 0;
     return { groupedTasks: groups, progress: prog };
-  }, [data, showCompleted]);
+  }, [data, kpiFilter]);
 
   if (loading || !data) {
     return <LoadingState />;
@@ -1091,47 +1161,57 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
 
   return (
     <div>
-      {/* Progress Overview */}
-      <div className="mb-6 p-6 rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-[14px] font-semibold text-[#EAF2FF]">Punch List Progress</h3>
-            <p className="text-[11px] text-[#64748B]">{data.stats.completed} of {data.stats.total} items complete</p>
-          </div>
-          <div className="text-[32px] font-bold text-[#22C55E]">{progress}%</div>
-        </div>
-        <div className="h-3 rounded-full bg-white/5 overflow-hidden">
-          <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} className="h-full rounded-full bg-gradient-to-r from-[#22C55E] to-[#38BDF8]" />
-        </div>
-        <div className="grid grid-cols-4 gap-4 mt-4 text-center">
-          <div><div className="text-[20px] font-semibold text-[#EAF2FF]">{data.stats.total}</div><div className="text-[10px] text-[#64748B]">Total</div></div>
-          <div><div className="text-[20px] font-semibold text-[#22C55E]">{data.stats.completed}</div><div className="text-[10px] text-[#64748B]">Done</div></div>
-          <div><div className="text-[20px] font-semibold text-[#EF4444]">{data.stats.overdue}</div><div className="text-[10px] text-[#64748B]">Overdue</div></div>
-          <div><div className="text-[20px] font-semibold text-[#8B5CF6]">{data.stats.unassigned}</div><div className="text-[10px] text-[#64748B]">Unassigned</div></div>
-        </div>
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <KPICard
+          title="Incomplete"
+          value={data.stats.incomplete}
+          subtitle="Open items"
+          color="#38BDF8"
+          isActive={kpiFilter === 'incomplete'}
+          onClick={() => setKpiFilter(kpiFilter === 'incomplete' ? 'all' : 'incomplete')}
+        />
+        <KPICard
+          title="Completed"
+          value={data.stats.completed}
+          subtitle={`${progress}% done`}
+          color="#22C55E"
+          isActive={kpiFilter === 'completed'}
+          onClick={() => setKpiFilter(kpiFilter === 'completed' ? 'all' : 'completed')}
+        />
+        <KPICard
+          title="Overdue"
+          value={data.stats.overdue}
+          subtitle="Past due date"
+          color="#EF4444"
+          isActive={kpiFilter === 'overdue'}
+          onClick={() => setKpiFilter(kpiFilter === 'overdue' ? 'all' : 'overdue')}
+        />
+        <KPICard
+          title="Unassigned"
+          value={data.stats.unassigned}
+          subtitle="Need owner"
+          color="#8B5CF6"
+          isActive={kpiFilter === 'unassigned'}
+          onClick={() => setKpiFilter(kpiFilter === 'unassigned' ? 'all' : 'unassigned')}
+        />
       </div>
 
       {/* Controls */}
-      <div className="flex justify-between items-center mb-4">
-        <div />
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowCompleted(!showCompleted)} className={`text-[11px] px-3 py-1.5 rounded-lg ${showCompleted ? 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
-            {showCompleted ? 'Hide Completed' : 'Show Completed'}
-          </button>
-          {data?.project?.gid && (
-            <a
-              href={`https://app.asana.com/0/${data.project.gid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              Open in Asana
-            </a>
-          )}
-        </div>
+      <div className="flex justify-end items-center mb-4">
+        {data?.project?.gid && (
+          <a
+            href={`https://app.asana.com/0/${data.project.gid}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Open in Asana
+          </a>
+        )}
       </div>
 
       {/* Grouped Tasks */}
