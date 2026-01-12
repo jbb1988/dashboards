@@ -446,12 +446,36 @@ export default function ContractDetailDrawer({
     }
   };
 
-  // Document handlers
+  // Document handlers - uploads to Supabase storage and syncs to Salesforce
   const handleDocumentUpload = async (file: File, documentType: string) => {
     setUploadingDocType(documentType);
 
     try {
-      const response = await fetch('/api/contracts/documents', {
+      // Step 1: Get signed upload URL from Supabase
+      const signedUrlResponse = await fetch(`/api/storage/upload?filename=${encodeURIComponent(file.name)}`);
+      if (!signedUrlResponse.ok) {
+        throw new Error('Failed to get upload URL');
+      }
+      const { signedUrl, storagePath } = await signedUrlResponse.json();
+
+      // Step 2: Upload file directly to Supabase storage
+      const uploadResponse = await fetch(signedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+      });
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file to storage');
+      }
+
+      // Step 3: Get the public URL for the uploaded file
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const fileUrl = `${supabaseUrl}/storage/v1/object/public/data-files/${storagePath}`;
+
+      // Step 4: Create document record in database
+      const docResponse = await fetch('/api/contracts/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -461,16 +485,37 @@ export default function ContractDetailDrawer({
           opportunityName: contract.notionName || contract.name,
           documentType,
           fileName: file.name,
-          fileUrl: `#local:${file.name}`,
+          fileUrl,
           fileSize: file.size,
           fileMimeType: file.type,
           status: 'draft',
         }),
       });
-      if (response.ok) {
-        // Refresh documents
-        setDocsFetched(false);
+
+      if (!docResponse.ok) {
+        throw new Error('Failed to create document record');
       }
+
+      const docData = await docResponse.json();
+
+      // Step 5: Auto-push to Salesforce if salesforceId is available
+      if (contract.salesforceId && docData.document?.id) {
+        try {
+          const sfResponse = await fetch('/api/contracts/documents/push-to-sf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documentId: docData.document.id }),
+          });
+          if (!sfResponse.ok) {
+            console.warn('Salesforce sync failed:', await sfResponse.json());
+          }
+        } catch (sfErr) {
+          console.warn('Salesforce sync error:', sfErr);
+        }
+      }
+
+      // Refresh documents
+      setDocsFetched(false);
     } catch (err) {
       console.error('Upload failed:', err);
     } finally {

@@ -136,25 +136,51 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
     fetchDocuments();
   }, [fetchDocuments]);
 
-  // Handle file upload
+  // Handle file upload with Supabase storage and Salesforce sync
   const handleUpload = async (
     file: File,
     documentType: string,
     contractId: string,
     contractName: string,
-    accountName: string
+    accountName: string,
+    salesforceId?: string
   ) => {
     try {
-      const response = await fetch('/api/contracts/documents', {
+      // Step 1: Get signed upload URL from Supabase
+      const signedUrlResponse = await fetch(`/api/storage/upload?filename=${encodeURIComponent(file.name)}`);
+      if (!signedUrlResponse.ok) {
+        throw new Error('Failed to get upload URL');
+      }
+      const { signedUrl, storagePath } = await signedUrlResponse.json();
+
+      // Step 2: Upload file directly to Supabase storage
+      const uploadResponse = await fetch(signedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+      });
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file to storage');
+      }
+
+      // Step 3: Get the public URL for the uploaded file
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const fileUrl = `${supabaseUrl}/storage/v1/object/public/data-files/${storagePath}`;
+
+      // Step 4: Create document record in database
+      const docResponse = await fetch('/api/contracts/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contractId,
+          salesforceId: salesforceId || null,
           accountName,
           opportunityName: contractName,
           documentType,
           fileName: file.name,
-          fileUrl: `#local:${file.name}`,
+          fileUrl,
           fileSize: file.size,
           fileMimeType: file.type,
           status: 'draft',
@@ -162,9 +188,29 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         }),
       });
 
-      if (response.ok) {
-        await fetchDocuments();
+      if (!docResponse.ok) {
+        throw new Error('Failed to create document record');
       }
+
+      const docData = await docResponse.json();
+
+      // Step 5: Auto-push to Salesforce if salesforceId is available
+      if (salesforceId && docData.document?.id) {
+        try {
+          const sfResponse = await fetch('/api/contracts/documents/push-to-sf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documentId: docData.document.id }),
+          });
+          if (!sfResponse.ok) {
+            console.warn('Salesforce sync failed, document saved locally:', await sfResponse.json());
+          }
+        } catch (sfErr) {
+          console.warn('Salesforce sync error:', sfErr);
+        }
+      }
+
+      await fetchDocuments();
     } catch (err) {
       console.error('Upload failed:', err);
     }
@@ -314,7 +360,14 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
         contracts={contractItems}
         onUpload={(file, documentType, contractId) => {
           const contract = contractItems.find(c => c.id === contractId);
-          handleUpload(file, documentType, contractId, contract?.contract_name || '', contract?.account_name || '');
+          handleUpload(
+            file,
+            documentType,
+            contractId,
+            contract?.contract_name || '',
+            contract?.account_name || '',
+            contract?.salesforce_id
+          );
         }}
         onDownload={(doc) => {
           if (doc.file_url && !doc.file_url.startsWith('#')) {
