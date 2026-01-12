@@ -242,16 +242,8 @@ export default function ContractReviewPage() {
     setResult(null);
 
     try {
-      // Use sectioned analysis for larger contracts (>15K chars) to prevent timeouts
-      // Sectioned analysis breaks contract into sections and processes in parallel
-      const useSectionedAnalysis = textToAnalyze.length > 15000;
-      const endpoint = useSectionedAnalysis
-        ? '/api/contracts/review/sectioned'
-        : '/api/contracts/review';
-
-      console.log(`Using ${useSectionedAnalysis ? 'sectioned' : 'standard'} analysis for ${textToAnalyze.length} chars`);
-
-      const response = await fetch(endpoint, {
+      // Use standard analysis - streaming enabled to prevent timeouts
+      const response = await fetch('/api/contracts/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

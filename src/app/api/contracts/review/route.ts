@@ -50,6 +50,13 @@ function normalizeToASCII(text: string): string {
 const normalizeText = normalizeToASCII;
 
 /**
+ * Escape special regex characters in a string
+ */
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Generate a clean diff display showing ONLY the actual changes.
  * Uses diff-match-patch for accurate word-level comparison.
  *
@@ -114,9 +121,8 @@ MARS STANDARD NEGOTIATING POSITIONS:
 
 YOUR TASK:
 1. Identify ONLY sections with MATERIAL risks to MARS (skip boilerplate that's not negotiable)
-2. For each material section, provide the ORIGINAL text and your REVISED text
-3. In the "revisedText" field ONLY: Use **bold** for NEW language and ~~strikethrough~~ for removed text
-4. Briefly explain WHY each change protects MARS
+2. For each material section, provide the EXACT ORIGINAL text and your REVISED text
+3. Briefly explain WHY each change protects MARS
 
 OUTPUT FORMAT:
 {
@@ -125,8 +131,8 @@ OUTPUT FORMAT:
       "sectionNumber": "6",
       "sectionTitle": "Indemnification",
       "materiality": "high",
-      "originalText": "The exact original text from the contract...",
-      "revisedText": "The revised text with **new language in bold** and ~~removed text struck through~~...",
+      "originalText": "Copy the EXACT text from the contract that needs changing - must match character-for-character so we can find it",
+      "revisedText": "The clean revised text WITHOUT any markdown formatting - plain text only",
       "rationale": "One sentence explaining why this change protects MARS"
     }
   ],
@@ -134,8 +140,7 @@ OUTPUT FORMAT:
     "[Indemnification] Made indemnity proportionate to Contractor fault",
     "[IP/Work Product] Added pre-existing IP carve-out",
     "[Liability] Capped liability at contract value"
-  ],
-  "modifiedText": "The COMPLETE contract with all revisions applied - CLEAN TEXT ONLY, NO markdown formatting (no ** or ~~)"
+  ]
 }
 
 MATERIALITY LEVELS:
@@ -145,10 +150,10 @@ MATERIALITY LEVELS:
 
 CRITICAL RULES:
 - Only flag sections that are MATERIALLY unfavorable - skip standard government boilerplate
-- Keep original text intact except for specific surgical changes
-- The "modifiedText" field must contain the COMPLETE contract with changes applied
-- CRITICAL: "modifiedText" must be PLAIN TEXT with NO markdown. Do NOT include ** or ~~ in modifiedText. Only the "revisedText" field in sections uses markdown.
-- PRESERVE ALL SPECIAL CHARACTERS exactly as they appear: § (section symbol), ¶ (paragraph symbol), © ® ™, and all legal citation formats like "§16-203" or "§7-401"
+- The "originalText" MUST be copied EXACTLY from the contract - character for character - so it can be found and replaced
+- The "revisedText" must be PLAIN TEXT with NO markdown (no ** or ~~ or any formatting)
+- Keep changes surgical and minimal - only change what's necessary
+- PRESERVE ALL SPECIAL CHARACTERS exactly as they appear: § (section symbol), ¶ (paragraph symbol), © ® ™, and all legal citation formats
 
 IMPORTANT: Your response must be ONLY a JSON object. No explanations, no markdown, no text before or after. Start your response with { and end with }
 
@@ -217,7 +222,7 @@ export async function POST(request: NextRequest) {
             content: fullPrompt,
           },
         ],
-        max_tokens: 16000,
+        max_tokens: 8000,  // Reduced - no longer outputting full document
         temperature: 0.2,
         stream: true, // Enable streaming to prevent timeout
       }),
@@ -325,7 +330,7 @@ export async function POST(request: NextRequest) {
 
         console.log('Successfully parsed JSON response');
         console.log('Fields in result:', Object.keys(result));
-        console.log('modifiedText length:', result.modifiedText?.length || 0);
+        console.log('sections count:', result.sections?.length || 0);
         console.log('summary count:', result.summary?.length || 0);
       } else {
         // No JSON found - maybe the AI returned text. Try to extract any useful info
@@ -351,16 +356,54 @@ export async function POST(request: NextRequest) {
     // Ensure sections is an array
     const sections = Array.isArray(result.sections) ? result.sections : [];
 
-    // Ensure modifiedText exists and clean it up
-    let modifiedText = result.modifiedText || text;
+    // BUILD modifiedText ourselves by applying section changes
+    // This is much faster than having Claude output the entire 50K+ document
+    let modifiedText = normalizedInput;
+    let appliedChanges = 0;
+    let failedChanges: string[] = [];
 
-    // Strip any markdown formatting (AI sometimes includes despite instructions)
-    modifiedText = modifiedText
-      .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove **bold** markers
-      .replace(/~~([^~]+)~~/g, '$1');     // Remove ~~strikethrough~~ markers
+    for (const section of sections) {
+      if (section.originalText && section.revisedText) {
+        // Clean up the revised text (remove any markdown that slipped through)
+        let cleanRevised = section.revisedText
+          .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove **bold** markers
+          .replace(/~~([^~]+)~~/g, '');        // Remove ~~strikethrough~~ content entirely
 
-    // Apply normalization to modifiedText as well (AI might introduce variants)
-    modifiedText = normalizeToASCII(modifiedText);
+        // Normalize both for matching
+        const normalizedOriginal = normalizeToASCII(section.originalText);
+        cleanRevised = normalizeToASCII(cleanRevised);
+
+        // Try to find and replace
+        if (modifiedText.includes(normalizedOriginal)) {
+          modifiedText = modifiedText.replace(normalizedOriginal, cleanRevised);
+          appliedChanges++;
+          console.log(`Applied change to section: ${section.sectionTitle || section.sectionNumber}`);
+        } else {
+          // Try fuzzy match - sometimes whitespace differs
+          const fuzzyOriginal = normalizedOriginal.replace(/\s+/g, ' ').trim();
+          const fuzzyModified = modifiedText.replace(/\s+/g, ' ');
+
+          if (fuzzyModified.includes(fuzzyOriginal)) {
+            // Found with fuzzy match - apply change
+            const regex = new RegExp(escapeRegExp(normalizedOriginal).replace(/\\s+/g, '\\s+'), 'g');
+            const before = modifiedText;
+            modifiedText = modifiedText.replace(regex, cleanRevised);
+            if (modifiedText !== before) {
+              appliedChanges++;
+              console.log(`Applied change (fuzzy) to section: ${section.sectionTitle || section.sectionNumber}`);
+            } else {
+              failedChanges.push(section.sectionTitle || section.sectionNumber || 'Unknown');
+            }
+          } else {
+            failedChanges.push(section.sectionTitle || section.sectionNumber || 'Unknown');
+            console.warn(`Could not find originalText for section: ${section.sectionTitle || section.sectionNumber}`);
+            console.warn(`Looking for (first 100 chars): ${normalizedOriginal.substring(0, 100)}`);
+          }
+        }
+      }
+    }
+
+    console.log(`Applied ${appliedChanges}/${sections.length} changes. Failed: ${failedChanges.length > 0 ? failedChanges.join(', ') : 'none'}`);
 
     // Generate diff display using diff-match-patch
     // Both normalizedInput and modifiedText are now in same encoding
