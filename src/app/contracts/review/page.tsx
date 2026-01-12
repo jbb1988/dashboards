@@ -378,36 +378,6 @@ export default function ContractReviewPage() {
     }
   }
 
-  async function handleSaveToContract() {
-    if (!result || !selectedContract) {
-      setError('Please select a contract and complete an analysis first');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/contracts/review/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractId: selectedContract,
-          provisionName: provisionName || 'Unnamed Provision',
-          originalText: activeTab === 'paste' ? inputText : extractedText,
-          redlinedText: result.redlinedText,
-          summary: result.summary,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save review');
-      }
-
-      setError(null);
-      alert('Review saved to contract successfully');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save review');
-    }
-  }
-
   function handleCopyRedlines() {
     if (result?.redlinedText) {
       navigator.clipboard.writeText(result.redlinedText);
@@ -1682,15 +1652,8 @@ export default function ContractReviewPage() {
                   </div>
                 )}
 
-                {/* Other Action Buttons */}
+                {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
-                  <button
-                    onClick={handleSaveToContract}
-                    disabled={!selectedContract}
-                    className="flex-1 min-w-[120px] py-2.5 bg-[#22C55E]/10 text-[#22C55E] font-medium rounded-lg hover:bg-[#22C55E]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Save to Notion
-                  </button>
                   <button
                     onClick={handleCopyRedlines}
                     className="flex-1 min-w-[100px] py-2.5 bg-[#38BDF8]/10 text-[#38BDF8] font-medium rounded-lg hover:bg-[#38BDF8]/20 transition-colors"
