@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/components/mars-ui';
 import { FilterBar, PillarCard, InitiativeRow } from '@/components/management';
 
 interface Initiative {
@@ -274,34 +274,49 @@ export default function ManagementDashboard() {
             </div>
           </div>
 
-          {/* Quick Stats */}
+          {/* Quick Stats - Using KPICard from master template */}
           {!loading && data && (
             <div className="grid grid-cols-4 gap-4 mb-6">
-              <div className="bg-[#151F2E] rounded-xl border border-white/[0.04] p-4">
-                <div className="text-[11px] text-[#64748B] uppercase tracking-wider">Total Initiatives</div>
-                <div className="text-3xl font-bold text-white mt-1">{summaryStats.total}</div>
-              </div>
-              <div className="bg-[#151F2E] rounded-xl border border-white/[0.04] p-4">
-                <div className="text-[11px] text-[#64748B] uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-400" />
-                  On Track
-                </div>
-                <div className="text-3xl font-bold text-green-400 mt-1">{summaryStats.onTrack}</div>
-              </div>
-              <div className="bg-[#151F2E] rounded-xl border border-white/[0.04] p-4">
-                <div className="text-[11px] text-[#64748B] uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  At Risk
-                </div>
-                <div className="text-3xl font-bold text-amber-400 mt-1">{summaryStats.atRisk}</div>
-              </div>
-              <div className="bg-[#151F2E] rounded-xl border border-white/[0.04] p-4">
-                <div className="text-[11px] text-[#64748B] uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-red-400" />
-                  Critical
-                </div>
-                <div className="text-3xl font-bold text-red-400 mt-1">{summaryStats.critical}</div>
-              </div>
+              <KPICard
+                title="Total Initiatives"
+                value={summaryStats.total}
+                subtitle={`${data.owners.length} owners`}
+                icon={KPIIcons.clipboard}
+                color="#A855F7"
+                delay={0}
+              />
+              <KPICard
+                title="On Track"
+                value={summaryStats.onTrack}
+                subtitle="Green status"
+                icon={KPIIcons.checkCircle}
+                color="#22C55E"
+                delay={0.1}
+                onClick={() => setSelectedStatus(selectedStatus === 'Green' ? null : 'Green')}
+                isActive={selectedStatus === 'Green'}
+              />
+              <KPICard
+                title="At Risk"
+                value={summaryStats.atRisk}
+                subtitle="Yellow status"
+                icon={KPIIcons.warning}
+                color="#F59E0B"
+                delay={0.2}
+                badge={summaryStats.atRisk > 0 ? summaryStats.atRisk : undefined}
+                onClick={() => setSelectedStatus(selectedStatus === 'Yellow' ? null : 'Yellow')}
+                isActive={selectedStatus === 'Yellow'}
+              />
+              <KPICard
+                title="Critical"
+                value={summaryStats.critical}
+                subtitle="Red status"
+                icon={KPIIcons.alert}
+                color="#EF4444"
+                delay={0.3}
+                badge={summaryStats.critical > 0 ? summaryStats.critical : undefined}
+                onClick={() => setSelectedStatus(selectedStatus === 'Red' ? null : 'Red')}
+                isActive={selectedStatus === 'Red'}
+              />
             </div>
           )}
 
