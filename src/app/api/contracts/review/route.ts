@@ -293,8 +293,22 @@ export async function POST(request: NextRequest) {
     // Both normalizedInput and modifiedText are now in same encoding
     const redlinedText = generateDiffDisplay(normalizedInput, modifiedText);
 
+    // Check if AI actually made changes
+    const hasStrikethrough = redlinedText.includes('[strikethrough]');
+    const hasUnderline = redlinedText.includes('[underline]');
+    const hasVisibleChanges = hasStrikethrough || hasUnderline;
+
     console.log(`Generated diff display, original: ${normalizedInput.length} chars, modified: ${modifiedText.length} chars`);
+    console.log(`Diff has visible changes: ${hasVisibleChanges} (strikethrough: ${hasStrikethrough}, underline: ${hasUnderline})`);
     console.log(`Found ${sections.length} material sections to review`);
+
+    // If we have sections but no visible diff changes, log warning
+    if (sections.length > 0 && !hasVisibleChanges) {
+      console.warn('WARNING: AI identified sections but modifiedText appears unchanged from original.');
+      console.warn('This may indicate AI token limit or failure to apply changes to full document.');
+      console.warn(`Original length: ${normalizedInput.length}, Modified length: ${modifiedText.length}`);
+      console.warn(`Length difference: ${modifiedText.length - normalizedInput.length} chars`);
+    }
 
     return NextResponse.json({
       redlinedText,
@@ -302,6 +316,7 @@ export async function POST(request: NextRequest) {
       modifiedText,                    // Normalized for REVISED.docx
       summary: result.summary,
       sections, // NEW: Structured section-by-section analysis
+      hasVisibleChanges, // NEW: Flag to indicate if diff found changes
       contractId,
       provisionName,
     });

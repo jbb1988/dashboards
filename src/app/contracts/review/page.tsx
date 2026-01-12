@@ -29,6 +29,11 @@ interface ReviewHistory {
   provisionName: string;
   createdAt: string;
   status: 'draft' | 'sent_to_boss' | 'sent_to_client' | 'approved';
+  // Full review data for viewing
+  originalText?: string;
+  redlinedText?: string;
+  modifiedText?: string;
+  summary?: string[];
 }
 
 // Types for document comparison (legacy diff mode)
@@ -193,10 +198,23 @@ export default function ContractReviewPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch contracts on mount
+  // Fetch contracts and history on mount
   useEffect(() => {
     fetchContracts();
+    fetchHistory();
   }, []);
+
+  async function fetchHistory() {
+    try {
+      const response = await fetch('/api/contracts/review/history?limit=50');
+      if (response.ok) {
+        const data = await response.json();
+        setHistory(data.history || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch review history:', err);
+    }
+  }
 
   async function fetchContracts() {
     try {
@@ -240,13 +258,37 @@ export default function ContractReviewPage() {
       }
 
       const data = await response.json();
-      setResult({
+      const newResult = {
         redlinedText: data.redlinedText,
         originalText: data.originalText,
         modifiedText: data.modifiedText,
         summary: data.summary,
         timestamp: new Date().toISOString(),
-      });
+      };
+      setResult(newResult);
+
+      // Save to database for history
+      const selectedContractObj = contracts.find(c => c.id === selectedContract);
+      try {
+        await fetch('/api/contracts/review/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contractId: selectedContract || null,
+            contractName: selectedContractObj?.name || null,
+            provisionName: provisionName || 'Unnamed Provision',
+            originalText: textToAnalyze,
+            redlinedText: data.redlinedText,
+            modifiedText: data.modifiedText,
+            summary: data.summary,
+            status: 'draft',
+          }),
+        });
+        // Refresh history to show the new entry
+        fetchHistory();
+      } catch (saveErr) {
+        console.error('Failed to save review to history:', saveErr);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
@@ -363,6 +405,47 @@ export default function ContractReviewPage() {
     setUploadedFile(null);
     setProvisionName('');
     setOriginalDocxBuffer(null);
+  }
+
+  async function handleDeleteHistoryItem(reviewId: string, event: React.MouseEvent) {
+    event.stopPropagation(); // Prevent triggering the load action
+    if (!confirm('Are you sure you want to delete this review from history?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/contracts/review/history?id=${reviewId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        setHistory(prev => prev.filter(item => item.id !== reviewId));
+      } else {
+        console.error('Failed to delete history item');
+      }
+    } catch (err) {
+      console.error('Error deleting history item:', err);
+    }
+  }
+
+  function handleLoadHistoryItem(item: ReviewHistory) {
+    if (item.originalText && item.redlinedText) {
+      setInputText(item.originalText);
+      setProvisionName(item.provisionName);
+      if (item.contractId) {
+        setSelectedContract(item.contractId);
+      }
+      setResult({
+        redlinedText: item.redlinedText,
+        originalText: item.originalText,
+        modifiedText: item.modifiedText || '',
+        summary: item.summary || [],
+        timestamp: item.createdAt,
+      });
+      setActiveTab('paste');
+      setShowHistory(false);
+    }
   }
 
   async function handleDownloadRevised() {
@@ -826,7 +909,8 @@ export default function ContractReviewPage() {
     setShowAnalysisComparison(false);
 
     try {
-      const response = await fetch('/api/contracts/compare', {
+      // Use the simple diff endpoint for exact text comparison
+      const response = await fetch('/api/contracts/compare/diff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1452,6 +1536,23 @@ export default function ContractReviewPage() {
                 {/* Redlined Text */}
                 <div>
                   <label className="block text-[#8FA3BF] text-sm mb-2">Redlined Text</label>
+                  {/* Warning if no visible changes in diff */}
+                  {result.redlinedText && !result.redlinedText.includes('[strikethrough]') && !result.redlinedText.includes('[underline]') && result.summary.length > 0 && (
+                    <div className="mb-2 p-3 bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-lg">
+                      <div className="flex items-start gap-2 text-sm text-[#F59E0B]">
+                        <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div>
+                          <p className="font-medium">Large Document Notice</p>
+                          <p className="text-[#CBD5E1] text-xs mt-1">
+                            The AI identified recommended changes (see Summary below) but the full document text comparison shows minimal markup.
+                            For large contracts, use <strong>Download Both for Word Compare</strong> below to see precise track changes in Microsoft Word.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="bg-[#0B1220] border border-white/[0.08] rounded-lg p-4 max-h-64 overflow-y-auto">
                     <div
                       className="text-white text-sm font-mono whitespace-pre-wrap contract-redlines"
@@ -2301,24 +2402,36 @@ export default function ContractReviewPage() {
                   {history.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-3 bg-[#0B1220] rounded-lg hover:bg-[#151F2E] transition-colors cursor-pointer"
+                      onClick={() => handleLoadHistoryItem(item)}
+                      className="flex items-center justify-between p-3 bg-[#0B1220] rounded-lg hover:bg-[#151F2E] transition-colors cursor-pointer group"
                     >
-                      <div>
-                        <p className="text-white font-medium">{item.provisionName}</p>
-                        <p className="text-[#64748B] text-sm">{item.contractName}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">{item.provisionName}</p>
+                        <p className="text-[#64748B] text-sm truncate">{item.contractName || 'No contract linked'}</p>
                       </div>
-                      <div className="text-right">
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          item.status === 'approved' ? 'bg-[#22C55E]/10 text-[#22C55E]' :
-                          item.status === 'sent_to_client' ? 'bg-[#38BDF8]/10 text-[#38BDF8]' :
-                          item.status === 'sent_to_boss' ? 'bg-[#F59E0B]/10 text-[#F59E0B]' :
-                          'bg-white/5 text-[#8FA3BF]'
-                        }`}>
-                          {item.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </span>
-                        <p className="text-[#64748B] text-xs mt-1">
-                          {new Date(item.createdAt).toLocaleDateString()}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            item.status === 'approved' ? 'bg-[#22C55E]/10 text-[#22C55E]' :
+                            item.status === 'sent_to_client' ? 'bg-[#38BDF8]/10 text-[#38BDF8]' :
+                            item.status === 'sent_to_boss' ? 'bg-[#F59E0B]/10 text-[#F59E0B]' :
+                            'bg-white/5 text-[#8FA3BF]'
+                          }`}>
+                            {item.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </span>
+                          <p className="text-[#64748B] text-xs mt-1">
+                            {new Date(item.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => handleDeleteHistoryItem(item.id, e)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-[#EF4444]/10 text-[#64748B] hover:text-[#EF4444]"
+                          title="Delete from history"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   ))}

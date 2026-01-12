@@ -2064,6 +2064,150 @@ export async function deleteAllProjectProfitability(): Promise<number> {
   return data?.length || 0;
 }
 
+// ============================================
+// CONTRACT REVIEW FUNCTIONS
+// ============================================
+
+export interface ContractReview {
+  id?: string;
+  contract_id?: string;
+  contract_name?: string;
+  provision_name: string;
+  original_text: string;
+  redlined_text: string;
+  modified_text?: string;
+  summary: string[];
+  status: 'draft' | 'sent_to_boss' | 'sent_to_client' | 'approved';
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Create a new contract review
+ */
+export async function createContractReview(
+  review: Omit<ContractReview, 'id' | 'created_at' | 'updated_at'>
+): Promise<ContractReview | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('contract_reviews')
+    .insert({
+      ...review,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating contract review:', error);
+    return null;
+  }
+
+  return data as ContractReview;
+}
+
+/**
+ * Get all contract reviews (with optional filters)
+ */
+export async function getContractReviews(filters?: {
+  contractId?: string;
+  status?: string;
+  limit?: number;
+}): Promise<ContractReview[]> {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from('contract_reviews')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (filters?.contractId) {
+    query = query.eq('contract_id', filters.contractId);
+  }
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching contract reviews:', error);
+    return [];
+  }
+
+  return data as ContractReview[];
+}
+
+/**
+ * Get a single contract review by ID
+ */
+export async function getContractReview(reviewId: string): Promise<ContractReview | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('contract_reviews')
+    .select('*')
+    .eq('id', reviewId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching contract review:', error);
+    return null;
+  }
+
+  return data as ContractReview;
+}
+
+/**
+ * Update a contract review
+ */
+export async function updateContractReview(
+  reviewId: string,
+  updates: Partial<Omit<ContractReview, 'id' | 'created_at'>>
+): Promise<ContractReview | null> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('contract_reviews')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', reviewId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating contract review:', error);
+    return null;
+  }
+
+  return data as ContractReview;
+}
+
+/**
+ * Delete a contract review
+ */
+export async function deleteContractReview(reviewId: string): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+
+  const { error } = await admin
+    .from('contract_reviews')
+    .delete()
+    .eq('id', reviewId);
+
+  if (error) {
+    console.error('Error deleting contract review:', error);
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Get filter options for profitability dashboard
  */
