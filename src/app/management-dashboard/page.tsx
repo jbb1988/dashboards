@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/components/mars-ui';
-import { FilterBar, PillarCard, InitiativeRow } from '@/components/management';
+import { FilterBar, PillarCard, InitiativeRow, InitiativeDetailDrawer } from '@/components/management';
 
 interface Initiative {
   id: number;
@@ -86,6 +86,7 @@ export default function ManagementDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingRows, setUpdatingRows] = useState<Set<number>>(new Set());
+  const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
 
   // Filters
   const [selectedPillar, setSelectedPillar] = useState<string | null>(null);
@@ -435,7 +436,7 @@ export default function ManagementDashboard() {
                           key={init.id}
                           initiative={init}
                           pillarColor={PILLAR_COLORS[init.parentPillar || ''] || '#64748B'}
-                          onUpdate={handleUpdate}
+                          onClick={() => !init.isPillarRow && setSelectedInitiative(init)}
                           isUpdating={updatingRows.has(init.id)}
                         />
                       ))}
@@ -483,7 +484,7 @@ export default function ManagementDashboard() {
                               key={init.id}
                               initiative={init}
                               pillarColor={color}
-                              onUpdate={handleUpdate}
+                              onClick={() => setSelectedInitiative(init)}
                               isUpdating={updatingRows.has(init.id)}
                             />
                           ))}
@@ -532,7 +533,7 @@ export default function ManagementDashboard() {
                               key={init.id}
                               initiative={init}
                               pillarColor={PILLAR_COLORS[init.parentPillar || ''] || '#64748B'}
-                              onUpdate={handleUpdate}
+                              onClick={() => setSelectedInitiative(init)}
                               isUpdating={updatingRows.has(init.id)}
                             />
                           ))}
@@ -578,7 +579,7 @@ export default function ManagementDashboard() {
                             key={init.id}
                             initiative={init}
                             pillarColor={PILLAR_COLORS[init.parentPillar || ''] || '#64748B'}
-                            onUpdate={handleUpdate}
+                            onClick={() => setSelectedInitiative(init)}
                             isUpdating={updatingRows.has(init.id)}
                           />
                         ))}
@@ -591,6 +592,27 @@ export default function ManagementDashboard() {
           )}
         </div>
       </main>
+
+      {/* Initiative Detail Drawer */}
+      <AnimatePresence>
+        {selectedInitiative && (
+          <InitiativeDetailDrawer
+            initiative={selectedInitiative}
+            onClose={() => setSelectedInitiative(null)}
+            onUpdate={async (rowId, updates) => {
+              await handleUpdate(rowId, updates);
+              // Update the selected initiative in local state after successful save
+              if (data) {
+                const updatedInit = data.initiatives.find(i => i.id === rowId);
+                if (updatedInit) {
+                  setSelectedInitiative(updatedInit);
+                }
+              }
+            }}
+            isUpdating={updatingRows.has(selectedInitiative.id)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
