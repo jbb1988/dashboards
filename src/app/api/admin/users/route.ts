@@ -17,6 +17,7 @@ import {
   assignUserRole,
   getUserEffectiveDashboards,
 } from '@/lib/permissions';
+import { generateTempPassword, sendWelcomeEmail } from '@/lib/email';
 
 /**
  * GET - List all users with their roles and dashboard overrides
@@ -110,18 +111,19 @@ export async function GET() {
 
 /**
  * POST - Create a new user
- * Supports both password-based and magic link (invite) creation
+ * Auto-generates a temporary password and sends welcome email via Resend
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, roleId, role, inviteMethod = 'password' } = body;
+    const { email, roleId, role } = body;
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
+    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     // Determine the role to assign
     let targetRoleId = roleId;
@@ -152,41 +154,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let userId: string;
+    // Generate temporary password
+    const tempPassword = generateTempPassword();
 
-    if (inviteMethod === 'magic_link') {
-      // Send magic link invitation
-      const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // Create user with auto-generated password
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true, // Auto-confirm email
+    });
 
-      const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-        redirectTo: `${origin}/login?invited=true`,
-      });
-
-      if (inviteError) {
-        console.error('Error sending invite:', inviteError);
-        return NextResponse.json({ error: inviteError.message }, { status: 400 });
-      }
-
-      userId = inviteData.user.id;
-    } else {
-      // Create user with password
-      if (!password) {
-        return NextResponse.json({ error: 'Password is required for password-based creation' }, { status: 400 });
-      }
-
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true, // Auto-confirm email
-      });
-
-      if (authError) {
-        console.error('Error creating user:', authError);
-        return NextResponse.json({ error: authError.message }, { status: 400 });
-      }
-
-      userId = authData.user.id;
+    if (authError) {
+      console.error('Error creating user:', authError);
+      return NextResponse.json({ error: authError.message }, { status: 400 });
     }
+
+    const userId = authData.user.id;
 
     // Assign role
     if (targetRoleId) {
@@ -198,14 +181,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Send welcome email with credentials
+    const loginUrl = `${origin}/login`;
+    const emailResult = await sendWelcomeEmail({
+      to: email,
+      password: tempPassword,
+      loginUrl,
+    });
+
+    if (!emailResult.success) {
+      console.error('Failed to send welcome email:', emailResult.error);
+      // User was created but email failed - don't delete user, just warn
+      return NextResponse.json({
+        success: true,
+        warning: 'User created but welcome email failed to send',
+        user: {
+          id: userId,
+          email,
+          role: targetRoleName,
+          roleId: targetRoleId,
+          tempPassword, // Return password so admin can share manually
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
+      emailSent: true,
       user: {
         id: userId,
         email,
         role: targetRoleName,
         roleId: targetRoleId,
-        inviteMethod,
       },
     });
 

@@ -1281,15 +1281,15 @@ export default function ContractDetailDrawer({
                   </div>
                 </div>
 
-                {/* AI Contract Reviews Section */}
+                {/* Contract Analysis Section */}
                 <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] overflow-hidden">
                   <div className="px-4 py-3 border-b border-white/[0.04]">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <svg className="w-4 h-4 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                         </svg>
-                        <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">AI Reviews</span>
+                        <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Contract Analysis</span>
                         {reviews.length > 0 && (
                           <span className="text-[10px] text-[#64748B] bg-[#1E293B] px-2 py-0.5 rounded-full">
                             {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
@@ -1428,14 +1428,14 @@ export default function ContractDetailDrawer({
                     ) : (
                       <div className="text-center py-6">
                         <svg className="w-8 h-8 text-[#475569] mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                         </svg>
-                        <p className="text-[12px] text-[#64748B] mb-2">No AI reviews yet</p>
+                        <p className="text-[12px] text-[#64748B] mb-2">No analyses yet</p>
                         <a
                           href={`/contracts/review?contractId=${contract.salesforceId || contract.id}&contractName=${encodeURIComponent(contract.name)}`}
                           className="text-[11px] text-[#22C55E] hover:text-[#4ADE80] transition-colors"
                         >
-                          Run your first contract analysis →
+                          Run contract analysis →
                         </a>
                       </div>
                     )}

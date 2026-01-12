@@ -176,7 +176,7 @@ export default function ContractReviewPage() {
   const [analysisCompareResult, setAnalysisCompareResult] = useState<CompareResult | null>(null);
   const [isComparingAnalysis, setIsComparingAnalysis] = useState(false);
 
-  // AI Recommendations state (for Compare tab)
+  // Recommendations state (for Compare tab)
   const [comparisonAnalysis, setComparisonAnalysis] = useState<ComparisonAnalysisResult | null>(null);
   const [isAnalyzingComparison, setIsAnalyzingComparison] = useState(false);
   const [compareViewMode, setCompareViewMode] = useState<'comparison' | 'recommendations'>('comparison');
@@ -650,7 +650,7 @@ export default function ContractReviewPage() {
     setSaveSuccess(null);
   }
 
-  // Get AI Recommendations for comparison
+  // Get Recommendations for comparison
   async function handleGetAIRecommendations() {
     if (!sectionCompareResult) return;
 
@@ -962,9 +962,9 @@ export default function ContractReviewPage() {
             delay={0.1}
           />
           <KPICard
-            title="Analysis Tool"
-            value="AI"
-            subtitle="Claude-powered review"
+            title="Reviews"
+            value={history.length}
+            subtitle="Analyses completed"
             icon={KPIIcons.trending}
             color="#8B5CF6"
             delay={0.2}
@@ -1342,7 +1342,7 @@ export default function ContractReviewPage() {
                   <div className="p-3 bg-[#A855F7]/10 border border-[#A855F7]/20 rounded-lg">
                     <p className="text-[#A855F7] text-xs">
                       <span className="font-medium">Deterministic Comparison</span> - Uses Google's diff-match-patch algorithm.
-                      Character-level accuracy with zero AI assumptions or hallucinations.
+                      Character-level accuracy with precise text comparison.
                     </p>
                   </div>
                 </motion.div>
@@ -1456,7 +1456,7 @@ export default function ContractReviewPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <p className="font-medium">No changes detected</p>
-                    <p className="text-sm opacity-75">The AI analysis didn&apos;t modify the original text</p>
+                    <p className="text-sm opacity-75">The analysis didn&apos;t modify the original text</p>
                   </div>
                 )}
 
@@ -1464,7 +1464,7 @@ export default function ContractReviewPage() {
                 <div className="p-3 bg-[#A855F7]/10 border border-[#A855F7]/20 rounded-lg">
                   <p className="text-[#A855F7] text-xs">
                     <span className="font-medium">Deterministic Comparison</span> - Uses Google&apos;s diff-match-patch algorithm.
-                    Shows exact character-level changes between original and AI-revised text.
+                    Shows exact character-level changes between original and revised text.
                   </p>
                 </div>
 
@@ -1534,7 +1534,7 @@ export default function ContractReviewPage() {
                         <div>
                           <p className="font-medium">Large Document Notice</p>
                           <p className="text-[#CBD5E1] text-xs mt-1">
-                            The AI identified recommended changes (see Summary below) but the full document text comparison shows minimal markup.
+                            The analysis identified recommended changes (see Summary below) but the full document text comparison shows minimal markup.
                             For large contracts, use <strong>Download Both for Word Compare</strong> below to see precise track changes in Microsoft Word.
                           </p>
                         </div>
@@ -1742,9 +1742,9 @@ export default function ContractReviewPage() {
                   </div>
                 )}
 
-                {/* AI Recommendations Section */}
+                {/* Recommendations Section */}
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Get AI Recommendations Button */}
+                  {/* Get Recommendations Button */}
                   {!comparisonAnalysis && (
                     <button
                       onClick={handleGetAIRecommendations}
@@ -1764,7 +1764,7 @@ export default function ContractReviewPage() {
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                           </svg>
-                          <span>Get AI Recommendations</span>
+                          <span>Get Recommendations</span>
                         </>
                       )}
                     </button>
@@ -1791,7 +1791,7 @@ export default function ContractReviewPage() {
                             : 'text-[#8FA3BF] hover:text-white'
                         }`}
                       >
-                        AI Recommendations
+                        Recommendations
                       </button>
                     </div>
                   )}
@@ -1999,7 +1999,7 @@ export default function ContractReviewPage() {
                           <div className={`mt-4 p-3 ${colors.bg} border ${colors.border} rounded-lg`}>
                             <div className="flex items-center gap-2 mb-2">
                               <span className={`${colors.text} font-medium text-sm`}>
-                                {colors.icon} AI Recommendation: {recommendation.verdict.replace('_', ' ').toUpperCase()}
+                                {colors.icon} Recommendation: {recommendation.verdict.replace('_', ' ').toUpperCase()}
                               </span>
                               <span className={`ml-auto px-2 py-0.5 rounded text-xs ${
                                 recommendation.riskLevel === 'high' ? 'bg-red-500/20 text-red-400' :
@@ -2081,17 +2081,17 @@ export default function ContractReviewPage() {
                     <span className="hidden sm:inline">Comparison PDF</span>
                   </button>
 
-                  {/* Download AI Recommendations PDF Button - only show if AI analysis was run */}
+                  {/* Download Recommendations PDF Button - only show if AI analysis was run */}
                   {comparisonAnalysis && (
                     <button
                       onClick={handleDownloadRecommendationsPDF}
                       className="flex items-center gap-2 px-3 py-2.5 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] font-medium rounded-lg transition-colors"
-                      title="Download AI Recommendations PDF"
+                      title="Download Recommendations PDF"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <span className="hidden sm:inline">AI Recommendations PDF</span>
+                      <span className="hidden sm:inline">Recommendations PDF</span>
                     </button>
                   )}
 
@@ -2165,7 +2165,7 @@ export default function ContractReviewPage() {
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                           </svg>
-                          Categorize with AI
+                          Auto-Categorize
                         </>
                       )}
                     </button>

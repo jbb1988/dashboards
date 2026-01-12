@@ -45,14 +45,15 @@ export default function UserModal({
   roleDashboardAccess,
 }: UserModalProps) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
   const [overrides, setOverrides] = useState<UserOverride[]>([]);
   const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [createdUserInfo, setCreatedUserInfo] = useState<{ email: string; password: string } | null>(null);
+  // If email fails, we show credentials for manual sharing
+  const [fallbackCredentials, setFallbackCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const isEditing = !!user;
@@ -68,13 +69,13 @@ export default function UserModal({
       setOverrides(user.overrides || []);
     } else {
       setEmail('');
-      setPassword('');
       setSelectedRoleId(defaultRoleId);
       setOverrides([]);
     }
     setError(null);
     setSuccess(null);
-    setCreatedUserInfo(null);
+    setFallbackCredentials(null);
+    setEmailSent(false);
     setCopied(false);
   }, [user, isOpen, defaultRoleId]);
 
@@ -126,16 +127,6 @@ export default function UserModal({
       return;
     }
 
-    if (!isEditing && !password.trim()) {
-      setError('Password is required');
-      return;
-    }
-
-    if (!isEditing && password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
     setSaving(true);
     setError(null);
 
@@ -151,9 +142,7 @@ export default function UserModal({
           }
         : {
             email,
-            password,
             roleId: selectedRoleId,
-            inviteMethod: 'password',
           };
 
       const response = await fetch(endpoint, {
@@ -168,8 +157,15 @@ export default function UserModal({
         setError(data.error);
       } else {
         if (!isEditing) {
-          // Show success screen with credentials to share
-          setCreatedUserInfo({ email, password });
+          // Check if email was sent or if we need to show fallback credentials
+          if (data.emailSent) {
+            setEmailSent(true);
+          } else if (data.warning && data.user?.tempPassword) {
+            // Email failed - show credentials for manual sharing
+            setFallbackCredentials({ email, password: data.user.tempPassword });
+          } else {
+            setEmailSent(true); // Assume success
+          }
           onSave();
         } else {
           onSave();
@@ -241,33 +237,49 @@ export default function UserModal({
 
             {/* Body */}
             <div className="p-6 space-y-5 overflow-y-auto flex-1">
-              {/* Success screen after creating user with password */}
-              {createdUserInfo ? (
+              {/* Success screen after creating user */}
+              {emailSent ? (
                 <div className="text-center py-4">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
                     <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-white mb-2">User Created</h3>
-                  <p className="text-[13px] text-[#8FA3BF] mb-6">
-                    Share these credentials with the user
+                  <p className="text-[13px] text-[#8FA3BF] mb-2">
+                    Welcome email sent to
+                  </p>
+                  <p className="text-white font-medium mb-4">{email}</p>
+                  <p className="text-[12px] text-[#64748B]">
+                    The email contains login credentials and instructions.
+                  </p>
+                </div>
+              ) : fallbackCredentials ? (
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">User Created</h3>
+                  <p className="text-[13px] text-amber-400 mb-4">
+                    Email could not be sent. Please share credentials manually.
                   </p>
 
                   <div className="bg-[#0F1722] rounded-lg p-4 text-left space-y-3">
                     <div>
                       <label className="block text-[11px] font-medium text-[#64748B] mb-1">Email</label>
-                      <div className="text-white font-mono text-[14px]">{createdUserInfo.email}</div>
+                      <div className="text-white font-mono text-[14px]">{fallbackCredentials.email}</div>
                     </div>
                     <div>
                       <label className="block text-[11px] font-medium text-[#64748B] mb-1">Temporary Password</label>
-                      <div className="text-white font-mono text-[14px]">{createdUserInfo.password}</div>
+                      <div className="text-white font-mono text-[14px]">{fallbackCredentials.password}</div>
                     </div>
                   </div>
 
                   <button
                     onClick={() => {
-                      const text = `Email: ${createdUserInfo.email}\nTemporary Password: ${createdUserInfo.password}\n\nLogin at: ${window.location.origin}/login\n\nPlease change your password after logging in using "Forgot Password".`;
+                      const text = `Email: ${fallbackCredentials.email}\nTemporary Password: ${fallbackCredentials.password}\n\nLogin at: ${window.location.origin}/login\n\nPlease change your password after logging in using "Forgot Password".`;
                       navigator.clipboard.writeText(text);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
@@ -310,25 +322,8 @@ export default function UserModal({
                     className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
                     placeholder="user@example.com"
                   />
-                </div>
-              )}
-
-
-              {/* Password (only for new users) */}
-              {!isEditing && (
-                <div>
-                  <label className="block text-[12px] font-medium text-[#64748B] mb-1.5">
-                    Initial Password
-                  </label>
-                  <input
-                    type="text"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50 font-mono"
-                    placeholder="Minimum 6 characters"
-                  />
                   <p className="text-[11px] text-[#64748B] mt-1.5">
-                    You'll need to share these credentials with the user directly.
+                    A welcome email with login credentials will be sent automatically.
                   </p>
                 </div>
               )}
@@ -450,7 +445,7 @@ export default function UserModal({
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-white/10 flex justify-between items-center flex-shrink-0">
-              {createdUserInfo ? (
+              {(emailSent || fallbackCredentials) ? (
                 // Done button after user creation
                 <div className="w-full flex justify-center">
                   <button
@@ -487,7 +482,7 @@ export default function UserModal({
                 <div />
               )}
 
-              {!createdUserInfo && (
+              {!(emailSent || fallbackCredentials) && (
                 <div className="flex gap-3">
                   <button
                     onClick={onClose}
@@ -501,10 +496,10 @@ export default function UserModal({
                     className="px-4 py-2 bg-[#38BDF8] hover:bg-[#38BDF8]/90 text-[#0B1220] font-semibold rounded-lg transition-colors disabled:opacity-50"
                   >
                     {saving
-                      ? 'Saving...'
+                      ? 'Creating...'
                       : isEditing
                       ? 'Save Changes'
-                      : 'Create User'}
+                      : 'Create & Send Email'}
                   </button>
                 </div>
               )}
