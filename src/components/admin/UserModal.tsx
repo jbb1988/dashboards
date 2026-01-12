@@ -55,6 +55,8 @@ export default function UserModal({
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [createdUserInfo, setCreatedUserInfo] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const isEditing = !!user;
 
@@ -76,6 +78,8 @@ export default function UserModal({
     }
     setError(null);
     setSuccess(null);
+    setCreatedUserInfo(null);
+    setCopied(false);
   }, [user, isOpen, defaultRoleId]);
 
   // Get role's default dashboards
@@ -168,6 +172,10 @@ export default function UserModal({
             onSave();
             onClose();
           }, 2000);
+        } else if (!isEditing && inviteMethod === 'password') {
+          // Show success screen with credentials to share
+          setCreatedUserInfo({ email, password });
+          onSave();
         } else {
           onSave();
           onClose();
@@ -238,6 +246,62 @@ export default function UserModal({
 
             {/* Body */}
             <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {/* Success screen after creating user with password */}
+              {createdUserInfo ? (
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">User Created</h3>
+                  <p className="text-[13px] text-[#8FA3BF] mb-6">
+                    Share these credentials with the user
+                  </p>
+
+                  <div className="bg-[#0F1722] rounded-lg p-4 text-left space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-[#64748B] mb-1">Email</label>
+                      <div className="text-white font-mono text-[14px]">{createdUserInfo.email}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-[#64748B] mb-1">Temporary Password</label>
+                      <div className="text-white font-mono text-[14px]">{createdUserInfo.password}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const text = `Email: ${createdUserInfo.email}\nTemporary Password: ${createdUserInfo.password}\n\nLogin at: ${window.location.origin}/login\n\nPlease change your password after logging in using "Forgot Password".`;
+                      navigator.clipboard.writeText(text);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="mt-4 px-4 py-2 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] rounded-lg transition-colors flex items-center gap-2 mx-auto"
+                  >
+                    {copied ? (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy Credentials
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-[11px] text-[#64748B] mt-4">
+                    User can change password using "Forgot Password" on login page
+                  </p>
+                </div>
+              ) : (
+              <>
               {/* Email (only for new users) */}
               {!isEditing && (
                 <div>
@@ -453,12 +517,23 @@ export default function UserModal({
                   {success}
                 </div>
               )}
+              </>
+              )}
             </div>
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-white/10 flex justify-between items-center flex-shrink-0">
-              {/* Resend Invite Button - only for editing */}
-              {isEditing ? (
+              {createdUserInfo ? (
+                // Done button after user creation
+                <div className="w-full flex justify-center">
+                  <button
+                    onClick={onClose}
+                    className="px-6 py-2 bg-[#38BDF8] hover:bg-[#38BDF8]/90 text-[#0B1220] font-semibold rounded-lg transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : isEditing ? (
                 <button
                   onClick={handleResendInvite}
                   disabled={resending || saving}
@@ -485,27 +560,29 @@ export default function UserModal({
                 <div />
               )}
 
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-[#64748B] hover:text-white transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !!success}
-                  className="px-4 py-2 bg-[#38BDF8] hover:bg-[#38BDF8]/90 text-[#0B1220] font-semibold rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {saving
-                    ? 'Saving...'
-                    : isEditing
-                    ? 'Save Changes'
-                    : inviteMethod === 'magic_link'
-                    ? 'Send Invitation'
-                    : 'Create User'}
-                </button>
-              </div>
+              {!createdUserInfo && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 text-[#64748B] hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !!success}
+                    className="px-4 py-2 bg-[#38BDF8] hover:bg-[#38BDF8]/90 text-[#0B1220] font-semibold rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {saving
+                      ? 'Saving...'
+                      : isEditing
+                      ? 'Save Changes'
+                      : inviteMethod === 'magic_link'
+                      ? 'Send Invitation'
+                      : 'Create User'}
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         </motion.div>
