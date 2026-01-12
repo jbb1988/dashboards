@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/components/mars-ui';
-import { FilterBar, PillarCard, InitiativeRow, InitiativeDetailDrawer } from '@/components/management';
+import { FilterBar, PillarCard, InitiativeRow, InitiativeDetailDrawer, ChartsTab, BoardView } from '@/components/management';
 
 interface Initiative {
   id: number;
@@ -70,7 +70,7 @@ interface InitiativesResponse {
   meta: Meta;
 }
 
-type TabType = 'overview' | 'by-pillar' | 'by-owner' | 'at-risk';
+type TabType = 'overview' | 'by-pillar' | 'by-owner' | 'at-risk' | 'charts' | 'board';
 
 const PILLAR_COLORS: Record<string, string> = {
   'REVENUE GROWTH': '#38BDF8',
@@ -228,6 +228,8 @@ export default function ManagementDashboard() {
     { id: 'by-pillar' as const, label: 'By Pillar' },
     { id: 'by-owner' as const, label: 'By Owner' },
     { id: 'at-risk' as const, label: 'At Risk', badge: summaryStats.atRisk + summaryStats.critical },
+    { id: 'charts' as const, label: 'Charts' },
+    { id: 'board' as const, label: 'Board View' },
   ];
 
   return (
@@ -586,6 +588,43 @@ export default function ManagementDashboard() {
                       </div>
                     )}
                   </div>
+                </motion.div>
+              )}
+
+              {/* Charts Tab */}
+              {activeTab === 'charts' && (
+                <motion.div
+                  key="charts"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <ChartsTab
+                    summary={data.summary}
+                    initiatives={data.initiatives}
+                    pillarColors={PILLAR_COLORS}
+                    onOwnerClick={(owner) => {
+                      setSelectedOwner(owner);
+                      setActiveTab('by-owner');
+                    }}
+                  />
+                </motion.div>
+              )}
+
+              {/* Board View Tab */}
+              {activeTab === 'board' && (
+                <motion.div
+                  key="board"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <BoardView
+                    summary={data.summary}
+                    initiatives={data.initiatives}
+                    pillarColors={PILLAR_COLORS}
+                    lastSynced={data.lastSynced}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
