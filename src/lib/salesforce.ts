@@ -858,3 +858,53 @@ export async function uploadFileToAccount(
     contentDocumentLinkId: linkResult.contentDocumentLinkId,
   };
 }
+
+/**
+ * Delete a ContentDocument from Salesforce
+ * Deleting the ContentDocument will cascade delete all ContentVersions and ContentDocumentLinks
+ */
+export async function deleteFileFromSalesforce(
+  contentDocumentId: string
+): Promise<{ success: boolean; errors?: string[] }> {
+  const { token: accessToken, instanceUrl } = await getSalesforceToken();
+  if (!accessToken) {
+    return { success: false, errors: ['Failed to get Salesforce access token'] };
+  }
+
+  if (!instanceUrl) {
+    return { success: false, errors: ['Salesforce instance URL not configured'] };
+  }
+
+  try {
+    const response = await fetch(
+      `${instanceUrl}/services/data/v59.0/sobjects/ContentDocument/${contentDocumentId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errors: string[];
+      try {
+        const errorJson = JSON.parse(errorText);
+        errors = Array.isArray(errorJson)
+          ? errorJson.map((e: any) => e.message || e.errorCode)
+          : [errorJson.message || errorText];
+      } catch {
+        errors = [errorText || `HTTP ${response.status}`];
+      }
+      return { success: false, errors };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      errors: [error instanceof Error ? error.message : 'Unknown error'],
+    };
+  }
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { ContractListView, ContractItem, ContractDocument } from '@/components/documents';
+import { ContractListView, ContractItem, ContractDocument, DocumentDetailDrawer, DocumentItem } from '@/components/documents';
 import {
   tokens,
   colors,
@@ -116,6 +116,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
   // State
   const [data, setData] = useState<DocumentsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
 
   // Fetch documents data
   const fetchDocuments = useCallback(async () => {
@@ -381,8 +382,30 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           }
         }}
         onView={(doc) => {
-          if (doc.file_url && !doc.file_url.startsWith('#')) {
-            window.open(doc.file_url, '_blank');
+          // Find the contract this document belongs to
+          const contract = contractItems.find(c =>
+            c.documents.some(d => d.id === doc.id)
+          );
+
+          if (contract) {
+            // Convert ContractDocument to DocumentItem for the drawer
+            const documentItem: DocumentItem = {
+              id: doc.id,
+              document_type: doc.document_type,
+              file_name: doc.file_name || 'Unknown',
+              file_url: doc.file_url || '',
+              file_size: doc.file_size,
+              uploaded_at: doc.uploaded_at,
+              uploaded_by: doc.uploaded_by,
+              status: doc.status === 'uploaded' ? 'draft' : 'missing',
+              contract_id: contract.id,
+              contract_name: contract.contract_name,
+              account_name: contract.account_name,
+              is_required: doc.is_required,
+              version: doc.version,
+              salesforce_id: contract.salesforce_id,
+            };
+            setSelectedDocument(documentItem);
           }
         }}
         onDelete={async (doc) => {
@@ -398,6 +421,36 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
           } catch (err) {
             console.error('Delete failed:', err);
           }
+        }}
+      />
+
+      {/* Document Detail Drawer for Preview */}
+      <DocumentDetailDrawer
+        document={selectedDocument}
+        onClose={() => setSelectedDocument(null)}
+        onDownload={(doc) => {
+          if (doc.file_url && !doc.file_url.startsWith('#')) {
+            window.open(doc.file_url, '_blank');
+          }
+        }}
+        onDelete={async (doc) => {
+          try {
+            const response = await fetch(`/api/contracts/documents?documentId=${doc.id}&hardDelete=true`, {
+              method: 'DELETE',
+            });
+            if (response.ok) {
+              setSelectedDocument(null);
+              await fetchDocuments();
+            } else {
+              console.error('Failed to delete document');
+            }
+          } catch (err) {
+            console.error('Delete failed:', err);
+          }
+        }}
+        onSfSync={async () => {
+          // Refresh document list after sync
+          await fetchDocuments();
         }}
       />
     </div>

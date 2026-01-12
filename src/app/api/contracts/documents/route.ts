@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { deleteFileFromSalesforce } from '@/lib/salesforce';
 
 // Document types matching the database enum
 const DOCUMENT_TYPES = [
@@ -624,6 +625,22 @@ export async function DELETE(request: NextRequest) {
 
     const admin = getSupabaseAdmin();
 
+    // First, get the document to check if it's synced to Salesforce
+    const { data: document } = await admin
+      .from('documents')
+      .select('sf_content_document_id')
+      .eq('id', documentId)
+      .single();
+
+    // If document is synced to Salesforce, delete from SF first
+    if (document?.sf_content_document_id) {
+      const sfDeleteResult = await deleteFileFromSalesforce(document.sf_content_document_id);
+      if (!sfDeleteResult.success) {
+        console.warn('Failed to delete from Salesforce:', sfDeleteResult.errors);
+        // Continue with local delete even if SF delete fails
+      }
+    }
+
     if (hardDelete) {
       // Actually delete the record
       const { error } = await admin
@@ -652,7 +669,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, documentId, hardDelete });
+    return NextResponse.json({ success: true, documentId, hardDelete, deletedFromSalesforce: !!document?.sf_content_document_id });
   } catch (error) {
     console.error('Error in DELETE /api/contracts/documents:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
