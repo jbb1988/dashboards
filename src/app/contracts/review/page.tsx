@@ -8,6 +8,7 @@ import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/com
 
 interface Contract {
   id: string;
+  salesforceId: string;
   name: string;
   status: string;
   value: number;
@@ -291,7 +292,7 @@ export default function ContractReviewPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contractId: selectedContract || null,
+            contractId: selectedContractObj?.salesforceId || selectedContract || null,
             contractName: selectedContractObj?.name || null,
             provisionName: provisionName || 'Unnamed Provision',
             originalText: textToAnalyze,
