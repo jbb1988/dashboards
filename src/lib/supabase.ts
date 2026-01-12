@@ -2102,7 +2102,7 @@ export async function createContractReview(
 
   if (error) {
     console.error('Error creating contract review:', error);
-    return null;
+    throw new Error(`Database error: ${error.message} (code: ${error.code})`);
   }
 
   return data as ContractReview;

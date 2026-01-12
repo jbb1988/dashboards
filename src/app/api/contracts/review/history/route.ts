@@ -91,11 +91,20 @@ export async function POST(request: NextRequest) {
       status,
     };
 
-    const created = await createContractReview(review);
+    let created;
+    try {
+      created = await createContractReview(review);
+    } catch (dbError) {
+      console.error('Database error creating review:', dbError);
+      return NextResponse.json(
+        { error: dbError instanceof Error ? dbError.message : 'Database error' },
+        { status: 500 }
+      );
+    }
 
     if (!created) {
       return NextResponse.json(
-        { error: 'Failed to create review record' },
+        { error: 'Failed to create review record - no data returned' },
         { status: 500 }
       );
     }
