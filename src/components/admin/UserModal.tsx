@@ -35,8 +35,6 @@ interface UserModalProps {
   roleDashboardAccess: Record<string, string[]>;
 }
 
-type InviteMethod = 'password' | 'magic_link';
-
 export default function UserModal({
   isOpen,
   onClose,
@@ -49,7 +47,6 @@ export default function UserModal({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
-  const [inviteMethod, setInviteMethod] = useState<InviteMethod>('password');
   const [overrides, setOverrides] = useState<UserOverride[]>([]);
   const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
@@ -73,7 +70,6 @@ export default function UserModal({
       setEmail('');
       setPassword('');
       setSelectedRoleId(defaultRoleId);
-      setInviteMethod('password');
       setOverrides([]);
     }
     setError(null);
@@ -130,8 +126,13 @@ export default function UserModal({
       return;
     }
 
-    if (!isEditing && inviteMethod === 'password' && !password.trim()) {
+    if (!isEditing && !password.trim()) {
       setError('Password is required');
+      return;
+    }
+
+    if (!isEditing && password.length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
 
@@ -150,9 +151,9 @@ export default function UserModal({
           }
         : {
             email,
-            password: inviteMethod === 'password' ? password : undefined,
+            password,
             roleId: selectedRoleId,
-            inviteMethod,
+            inviteMethod: 'password',
           };
 
       const response = await fetch(endpoint, {
@@ -166,13 +167,7 @@ export default function UserModal({
       if (data.error) {
         setError(data.error);
       } else {
-        if (!isEditing && inviteMethod === 'magic_link') {
-          setSuccess(`Magic link invitation sent to ${email}`);
-          setTimeout(() => {
-            onSave();
-            onClose();
-          }, 2000);
-        } else if (!isEditing && inviteMethod === 'password') {
+        if (!isEditing) {
           // Show success screen with credentials to share
           setCreatedUserInfo({ email, password });
           onSave();
@@ -318,90 +313,22 @@ export default function UserModal({
                 </div>
               )}
 
-              {/* Invite Method (only for new users) */}
+
+              {/* Password (only for new users) */}
               {!isEditing && (
                 <div>
-                  <label className="block text-[12px] font-medium text-[#64748B] mb-2">
-                    Account Setup Method
-                  </label>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setInviteMethod('password')}
-                      className={`flex-1 p-3 rounded-lg border transition-colors ${
-                        inviteMethod === 'password'
-                          ? 'border-[#38BDF8] bg-[#38BDF8]/10'
-                          : 'border-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-4 h-4 rounded-full border-2 ${
-                            inviteMethod === 'password'
-                              ? 'border-[#38BDF8] bg-[#38BDF8]'
-                              : 'border-[#64748B]'
-                          }`}
-                        >
-                          {inviteMethod === 'password' && (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#0B1220]" />
-                            </div>
-                          )}
-                        </div>
-                        <span className="text-[13px] font-medium text-white">Temporary Password</span>
-                      </div>
-                      <p className="text-[11px] text-[#64748B] mt-1 text-left">
-                        User will change on first login
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInviteMethod('magic_link')}
-                      className={`flex-1 p-3 rounded-lg border transition-colors ${
-                        inviteMethod === 'magic_link'
-                          ? 'border-[#38BDF8] bg-[#38BDF8]/10'
-                          : 'border-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-4 h-4 rounded-full border-2 ${
-                            inviteMethod === 'magic_link'
-                              ? 'border-[#38BDF8] bg-[#38BDF8]'
-                              : 'border-[#64748B]'
-                          }`}
-                        >
-                          {inviteMethod === 'magic_link' && (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#0B1220]" />
-                            </div>
-                          )}
-                        </div>
-                        <span className="text-[13px] font-medium text-white">Magic Link</span>
-                      </div>
-                      <p className="text-[11px] text-[#64748B] mt-1 text-left">
-                        Send email invitation
-                      </p>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Password (only for password method) */}
-              {!isEditing && inviteMethod === 'password' && (
-                <div>
                   <label className="block text-[12px] font-medium text-[#64748B] mb-1.5">
-                    Temporary Password
+                    Initial Password
                   </label>
                   <input
-                    type="password"
+                    type="text"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
+                    className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50 font-mono"
                     placeholder="Minimum 6 characters"
                   />
-                  <p className="text-[11px] text-amber-400/80 mt-1.5">
-                    Share this password with the user. They can change it using "Forgot Password" on the login page.
+                  <p className="text-[11px] text-[#64748B] mt-1.5">
+                    You'll need to share these credentials with the user directly.
                   </p>
                 </div>
               )}
@@ -577,8 +504,6 @@ export default function UserModal({
                       ? 'Saving...'
                       : isEditing
                       ? 'Save Changes'
-                      : inviteMethod === 'magic_link'
-                      ? 'Send Invitation'
                       : 'Create User'}
                   </button>
                 </div>
