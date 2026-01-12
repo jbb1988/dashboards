@@ -52,6 +52,7 @@ export default function UserModal({
   const [inviteMethod, setInviteMethod] = useState<InviteMethod>('password');
   const [overrides, setOverrides] = useState<UserOverride[]>([]);
   const [saving, setSaving] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -180,6 +181,33 @@ export default function UserModal({
   };
 
   const selectedRole = roles.find(r => r.id === selectedRoleId);
+
+  const handleResendInvite = async () => {
+    if (!user) return;
+
+    setResending(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, email: user.email }),
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setSuccess(`Magic link sent to ${user.email}`);
+      }
+    } catch (err) {
+      setError('Failed to resend invite');
+    } finally {
+      setResending(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -425,26 +453,56 @@ export default function UserModal({
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-white/10 flex justify-end gap-3 flex-shrink-0">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-[#64748B] hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !!success}
-                className="px-4 py-2 bg-[#38BDF8] hover:bg-[#38BDF8]/90 text-[#0B1220] font-semibold rounded-lg transition-colors disabled:opacity-50"
-              >
-                {saving
-                  ? 'Saving...'
-                  : isEditing
-                  ? 'Save Changes'
-                  : inviteMethod === 'magic_link'
-                  ? 'Send Invitation'
-                  : 'Create User'}
-              </button>
+            <div className="px-6 py-4 border-t border-white/10 flex justify-between items-center flex-shrink-0">
+              {/* Resend Invite Button - only for editing */}
+              {isEditing ? (
+                <button
+                  onClick={handleResendInvite}
+                  disabled={resending || saving}
+                  className="px-4 py-2 text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {resending ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Send Magic Link
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-[#64748B] hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !!success}
+                  className="px-4 py-2 bg-[#38BDF8] hover:bg-[#38BDF8]/90 text-[#0B1220] font-semibold rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {saving
+                    ? 'Saving...'
+                    : isEditing
+                    ? 'Save Changes'
+                    : inviteMethod === 'magic_link'
+                    ? 'Send Invitation'
+                    : 'Create User'}
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>
