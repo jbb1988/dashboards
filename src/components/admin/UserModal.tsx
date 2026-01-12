@@ -284,10 +284,10 @@ export default function UserModal({
                             </div>
                           )}
                         </div>
-                        <span className="text-[13px] font-medium text-white">Set Password</span>
+                        <span className="text-[13px] font-medium text-white">Temporary Password</span>
                       </div>
                       <p className="text-[11px] text-[#64748B] mt-1 text-left">
-                        Create account with a password
+                        User will change on first login
                       </p>
                     </button>
                     <button
@@ -327,7 +327,7 @@ export default function UserModal({
               {!isEditing && inviteMethod === 'password' && (
                 <div>
                   <label className="block text-[12px] font-medium text-[#64748B] mb-1.5">
-                    Password
+                    Temporary Password
                   </label>
                   <input
                     type="password"
@@ -336,6 +336,9 @@ export default function UserModal({
                     className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
                     placeholder="Minimum 6 characters"
                   />
+                  <p className="text-[11px] text-amber-400/80 mt-1.5">
+                    Share this password with the user. They can change it using "Forgot Password" on the login page.
+                  </p>
                 </div>
               )}
 
