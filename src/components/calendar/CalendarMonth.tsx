@@ -247,12 +247,12 @@ export function CalendarMonth({ month, onEventClick }: CalendarMonthProps) {
           return (
             <div
               key={weekIdx}
-              className="relative border-b border-white/[0.02]"
+              className="relative border-b border-white/[0.02] overflow-hidden"
             >
-              {/* Spanning events layer */}
+              {/* Spanning events layer - positioned relative to the week container */}
               {spanningEvents.length > 0 && (
                 <div
-                  className="absolute top-0 left-0 right-0 z-10 pointer-events-none"
+                  className="absolute top-0 left-0 right-0 z-10 pointer-events-none overflow-hidden"
                   style={{ height: `${32 + maxSpanningRows * 26}px` }}
                 >
                   {spanningEvents.map(se => (

@@ -95,14 +95,14 @@ export function ContinuousCalendar({
       {/* Fullscreen backdrop */}
       {isFullscreen && (
         <div
-          className="fixed inset-0 bg-black/80 z-40"
+          className="fixed inset-0 bg-black/90 z-[9998]"
           onClick={() => setIsFullscreen(false)}
         />
       )}
 
       <div className={`
         rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden
-        ${isFullscreen ? 'fixed inset-4 z-50 flex flex-col' : ''}
+        ${isFullscreen ? 'fixed inset-4 z-[9999] flex flex-col' : ''}
       `}>
 
       {/* Header */}

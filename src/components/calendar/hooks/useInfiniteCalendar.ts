@@ -121,6 +121,14 @@ export function useInfiniteCalendar({
   const isLoadingRef = useRef(false);
   const initialScrollDone = useRef(false);
 
+  // Reset scroll flag on mount
+  useEffect(() => {
+    initialScrollDone.current = false;
+    return () => {
+      initialScrollDone.current = false;
+    };
+  }, []);
+
   // Initialize with months around current date
   useEffect(() => {
     const today = new Date();
@@ -134,6 +142,8 @@ export function useInfiniteCalendar({
     }
 
     setLoadedMonths(initialMonths);
+    // Reset scroll flag when events change so we scroll to today again
+    initialScrollDone.current = false;
   }, [events]);
 
   // Load more months in a direction
