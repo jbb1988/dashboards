@@ -271,6 +271,8 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
     items: category.items.filter(item => {
       // Always show disabled items
       if (item.disabled) return true;
+      // Admin sees everything
+      if (userRole === 'admin') return true;
       // Check if route is in accessible routes
       return accessibleRoutes.some(route =>
         item.href === route || item.href.startsWith(route + '/')
