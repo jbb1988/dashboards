@@ -61,9 +61,9 @@ function LoginForm() {
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
           setSuccess('Welcome! Your account is ready. Redirecting...');
+          // Use full page reload to ensure cookies are sent with next request
           setTimeout(() => {
-            router.push('/');
-            router.refresh();
+            window.location.href = '/';
           }, 1500);
           return;
         }
@@ -77,12 +77,10 @@ function LoginForm() {
         if (isInvited) {
           setSuccess('Welcome! Your account is ready. Redirecting...');
           setTimeout(() => {
-            router.push('/');
-            router.refresh();
+            window.location.href = '/';
           }, 1500);
         } else {
-          router.push('/');
-          router.refresh();
+          window.location.href = '/';
         }
         return;
       }
