@@ -154,7 +154,7 @@ export function DashboardBackground({
   className = '',
 }: DashboardBackgroundProps) {
   return (
-    <div className={`fixed inset-0 pointer-events-none ${className}`}>
+    <div className={`fixed inset-0 pointer-events-none z-0 ${className}`}>
       <GridBackground
         accentColor={accentColor}
         secondaryColor={secondaryColor}
