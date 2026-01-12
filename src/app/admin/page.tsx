@@ -100,7 +100,7 @@ export default function AdminPage() {
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
       <main
-        className="transition-all duration-200 ease-out min-h-screen"
+        className="relative z-10 transition-all duration-200 ease-out min-h-screen"
         style={{ marginLeft }}
       >
         <div className="p-8">
