@@ -11,3 +11,5 @@ export { default as DocumentListView } from './DocumentListView';
 export { default as ContractDetailDrawer } from './ContractDetailDrawer';
 export type { ContractItem, ContractDocument } from './ContractDetailDrawer';
 export { default as ContractListView } from './ContractListView';
+export { default as FilterDrawer } from './FilterDrawer';
+export type { FilterState } from './FilterDrawer';
