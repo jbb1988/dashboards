@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -27,7 +28,13 @@ export function ContinuousCalendar({
 }: CalendarProps) {
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const hasScrolledToToday = useRef(false);
+
+  // Set portal container on client side
+  useEffect(() => {
+    setPortalContainer(document.body);
+  }, []);
 
   // Escape key handler for fullscreen
   useEffect(() => {
@@ -110,20 +117,14 @@ export function ContinuousCalendar({
     );
   }
 
-  return (
-    <>
-      {/* Fullscreen backdrop */}
-      {isFullscreen && (
-        <div
-          className="fixed inset-0 bg-black/70 z-[9998]"
-          onClick={() => setIsFullscreen(false)}
-        />
-      )}
-
-      <div className={`
-        rounded-xl bg-[#1E293B] border border-[#334155] shadow-xl overflow-hidden
-        ${isFullscreen ? 'fixed inset-0 z-[9999] flex flex-col rounded-none' : ''}
-      `}>
+  // Calendar content component (reused for both normal and fullscreen)
+  const calendarContent = (isFullscreenMode: boolean) => (
+    <div className={`
+      bg-[#1E293B] border border-[#334155] shadow-xl overflow-hidden
+      ${isFullscreenMode
+        ? 'fixed inset-0 z-[9999] flex flex-col'
+        : 'rounded-xl'}
+    `}>
 
       {/* Header */}
       <div className="px-5 py-4 bg-[#1E293B] border-b border-[#334155] flex items-center justify-between shrink-0">
@@ -203,7 +204,7 @@ export function ContinuousCalendar({
           className={`
             overflow-y-auto overflow-x-hidden relative bg-[#0F172A]
             ${isDragging ? 'cursor-grabbing' : ''}
-            ${isFullscreen ? 'flex-1' : 'h-[600px]'}
+            ${isFullscreenMode ? 'flex-1' : 'h-[600px]'}
           `}
         >
           {/* Top sentinel for loading past months */}
@@ -252,6 +253,29 @@ export function ContinuousCalendar({
         </span>
       </div>
     </div>
+  );
+
+  // Fullscreen portal content
+  const fullscreenPortal = isFullscreen && portalContainer ? createPortal(
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/70 z-[9998]"
+        onClick={() => setIsFullscreen(false)}
+      />
+      {/* Fullscreen calendar */}
+      {calendarContent(true)}
+    </>,
+    portalContainer
+  ) : null;
+
+  return (
+    <>
+      {/* Normal (non-fullscreen) view */}
+      {!isFullscreen && calendarContent(false)}
+
+      {/* Fullscreen view via portal (renders to document.body) */}
+      {fullscreenPortal}
     </>
   );
 }
