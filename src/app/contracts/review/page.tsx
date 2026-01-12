@@ -253,14 +253,28 @@ export default function ContractReviewPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = typeof errorData.error === 'string'
-          ? errorData.error
-          : errorData.error?.message || 'Analysis failed. Please try again.';
+        let errorMessage = 'Analysis failed. Please try again.';
+        try {
+          const errorData = await response.json();
+          errorMessage = typeof errorData.error === 'string'
+            ? errorData.error
+            : errorData.error?.message || errorMessage;
+        } catch {
+          // Response was not JSON, try to get text
+          const errorText = await response.text().catch(() => '');
+          if (errorText) {
+            errorMessage = errorText.substring(0, 200);
+          }
+        }
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Server returned invalid response. Please try again.');
+      }
       const newResult = {
         redlinedText: data.redlinedText,
         originalText: data.originalText,

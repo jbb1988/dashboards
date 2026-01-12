@@ -211,14 +211,33 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenRouter error:', errorText);
+      console.error('=== OPENROUTER API ERROR ===');
+      console.error('Status:', response.status);
+      console.error('Status Text:', response.statusText);
+      console.error('Response Body:', errorText);
+      console.error('Model Used:', openRouterModel);
+      console.error('Input Length:', normalizedInput.length, 'chars');
+      console.error('============================');
       return NextResponse.json(
-        { error: `AI analysis failed: ${response.status}` },
+        { error: `AI analysis failed (${response.status}): ${errorText.substring(0, 200)}` },
         { status: 500 }
       );
     }
 
-    const aiResponse = await response.json();
+    let aiResponse;
+    try {
+      aiResponse = await response.json();
+    } catch (jsonErr) {
+      const responseText = await response.text();
+      console.error('=== OPENROUTER JSON PARSE ERROR ===');
+      console.error('Failed to parse OpenRouter response as JSON');
+      console.error('Response Text:', responseText.substring(0, 500));
+      console.error('====================================');
+      return NextResponse.json(
+        { error: 'AI returned invalid response format. Please try again.' },
+        { status: 500 }
+      );
+    }
     const stdout = aiResponse.choices?.[0]?.message?.content || '';
 
     console.log(`OpenRouter completed in ${(Date.now() - startTime) / 1000}s`);
@@ -321,14 +340,15 @@ export async function POST(request: NextRequest) {
       provisionName,
     });
   } catch (error) {
-    console.error('Contract review error:', error);
+    console.error('=== CONTRACT REVIEW FATAL ERROR ===');
+    console.error('Error Type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('Error Message:', error instanceof Error ? error.message : String(error));
+    console.error('Error Stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('===================================');
 
-    // Log more details about the error
-    const errorDetails = error instanceof Error ? error.message : String(error);
-    console.error('Full error details:', errorDetails);
-
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { error: 'Failed to analyze contract. Please try again.' },
+      { error: `Analysis failed: ${errorMessage}` },
       { status: 500 }
     );
   }
