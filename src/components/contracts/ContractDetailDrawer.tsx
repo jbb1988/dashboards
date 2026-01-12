@@ -471,7 +471,7 @@ export default function ContractDetailDrawer({
       }
 
       // Step 3: Get the public URL for the uploaded file
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://opgunonejficgxztqegf.supabase.co';
       const fileUrl = `${supabaseUrl}/storage/v1/object/public/data-files/${storagePath}`;
 
       // Step 4: Create document record in database
