@@ -34,6 +34,33 @@ interface ContractListViewProps {
   onDelete?: (doc: ContractDocument) => void;
 }
 
+// Format date for display
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Calculate days until date
+function getDaysUntil(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  return Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// Get urgency color based on days until due
+function getUrgencyColor(daysUntil: number | null): string {
+  if (daysUntil === null) return '#64748B';
+  if (daysUntil < 0) return '#EF4444'; // Overdue - red
+  if (daysUntil <= 7) return '#EF4444'; // Due within a week - red
+  if (daysUntil <= 30) return '#F59E0B'; // Due within a month - amber
+  if (daysUntil <= 60) return '#3B82F6'; // Due within 2 months - blue
+  return '#22C55E'; // More than 2 months - green
+}
+
 // Contract Row Component
 function ContractRow({
   contract,
@@ -57,6 +84,11 @@ function ContractRow({
 
   const status = getStatusColor();
   const contractStatusColor = contract.status ? STATUS_COLORS[contract.status] : '#64748B';
+
+  // Contract date info
+  const contractDate = contract.contract_date || contract.close_date;
+  const daysUntil = getDaysUntil(contractDate);
+  const urgencyColor = getUrgencyColor(daysUntil);
 
   return (
     <motion.button
@@ -134,6 +166,25 @@ function ContractRow({
 
       {/* Status & Documents Count */}
       <div className="flex-shrink-0 flex items-center gap-4">
+        {/* Contract Date */}
+        {contractDate && (
+          <div className="text-right min-w-[100px]">
+            <div className="text-[12px] text-white font-medium">
+              {formatDate(contractDate)}
+            </div>
+            <div
+              className="text-[11px] font-medium"
+              style={{ color: urgencyColor }}
+            >
+              {daysUntil === null ? '' :
+               daysUntil < 0 ? `${Math.abs(daysUntil)} days overdue` :
+               daysUntil === 0 ? 'Due today' :
+               daysUntil === 1 ? 'Due tomorrow' :
+               `${daysUntil} days left`}
+            </div>
+          </div>
+        )}
+
         {/* Status Badge */}
         <span
           className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-white/[0.04] border border-white/[0.06]"
