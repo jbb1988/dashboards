@@ -25,7 +25,20 @@ function LoginForm() {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
       const refreshToken = hashParams.get('refresh_token');
-      const tokenType = hashParams.get('type');
+      const hashError = hashParams.get('error');
+      const errorDescription = hashParams.get('error_description');
+
+      // Check for errors in hash (expired link, etc.)
+      if (hashError) {
+        const message = errorDescription
+          ? decodeURIComponent(errorDescription.replace(/\+/g, ' '))
+          : 'The invitation link is invalid or has expired.';
+        setError(message + ' Please request a new invitation from your administrator.');
+        // Clear the hash from URL
+        window.history.replaceState(null, '', window.location.pathname);
+        setCheckingSession(false);
+        return;
+      }
 
       // If we have tokens in the hash, set the session manually
       if (accessToken && refreshToken) {
