@@ -6,6 +6,9 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 // Default model if none specified
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 
+// Increase timeout for Vercel - this requires vercel.json config as well
+export const maxDuration = 300; // 5 minutes max for Pro plan
+
 /**
  * Normalize Unicode characters to ASCII equivalents.
  *
@@ -197,6 +200,7 @@ export async function POST(request: NextRequest) {
     console.log(`Starting OpenRouter analysis with model: ${openRouterModel}...`);
     const startTime = Date.now();
 
+    // Use streaming to prevent timeout on large contracts
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -215,6 +219,7 @@ export async function POST(request: NextRequest) {
         ],
         max_tokens: 16000,
         temperature: 0.2,
+        stream: true, // Enable streaming to prevent timeout
       }),
     });
 
@@ -233,33 +238,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read response as text first, then parse as JSON
-    const responseText = await response.text();
-    console.log('=== OPENROUTER RAW RESPONSE ===');
-    console.log('Response length:', responseText.length);
-    console.log('First 200 chars:', responseText.substring(0, 200));
-    console.log('===============================');
-
-    let aiResponse;
-    try {
-      aiResponse = JSON.parse(responseText);
-    } catch (jsonErr) {
-      console.error('=== OPENROUTER JSON PARSE ERROR ===');
-      console.error('Failed to parse OpenRouter response as JSON');
-      console.error('Parse Error:', jsonErr instanceof Error ? jsonErr.message : String(jsonErr));
-      console.error('Full Response Text:', responseText);
-      console.error('====================================');
+    // Collect streamed response chunks
+    const reader = response.body?.getReader();
+    if (!reader) {
       return NextResponse.json(
-        { error: `AI returned invalid response: ${responseText.substring(0, 100)}` },
+        { error: 'Failed to get response stream' },
         { status: 500 }
       );
     }
 
-    const stdout = aiResponse.choices?.[0]?.message?.content || '';
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let chunkCount = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content || '';
+              if (content) {
+                fullContent += content;
+                chunkCount++;
+              }
+            } catch {
+              // Skip malformed JSON chunks
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    console.log(`Received ${chunkCount} chunks, total content: ${fullContent.length} chars`);
+    const stdout = fullContent;
     if (!stdout) {
       console.error('=== OPENROUTER EMPTY RESPONSE ===');
-      console.error('No content in AI response');
-      console.error('Full AI Response:', JSON.stringify(aiResponse, null, 2));
+      console.error('No content in streamed AI response');
+      console.error('Chunk count:', chunkCount);
       console.error('=================================');
       return NextResponse.json(
         { error: 'AI returned empty response. Please try again.' },
