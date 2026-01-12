@@ -254,7 +254,10 @@ export default function ContractReviewPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Analysis failed');
+        const errorMessage = typeof errorData.error === 'string'
+          ? errorData.error
+          : errorData.error?.message || 'Analysis failed. Please try again.';
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
