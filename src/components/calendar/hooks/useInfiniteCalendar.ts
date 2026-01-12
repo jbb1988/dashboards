@@ -125,9 +125,9 @@ export function useInfiniteCalendar({
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
 
-    // Load previous month, current month, and next month
+    // Load 2 months before and 6 months after current (9 months total)
     const initialMonths: CalendarMonth[] = [];
-    for (let i = -1; i <= 1; i++) {
+    for (let i = -2; i <= 6; i++) {
       initialMonths.push(generateMonthData(currentYear, currentMonth + i, events));
     }
 
@@ -145,7 +145,7 @@ export function useInfiniteCalendar({
       setLoadedMonths(prev => {
         if (prev.length === 0) return prev;
 
-        const monthsToAdd = 2; // Load 2 months at a time
+        const monthsToAdd = 3; // Load 3 months at a time
         const newMonths: CalendarMonth[] = [];
 
         if (direction === 'past') {
