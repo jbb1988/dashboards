@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/components/mars-ui';
-import { FilterBar, PillarCard, InitiativeRow, InitiativeDetailDrawer, ChartsTab, BoardView } from '@/components/management';
+import { FilterBar, PillarCard, InitiativeRow, InitiativeDetailDrawer, ChartsTab, BoardView, OwnerDetailDrawer } from '@/components/management';
 
 interface Initiative {
   id: number;
@@ -87,6 +87,7 @@ export default function ManagementDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [updatingRows, setUpdatingRows] = useState<Set<number>>(new Set());
   const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
+  const [selectedChartOwner, setSelectedChartOwner] = useState<string | null>(null);
 
   // Filters
   const [selectedPillar, setSelectedPillar] = useState<string | null>(null);
@@ -603,6 +604,7 @@ export default function ManagementDashboard() {
                     summary={data.summary}
                     initiatives={data.initiatives}
                     pillarColors={PILLAR_COLORS}
+                    onOwnerClick={(owner) => setSelectedChartOwner(owner)}
                   />
                 </motion.div>
               )}
@@ -645,6 +647,23 @@ export default function ManagementDashboard() {
               }
             }}
             isUpdating={updatingRows.has(selectedInitiative.id)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Owner Detail Drawer (from Charts) */}
+      <AnimatePresence>
+        {selectedChartOwner && data && (
+          <OwnerDetailDrawer
+            owner={selectedChartOwner}
+            initiatives={data.initiatives.filter(i => !i.isPillarRow && i.owner === selectedChartOwner)}
+            pillarColors={PILLAR_COLORS}
+            onClose={() => setSelectedChartOwner(null)}
+            onInitiativeClick={(init) => {
+              setSelectedChartOwner(null);
+              const fullInit = data.initiatives.find(i => i.id === init.id);
+              if (fullInit) setSelectedInitiative(fullInit);
+            }}
           />
         )}
       </AnimatePresence>

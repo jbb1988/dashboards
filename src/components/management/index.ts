@@ -4,3 +4,4 @@ export { default as InitiativeRow } from './InitiativeRow';
 export { default as InitiativeDetailDrawer } from './InitiativeDetailDrawer';
 export { default as ChartsTab } from './ChartsTab';
 export { default as BoardView } from './BoardView';
+export { default as OwnerDetailDrawer } from './OwnerDetailDrawer';
