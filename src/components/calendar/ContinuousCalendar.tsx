@@ -126,8 +126,8 @@ export function ContinuousCalendar({
         <div
           ref={scrollContainerRef}
           className={`
-            h-[calc(100vh-320px)] min-h-[400px] overflow-y-auto overflow-x-hidden
-            scroll-smooth
+            h-[600px] min-h-[400px] max-h-[calc(100vh-280px)] overflow-y-scroll overflow-x-hidden
+            scroll-smooth relative
             ${isDragging ? 'cursor-grabbing' : ''}
           `}
         >

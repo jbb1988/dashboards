@@ -5,8 +5,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'MARS Contracts Dashboard',
-  description: 'Executive Pipeline Dashboard for MARS Company',
+  title: 'MARS Executive Dashboards',
+  description: 'Executive Dashboards for MARS Company',
 };
 
 export default function RootLayout({
