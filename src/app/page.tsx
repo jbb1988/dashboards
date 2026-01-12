@@ -117,7 +117,9 @@ const departments: Department[] = [
       </svg>
     ),
     color: 'from-[#A855F7] to-[#C084FC]',
-    dashboards: [],
+    dashboards: [
+      { name: 'Strategic Initiatives', href: '/management-dashboard', description: '2026 company pillars & objectives', badge: 'Smartsheet' },
+    ],
   },
   {
     name: 'Operations',
@@ -152,6 +154,7 @@ function getBadgeColor(badge: string): string {
     case 'Excel': return 'bg-[#22C55E]';
     case 'Claude': return 'bg-[#D97706]';
     case 'NetSuite': return 'bg-[#F97316]';
+    case 'Smartsheet': return 'bg-[#0073EA]';
     default: return 'bg-[#64748B]';
   }
 }
