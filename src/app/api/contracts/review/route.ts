@@ -153,9 +153,18 @@ CONTRACT:
 `;
 
 export async function POST(request: NextRequest) {
+  console.log('=== CONTRACT REVIEW API CALLED ===');
+  console.log('Timestamp:', new Date().toISOString());
+
   try {
     const body = await request.json();
     const { text, contractId, provisionName, model = 'sonnet' } = body;
+
+    console.log('Request received:');
+    console.log('- Text length:', text?.length || 0);
+    console.log('- Contract ID:', contractId || 'none');
+    console.log('- Provision:', provisionName || 'none');
+    console.log('- Model:', model);
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return NextResponse.json(
@@ -224,21 +233,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Read response as text first, then parse as JSON
+    const responseText = await response.text();
+    console.log('=== OPENROUTER RAW RESPONSE ===');
+    console.log('Response length:', responseText.length);
+    console.log('First 200 chars:', responseText.substring(0, 200));
+    console.log('===============================');
+
     let aiResponse;
     try {
-      aiResponse = await response.json();
+      aiResponse = JSON.parse(responseText);
     } catch (jsonErr) {
-      const responseText = await response.text();
       console.error('=== OPENROUTER JSON PARSE ERROR ===');
       console.error('Failed to parse OpenRouter response as JSON');
-      console.error('Response Text:', responseText.substring(0, 500));
+      console.error('Parse Error:', jsonErr instanceof Error ? jsonErr.message : String(jsonErr));
+      console.error('Full Response Text:', responseText);
       console.error('====================================');
       return NextResponse.json(
-        { error: 'AI returned invalid response format. Please try again.' },
+        { error: `AI returned invalid response: ${responseText.substring(0, 100)}` },
         { status: 500 }
       );
     }
+
     const stdout = aiResponse.choices?.[0]?.message?.content || '';
+    if (!stdout) {
+      console.error('=== OPENROUTER EMPTY RESPONSE ===');
+      console.error('No content in AI response');
+      console.error('Full AI Response:', JSON.stringify(aiResponse, null, 2));
+      console.error('=================================');
+      return NextResponse.json(
+        { error: 'AI returned empty response. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     console.log(`OpenRouter completed in ${(Date.now() - startTime) / 1000}s`);
     console.log('Raw output length:', stdout.length);
