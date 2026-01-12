@@ -89,7 +89,7 @@ export function ConcentrationChart({ data, index = 0, onCustomerClick }: Concent
         </svg>
       }
       index={index}
-      height={380}
+      height={520}
     >
       <div className="space-y-4">
         {/* THE RISK - What you could lose */}
