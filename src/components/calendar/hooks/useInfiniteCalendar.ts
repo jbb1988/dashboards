@@ -140,7 +140,7 @@ export function useInfiniteCalendar({
     isLoadingRef.current = true;
     setLoadingDirection(direction);
 
-    // Small delay to show loading state
+    // Brief delay to show loading state
     setTimeout(() => {
       setLoadedMonths(prev => {
         if (prev.length === 0) return prev;
@@ -169,7 +169,7 @@ export function useInfiniteCalendar({
 
       setLoadingDirection(null);
       isLoadingRef.current = false;
-    }, 150);
+    }, 50);
   }, [events]);
 
   // Set up intersection observers
@@ -207,7 +207,7 @@ export function useInfiniteCalendar({
       },
       {
         root: container,
-        rootMargin: '200px 0px',
+        rootMargin: '400px 0px', // Increased margin to trigger loading earlier
         threshold: 0,
       }
     );

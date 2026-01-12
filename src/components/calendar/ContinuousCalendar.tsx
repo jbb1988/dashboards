@@ -208,7 +208,7 @@ export function ContinuousCalendar({
           `}
         >
           {/* Top sentinel for loading past months */}
-          <div ref={topSentinelRef} className="h-1">
+          <div ref={topSentinelRef} className="h-8">
             <AnimatePresence>
               {loadingDirection === 'past' && (
                 <CalendarLoadingIndicator direction="past" />
@@ -226,7 +226,7 @@ export function ContinuousCalendar({
           ))}
 
           {/* Bottom sentinel for loading future months */}
-          <div ref={bottomSentinelRef} className="h-1">
+          <div ref={bottomSentinelRef} className="h-8">
             <AnimatePresence>
               {loadingDirection === 'future' && (
                 <CalendarLoadingIndicator direction="future" />

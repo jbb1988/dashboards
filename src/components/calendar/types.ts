@@ -19,6 +19,17 @@ export interface CalendarMonth {
 
 export interface CalendarWeek {
   days: (CalendarDay | null)[];
+  spanningEvents?: SpanningEvent[];
+}
+
+// Event that spans multiple days - rendered as horizontal bar
+export interface SpanningEvent {
+  event: CalendarEvent;
+  startCol: number;      // 0-6, which column to start
+  endCol: number;        // 0-6, which column to end
+  isStart: boolean;      // true if event starts this week
+  isEnd: boolean;        // true if event ends this week
+  row: number;           // which row in the spanning area (for stacking)
 }
 
 export interface CalendarDay {

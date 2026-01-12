@@ -1,16 +1,28 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDay, CalendarEvent } from './types';
 import { CalendarEventCard } from './CalendarEventCard';
 
+// Check if an event is multi-day (has both start and end on different days)
+function isMultiDayEvent(event: CalendarEvent): boolean {
+  if (!event.startOn || !event.dueOn) return false;
+  const start = new Date(event.startOn);
+  const end = new Date(event.dueOn);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  return start.getTime() !== end.getTime();
+}
+
 interface CalendarDayCellProps {
   day: CalendarDay | null;
   onEventClick: (event: CalendarEvent) => void;
+  hideMultiDayEvents?: boolean;
 }
 
-export function CalendarDayCell({ day, onEventClick }: CalendarDayCellProps) {
+export function CalendarDayCell({ day, onEventClick, hideMultiDayEvents = false }: CalendarDayCellProps) {
   const { setNodeRef, isOver, active } = useDroppable({
     id: day?.dateKey ?? 'empty',
     disabled: !day,
@@ -23,10 +35,16 @@ export function CalendarDayCell({ day, onEventClick }: CalendarDayCellProps) {
     );
   }
 
+  // Filter events - hide multi-day events if they're shown as spanning bars
+  const filteredEvents = useMemo(() => {
+    if (!hideMultiDayEvents) return day.events;
+    return day.events.filter(event => !isMultiDayEvent(event));
+  }, [day.events, hideMultiDayEvents]);
+
   const maxVisibleEvents = 3;
-  const hasMoreEvents = day.events.length > maxVisibleEvents;
-  const visibleEvents = day.events.slice(0, maxVisibleEvents);
-  const hiddenCount = day.events.length - maxVisibleEvents;
+  const hasMoreEvents = filteredEvents.length > maxVisibleEvents;
+  const visibleEvents = filteredEvents.slice(0, maxVisibleEvents);
+  const hiddenCount = filteredEvents.length - maxVisibleEvents;
 
   return (
     <motion.div
@@ -69,10 +87,10 @@ export function CalendarDayCell({ day, onEventClick }: CalendarDayCellProps) {
           )}
         </div>
 
-        {/* Event count badge if there are events */}
-        {day.events.length > 0 && !day.isToday && (
+        {/* Event count badge if there are single-day events */}
+        {filteredEvents.length > 0 && !day.isToday && (
           <span className="text-[9px] text-[#64748B] bg-[#334155] px-1.5 py-0.5 rounded">
-            {day.events.length}
+            {filteredEvents.length}
           </span>
         )}
       </div>
@@ -105,8 +123,8 @@ export function CalendarDayCell({ day, onEventClick }: CalendarDayCellProps) {
               text-[#94A3B8] bg-[#334155]/50 hover:bg-[#334155] hover:text-white
               transition-colors border border-[#334155]"
             onClick={() => {
-              if (day.events.length > 0) {
-                onEventClick(day.events[maxVisibleEvents]);
+              if (filteredEvents.length > 0) {
+                onEventClick(filteredEvents[maxVisibleEvents]);
               }
             }}
           >
