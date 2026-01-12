@@ -32,6 +32,19 @@ interface ContractDocument {
   uploaded_by: string | null;
 }
 
+interface ContractReviewItem {
+  id: string;
+  contractId: string;
+  contractName: string;
+  provisionName: string;
+  createdAt: string;
+  status: 'draft' | 'sent_to_boss' | 'sent_to_client' | 'approved';
+  originalText?: string;
+  redlinedText?: string;
+  modifiedText?: string;
+  summary?: string[];
+}
+
 const DOCUMENT_TYPES = [
   { type: 'Original Contract', required: true },
   { type: 'MARS Redlines', required: true },
@@ -171,6 +184,12 @@ export default function ContractDetailDrawer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
 
+  // Reviews state
+  const [reviews, setReviews] = useState<ContractReviewItem[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsFetched, setReviewsFetched] = useState(false);
+  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
+
   // Reset state when contract changes
   useEffect(() => {
     if (contract) {
@@ -185,6 +204,9 @@ export default function ContractDetailDrawer({
       setTasks([]);
       setDocsFetched(false);
       setDocuments([]);
+      setReviewsFetched(false);
+      setReviews([]);
+      setExpandedReviewId(null);
     }
   }, [contract?.id]);
 
@@ -218,6 +240,22 @@ export default function ContractDetailDrawer({
         .finally(() => setDocsLoading(false));
     }
   }, [contract, docsFetched]);
+
+  // Fetch reviews when drawer opens
+  useEffect(() => {
+    if (contract && !reviewsFetched) {
+      setReviewsLoading(true);
+      const contractId = contract.salesforceId || contract.id;
+      fetch(`/api/contracts/review/history?contractId=${encodeURIComponent(contractId)}`)
+        .then(res => res.json())
+        .then(data => {
+          setReviews(data.history || []);
+          setReviewsFetched(true);
+        })
+        .catch(err => console.error('Error fetching reviews:', err))
+        .finally(() => setReviewsLoading(false));
+    }
+  }, [contract, reviewsFetched]);
 
   // Escape key handler
   useEffect(() => {
@@ -385,6 +423,26 @@ export default function ContractDetailDrawer({
       }
     } catch (err) {
       console.error('Error deleting task:', err);
+    }
+  };
+
+  // Review handlers
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Delete this analysis? This cannot be undone.')) return;
+
+    try {
+      const response = await fetch(`/api/contracts/review/history?id=${reviewId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setReviews(prev => prev.filter(r => r.id !== reviewId));
+        if (expandedReviewId === reviewId) {
+          setExpandedReviewId(null);
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting review:', err);
     }
   };
 
@@ -1218,6 +1276,167 @@ export default function ContractDetailDrawer({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                         <p className="text-[12px] text-[#64748B]">No tasks linked to this contract</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Contract Reviews Section */}
+                <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/[0.04]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">AI Reviews</span>
+                        {reviews.length > 0 && (
+                          <span className="text-[10px] text-[#64748B] bg-[#1E293B] px-2 py-0.5 rounded-full">
+                            {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                          </span>
+                        )}
+                      </div>
+                      <a
+                        href={`/contracts/review?contractId=${contract.salesforceId || contract.id}&contractName=${encodeURIComponent(contract.name)}`}
+                        className="text-[10px] text-[#22C55E] hover:text-[#4ADE80] transition-colors flex items-center gap-1 px-2 py-1 rounded hover:bg-[#22C55E]/10"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        New Review
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    {reviewsLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="w-5 h-5 border-2 border-[#22C55E]/20 border-t-[#22C55E] rounded-full animate-spin" />
+                      </div>
+                    ) : reviews.length > 0 ? (
+                      <div className="space-y-3">
+                        {reviews.map(review => {
+                          const isExpanded = expandedReviewId === review.id;
+                          const statusColors: Record<string, { bg: string; text: string }> = {
+                            draft: { bg: 'bg-[#64748B]/15', text: 'text-[#64748B]' },
+                            sent_to_boss: { bg: 'bg-[#F59E0B]/15', text: 'text-[#F59E0B]' },
+                            sent_to_client: { bg: 'bg-[#38BDF8]/15', text: 'text-[#38BDF8]' },
+                            approved: { bg: 'bg-[#22C55E]/15', text: 'text-[#22C55E]' },
+                          };
+                          const statusStyle = statusColors[review.status] || statusColors.draft;
+
+                          return (
+                            <div
+                              key={review.id}
+                              className="rounded-lg bg-[#151F2E] border border-white/[0.04] overflow-hidden"
+                            >
+                              {/* Review Header */}
+                              <div
+                                className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                                onClick={() => setExpandedReviewId(isExpanded ? null : review.id)}
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <div className={`w-6 h-6 rounded flex items-center justify-center ${statusStyle.bg}`}>
+                                    <svg className={`w-3.5 h-3.5 ${statusStyle.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <span className="text-[12px] text-white font-medium block truncate">
+                                      {review.provisionName}
+                                    </span>
+                                    <span className="text-[10px] text-[#64748B]">
+                                      {new Date(review.createdAt).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                        hour: 'numeric',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${statusStyle.bg} ${statusStyle.text}`}>
+                                    {review.status.replace(/_/g, ' ')}
+                                  </span>
+                                  <svg
+                                    className={`w-4 h-4 text-[#64748B] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
+                              </div>
+
+                              {/* Expanded Content */}
+                              {isExpanded && (
+                                <div className="border-t border-white/[0.04]">
+                                  {/* Summary */}
+                                  {review.summary && review.summary.length > 0 && (
+                                    <div className="p-3 bg-[#22C55E]/5 border-b border-white/[0.04]">
+                                      <h5 className="text-[10px] font-semibold text-[#22C55E] uppercase tracking-wider mb-2">
+                                        Key Changes
+                                      </h5>
+                                      <ul className="space-y-1.5">
+                                        {review.summary.map((item, i) => (
+                                          <li key={i} className="text-[11px] text-[#CBD5E1] flex items-start gap-2">
+                                            <span className="text-[#22C55E] mt-0.5 flex-shrink-0">•</span>
+                                            <span>{item}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {/* Actions */}
+                                  <div className="p-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <a
+                                        href={`/contracts/review?viewId=${review.id}`}
+                                        className="px-3 py-1.5 text-[10px] font-medium rounded-lg bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20 transition-colors flex items-center gap-1"
+                                      >
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        View Full Analysis
+                                      </a>
+                                    </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteReview(review.id);
+                                      }}
+                                      className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-all"
+                                      title="Delete review"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <svg className="w-8 h-8 text-[#475569] mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        <p className="text-[12px] text-[#64748B] mb-2">No AI reviews yet</p>
+                        <a
+                          href={`/contracts/review?contractId=${contract.salesforceId || contract.id}&contractName=${encodeURIComponent(contract.name)}`}
+                          className="text-[11px] text-[#22C55E] hover:text-[#4ADE80] transition-colors"
+                        >
+                          Run your first contract analysis →
+                        </a>
                       </div>
                     )}
                   </div>
