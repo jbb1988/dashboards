@@ -449,17 +449,23 @@ export default function ContractDetailDrawer({
   // Document handlers
   const handleDocumentUpload = async (file: File, documentType: string) => {
     setUploadingDocType(documentType);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('contractId', contract.id);
-    formData.append('salesforceId', contract.salesforceId || '');
-    formData.append('accountName', contract.opportunityName || contract.name);
-    formData.append('documentType', documentType);
 
     try {
       const response = await fetch('/api/contracts/documents', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: contract.id,
+          salesforceId: contract.salesforceId || null,
+          accountName: contract.opportunityName || contract.name,
+          opportunityName: contract.notionName || contract.name,
+          documentType,
+          fileName: file.name,
+          fileUrl: `#local:${file.name}`,
+          fileSize: file.size,
+          fileMimeType: file.type,
+          status: 'draft',
+        }),
       });
       if (response.ok) {
         // Refresh documents

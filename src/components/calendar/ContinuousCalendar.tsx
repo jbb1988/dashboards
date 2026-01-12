@@ -91,20 +91,22 @@ export function ContinuousCalendar({
   }
 
   return (
-    <div className={`
-      rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden
-      ${isFullscreen ? 'fixed inset-4 z-50 rounded-xl' : ''}
-    `}>
+    <>
       {/* Fullscreen backdrop */}
       {isFullscreen && (
         <div
-          className="fixed inset-0 bg-black/60 -z-10"
+          className="fixed inset-0 bg-black/80 z-40"
           onClick={() => setIsFullscreen(false)}
         />
       )}
 
+      <div className={`
+        rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden
+        ${isFullscreen ? 'fixed inset-4 z-50 flex flex-col' : ''}
+      `}>
+
       {/* Header */}
-      <div className="px-4 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-4 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <h3 className="text-[14px] font-semibold text-[#EAF2FF]">Calendar</h3>
           <span className="text-[11px] text-[#64748B]">
@@ -152,7 +154,7 @@ export function ContinuousCalendar({
       </div>
 
       {/* Weekday Header - Sticky */}
-      <div className="grid grid-cols-7 border-b border-white/[0.06] sticky top-0 z-20 bg-[#0F1722]">
+      <div className="grid grid-cols-7 border-b border-white/[0.06] sticky top-0 z-20 bg-[#0F1722] shrink-0">
         {WEEKDAYS.map((day, idx) => (
           <div
             key={day}
@@ -180,7 +182,7 @@ export function ContinuousCalendar({
           className={`
             overflow-y-scroll overflow-x-hidden scroll-smooth relative
             ${isDragging ? 'cursor-grabbing' : ''}
-            ${isFullscreen ? 'h-[calc(100vh-180px)]' : 'h-[600px] min-h-[400px] max-h-[calc(100vh-280px)]'}
+            ${isFullscreen ? 'flex-1' : 'h-[600px] min-h-[400px] max-h-[calc(100vh-280px)]'}
           `}
         >
           {/* Top sentinel for loading past months */}
@@ -223,11 +225,12 @@ export function ContinuousCalendar({
       </DndContext>
 
       {/* Scroll hint at bottom */}
-      <div className="px-4 py-2 bg-[#0B1220]/50 border-t border-white/[0.04] text-center">
+      <div className="px-4 py-2 bg-[#0B1220]/50 border-t border-white/[0.04] text-center shrink-0">
         <span className="text-[9px] text-[#475569]">
           Scroll to see more months
         </span>
       </div>
     </div>
+    </>
   );
 }

@@ -295,7 +295,7 @@ export default function ContractReviewPage() {
           body: JSON.stringify({
             contractId: selectedContractObj?.salesforceId || selectedContract || null,
             contractName: selectedContractObj?.name || null,
-            provisionName: provisionName || 'Unnamed Provision',
+            provisionName: provisionName || selectedContractObj?.name || 'Contract Analysis',
             originalText: textToAnalyze,
             redlinedText: data.redlinedText,
             modifiedText: data.modifiedText,
