@@ -299,6 +299,53 @@ export async function PATCH(request: NextRequest) {
 }
 
 /**
+ * PUT - Resend magic link invite to a user
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, email } = body;
+
+    if (!userId && !email) {
+      return NextResponse.json({ error: 'userId or email is required' }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    // If we have userId but not email, look up the email
+    let targetEmail = email;
+    if (!targetEmail && userId) {
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+      if (userError || !userData?.user?.email) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+      targetEmail = userData.user.email;
+    }
+
+    // Resend the magic link invite
+    const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(targetEmail, {
+      redirectTo: `${origin}/login?invited=true`,
+    });
+
+    if (inviteError) {
+      console.error('Error resending invite:', inviteError);
+      return NextResponse.json({ error: inviteError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Invitation resent to ${targetEmail}`,
+      email: targetEmail,
+    });
+
+  } catch (error) {
+    console.error('Error in PUT /api/admin/users:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
  * DELETE - Remove a user
  */
 export async function DELETE(request: NextRequest) {

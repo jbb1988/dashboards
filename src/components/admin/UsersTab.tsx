@@ -67,6 +67,8 @@ export default function UsersTab({
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [resendingUserId, setResendingUserId] = useState<string | null>(null);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
@@ -99,6 +101,30 @@ export default function UsersTab({
     }
   };
 
+  const handleResendInvite = async (user: User) => {
+    setResendingUserId(user.id);
+    setResendSuccess(null);
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, email: user.email }),
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        console.error('Failed to resend invite:', data.error);
+      } else {
+        setResendSuccess(user.email);
+        setTimeout(() => setResendSuccess(null), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to resend invite:', err);
+    } finally {
+      setResendingUserId(null);
+    }
+  };
+
   const getRoleColor = (roleName: string) => {
     return ROLE_COLORS[roleName] || '#64748B';
   };
@@ -123,6 +149,25 @@ export default function UsersTab({
           Add User
         </button>
       </div>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {resendSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-4 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-3"
+          >
+            <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-emerald-400 text-[13px]">
+              Invitation resent to <strong>{resendSuccess}</strong>
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Users Table */}
       <div className="bg-[#151F2E] rounded-xl border border-white/[0.04] overflow-hidden">
@@ -190,7 +235,29 @@ export default function UsersTab({
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {/* Resend Invite - only show if user hasn't signed in */}
+                {!user.lastSignIn && (
+                  <motion.button
+                    onClick={() => handleResendInvite(user)}
+                    disabled={resendingUserId === user.id}
+                    className="p-2 text-[#64748B] hover:text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors disabled:opacity-50"
+                    title="Resend invite"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {resendingUserId === user.id ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </motion.button>
+                )}
                 <motion.button
                   onClick={() => handleEdit(user)}
                   className="p-2 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded-lg transition-colors"
