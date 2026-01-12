@@ -132,7 +132,7 @@ const navCategories: NavCategory[] = [
     name: 'Management',
     items: [
       {
-        name: 'Management Dashboard',
+        name: 'Strategic Initiatives',
         href: '/management-dashboard',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
