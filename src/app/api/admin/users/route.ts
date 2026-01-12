@@ -299,7 +299,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 /**
- * PUT - Resend magic link invite to a user
+ * PUT - Send magic link to an existing user
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -323,19 +323,38 @@ export async function PUT(request: NextRequest) {
       targetEmail = userData.user.email;
     }
 
-    // Resend the magic link invite
-    const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(targetEmail, {
-      redirectTo: `${origin}/login?invited=true`,
+    // Generate a magic link for existing user
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: targetEmail,
+      options: {
+        redirectTo: `${origin}/login?invited=true`,
+      },
     });
 
-    if (inviteError) {
-      console.error('Error resending invite:', inviteError);
-      return NextResponse.json({ error: inviteError.message }, { status: 400 });
+    if (linkError) {
+      console.error('Error generating magic link:', linkError);
+      return NextResponse.json({ error: linkError.message }, { status: 400 });
+    }
+
+    // The generateLink returns the link but doesn't send it automatically
+    // We need to send the email ourselves or use inviteUserByEmail for new users
+    // For now, let's try using signInWithOtp which sends the email
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: targetEmail,
+      options: {
+        emailRedirectTo: `${origin}/login?invited=true`,
+      },
+    });
+
+    if (otpError) {
+      console.error('Error sending magic link:', otpError);
+      return NextResponse.json({ error: otpError.message }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      message: `Invitation resent to ${targetEmail}`,
+      message: `Magic link sent to ${targetEmail}`,
       email: targetEmail,
     });
 
