@@ -603,10 +603,6 @@ export default function ManagementDashboard() {
                     summary={data.summary}
                     initiatives={data.initiatives}
                     pillarColors={PILLAR_COLORS}
-                    onOwnerClick={(owner) => {
-                      setSelectedOwner(owner);
-                      setActiveTab('by-owner');
-                    }}
                   />
                 </motion.div>
               )}
