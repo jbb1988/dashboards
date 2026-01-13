@@ -323,6 +323,7 @@ export async function getTasks(filters?: {
   contractId?: string;
   contractSalesforceId?: string;
   contractName?: string;
+  bundleId?: string;
   status?: string;
   assigneeEmail?: string;
 }): Promise<Task[]> {
@@ -340,6 +341,9 @@ export async function getTasks(filters?: {
   }
   if (filters?.contractName) {
     query = query.eq('contract_name', filters.contractName);
+  }
+  if (filters?.bundleId) {
+    query = query.eq('bundle_id', filters.bundleId);
   }
   if (filters?.status) {
     query = query.eq('status', filters.status);

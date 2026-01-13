@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
     const filters: {
       contractId?: string;
       contractSalesforceId?: string;
+      bundleId?: string;
       status?: string;
       assigneeEmail?: string;
     } = {};
@@ -45,6 +46,9 @@ export async function GET(request: NextRequest) {
 
     const contractSalesforceId = searchParams.get('contractSalesforceId');
     if (contractSalesforceId) filters.contractSalesforceId = contractSalesforceId;
+
+    const bundleId = searchParams.get('bundleId');
+    if (bundleId) filters.bundleId = bundleId;
 
     const status = searchParams.get('status');
     if (status) filters.status = status;

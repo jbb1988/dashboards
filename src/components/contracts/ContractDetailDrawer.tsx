@@ -219,26 +219,23 @@ export default function ContractDetailDrawer({
       const fetchContractAndBundleTasks = async () => {
         try {
           const contractId = contract.id;
-          const salesforceId = contract.salesforceId;
-          const contractName = contract.name;
           const bundleId = contract.bundleInfo?.bundleId;
 
-          // Build query params for contract tasks
-          const params = new URLSearchParams();
-          if (contractId) {
-            params.append('contractId', contractId);
-          }
-          if (salesforceId) {
-            params.append('contractSalesforceId', salesforceId);
-          }
-          if (contractName) {
-            params.append('contractName', contractName);
-          }
-
-          // Fetch contract-specific tasks
-          const contractTasksPromise = fetch(`/api/contracts/tasks?${params}`)
-            .then(res => res.json())
-            .then(data => data.tasks || []);
+          // Fetch contract-specific tasks using contract ID only (most reliable)
+          const contractTasksPromise = contractId
+            ? fetch(`/api/tasks?contractId=${contractId}`)
+                .then(res => res.json())
+                .then(data => (data.tasks || []).map((t: any) => ({
+                  id: t.id,
+                  title: t.title,
+                  status: t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'In Progress' : 'To Do',
+                  dueDate: t.due_date || null,
+                  priority: t.priority,
+                  assignee: t.assignee_email || null,
+                  contractName: t.contract_name || contract.name,
+                  completed: t.status === 'completed',
+                })))
+            : Promise.resolve([]);
 
           // If contract is in a bundle, also fetch bundle tasks
           const bundleTasksPromise = bundleId
