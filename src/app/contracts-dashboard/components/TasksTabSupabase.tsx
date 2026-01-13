@@ -360,7 +360,17 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
     const grouped = new Map<string, Task[]>();
 
     tasks.forEach(task => {
-      const key = task.contract_name || 'Unassigned';
+      let key: string;
+
+      if (task.bundle_id) {
+        // For bundle tasks, use the bundle's account name
+        const bundle = bundles.find(b => b.id === task.bundle_id);
+        key = bundle?.accountName || task.bundle_name || 'Unassigned';
+      } else {
+        // For regular contract tasks, use contract name
+        key = task.contract_name || 'Unassigned';
+      }
+
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(task);
     });
@@ -376,7 +386,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         totalCount: contractTasks.length,
       }))
       .sort((a, b) => b.overdueCount - a.overdueCount || b.activeCount - a.activeCount);
-  }, [tasks]);
+  }, [tasks, bundles]);
 
   // Group tasks by bundle
   const tasksByBundle = useMemo(() => {
