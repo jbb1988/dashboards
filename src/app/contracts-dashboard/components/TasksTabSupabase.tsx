@@ -136,8 +136,16 @@ function DraggableTaskCard({
             AUTO
           </span>
         )}
+        {task.bundle_id && (
+          <span className="text-[8px] px-1 py-0.5 bg-purple-500/20 text-purple-400 rounded flex-shrink-0 flex items-center gap-0.5">
+            📦 BUNDLE
+          </span>
+        )}
       </div>
-      {task.contract_name && (
+      {task.bundle_id && task.bundle_name && (
+        <p className="text-xs text-purple-400 mt-1 truncate">{task.bundle_name}</p>
+      )}
+      {!task.bundle_id && task.contract_name && (
         <p className="text-xs text-[#38BDF8] mt-1 truncate">{task.contract_name}</p>
       )}
       <div className="flex items-center justify-between gap-2 mt-2">
@@ -778,8 +786,17 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                 AUTO
               </span>
             )}
+            {task.bundle_id && (
+              <span className="text-[9px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded font-medium flex items-center gap-1">
+                <span>📦</span>
+                <span>BUNDLE</span>
+              </span>
+            )}
           </div>
-          {showContract && task.contract_name && (
+          {task.bundle_id && task.bundle_name && (
+            <p className="text-purple-400 text-xs truncate">{task.bundle_name}</p>
+          )}
+          {!task.bundle_id && showContract && task.contract_name && (
             <p className="text-[#38BDF8] text-xs truncate">{task.contract_name}</p>
           )}
         </div>
