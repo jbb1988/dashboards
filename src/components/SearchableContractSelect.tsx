@@ -7,6 +7,7 @@ interface Contract {
   id: string;
   salesforceId?: string;
   name: string;
+  opportunityName?: string;
   status: string;
   contractType?: string[];
 }
@@ -55,10 +56,11 @@ export function SearchableContractSelect({
   const filteredContracts = contracts.filter(contract => {
     const searchLower = searchTerm.toLowerCase();
     const nameMatch = contract.name.toLowerCase().includes(searchLower);
+    const oppMatch = contract.opportunityName?.toLowerCase().includes(searchLower);
     const typeMatch = contract.contractType?.some(type =>
       type.toLowerCase().includes(searchLower)
     );
-    return nameMatch || typeMatch;
+    return nameMatch || oppMatch || typeMatch;
   });
 
   // Get selected contract
@@ -80,7 +82,7 @@ export function SearchableContractSelect({
       >
         <span className={selectedContract ? 'text-white' : 'text-[#475569]'}>
           {selectedContract
-            ? `${selectedContract.name}${selectedContract.contractType?.length ? ` • ${selectedContract.contractType.join(', ')}` : ''}`
+            ? `${selectedContract.opportunityName || selectedContract.name}${selectedContract.contractType?.length ? ` • ${selectedContract.contractType.join(', ')}` : ''}`
             : placeholder}
         </span>
         <svg
@@ -154,12 +156,11 @@ export function SearchableContractSelect({
                         isSelected ? 'bg-[#38BDF8]/10 text-[#38BDF8]' : 'text-white'
                       }`}
                     >
-                      <div className="font-medium">{contract.name}</div>
-                      {contract.contractType?.length ? (
-                        <div className="text-xs text-[#64748B] mt-0.5">
-                          {contract.contractType.join(', ')}
-                        </div>
-                      ) : null}
+                      <div className="font-medium">{contract.opportunityName || contract.name}</div>
+                      <div className="text-xs text-[#64748B] mt-0.5">
+                        {contract.name}
+                        {contract.contractType?.length ? ` • ${contract.contractType.join(', ')}` : ''}
+                      </div>
                     </button>
                   );
                 })
