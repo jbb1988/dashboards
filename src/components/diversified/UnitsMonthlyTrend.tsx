@@ -13,6 +13,20 @@ import {
 } from 'recharts';
 import { ChartContainer, tooltipStyle, CHART_COLORS } from '../charts/ChartContainer';
 
+// Array of colors for line charts
+const COLOR_ARRAY = [
+  CHART_COLORS.cyan,
+  CHART_COLORS.emerald,
+  CHART_COLORS.orange,
+  CHART_COLORS.purple,
+  CHART_COLORS.amber,
+  CHART_COLORS.blue,
+  CHART_COLORS.pink,
+  CHART_COLORS.teal,
+  CHART_COLORS.indigo,
+  CHART_COLORS.red,
+];
+
 interface MonthlyTrendData {
   year: number;
   month: number;
@@ -145,10 +159,10 @@ export function UnitsMonthlyTrend({
               key={className}
               type="monotone"
               dataKey={className}
-              stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+              stroke={COLOR_ARRAY[idx % COLOR_ARRAY.length]}
               strokeWidth={2}
               dot={{ r: 3, strokeWidth: 2, fill: '#0F1123' }}
-              activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS[idx % CHART_COLORS.length] }}
+              activeDot={{ r: 5, strokeWidth: 0, fill: COLOR_ARRAY[idx % COLOR_ARRAY.length] }}
               animationDuration={1500}
               animationEasing="ease-out"
               animationBegin={idx * 100}
