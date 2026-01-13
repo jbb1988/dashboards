@@ -42,6 +42,10 @@ export async function POST(request: NextRequest) {
       console.log('[ORIGINAL-DOCX] ERROR: Normalization failed to remove smart quotes!');
     }
 
+    // Parse lines and detect structure (SAME logic as revised generator)
+    const lines = normalizedText.split('\n');
+    const parsedLines = lines.map(parseLine);
+
     // Build document with IDENTICAL formatting to revised version
     const doc = new Document({
       sections: [{
@@ -55,28 +59,7 @@ export async function POST(request: NextRequest) {
             },
           },
         },
-        children: normalizedText.split('\n').map((line: string) => {
-          // Detect section headers (all caps or numbered sections)
-          const isHeader = /^[A-Z\s]{10,}$/.test(line.trim()) ||
-                          /^(SECTION|ARTICLE|EXHIBIT)\s+\d+/i.test(line.trim()) ||
-                          /^\d+\.\s+[A-Z]/.test(line.trim());
-
-          return new Paragraph({
-            children: [
-              new TextRun({
-                text: line,
-                size: 24, // 12pt
-                font: 'Times New Roman',
-                bold: isHeader,
-              }),
-            ],
-            alignment: isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
-            spacing: {
-              after: 200, // 10pt spacing after paragraphs
-              line: 276, // 1.15 line spacing
-            },
-          });
-        }),
+        children: parsedLines.map((parsed, index) => createParagraph(parsed, index)),
       }],
     });
 
@@ -101,6 +84,118 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Parsed line with structure detection
+ */
+interface ParsedLine {
+  text: string;
+  originalText: string;
+  type: 'header' | 'numbered' | 'lettered' | 'roman' | 'plain';
+  level: number;
+  numberValue?: string;
+}
+
+/**
+ * Parse a line to detect its structure (SAME logic as revised generator)
+ */
+function parseLine(line: string): ParsedLine {
+  const trimmed = line.trim();
+
+  // Detect section headers (SECTION, ARTICLE, or all caps)
+  if (/^(SECTION|ARTICLE|EXHIBIT)\s+\d+/i.test(trimmed) ||
+      (/^[A-Z\s]{10,}$/.test(trimmed) && trimmed.length < 80)) {
+    return { text: trimmed, originalText: line, type: 'header', level: 0 };
+  }
+
+  // Detect numbered patterns
+  const numMatch = trimmed.match(/^(\d+)[.)]\s+(.*)$/);
+  if (numMatch) {
+    return {
+      text: trimmed,
+      originalText: line,
+      type: 'numbered',
+      level: 0,
+      numberValue: numMatch[1],
+    };
+  }
+
+  const parenNumMatch = trimmed.match(/^\((\d+)\)\s+(.*)$/);
+  if (parenNumMatch) {
+    return {
+      text: trimmed,
+      originalText: line,
+      type: 'numbered',
+      level: 1,
+      numberValue: parenNumMatch[1],
+    };
+  }
+
+  // Lettered lists
+  const letterMatch = trimmed.match(/^([a-z])[.)]\s+(.*)$/i);
+  if (letterMatch) {
+    return {
+      text: trimmed,
+      originalText: line,
+      type: 'lettered',
+      level: 1,
+      numberValue: letterMatch[1],
+    };
+  }
+
+  const parenLetterMatch = trimmed.match(/^\(([a-z])\)\s+(.*)$/i);
+  if (parenLetterMatch) {
+    return {
+      text: trimmed,
+      originalText: line,
+      type: 'lettered',
+      level: 2,
+      numberValue: parenLetterMatch[1],
+    };
+  }
+
+  // Roman numerals
+  const romanMatch = trimmed.match(/^\(([ivxlcdm]+)\)\s+(.*)$/i);
+  if (romanMatch) {
+    return {
+      text: trimmed,
+      originalText: line,
+      type: 'roman',
+      level: 2,
+      numberValue: romanMatch[1],
+    };
+  }
+
+  // Plain paragraph
+  return { text: trimmed, originalText: line, type: 'plain', level: 0 };
+}
+
+/**
+ * Create a paragraph from parsed line (SAME logic as revised generator)
+ */
+function createParagraph(parsed: ParsedLine, index: number): Paragraph {
+  const isHeader = parsed.type === 'header';
+
+  return new Paragraph({
+    children: [
+      new TextRun({
+        text: parsed.text,
+        size: 24, // 12pt
+        font: 'Times New Roman',
+        bold: isHeader,
+      }),
+    ],
+    alignment: isHeader ? AlignmentType.CENTER : AlignmentType.LEFT,
+    spacing: {
+      after: 200, // 10pt spacing after paragraphs
+      line: 276, // 1.15 line spacing
+    },
+    // Add indentation for nested items to match typical contract structure
+    indent: parsed.level > 0 ? {
+      left: parsed.level * 720, // 0.5 inch per level
+    } : undefined,
+  });
 }
 
 /**
