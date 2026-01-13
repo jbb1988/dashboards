@@ -258,13 +258,13 @@ export default function ContractListView({
       case 'needsAttention':
         setFilters({
           ...DEFAULT_FILTERS,
-          completenessFilter: 'needsAttention',
+          completenessFilter: 'needs_attention',
         });
         break;
       case 'closingSoon':
         setFilters({
           ...DEFAULT_FILTERS,
-          dateFilter: '90days',
+          dateFilter: '90',
         });
         break;
       case 'budgeted':
