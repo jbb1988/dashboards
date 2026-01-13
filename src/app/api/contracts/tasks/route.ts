@@ -2,18 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTasks, createTask, deleteTask, Task } from '@/lib/supabase';
 
 /**
- * GET - Fetch tasks, optionally filtered by contract name
+ * GET - Fetch tasks, optionally filtered by contract ID, Salesforce ID, or contract name
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const contractId = searchParams.get('contractId');
+    const contractSalesforceId = searchParams.get('contractSalesforceId');
     const contractName = searchParams.get('contractName');
 
     let tasks: Task[];
 
+    // Build filters object - try ID first, then Salesforce ID, then name
+    const filters: any = {};
+    if (contractId) {
+      filters.contractId = contractId;
+    }
+    if (contractSalesforceId) {
+      filters.contractSalesforceId = contractSalesforceId;
+    }
     if (contractName) {
-      // Get tasks for a specific contract by name
-      tasks = await getTasks({ contractName });
+      filters.contractName = contractName;
+    }
+
+    // Get tasks with filters
+    if (Object.keys(filters).length > 0) {
+      tasks = await getTasks(filters);
     } else {
       // Get all tasks
       tasks = await getTasks();
