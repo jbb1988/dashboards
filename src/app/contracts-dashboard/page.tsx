@@ -1155,11 +1155,10 @@ export default function ContractsDashboard() {
     { enabled: !commandPaletteOpen, onCommandPalette: () => setCommandPaletteOpen(true) }
   );
 
-  // Get unique statuses for filter dropdown
+  // Get unique statuses for filter dropdown - use VALID_STATUSES to ensure all stages appear in correct order
   const statuses = useMemo(() => {
-    if (!data) return [];
-    return [...new Set(data.contracts.map(c => c.status))].sort();
-  }, [data]);
+    return VALID_STATUSES;
+  }, []);
 
   // Get available years for year filter
   const availableYears = useMemo(() => {
@@ -1791,7 +1790,7 @@ export default function ContractsDashboard() {
                             setContractYearFilter([]);
                             setBudgetedFilter(false);
                             setProbabilityMin(0);
-                            setHideMidContract(true);
+                            setHideMidContract(false);
                             setSearchQuery('');
                             setActiveFilter('all');
                           }}
