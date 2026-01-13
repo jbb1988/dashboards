@@ -147,7 +147,7 @@ function ContractRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[15px] font-medium text-white truncate">
-            {contract.account_name}
+            {contract.contract_name}
           </span>
           {hasMissingRequired && (
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium uppercase flex-shrink-0">
@@ -161,7 +161,7 @@ function ContractRow({
           )}
         </div>
         <div className="flex items-center gap-2 text-[13px] text-[#8FA3BF]">
-          <span className="truncate">{contract.contract_type || contract.contract_name}</span>
+          <span className="truncate">{contract.account_name}</span>
           {contract.status && (
             <>
               <span className="text-[#475569]">•</span>
