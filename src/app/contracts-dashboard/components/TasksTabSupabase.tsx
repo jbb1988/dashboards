@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from '@/lib/supabase';
 import { KPICard, KPIIcons } from '@/components/mars-ui';
 import { SearchableContractSelect } from '@/components/SearchableContractSelect';
+import { SearchableBundleOrContractSelect } from '@/components/SearchableBundleOrContractSelect';
 import {
   DndContext,
   DragOverlay,
@@ -210,9 +211,16 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
   const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
   const [showAddTask, setShowAddTask] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // Bundle support state
+  const [bundles, setBundles] = useState<any[]>([]);
+
   const [newTask, setNewTask] = useState<{
     title: string;
     contractSalesforceId: string;
+    contractName?: string;
+    bundleId?: string;
+    bundleName?: string;
     dueDate: string;
     priority: 'low' | 'medium' | 'high' | 'urgent';
   }>({
@@ -260,9 +268,23 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
     }
   }, []);
 
+  // Fetch bundles
+  const fetchBundles = useCallback(async () => {
+    try {
+      const response = await fetch('/api/bundles');
+      if (response.ok) {
+        const data = await response.json();
+        setBundles(data.bundles || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch bundles:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTasks();
-  }, [fetchTasks]);
+    fetchBundles();
+  }, [fetchTasks, fetchBundles]);
 
   // Task KPIs
   const taskKpis = useMemo(() => {
@@ -417,7 +439,9 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         body: JSON.stringify({
           title: newTask.title,
           contractSalesforceId: newTask.contractSalesforceId || undefined,
-          contractName: contract?.name,
+          contractName: contract?.name || newTask.contractName,
+          bundleId: newTask.bundleId || undefined,
+          bundleName: newTask.bundleName || undefined,
           dueDate: newTask.dueDate || undefined,
           priority: newTask.priority,
           status: 'pending',
@@ -453,6 +477,8 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           dueDate: editingTask.due_date,
           contractSalesforceId: editingTask.contract_salesforce_id || null,
           contractName: contract?.name || null,
+          bundleId: editingTask.bundle_id || null,
+          bundleName: editingTask.bundle_name || null,
         }),
       });
 
@@ -1105,11 +1131,27 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                 className="col-span-2 bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm placeholder-[#475569]"
                 autoFocus
               />
-              <SearchableContractSelect
+              <SearchableBundleOrContractSelect
                 contracts={contracts}
-                value={newTask.contractSalesforceId}
-                onChange={(salesforceId) => setNewTask({ ...newTask, contractSalesforceId: salesforceId })}
-                placeholder="Link to contract..."
+                bundles={bundles}
+                value={
+                  newTask.bundleId
+                    ? { type: 'bundle', id: newTask.bundleId, name: newTask.bundleName || '' }
+                    : newTask.contractSalesforceId
+                    ? { type: 'contract', id: newTask.contractSalesforceId, name: contracts.find(c => c.salesforceId === newTask.contractSalesforceId)?.name || '' }
+                    : null
+                }
+                onChange={(selection) => {
+                  if (!selection || selection.id === '') {
+                    setNewTask({ ...newTask, contractSalesforceId: '', contractName: undefined, bundleId: undefined, bundleName: undefined });
+                  } else if (selection.type === 'bundle') {
+                    setNewTask({ ...newTask, contractSalesforceId: '', contractName: undefined, bundleId: selection.id, bundleName: selection.name });
+                  } else {
+                    const contract = contracts.find(c => c.salesforceId === selection.id);
+                    setNewTask({ ...newTask, contractSalesforceId: selection.id, contractName: contract?.name, bundleId: undefined, bundleName: undefined });
+                  }
+                }}
+                placeholder="Link to contract or bundle..."
               />
               <div
                 className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-sm cursor-pointer relative"
@@ -1180,12 +1222,27 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Contract</label>
-                  <SearchableContractSelect
+                  <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Contract or Bundle</label>
+                  <SearchableBundleOrContractSelect
                     contracts={contracts}
-                    value={editingTask.contract_salesforce_id || ''}
-                    onChange={(salesforceId) => setEditingTask({ ...editingTask, contract_salesforce_id: salesforceId })}
-                    placeholder="Link to contract..."
+                    bundles={bundles}
+                    value={
+                      editingTask.bundle_id
+                        ? { type: 'bundle', id: editingTask.bundle_id, name: editingTask.bundle_name || '' }
+                        : editingTask.contract_salesforce_id
+                        ? { type: 'contract', id: editingTask.contract_salesforce_id, name: contracts.find(c => c.salesforceId === editingTask.contract_salesforce_id)?.name || '' }
+                        : null
+                    }
+                    onChange={(selection) => {
+                      if (!selection || selection.id === '') {
+                        setEditingTask({ ...editingTask, contract_salesforce_id: undefined, bundle_id: undefined, bundle_name: undefined });
+                      } else if (selection.type === 'bundle') {
+                        setEditingTask({ ...editingTask, contract_salesforce_id: undefined, bundle_id: selection.id, bundle_name: selection.name });
+                      } else {
+                        setEditingTask({ ...editingTask, contract_salesforce_id: selection.id, bundle_id: undefined, bundle_name: undefined });
+                      }
+                    }}
+                    placeholder="Link to contract or bundle..."
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
