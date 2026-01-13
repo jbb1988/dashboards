@@ -144,6 +144,9 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [groupBy, setGroupBy] = useState<'top-level' | 'all'>('all');
 
+  // Selected class for filtering entire view
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -185,6 +188,9 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
         if (selectedMonths && selectedMonths.length > 0) {
           params.set('months', selectedMonths.join(','));
         }
+        if (selectedClass) {
+          params.set('className', selectedClass);
+        }
         params.set('groupBy', groupBy);
 
         const url = `/api/diversified/units${params.toString() ? `?${params.toString()}` : ''}`;
@@ -202,7 +208,7 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
     };
 
     fetchUnitsData();
-  }, [selectedYears, selectedMonths, groupBy]);
+  }, [selectedYears, selectedMonths, groupBy, selectedClass]);
 
   const filteredAndSortedProducts = useMemo(() => {
     if (!data) return [];
@@ -259,6 +265,36 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
     }
   };
 
+  // Compute metrics for selected class
+  const selectedClassData = useMemo(() => {
+    if (!data || !selectedClass) return null;
+
+    const classProducts = data.products.filter(p => p.class_name === selectedClass);
+    const totalCurrentRevenue = classProducts.reduce((sum, p) => sum + p.current_revenue, 0);
+    const totalPriorRevenue = classProducts.reduce((sum, p) => sum + p.prior_revenue, 0);
+    const totalCurrentUnits = classProducts.reduce((sum, p) => sum + p.current_units, 0);
+    const totalPriorUnits = classProducts.reduce((sum, p) => sum + p.prior_units, 0);
+    const changePct = totalPriorRevenue > 0
+      ? ((totalCurrentRevenue - totalPriorRevenue) / totalPriorRevenue) * 100
+      : 0;
+    const unitsChangePct = totalPriorUnits > 0
+      ? ((totalCurrentUnits - totalPriorUnits) / totalPriorUnits) * 100
+      : 0;
+
+    return {
+      className: selectedClass,
+      totalProducts: classProducts.length,
+      currentRevenue: totalCurrentRevenue,
+      priorRevenue: totalPriorRevenue,
+      changePct,
+      currentUnits: totalCurrentUnits,
+      priorUnits: totalPriorUnits,
+      unitsChangePct,
+      growingProducts: classProducts.filter(p => p.trend === 'growing').length,
+      decliningProducts: classProducts.filter(p => p.trend === 'declining').length,
+    };
+  }, [data, selectedClass]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -282,29 +318,92 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
 
   return (
     <div className="space-y-6">
+      {/* Selected Class Banner */}
+      {selectedClass && selectedClassData && (
+        <div className="p-6 rounded-xl bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border-2 border-cyan-500/30">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-[11px] text-cyan-300 uppercase tracking-wider font-semibold mb-1">Filtering by Class</div>
+                <h2 className="text-[24px] font-bold text-white">{selectedClass}</h2>
+                <div className="text-[12px] text-[#94A3B8] mt-1">{selectedClassData.totalProducts} products in this class</div>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedClass(null)}
+              className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-[13px] flex items-center gap-2 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear Filter
+            </button>
+          </div>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-4 gap-4 pt-4 border-t border-white/10">
+            <div>
+              <div className="text-[10px] text-cyan-300 uppercase tracking-wide mb-1">Revenue</div>
+              <div className="text-[18px] font-bold text-white">{formatCurrency(selectedClassData.currentRevenue)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-cyan-300 uppercase tracking-wide mb-1">Units</div>
+              <div className="text-[18px] font-bold text-white">{selectedClassData.currentUnits.toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-cyan-300 uppercase tracking-wide mb-1">Revenue YoY</div>
+              <div className={`text-[18px] font-bold ${selectedClassData.changePct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {selectedClassData.changePct >= 0 ? '+' : ''}{selectedClassData.changePct.toFixed(1)}%
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] text-cyan-300 uppercase tracking-wide mb-1">Units YoY</div>
+              <div className={`text-[18px] font-bold ${selectedClassData.unitsChangePct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {selectedClassData.unitsChangePct >= 0 ? '+' : ''}{selectedClassData.unitsChangePct.toFixed(1)}%
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary KPIs */}
       <div className="grid grid-cols-5 gap-4">
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
-          <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Total Products</div>
-          <div className="text-2xl font-bold text-white">{data.summary.total_products}</div>
+          <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">
+            {selectedClassData ? 'Products in Class' : 'Total Products'}
+          </div>
+          <div className="text-2xl font-bold text-white">
+            {selectedClassData ? selectedClassData.totalProducts : data.summary.total_products}
+          </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">R12 Revenue</div>
-          <div className="text-2xl font-bold text-white">{formatCurrency(data.summary.total_current_revenue)}</div>
+          <div className="text-2xl font-bold text-white">
+            {formatCurrency(selectedClassData ? selectedClassData.currentRevenue : data.summary.total_current_revenue)}
+          </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">R12 Change</div>
-          <div className={`text-2xl font-bold ${data.summary.overall_change_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {data.summary.overall_change_pct >= 0 ? '+' : ''}{data.summary.overall_change_pct.toFixed(1)}%
+          <div className={`text-2xl font-bold ${(selectedClassData ? selectedClassData.changePct : data.summary.overall_change_pct) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {(selectedClassData ? selectedClassData.changePct : data.summary.overall_change_pct) >= 0 ? '+' : ''}
+            {(selectedClassData ? selectedClassData.changePct : data.summary.overall_change_pct).toFixed(1)}%
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Growing</div>
-          <div className="text-2xl font-bold text-green-400">{data.summary.growing_products}</div>
+          <div className="text-2xl font-bold text-green-400">
+            {selectedClassData ? selectedClassData.growingProducts : data.summary.growing_products}
+          </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Declining</div>
-          <div className="text-2xl font-bold text-red-400">{data.summary.declining_products}</div>
+          <div className="text-2xl font-bold text-red-400">
+            {selectedClassData ? selectedClassData.decliningProducts : data.summary.declining_products}
+          </div>
         </div>
       </div>
 
@@ -371,7 +470,10 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
 
         {/* Class Breakdown Pie Chart */}
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
-          <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wide mb-4">Revenue by Product Class</h3>
+          <h3 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wide mb-4">
+            Revenue by Product Class
+            <span className="text-[10px] text-cyan-400 ml-2 font-normal">(Click to filter)</span>
+          </h3>
           <div className="h-[320px] flex items-center">
             <div className="w-1/2 h-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -384,9 +486,19 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
                     outerRadius={90}
                     dataKey="revenue"
                     nameKey="class_name"
+                    onClick={(data: any) => {
+                      if (data && data.class_name) {
+                        setSelectedClass(data.class_name);
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
                   >
                     {classBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        opacity={selectedClass === entry.class_name ? 1 : selectedClass ? 0.3 : 0.8}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
@@ -408,16 +520,34 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
             </div>
             <div className="w-1/2 space-y-2">
               {classBreakdown.map((cls, idx) => (
-                <div key={cls.class_name} className="flex items-center gap-2 text-[11px]">
+                <button
+                  key={cls.class_name}
+                  onClick={() => setSelectedClass(cls.class_name)}
+                  className={`w-full flex items-center gap-2 text-[11px] px-2 py-1.5 rounded transition-all ${
+                    selectedClass === cls.class_name
+                      ? 'bg-cyan-500/20 border border-cyan-500/50'
+                      : 'hover:bg-white/5'
+                  }`}
+                >
                   <div
                     className="w-3 h-3 rounded-sm flex-shrink-0"
-                    style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                    style={{
+                      backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
+                      opacity: selectedClass === cls.class_name ? 1 : selectedClass ? 0.3 : 1
+                    }}
                   />
-                  <span className="text-[#94A3B8] truncate flex-1" title={cls.class_name}>
+                  <span
+                    className={`truncate flex-1 text-left ${
+                      selectedClass === cls.class_name ? 'text-white font-semibold' : 'text-[#94A3B8]'
+                    }`}
+                    title={cls.class_name}
+                  >
                     {cls.class_name.length > 20 ? `${cls.class_name.slice(0, 20)}...` : cls.class_name}
                   </span>
-                  <span className="text-white font-medium">{formatCurrency(cls.revenue)}</span>
-                </div>
+                  <span className={`font-medium ${selectedClass === cls.class_name ? 'text-cyan-300' : 'text-white'}`}>
+                    {formatCurrency(cls.revenue)}
+                  </span>
+                </button>
               ))}
             </div>
           </div>
