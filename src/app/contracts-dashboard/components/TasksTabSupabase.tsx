@@ -447,7 +447,8 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           title: editingTask.title,
           status: editingTask.status,
           priority: editingTask.priority,
-          due_date: editingTask.due_date,
+          dueDate: editingTask.due_date,
+          contractSalesforceId: editingTask.contract_salesforce_id || null,
         }),
       });
 
@@ -1176,9 +1177,12 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                 </div>
                 <div>
                   <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Contract</label>
-                  <div className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-[#38BDF8] text-sm">
-                    {editingTask.contract_name || 'No contract linked'}
-                  </div>
+                  <SearchableContractSelect
+                    contracts={contracts}
+                    value={editingTask.contract_salesforce_id || ''}
+                    onChange={(salesforceId) => setEditingTask({ ...editingTask, contract_salesforce_id: salesforceId })}
+                    placeholder="Link to contract..."
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>

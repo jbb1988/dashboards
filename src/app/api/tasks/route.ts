@@ -163,6 +163,7 @@ export async function PATCH(request: NextRequest) {
     if (updates.description !== undefined) taskUpdates.description = updates.description?.trim();
     if (updates.status !== undefined) taskUpdates.status = updates.status;
     if (updates.priority !== undefined) taskUpdates.priority = updates.priority;
+    if (updates.contractSalesforceId !== undefined) taskUpdates.contract_salesforce_id = updates.contractSalesforceId || undefined;
     if (updates.dueDate !== undefined) taskUpdates.due_date = updates.dueDate || undefined;
     if (updates.assigneeEmail !== undefined) taskUpdates.assignee_email = updates.assigneeEmail || undefined;
     if (updates.completedAt !== undefined) taskUpdates.completed_at = updates.completedAt || undefined;

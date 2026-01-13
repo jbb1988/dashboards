@@ -72,6 +72,7 @@ export const taskUpdateSchema = z.object({
   description: z.string().max(5000).optional(),
   status: z.enum(TASK_STATUSES).optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
+  contractSalesforceId: salesforceId.optional().nullable(),
   dueDate: dateString.optional().nullable(),
   assigneeEmail: z.string().email().optional().nullable(),
   completedAt: z.string().datetime().optional().nullable(),
