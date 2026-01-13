@@ -170,6 +170,33 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
     return sorted;
   }, [data, filterTrend, searchTerm, sortBy, sortDir]);
 
+  // Compute class-specific summary when class filter is active
+  // MUST be called before any conditional returns to follow Rules of Hooks
+  const filteredSummary = useMemo(() => {
+    if (!selectedClass || !data) return null;
+
+    // Filter products by selected class
+    const classProducts = data.products.filter(p => p.class_name === selectedClass);
+
+    const totalProducts = classProducts.length;
+    const currentRevenue = classProducts.reduce((sum, p) => sum + p.current_revenue, 0);
+    const priorRevenue = classProducts.reduce((sum, p) => sum + p.prior_revenue, 0);
+    const changePct = priorRevenue > 0
+      ? ((currentRevenue - priorRevenue) / priorRevenue) * 100
+      : currentRevenue > 0 ? 100 : 0;
+    const growingProducts = classProducts.filter(p => p.trend === 'growing').length;
+    const decliningProducts = classProducts.filter(p => p.trend === 'declining').length;
+
+    return {
+      totalProducts,
+      currentRevenue,
+      priorRevenue,
+      changePct,
+      growingProducts,
+      decliningProducts,
+    };
+  }, [selectedClass, data]);
+
   const handleSort = (column: 'revenue' | 'change' | 'customers') => {
     if (sortBy === column) {
       setSortDir(sortDir === 'desc' ? 'asc' : 'desc');
@@ -196,32 +223,6 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
   }
 
   if (!data) return null;
-
-  // Compute class-specific summary when class filter is active
-  const filteredSummary = useMemo(() => {
-    if (!selectedClass || !data) return null;
-
-    // Filter products by selected class
-    const classProducts = data.products.filter(p => p.class_name === selectedClass);
-
-    const totalProducts = classProducts.length;
-    const currentRevenue = classProducts.reduce((sum, p) => sum + p.current_revenue, 0);
-    const priorRevenue = classProducts.reduce((sum, p) => sum + p.prior_revenue, 0);
-    const changePct = priorRevenue > 0
-      ? ((currentRevenue - priorRevenue) / priorRevenue) * 100
-      : currentRevenue > 0 ? 100 : 0;
-    const growingProducts = classProducts.filter(p => p.trend === 'growing').length;
-    const decliningProducts = classProducts.filter(p => p.trend === 'declining').length;
-
-    return {
-      totalProducts,
-      currentRevenue,
-      priorRevenue,
-      changePct,
-      growingProducts,
-      decliningProducts,
-    };
-  }, [selectedClass, data]);
 
   const top10Products = data.products.slice(0, 10);
   const classBreakdown = data.by_class.slice(0, 8);
