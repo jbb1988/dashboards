@@ -33,7 +33,7 @@ interface Contract {
   contractType?: string[];
 }
 
-type ViewMode = 'byContract' | 'list' | 'board' | 'byDueDate';
+type ViewMode = 'byContract' | 'byBundle' | 'list' | 'board' | 'byDueDate';
 type FilterMode = 'all' | 'overdue' | 'pending' | 'completed' | 'myTasks';
 type SortMode = 'dueDate' | 'priority' | 'created' | 'contract' | 'status';
 
@@ -340,6 +340,42 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         totalCount: contractTasks.length,
       }))
       .sort((a, b) => b.overdueCount - a.overdueCount || b.activeCount - a.activeCount);
+  }, [tasks]);
+
+  // Group tasks by bundle
+  const tasksByBundle = useMemo(() => {
+    const grouped = new Map<string, Task[]>();
+
+    tasks.forEach(task => {
+      if (task.bundle_id) {
+        // Bundle tasks
+        const key = task.bundle_name || 'Unnamed Bundle';
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(task);
+      } else {
+        // Individual contract tasks
+        if (!grouped.has('Individual Tasks')) grouped.set('Individual Tasks', []);
+        grouped.get('Individual Tasks')!.push(task);
+      }
+    });
+
+    return Array.from(grouped.entries())
+      .map(([groupName, groupTasks]) => ({
+        groupName,
+        isBundle: groupName !== 'Individual Tasks',
+        tasks: groupTasks,
+        overdueCount: groupTasks.filter(t =>
+          t.status !== 'completed' && t.status !== 'cancelled' && t.due_date && new Date(t.due_date) < new Date()
+        ).length,
+        activeCount: groupTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
+        totalCount: groupTasks.length,
+      }))
+      .sort((a, b) => {
+        // Sort bundles first, then by overdue/active count
+        if (a.isBundle && !b.isBundle) return -1;
+        if (!a.isBundle && b.isBundle) return 1;
+        return b.overdueCount - a.overdueCount || b.activeCount - a.activeCount;
+      });
   }, [tasks]);
 
   // Group tasks by status for board view
@@ -1056,6 +1092,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         <div className="flex items-center gap-1 bg-[#0B1220] rounded-lg p-1 border border-white/[0.04]">
           {[
             { key: 'byContract', label: 'By Contract', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
+            { key: 'byBundle', label: 'By Bundle', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
             { key: 'byDueDate', label: 'By Due Date', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
             { key: 'list', label: 'List', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
             { key: 'board', label: 'Board', icon: 'M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2' },
@@ -1371,6 +1408,80 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                       >
                         <div className="px-6 pb-4 space-y-2 pl-12">
                           {contractTasks.map((task, idx) => (
+                            <TaskRow key={task.id} task={task} index={idx} />
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );})
+            ) : (
+              <div className="text-center py-16 text-[#475569]">
+                <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                <p className="text-sm">No tasks yet</p>
+                <p className="text-xs mt-1">Click "Add Task" to create your first task</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* By Bundle View */}
+        {viewMode === 'byBundle' && (
+          <div className="divide-y divide-white/[0.04]">
+            {tasksByBundle.length > 0 ? (
+              tasksByBundle.map(({ groupName, isBundle, tasks: groupTasks, overdueCount, activeCount, totalCount }) => {
+                return (
+                <div key={groupName}>
+                  <button
+                    onClick={() => toggleContractExpanded(groupName)}
+                    className="w-full flex items-center gap-3 px-6 py-4 hover:bg-white/[0.02] transition-colors"
+                  >
+                    <svg
+                      className={`w-4 h-4 text-[#64748B] transition-transform ${expandedContracts.has(groupName) ? 'rotate-90' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <div className="flex-1 text-left flex items-center gap-2">
+                      {isBundle && (
+                        <span className="text-purple-400 text-lg">📦</span>
+                      )}
+                      <span className={`font-medium ${isBundle ? 'text-purple-400' : 'text-white'}`}>
+                        {groupName}
+                      </span>
+                      {isBundle && (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded font-medium uppercase">
+                          Bundle
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {overdueCount > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
+                          ⚠ {overdueCount}
+                        </span>
+                      )}
+                      <span className="text-xs text-[#64748B] bg-white/[0.04] px-2 py-1 rounded">
+                        {activeCount} active / {totalCount} total
+                      </span>
+                    </div>
+                  </button>
+                  <AnimatePresence>
+                    {expandedContracts.has(groupName) && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-6 pb-4 space-y-2 pl-12">
+                          {groupTasks.map((task, idx) => (
                             <TaskRow key={task.id} task={task} index={idx} />
                           ))}
                         </div>
