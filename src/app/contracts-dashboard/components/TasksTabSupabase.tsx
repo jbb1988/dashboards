@@ -25,6 +25,28 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+// Helper to compare dates in local timezone (not UTC)
+// Converts date strings to start of day in local time for accurate comparisons
+function getLocalStartOfDay(dateString: string | null | undefined): Date | null {
+  if (!dateString) return null;
+  // Parse as local date by appending time, not letting JS interpret as UTC
+  const date = new Date(dateString + 'T00:00:00');
+  return date;
+}
+
+function isTaskOverdue(dueDate: string | null | undefined, status: string): boolean {
+  if (!dueDate || status === 'completed' || status === 'cancelled') return false;
+
+  const dueDateLocal = getLocalStartOfDay(dueDate);
+  if (!dueDateLocal) return false;
+
+  // Get today at start of day in local time
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return dueDateLocal < today;
+}
+
 interface Contract {
   id: string;
   salesforceId?: string;
@@ -114,7 +136,7 @@ function DraggableTaskCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'completed';
+  const isOverdue = isTaskOverdue(task.due_date, task.status);
 
   return (
     <motion.div
@@ -383,7 +405,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         contractName,
         tasks: contractTasks,
         overdueCount: contractTasks.filter(t =>
-          t.status !== 'completed' && t.status !== 'cancelled' && t.due_date && new Date(t.due_date) < new Date()
+          isTaskOverdue(t.due_date, t.status)
         ).length,
         activeCount: contractTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
         totalCount: contractTasks.length,
@@ -414,7 +436,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         isBundle: groupName !== 'Individual Tasks',
         tasks: groupTasks,
         overdueCount: groupTasks.filter(t =>
-          t.status !== 'completed' && t.status !== 'cancelled' && t.due_date && new Date(t.due_date) < new Date()
+          isTaskOverdue(t.due_date, t.status)
         ).length,
         activeCount: groupTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
         totalCount: groupTasks.length,
@@ -448,7 +470,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
       // Status filter
       if (filter === 'all') return true;
       if (filter === 'overdue') {
-        return task.due_date && new Date(task.due_date) < new Date() && task.status !== 'completed' && task.status !== 'cancelled';
+        return isTaskOverdue(task.due_date, task.status);
       }
       if (filter === 'pending') return task.status === 'pending' || task.status === 'in_progress';
       if (filter === 'completed') return task.status === 'completed';
@@ -473,7 +495,10 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
           if (!a.due_date && !b.due_date) return 0;
           if (!a.due_date) return 1;
           if (!b.due_date) return -1;
-          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+          const aDate = getLocalStartOfDay(a.due_date);
+          const bDate = getLocalStartOfDay(b.due_date);
+          if (!aDate || !bDate) return 0;
+          return aDate.getTime() - bDate.getTime();
       }
     });
 
