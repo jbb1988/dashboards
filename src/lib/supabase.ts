@@ -1224,6 +1224,7 @@ export async function getDiversifiedUnitsByClass(filters?: {
   topItemsByClass: Record<string, Array<{
     item_id: string;
     item_name: string;
+    item_description: string;
     units: number;
     revenue: number;
   }>>;
@@ -1234,28 +1235,65 @@ export async function getDiversifiedUnitsByClass(filters?: {
 }> {
   const admin = getSupabaseAdmin();
 
-  // Calculate R12 periods (current 12 months vs prior 12 months)
-  const now = new Date();
-  const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const currentPeriodStart = new Date(currentPeriodEnd);
-  currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
-
-  const priorPeriodEnd = new Date(currentPeriodStart);
-  priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
-  const priorPeriodStart = new Date(priorPeriodEnd);
-  priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
-
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
-  // Determine years to query
-  const yearsToQuery = filters?.years && filters.years.length > 0
-    ? filters.years
-    : [2024, 2025, 2026];
+  // Determine years to query and calculate periods based on filters
+  let currentPeriodStart: Date;
+  let currentPeriodEnd: Date;
+  let priorPeriodStart: Date;
+  let priorPeriodEnd: Date;
+  let yearsToQuery: number[];
+
+  if (filters?.years && filters.years.length > 0) {
+    // User has selected specific year(s) - compare against prior year
+    const selectedYears = [...filters.years].sort((a, b) => a - b);
+    const minYear = selectedYears[0];
+    const maxYear = selectedYears[selectedYears.length - 1];
+
+    // Current period: selected year(s) and month(s)
+    if (filters?.months && filters.months.length > 0) {
+      const selectedMonths = [...filters.months].sort((a, b) => a - b);
+      const minMonth = selectedMonths[0];
+      const maxMonth = selectedMonths[selectedMonths.length - 1];
+
+      currentPeriodStart = new Date(minYear, minMonth - 1, 1);
+      currentPeriodEnd = new Date(maxYear, maxMonth, 0); // Last day of max month
+
+      // Prior period: same months in prior year(s)
+      priorPeriodStart = new Date(minYear - 1, minMonth - 1, 1);
+      priorPeriodEnd = new Date(maxYear - 1, maxMonth, 0);
+    } else {
+      // All months in selected year(s)
+      currentPeriodStart = new Date(minYear, 0, 1);
+      currentPeriodEnd = new Date(maxYear, 11, 31);
+
+      // Prior period: same in prior year(s)
+      priorPeriodStart = new Date(minYear - 1, 0, 1);
+      priorPeriodEnd = new Date(maxYear - 1, 11, 31);
+    }
+
+    // Query both current and prior years
+    yearsToQuery = [...new Set([...selectedYears, ...selectedYears.map(y => y - 1)])];
+  } else {
+    // No year filter - use R12 periods from today
+    const now = new Date();
+    currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    currentPeriodStart = new Date(currentPeriodEnd);
+    currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
+
+    priorPeriodEnd = new Date(currentPeriodStart);
+    priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
+    priorPeriodStart = new Date(priorPeriodEnd);
+    priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
+
+    yearsToQuery = [2024, 2025, 2026];
+  }
 
   // Fetch all data in batches
   const allData: Array<{
     item_id: string;
     item_name: string;
+    item_description: string;
     class_name: string;
     parent_class: string | null;
     transaction_date: string;
@@ -1273,7 +1311,7 @@ export async function getDiversifiedUnitsByClass(filters?: {
     while (hasMore) {
       let query = admin
         .from('diversified_sales')
-        .select('item_id, item_name, class_name, parent_class, transaction_date, year, month, quantity, revenue')
+        .select('item_id, item_name, item_description, class_name, parent_class, transaction_date, year, month, quantity, revenue')
         .eq('year', year)
         .range(offset, offset + batchSize - 1);
 
@@ -1310,7 +1348,7 @@ export async function getDiversifiedUnitsByClass(filters?: {
     prior_units: number;
     current_revenue: number;
     prior_revenue: number;
-    items: Map<string, { item_id: string; item_name: string; units: number; revenue: number }>;
+    items: Map<string, { item_id: string; item_name: string; item_description: string; units: number; revenue: number }>;
   }>();
 
   // Monthly trends map
@@ -1355,6 +1393,7 @@ export async function getDiversifiedUnitsByClass(filters?: {
           classData.items.set(itemKey, {
             item_id: row.item_id,
             item_name: row.item_name,
+            item_description: row.item_description || '',
             units: 0,
             revenue: 0,
           });
@@ -1421,6 +1460,7 @@ export async function getDiversifiedUnitsByClass(filters?: {
   const topItemsByClass: Record<string, Array<{
     item_id: string;
     item_name: string;
+    item_description: string;
     units: number;
     revenue: number;
   }>> = {};

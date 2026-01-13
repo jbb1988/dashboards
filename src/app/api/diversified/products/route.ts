@@ -14,18 +14,52 @@ export async function GET(request: NextRequest) {
     const years = yearsParam ? yearsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
     const months = monthsParam ? monthsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
 
-    // Calculate date ranges for R12 comparison
-    const now = new Date();
-    const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const currentPeriodStart = new Date(currentPeriodEnd);
-    currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
-
-    const priorPeriodEnd = new Date(currentPeriodStart);
-    priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
-    const priorPeriodStart = new Date(priorPeriodEnd);
-    priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
-
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+    // Calculate date ranges based on filters (not R12 from today)
+    let currentPeriodStart: Date;
+    let currentPeriodEnd: Date;
+    let priorPeriodStart: Date;
+    let priorPeriodEnd: Date;
+
+    if (years.length > 0) {
+      // User has selected specific year(s) - compare against prior year
+      const selectedYears = [...years].sort((a, b) => a - b);
+      const minYear = selectedYears[0];
+      const maxYear = selectedYears[selectedYears.length - 1];
+
+      if (months.length > 0) {
+        const selectedMonths = [...months].sort((a, b) => a - b);
+        const minMonth = selectedMonths[0];
+        const maxMonth = selectedMonths[selectedMonths.length - 1];
+
+        currentPeriodStart = new Date(minYear, minMonth - 1, 1);
+        currentPeriodEnd = new Date(maxYear, maxMonth, 0); // Last day of max month
+
+        // Prior period: same months in prior year(s)
+        priorPeriodStart = new Date(minYear - 1, minMonth - 1, 1);
+        priorPeriodEnd = new Date(maxYear - 1, maxMonth, 0);
+      } else {
+        // All months in selected year(s)
+        currentPeriodStart = new Date(minYear, 0, 1);
+        currentPeriodEnd = new Date(maxYear, 11, 31);
+
+        // Prior period: same in prior year(s)
+        priorPeriodStart = new Date(minYear - 1, 0, 1);
+        priorPeriodEnd = new Date(maxYear - 1, 11, 31);
+      }
+    } else {
+      // No year filter - use R12 periods from today
+      const now = new Date();
+      currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      currentPeriodStart = new Date(currentPeriodEnd);
+      currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
+
+      priorPeriodEnd = new Date(currentPeriodStart);
+      priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
+      priorPeriodStart = new Date(priorPeriodEnd);
+      priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
+    }
 
     // Fetch all product data (last 24 months)
     const allData: Array<{
@@ -55,7 +89,9 @@ export async function GET(request: NextRequest) {
 
       // Apply year/month filters if provided
       if (years.length > 0) {
-        query = query.in('year', years);
+        // Include both current and prior years for YoY comparison
+        const yearsToQuery = [...new Set([...years, ...years.map(y => y - 1)])];
+        query = query.in('year', yearsToQuery);
       } else {
         query = query.gte('transaction_date', formatDate(priorPeriodStart));
       }

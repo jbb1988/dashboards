@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface TopItem {
   item_id: string;
   item_name: string;
+  item_description: string;
   units: number;
   revenue: number;
 }
@@ -131,7 +132,7 @@ export function TopItemsByClass({
                                 </span>
                                 <div className="flex-1 min-w-0">
                                   <div className="text-[13px] font-medium text-white truncate">
-                                    {item.item_name}
+                                    {item.item_description || item.item_name}
                                   </div>
                                   <div className="text-[11px] text-[#64748B]">
                                     {pctOfClass.toFixed(1)}% of class units
