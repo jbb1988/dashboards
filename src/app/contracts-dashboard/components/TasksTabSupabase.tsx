@@ -232,17 +232,20 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
     bundleName?: string;
     dueDate: string;
     priority: 'low' | 'medium' | 'high' | 'urgent';
+    description?: string;
   }>({
     title: '',
     contractSalesforceId: '',
     dueDate: '',
     priority: 'medium',
+    description: '',
   });
 
   // New state for 10X improvements
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortMode>('dueDate');
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const [expandedDateGroups, setExpandedDateGroups] = useState<Set<string>>(new Set(['overdue', 'today', 'thisWeek']));
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -528,6 +531,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTask.title,
+          description: newTask.description || undefined,
           contractSalesforceId: newTask.contractSalesforceId || undefined,
           contractName: contract?.name || newTask.contractName,
           bundleId: newTask.bundleId || undefined,
@@ -541,7 +545,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
 
       if (response.ok) {
         await fetchTasks();
-        setNewTask({ title: '', contractSalesforceId: '', dueDate: '', priority: 'medium' });
+        setNewTask({ title: '', contractSalesforceId: '', dueDate: '', priority: 'medium', description: '' });
         setShowAddTask(false);
       }
     } catch (err) {
@@ -562,6 +566,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         body: JSON.stringify({
           id: editingTask.id,
           title: editingTask.title,
+          description: editingTask.description || null,
           status: editingTask.status,
           priority: editingTask.priority,
           dueDate: editingTask.due_date,
@@ -874,7 +879,60 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                 <span>BUNDLE</span>
               </span>
             )}
+            {task.description && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedTasks(prev => {
+                    const next = new Set(prev);
+                    if (next.has(task.id!)) {
+                      next.delete(task.id!);
+                    } else {
+                      next.add(task.id!);
+                    }
+                    return next;
+                  });
+                }}
+                className="text-[9px] px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded font-medium hover:bg-amber-500/20 transition-colors flex items-center gap-1"
+                title="View notes"
+              >
+                <span>📝</span>
+                <span>NOTES</span>
+                <svg
+                  className={`w-2.5 h-2.5 transition-transform ${expandedTasks.has(task.id!) ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
           </div>
+
+          {/* Expandable notes section */}
+          <AnimatePresence>
+            {task.description && expandedTasks.has(task.id!) && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mt-2 overflow-hidden"
+              >
+                <div className="bg-[#0B1220] rounded-lg p-3 border border-white/[0.08]">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[10px] font-semibold text-amber-400 uppercase">Notes</span>
+                    <div className="flex-1 h-px bg-white/[0.08]"></div>
+                  </div>
+                  <p className="text-xs text-[#8FA3BF] whitespace-pre-wrap leading-relaxed">
+                    {task.description}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {task.bundle_id && task.bundle_name && (
             <p className="text-purple-400 text-xs truncate">{task.bundle_name}</p>
           )}
@@ -1231,6 +1289,22 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                 className="col-span-2 bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm placeholder-[#475569]"
                 autoFocus
               />
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-[#64748B] mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={newTask.description || ''}
+                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  placeholder="Add notes or additional details about this task..."
+                  rows={3}
+                  maxLength={5000}
+                  className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-[#475569] focus:outline-none focus:border-[#38BDF8]/50 resize-y"
+                />
+                <div className="mt-1 text-xs text-[#475569] text-right">
+                  {(newTask.description || '').length} / 5000
+                </div>
+              </div>
               <SearchableBundleOrContractSelect
                 contracts={unbundledContracts}
                 bundles={bundles}
@@ -1320,6 +1394,20 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                     onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
                     className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm"
                   />
+                </div>
+                <div>
+                  <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Notes (Optional)</label>
+                  <textarea
+                    value={editingTask.description || ''}
+                    onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                    placeholder="Add notes or additional details about this task..."
+                    rows={3}
+                    maxLength={5000}
+                    className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white placeholder-[#475569] focus:outline-none focus:border-[#38BDF8]/50 resize-y"
+                  />
+                  <div className="mt-1 text-xs text-[#475569] text-right">
+                    {(editingTask.description || '').length} / 5000
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Contract or Bundle</label>
