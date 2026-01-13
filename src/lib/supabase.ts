@@ -249,6 +249,14 @@ export async function getContracts(): Promise<Contract[]> {
 export async function upsertContracts(contracts: Contract[]): Promise<{ success: boolean; count: number; error?: string }> {
   const admin = getSupabaseAdmin();
 
+  // Mark this as a sync operation so trigger doesn't create false pending syncs
+  // This sets a transaction-local session variable that the trigger checks
+  const { error: flagError } = await admin.rpc('set_sync_operation_flag');
+  if (flagError) {
+    console.warn('Failed to set sync operation flag:', flagError);
+    // Continue anyway - worst case we get false pending syncs
+  }
+
   // Add updated_at timestamp
   const contractsWithTimestamp = contracts.map(c => ({
     ...c,

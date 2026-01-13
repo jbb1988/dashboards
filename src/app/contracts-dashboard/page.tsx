@@ -801,6 +801,8 @@ export default function ContractsDashboard() {
   const [isPushingToSalesforce, setIsPushingToSalesforce] = useState(false);
   const [sfPushProgress, setSfPushProgress] = useState<{ current: number; total: number } | null>(null);
   const [showPendingSyncsModal, setShowPendingSyncsModal] = useState(false);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [lastAutoSync, setLastAutoSync] = useState<Date | null>(null);
 
   // Fetch contracts with pending Salesforce sync
   const fetchSfSyncPending = useCallback(async () => {
@@ -821,6 +823,31 @@ export default function ContractsDashboard() {
       fetchSfSyncPending();
     }
   }, [data?.contracts, fetchSfSyncPending]);
+
+  // Hourly auto-sync polling
+  useEffect(() => {
+    if (!autoSyncEnabled) return;
+
+    const SYNC_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds
+
+    const syncInterval = setInterval(async () => {
+      console.log('Auto-sync: Checking for Salesforce changes...');
+
+      try {
+        // Fetch pending syncs (contracts with changes FROM Salesforce)
+        await fetchSfSyncPending();
+        setLastAutoSync(new Date());
+      } catch (error) {
+        console.error('Auto-sync failed:', error);
+      }
+    }, SYNC_INTERVAL);
+
+    // Initial sync on mount
+    fetchSfSyncPending();
+    setLastAutoSync(new Date());
+
+    return () => clearInterval(syncInterval);
+  }, [autoSyncEnabled, fetchSfSyncPending]);
 
   // Push pending changes to Salesforce
   const handlePushToSalesforce = useCallback(async () => {
@@ -2406,36 +2433,45 @@ export default function ContractsDashboard() {
                           Fields to Sync
                         </div>
                         <div className="space-y-2">
-                          {Object.entries(contract.pendingFields).map(([field, value]) => {
-                            // Format field name for display
-                            const fieldName = field
-                              .split('_')
-                              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                              .join(' ');
+                          {(() => {
+                            // Define explicit order: Award, Contract, Delivery, Install, Cash
+                            const fieldOrder = [
+                              { key: 'award_date', label: 'Award' },
+                              { key: 'contract_date', label: 'Contract' },
+                              { key: 'deliver_date', label: 'Delivery' },  // Note: "Delivery" not "Deliver"
+                              { key: 'install_date', label: 'Install' },
+                              { key: 'cash_date', label: 'Cash' },
+                            ];
 
-                            // Format value based on type
-                            let displayValue = value as string;
-                            if (value instanceof Date) {
-                              displayValue = value.toLocaleDateString();
-                            } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
-                              displayValue = new Date(value).toLocaleDateString();
-                            } else if (value === null || value === undefined) {
-                              displayValue = '(empty)';
-                            } else if (typeof value === 'object') {
-                              displayValue = JSON.stringify(value);
-                            }
+                            return fieldOrder
+                              .filter(field => field.key in contract.pendingFields)
+                              .map(field => {
+                                const value = contract.pendingFields[field.key];
 
-                            return (
-                              <div key={field} className="flex items-baseline gap-2">
-                                <span className="text-[#8FA3BF] text-xs font-medium min-w-[120px]">
-                                  {fieldName}:
-                                </span>
-                                <span className="text-white text-xs">
-                                  {displayValue}
-                                </span>
-                              </div>
-                            );
-                          })}
+                                // Format value based on type
+                                let displayValue = value as string;
+                                if (value instanceof Date) {
+                                  displayValue = value.toLocaleDateString();
+                                } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+                                  displayValue = new Date(value).toLocaleDateString();
+                                } else if (value === null || value === undefined) {
+                                  displayValue = '(empty)';
+                                } else if (typeof value === 'object') {
+                                  displayValue = JSON.stringify(value);
+                                }
+
+                                return (
+                                  <div key={field.key} className="flex items-baseline gap-2">
+                                    <span className="text-[#8FA3BF] text-xs font-medium min-w-[120px]">
+                                      {field.label}:
+                                    </span>
+                                    <span className="text-white text-xs">
+                                      {displayValue}
+                                    </span>
+                                  </div>
+                                );
+                              });
+                          })()}
                         </div>
                       </div>
                     </div>
