@@ -7,6 +7,14 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'MARS Executive Dashboards',
   description: 'Executive Dashboards for MARS Company',
+  icons: {
+    icon: [
+      { url: '/drop-white.png', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/drop-white.png', type: 'image/png' },
+    ],
+  },
 };
 
 export default function RootLayout({
