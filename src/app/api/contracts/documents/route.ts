@@ -176,6 +176,7 @@ export async function GET(request: NextRequest) {
 
     // Filter parameters
     const contractId = searchParams.get('contractId');
+    const salesforceId = searchParams.get('salesforceId');
     const accountName = searchParams.get('accountName');
     const documentType = searchParams.get('documentType');
     const status = searchParams.get('status');
@@ -207,7 +208,8 @@ export async function GET(request: NextRequest) {
 
     // Check if contract is part of a bundle
     let bundledContractIds: string[] = [];
-    if (contractId && includeBundled) {
+    const idForBundleLookup = contractId || salesforceId;
+    if (idForBundleLookup && includeBundled) {
       try {
         // Find if this contract is in a bundle
         const { data: bundleContract } = await admin
@@ -220,7 +222,7 @@ export async function GET(request: NextRequest) {
               name
             )
           `)
-          .eq('contract_id', contractId)
+          .eq('contract_id', idForBundleLookup)
           .single();
 
         if (bundleContract?.bundle_id) {
@@ -271,6 +273,10 @@ export async function GET(request: NextRequest) {
         } else {
           query = query.eq('contract_id', contractId);
         }
+      } else if (salesforceId) {
+        // Filter by salesforce_id OR contract_id matching the salesforceId
+        // This handles cases where documents are stored with either identifier
+        query = query.or(`contract_id.eq.${salesforceId},salesforce_id.eq.${salesforceId}`);
       }
       if (accountName) {
         query = query.eq('account_name', accountName);
@@ -290,9 +296,10 @@ export async function GET(request: NextRequest) {
         documentsTableExists = false;
       } else {
         // Mark documents that are from bundled contracts (not the requested contract)
+        const requestedId = contractId || salesforceId;
         documents = (docsData || []).map(doc => ({
           ...doc,
-          fromBundledContract: contractId && doc.contract_id !== contractId ? doc.contract_id : null,
+          fromBundledContract: requestedId && doc.contract_id !== requestedId && doc.salesforce_id !== requestedId ? doc.contract_id : null,
         }));
       }
     } catch (err) {
