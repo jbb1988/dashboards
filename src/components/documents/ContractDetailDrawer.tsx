@@ -184,7 +184,7 @@ function DocumentRow({
               </p>
             ) : (
               <div className="flex items-center gap-2 text-[12px] text-[#8FA3BF]">
-                <span className="truncate">{doc.file_name}</span>
+                <span className="truncate" title={doc.file_name}>{doc.file_name}</span>
                 {doc.file_size && (
                   <>
                     <span className="text-[#475569]">•</span>
