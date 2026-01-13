@@ -17,6 +17,9 @@ export interface DocumentItem {
   account_name: string;
   is_required: boolean;
   version?: number;
+  // Bundle fields (NEW)
+  bundle_id?: string | null;
+  bundle_name?: string | null;
   // Salesforce sync fields
   salesforce_id?: string;
   sf_content_document_id?: string;
@@ -235,6 +238,17 @@ export default function DocumentDetailDrawer({
                       </span>
                     )}
                   </div>
+
+                  {/* Bundle Badge (if applicable) */}
+                  {document.bundle_id && document.bundle_name && (
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-500/20 text-purple-400">
+                        <span>📦</span>
+                        <span>{document.bundle_name}</span>
+                      </span>
+                      <span className="text-[10px] text-[#64748B]">Bundle Document</span>
+                    </div>
+                  )}
 
                   {/* Contract Name */}
                   <h2 className="text-[17px] font-semibold text-white leading-tight mb-1">

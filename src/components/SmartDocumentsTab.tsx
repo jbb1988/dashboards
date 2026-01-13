@@ -14,6 +14,8 @@ interface Document {
   id: string;
   contract_id: string | null;
   salesforce_id: string | null;
+  bundle_id?: string | null;
+  bundle_name?: string | null;
   account_name: string;
   opportunity_name: string | null;
   opportunity_year: number | null;

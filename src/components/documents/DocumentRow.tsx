@@ -15,6 +15,8 @@ export interface DocumentData {
     id: string;
     name: string;
   };
+  bundle_id?: string | null;
+  bundle_name?: string | null;
 }
 
 interface DocumentRowProps {
@@ -143,6 +145,12 @@ export default function DocumentRow({
                   {formatFileSize(document.file_size)}
                 </span>
               </>
+            )}
+            {document.bundle_id && document.bundle_name && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium flex items-center gap-1">
+                <span>📦</span>
+                <span>{document.bundle_name}</span>
+              </span>
             )}
             {document.source_contract && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#8B5CF6]/10 text-[#8B5CF6] font-medium flex items-center gap-1">
