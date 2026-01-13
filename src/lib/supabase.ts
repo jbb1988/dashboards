@@ -158,10 +158,17 @@ export interface Task {
   description?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high' | 'urgent';
+
+  // Contract linking (mutually exclusive with bundle)
   contract_id?: string;
   contract_salesforce_id?: string;
   contract_name?: string;
   contract_stage?: string;
+
+  // Bundle linking (NEW)
+  bundle_id?: string;
+  bundle_name?: string;
+
   is_auto_generated: boolean;
   task_template_id?: string;
   due_date?: string;
@@ -169,6 +176,24 @@ export interface Task {
   assignee_email?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+// Bundle info for tasks linked to bundles
+export interface TaskBundleInfo {
+  bundleId: string;
+  bundleName: string;
+  contractCount: number;
+  contracts: {
+    id: string;
+    name: string;
+    salesforceId: string;
+    isPrimary: boolean;
+  }[];
+}
+
+// Task with enriched bundle information
+export interface TaskWithBundleInfo extends Task {
+  bundleInfo?: TaskBundleInfo;
 }
 
 // Contract type for Supabase contracts table
