@@ -800,6 +800,7 @@ export default function ContractsDashboard() {
   const [sfSyncPending, setSfSyncPending] = useState<Array<{ id: string; salesforceId: string; name: string; pendingFields: Record<string, any>; salesStage?: string }>>([]);
   const [isPushingToSalesforce, setIsPushingToSalesforce] = useState(false);
   const [sfPushProgress, setSfPushProgress] = useState<{ current: number; total: number } | null>(null);
+  const [showPendingSyncsModal, setShowPendingSyncsModal] = useState(false);
 
   // Fetch contracts with pending Salesforce sync
   const fetchSfSyncPending = useCallback(async () => {
@@ -2252,12 +2253,19 @@ export default function ContractsDashboard() {
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
             className="fixed bottom-8 right-8 z-50 flex items-center gap-3"
           >
-            {/* Pending sync count badge */}
-            <div className="bg-[#1E293B] border border-blue-500/30 rounded-lg px-4 py-2 shadow-lg">
-              <span className="text-blue-400 font-medium">
+            {/* Pending sync count badge - clickable */}
+            <button
+              onClick={() => setShowPendingSyncsModal(true)}
+              className="bg-[#1E293B] border border-blue-500/30 rounded-lg px-4 py-2 shadow-lg hover:bg-[#1E293B]/80 hover:border-blue-500/50 transition-all cursor-pointer group"
+              title="Click to see pending changes"
+            >
+              <span className="text-blue-400 font-medium group-hover:text-blue-300 flex items-center gap-2">
                 {sfSyncPending.length} pending Salesforce {sfSyncPending.length === 1 ? 'sync' : 'syncs'}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </span>
-            </div>
+            </button>
 
             {/* Push to Salesforce button */}
             <button
@@ -2331,6 +2339,148 @@ export default function ContractsDashboard() {
           existingBundleId={selectedContractForBundle.bundleInfo?.bundleId}
         />
       )}
+
+      {/* Pending Salesforce Syncs Preview Modal */}
+      <AnimatePresence>
+        {showPendingSyncsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowPendingSyncsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-[#151F2E] border border-white/10 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden"
+            >
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Pending Salesforce Syncs</h2>
+                  <p className="text-sm text-[#64748B] mt-1">
+                    {sfSyncPending.length} contract{sfSyncPending.length !== 1 ? 's' : ''} with changes ready to push
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPendingSyncsModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-[#64748B] hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Pending Syncs List */}
+              <div className="p-6 overflow-y-auto max-h-[calc(80vh-180px)]">
+                <div className="space-y-3">
+                  {sfSyncPending.map((contract) => (
+                    <div
+                      key={contract.id}
+                      className="bg-[#0B1220] border border-white/[0.08] rounded-lg p-4 hover:border-blue-500/30 transition-colors"
+                    >
+                      {/* Contract Info */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-white font-medium text-sm">{contract.name}</h3>
+                          <p className="text-[#64748B] text-xs mt-1">
+                            Salesforce ID: {contract.salesforceId}
+                          </p>
+                          {contract.salesStage && (
+                            <div className="mt-2">
+                              <span className="text-[10px] px-2 py-1 rounded bg-blue-500/10 text-blue-400 font-medium">
+                                SF Stage: {contract.salesStage}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pending Fields */}
+                      <div className="border-t border-white/[0.08] pt-3">
+                        <div className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">
+                          Fields to Sync
+                        </div>
+                        <div className="space-y-2">
+                          {Object.entries(contract.pendingFields).map(([field, value]) => {
+                            // Format field name for display
+                            const fieldName = field
+                              .split('_')
+                              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                              .join(' ');
+
+                            // Format value based on type
+                            let displayValue = value as string;
+                            if (value instanceof Date) {
+                              displayValue = value.toLocaleDateString();
+                            } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+                              displayValue = new Date(value).toLocaleDateString();
+                            } else if (value === null || value === undefined) {
+                              displayValue = '(empty)';
+                            } else if (typeof value === 'object') {
+                              displayValue = JSON.stringify(value);
+                            }
+
+                            return (
+                              <div key={field} className="flex items-baseline gap-2">
+                                <span className="text-[#8FA3BF] text-xs font-medium min-w-[120px]">
+                                  {fieldName}:
+                                </span>
+                                <span className="text-white text-xs">
+                                  {displayValue}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {sfSyncPending.length === 0 && (
+                    <div className="text-center py-12 text-[#475569]">
+                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p>No pending syncs</p>
+                      <p className="text-xs mt-1">All changes have been synced to Salesforce</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer with Actions */}
+              <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
+                <button
+                  onClick={() => setShowPendingSyncsModal(false)}
+                  className="px-4 py-2 text-[#64748B] hover:text-white text-sm font-medium transition-colors"
+                >
+                  Close
+                </button>
+                {sfSyncPending.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setShowPendingSyncsModal(false);
+                      handlePushToSalesforce();
+                    }}
+                    disabled={isPushingToSalesforce}
+                    className="px-6 py-2 bg-gradient-to-r from-[#0189CB] to-[#0066A1] text-white font-medium text-sm rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Push to Salesforce
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Contract Detail Drawer */}
       <ContractDetailDrawer

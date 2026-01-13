@@ -115,6 +115,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // If contract_id is missing but contractSalesforceId is provided, look up the UUID
+    let contractId = validated.contractId;
+    if (!contractId && validated.contractSalesforceId && !validated.bundleId) {
+      try {
+        const contractsResponse = await fetch(`${request.nextUrl.origin}/api/contracts`);
+        if (contractsResponse.ok) {
+          const contractsData = await contractsResponse.json();
+          const contract = contractsData.contracts?.find((c: any) => c.salesforceId === validated.contractSalesforceId);
+          if (contract) {
+            contractId = contract.id;
+          } else {
+            return NextResponse.json({
+              error: 'Contract not found',
+              details: `No contract found with Salesforce ID: ${validated.contractSalesforceId}. The contract may need to be synced from Salesforce first.`
+            }, { status: 404 });
+          }
+        } else {
+          return NextResponse.json({ error: 'Failed to verify contract exists' }, { status: 500 });
+        }
+      } catch (err) {
+        console.error('Failed to look up contract UUID:', err);
+        return NextResponse.json({ error: 'Failed to look up contract information' }, { status: 500 });
+      }
+    }
+
+    // Validate that we have either a contract or bundle
+    if (!validated.bundleId && !contractId) {
+      return NextResponse.json({
+        error: 'Invalid task data',
+        details: 'Task must be associated with either a contract or a bundle. Please select a contract or bundle before creating the task.'
+      }, { status: 400 });
+    }
+
     // Map camelCase to snake_case for database
     const task: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
       title: validated.title.trim(),
@@ -123,7 +156,7 @@ export async function POST(request: NextRequest) {
       priority: validated.priority,
 
       // Contract fields (only if no bundle)
-      contract_id: validated.bundleId ? undefined : validated.contractId,
+      contract_id: validated.bundleId ? undefined : contractId,
       contract_salesforce_id: validated.bundleId ? undefined : validated.contractSalesforceId,
       contract_name: validated.bundleId ? undefined : validated.contractName,
       contract_stage: validated.bundleId ? undefined : validated.contractStage,
