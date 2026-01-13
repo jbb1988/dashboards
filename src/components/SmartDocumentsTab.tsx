@@ -411,9 +411,9 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
       <ContractListView
         contracts={contractItems}
         openBundleModal={openBundleModal}
-        onUpload={(file, documentType, contractId) => {
+        onUpload={async (file, documentType, contractId) => {
           const contract = contractItems.find(c => c.id === contractId);
-          handleUpload(
+          await handleUpload(
             file,
             documentType,
             contractId,
