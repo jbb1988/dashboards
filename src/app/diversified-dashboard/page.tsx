@@ -56,6 +56,8 @@ interface CustomerSummary {
 interface DashboardSummary {
   totalRevenue: number;
   totalUnits: number;
+  totalUnitsPrior: number;
+  unitsYoYChangePct: number | null;
   totalCost: number;
   grossProfit: number;
   grossProfitPct: number;
@@ -1037,7 +1039,17 @@ export default function DiversifiedDashboard() {
                 <KPICard
                   title="Units Sold"
                   value={formatNumber(data.summary.totalUnits)}
-                  subtitle={`${data.summary.uniqueClasses} classes`}
+                  subtitle={
+                    data.summary.unitsYoYChangePct !== null
+                      ? `${data.summary.unitsYoYChangePct >= 0 ? '+' : ''}${data.summary.unitsYoYChangePct.toFixed(1)}% YoY`
+                      : `${data.summary.uniqueClasses} classes`
+                  }
+                  trend={
+                    data.summary.unitsYoYChangePct !== null
+                      ? data.summary.unitsYoYChangePct >= 0 ? 'up' : 'down'
+                      : undefined
+                  }
+                  trendLabel={`${data.summary.uniqueClasses} classes`}
                   icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
                   color="#22D3EE"
                   delay={0.05}

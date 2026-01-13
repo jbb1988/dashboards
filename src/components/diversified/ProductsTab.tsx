@@ -13,6 +13,10 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import { UnitsBarChart } from './UnitsBarChart';
+import { UnitsMonthlyTrend } from './UnitsMonthlyTrend';
+import { RevenueYoYTable } from './RevenueYoYTable';
+import { TopItemsByClass } from './TopItemsByClass';
 
 interface ProductData {
   item_id: string;
@@ -49,6 +53,46 @@ interface ProductsResponse {
     products_with_lost_customers: number;
   };
   by_class: Array<{ class_name: string; revenue: number; count: number }>;
+  periods: {
+    current: { start: string; end: string };
+    prior: { start: string; end: string };
+  };
+}
+
+interface UnitsData {
+  summary: {
+    total_units_current: number;
+    total_units_prior: number;
+    yoy_change_pct: number;
+    total_revenue_current: number;
+    total_revenue_prior: number;
+    revenue_yoy_change_pct: number;
+    total_classes: number;
+  };
+  by_class: Array<{
+    class_name: string;
+    parent_class: string | null;
+    current_units: number;
+    prior_units: number;
+    units_change_pct: number;
+    current_revenue: number;
+    prior_revenue: number;
+    revenue_change_pct: number;
+    avg_price_per_unit: number;
+  }>;
+  monthly_trends: Array<{
+    year: number;
+    month: number;
+    class_name: string;
+    units: number;
+    revenue: number;
+  }>;
+  top_items_by_class: Record<string, Array<{
+    item_id: string;
+    item_name: string;
+    units: number;
+    revenue: number;
+  }>>;
   periods: {
     current: { start: string; end: string };
     prior: { start: string; end: string };
@@ -95,6 +139,11 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
   const [filterTrend, setFilterTrend] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Units analysis state
+  const [unitsData, setUnitsData] = useState<UnitsData | null>(null);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+  const [groupBy, setGroupBy] = useState<'top-level' | 'all'>('all');
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -123,6 +172,37 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
 
     fetchData();
   }, [selectedYears, selectedMonths]);
+
+  // Fetch units data
+  useEffect(() => {
+    const fetchUnitsData = async () => {
+      setLoadingUnits(true);
+      try {
+        const params = new URLSearchParams();
+        if (selectedYears && selectedYears.length > 0) {
+          params.set('years', selectedYears.join(','));
+        }
+        if (selectedMonths && selectedMonths.length > 0) {
+          params.set('months', selectedMonths.join(','));
+        }
+        params.set('groupBy', groupBy);
+
+        const url = `/api/diversified/units${params.toString() ? `?${params.toString()}` : ''}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error('Failed to fetch units data');
+        }
+        const result = await response.json();
+        setUnitsData(result);
+      } catch (err) {
+        console.error('Error fetching units data:', err);
+      } finally {
+        setLoadingUnits(false);
+      }
+    };
+
+    fetchUnitsData();
+  }, [selectedYears, selectedMonths, groupBy]);
 
   const filteredAndSortedProducts = useMemo(() => {
     if (!data) return [];
@@ -343,6 +423,58 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
           </div>
         </div>
       </div>
+
+      {/* Units Analysis Section */}
+      {unitsData && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[16px] font-semibold text-white flex items-center gap-3">
+              <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Units Sold Analysis
+              <span className="text-[12px] text-[#64748B] bg-[#334155] px-3 py-1 rounded font-normal">
+                {unitsData.summary.total_classes} classes
+              </span>
+            </h2>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-[#64748B] uppercase">Group By:</span>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as 'top-level' | 'all')}
+                className="px-3 py-2 rounded-lg bg-[#0F1722] border border-white/[0.04] text-[12px] text-white focus:outline-none focus:border-[#38BDF8]/50"
+                disabled={loadingUnits}
+              >
+                <option value="all">All Sub-classes</option>
+                <option value="top-level">Top-level Classes</option>
+              </select>
+            </div>
+          </div>
+
+          {loadingUnits ? (
+            <div className="flex items-center justify-center h-[400px] bg-[#151F2E] rounded-xl border border-white/[0.04]">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                <p className="text-[13px] text-[#64748B]">Loading units data...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Charts Row */}
+              <div className="grid grid-cols-2 gap-6">
+                <UnitsBarChart data={unitsData.by_class} />
+                <UnitsMonthlyTrend data={unitsData.monthly_trends} topN={6} />
+              </div>
+
+              {/* Revenue YoY Table */}
+              <RevenueYoYTable data={unitsData.by_class} />
+
+              {/* Top Items by Class */}
+              <TopItemsByClass data={unitsData.top_items_by_class} />
+            </>
+          )}
+        </div>
+      )}
 
       {/* Filters & Search */}
       <div className="flex items-center gap-4 p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">

@@ -1056,6 +1056,8 @@ export async function getDiversifiedDashboardSummary(filters?: {
 }): Promise<{
   totalRevenue: number;
   totalUnits: number;
+  totalUnitsPrior: number;
+  unitsYoYChangePct: number | null;
   totalCost: number;
   grossProfit: number;
   grossProfitPct: number;
@@ -1065,12 +1067,31 @@ export async function getDiversifiedDashboardSummary(filters?: {
 }> {
   const admin = getSupabaseAdmin();
 
+  // Calculate R12 periods for YoY comparison
+  const now = new Date();
+  const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentPeriodStart = new Date(currentPeriodEnd);
+  currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
+
+  const priorPeriodEnd = new Date(currentPeriodStart);
+  priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
+  const priorPeriodStart = new Date(priorPeriodEnd);
+  priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
+
   // Determine which years to query
   const yearsToQuery = filters?.years && filters.years.length > 0
     ? filters.years
     : [2024, 2025, 2026];
 
-  const allData: Array<{ quantity: number; revenue: number; cost: number; gross_profit: number; class_name: string; customer_id: string }> = [];
+  const allData: Array<{
+    quantity: number;
+    revenue: number;
+    cost: number;
+    gross_profit: number;
+    class_name: string;
+    customer_id: string;
+    transaction_date: string;
+  }> = [];
 
   // Fetch data per year in batches to avoid 1000-row limit
   for (const year of yearsToQuery) {
@@ -1081,7 +1102,7 @@ export async function getDiversifiedDashboardSummary(filters?: {
     while (hasMore) {
       let query = admin
         .from('diversified_sales')
-        .select('quantity, revenue, cost, gross_profit, class_name, customer_id')
+        .select('quantity, revenue, cost, gross_profit, class_name, customer_id, transaction_date')
         .eq('year', year)
         .range(offset, offset + batchSize - 1);
 
@@ -1117,6 +1138,8 @@ export async function getDiversifiedDashboardSummary(filters?: {
     return {
       totalRevenue: 0,
       totalUnits: 0,
+      totalUnitsPrior: 0,
+      unitsYoYChangePct: null,
       totalCost: 0,
       grossProfit: 0,
       grossProfitPct: 0,
@@ -1129,19 +1152,39 @@ export async function getDiversifiedDashboardSummary(filters?: {
   const uniqueClasses = new Set(allData.map(d => d.class_name));
   const uniqueCustomers = new Set(allData.filter(d => d.customer_id).map(d => d.customer_id));
 
+  // Aggregate totals and separate by period for YoY
   const totals = allData.reduce(
-    (acc, row) => ({
-      revenue: acc.revenue + (row.revenue || 0),
-      units: acc.units + (row.quantity || 0),
-      cost: acc.cost + (row.cost || 0),
-      grossProfit: acc.grossProfit + (row.gross_profit || 0),
-    }),
-    { revenue: 0, units: 0, cost: 0, grossProfit: 0 }
+    (acc, row) => {
+      const txDate = new Date(row.transaction_date);
+
+      // Add to overall totals
+      acc.revenue += row.revenue || 0;
+      acc.units += row.quantity || 0;
+      acc.cost += row.cost || 0;
+      acc.grossProfit += row.gross_profit || 0;
+
+      // Track units by period for YoY
+      if (txDate >= currentPeriodStart && txDate <= currentPeriodEnd) {
+        acc.unitsCurrent += row.quantity || 0;
+      } else if (txDate >= priorPeriodStart && txDate <= priorPeriodEnd) {
+        acc.unitsPrior += row.quantity || 0;
+      }
+
+      return acc;
+    },
+    { revenue: 0, units: 0, cost: 0, grossProfit: 0, unitsCurrent: 0, unitsPrior: 0 }
   );
+
+  // Calculate YoY change percentage
+  const unitsYoYChangePct = totals.unitsPrior > 0
+    ? ((totals.unitsCurrent - totals.unitsPrior) / totals.unitsPrior) * 100
+    : totals.unitsCurrent > 0 ? 100 : null;
 
   return {
     totalRevenue: totals.revenue,
     totalUnits: totals.units,
+    totalUnitsPrior: totals.unitsPrior,
+    unitsYoYChangePct,
     totalCost: totals.cost,
     grossProfit: totals.grossProfit,
     grossProfitPct: totals.revenue > 0 ? (totals.grossProfit / totals.revenue) * 100 : 0,
