@@ -413,6 +413,295 @@ const guideContent: Record<string, GuideData> = {
       },
     ],
   },
+  bundles: {
+    title: 'Contract Bundles Guide',
+    description: 'Group related contracts together and manage shared tasks and documents across the bundle.',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+    color: '#A855F7',
+    topics: [
+      {
+        id: 'what-are-bundles',
+        title: 'What are Contract Bundles?',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Contract Bundles allow you to group related contracts together and manage them as a single unit. This is perfect for:
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { icon: '🏢', title: 'Multi-Site Deals', desc: 'One customer, multiple locations with separate contracts' },
+                { icon: '📅', title: 'Phased Projects', desc: 'Multi-year projects with contracts for each phase' },
+                { icon: '🔄', title: 'Renewal Groups', desc: 'Multiple contracts renewing together' },
+                { icon: '🎯', title: 'Related Opportunities', desc: 'Connected contracts that need coordinated management' },
+              ].map((useCase) => (
+                <div key={useCase.title} className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                  <div className="text-2xl mb-2">{useCase.icon}</div>
+                  <h5 className="text-white font-medium text-sm mb-1">{useCase.title}</h5>
+                  <p className="text-[#64748B] text-xs">{useCase.desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+              <p className="text-purple-300 text-sm">
+                <strong>💡 Key Benefit:</strong> When you link a task or document to a bundle, it automatically applies to all contracts in that bundle—no need to upload the same document multiple times or create duplicate tasks.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'creating-bundles',
+        title: 'Creating & Managing Bundles',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Creating a bundle is simple and takes just a few clicks:
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-sm flex-shrink-0">1</div>
+                <div>
+                  <h5 className="text-white font-medium mb-1">Select Contracts</h5>
+                  <p className="text-[#64748B] text-sm">In the Pipeline view, select 2 or more related contracts</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-sm flex-shrink-0">2</div>
+                <div>
+                  <h5 className="text-white font-medium mb-1">Create Bundle</h5>
+                  <p className="text-[#64748B] text-sm">Click "Create Bundle" and give it a descriptive name (e.g., "Acme Corp - 2025 Multi-Site")</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-sm flex-shrink-0">3</div>
+                <div>
+                  <h5 className="text-white font-medium mb-1">Designate Primary</h5>
+                  <p className="text-[#64748B] text-sm">Choose which contract is the primary one (this is usually the first or largest contract)</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h5 className="text-white font-medium mb-3">Managing Bundles</h5>
+              <ul className="space-y-2 text-sm text-[#8FA3BF]">
+                <li>• <strong className="text-white">View Bundle:</strong> Click any bundled contract to see all contracts in the bundle in the side drawer</li>
+                <li>• <strong className="text-white">Add Contract:</strong> Select additional contracts and add them to an existing bundle</li>
+                <li>• <strong className="text-white">Remove Contract:</strong> Unbundle individual contracts if they no longer belong together</li>
+                <li>• <strong className="text-white">Rename Bundle:</strong> Update the bundle name as the project evolves</li>
+                <li>• <strong className="text-white">Delete Bundle:</strong> Dissolve the bundle (contracts remain, just unlinked)</li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'bundle-tasks',
+        title: 'Bundle Tasks & Documents',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The power of bundles shines when managing tasks and documents:
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-purple-500/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-2xl">📦</span>
+                  <h5 className="text-purple-400 font-medium">Bundle Tasks</h5>
+                </div>
+                <p className="text-[#64748B] text-sm mb-3">When creating a task, you can link it to a bundle instead of a single contract:</p>
+                <ul className="space-y-1.5 text-xs text-[#8FA3BF]">
+                  <li>• Task applies to all contracts in bundle</li>
+                  <li>• Shows purple 📦 BUNDLE badge</li>
+                  <li>• Displays bundle name instead of contract</li>
+                  <li>• Visible in "By Bundle" view mode</li>
+                </ul>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-purple-500/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-2xl">📄</span>
+                  <h5 className="text-purple-400 font-medium">Bundle Documents</h5>
+                </div>
+                <p className="text-[#64748B] text-sm mb-3">Upload documents once and have them available across all bundled contracts:</p>
+                <ul className="space-y-1.5 text-xs text-[#8FA3BF]">
+                  <li>• No need for duplicate uploads</li>
+                  <li>• Shows purple 📦 bundle indicator</li>
+                  <li>• All bundle members can access it</li>
+                  <li>• Version control applies to entire bundle</li>
+                </ul>
+              </div>
+            </div>
+            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+              <h5 className="text-purple-300 font-medium mb-2 flex items-center gap-2">
+                <span>🎯</span>
+                <span>Practical Example</span>
+              </h5>
+              <p className="text-[#8FA3BF] text-sm">
+                You have 5 contracts for Acme Corp's different warehouses. Instead of creating 5 separate tasks for "Schedule kickoff calls" and uploading the master service agreement 5 times, create one bundle task and upload the document once to the bundle. All 5 contracts instantly have access.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'bundle-views',
+        title: 'By Bundle View Mode',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Tasks tab includes a special "By Bundle" view mode for managing bundle tasks:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <div className="flex items-center gap-2 mb-4">
+                <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <span className="text-white font-medium">By Bundle View</span>
+              </div>
+              <p className="text-[#64748B] text-sm mb-3">This view groups tasks into two sections:</p>
+              <div className="space-y-3">
+                <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-purple-400">📦</span>
+                    <span className="text-purple-400 font-medium text-sm">Bundle Tasks</span>
+                  </div>
+                  <p className="text-[#64748B] text-xs">Tasks linked to bundles, grouped by bundle name with expandable sections</p>
+                </div>
+                <div className="p-3 bg-[#111827] rounded-lg border border-white/[0.04]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[#38BDF8]">📄</span>
+                    <span className="text-white font-medium text-sm">Individual Tasks</span>
+                  </div>
+                  <p className="text-[#64748B] text-xs">Tasks linked to single contracts, not part of any bundle</p>
+                </div>
+              </div>
+              <div className="mt-4 flex items-start gap-2">
+                <svg className="w-4 h-4 text-purple-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-[#8FA3BF] text-xs">Each group shows overdue count and active/total task counts for quick status overview</p>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'visual-indicators',
+        title: 'Bundle Badges & Indicators',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Bundle items are visually distinct throughout MARS with purple indicators:
+            </p>
+            <div className="space-y-3">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 text-xs font-medium flex items-center gap-1">
+                    <span>📦</span>
+                    <span>BUNDLE</span>
+                  </span>
+                  <span className="text-white text-sm font-medium">Task Badge</span>
+                </div>
+                <p className="text-[#64748B] text-xs">Purple badge appears on tasks linked to bundles in all views (Kanban, List, By Contract)</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 text-xs font-medium flex items-center gap-1">
+                    <span>📦</span>
+                    <span>Bundle Name</span>
+                  </span>
+                  <span className="text-white text-sm font-medium">Document Badge</span>
+                </div>
+                <p className="text-[#64748B] text-xs">Bundle name displayed on documents with purple styling in document lists and detail views</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-purple-400 font-medium text-sm">Purple Text & Icons</span>
+                </div>
+                <p className="text-[#64748B] text-xs">Bundle names always appear in purple (vs blue for individual contracts) for instant recognition</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/10">
+                <div className="text-xs text-[#64748B] mb-1">Individual Contract</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#38BDF8]">📄</span>
+                  <span className="text-[#38BDF8] text-sm">Blue indicators</span>
+                </div>
+              </div>
+              <div className="p-3 bg-purple-500/5 rounded-lg border border-purple-500/10">
+                <div className="text-xs text-[#64748B] mb-1">Bundle</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-purple-400">📦</span>
+                  <span className="text-purple-400 text-sm">Purple indicators</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'best-practices',
+        title: 'Best Practices',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Get the most out of contract bundles with these tips:
+            </p>
+            <div className="space-y-3">
+              {[
+                {
+                  icon: '🏷️',
+                  title: 'Descriptive Naming',
+                  desc: 'Use clear bundle names like "Acme Corp - 2025 Multi-Site Expansion" instead of "Bundle 1"',
+                },
+                {
+                  icon: '🎯',
+                  title: 'Primary Contract Selection',
+                  desc: 'Choose the largest or first contract as primary—it makes reporting and navigation easier',
+                },
+                {
+                  icon: '📋',
+                  title: 'Shared Documents Only',
+                  desc: 'Upload documents to bundles when they truly apply to all contracts. Site-specific docs should stay on individual contracts',
+                },
+                {
+                  icon: '✅',
+                  title: 'Bundle-Level Tasks',
+                  desc: 'Create bundle tasks for activities that need to happen once for the group (e.g., "Schedule project kickoff")',
+                },
+                {
+                  icon: '🔄',
+                  title: 'Review Periodically',
+                  desc: 'As projects evolve, contracts may no longer need to be bundled. Review and unbundle as needed',
+                },
+                {
+                  icon: '📊',
+                  title: 'Use Bundle View',
+                  desc: 'Switch to "By Bundle" view regularly to see all bundle tasks at a glance and ensure nothing falls through the cracks',
+                },
+              ].map((tip) => (
+                <div key={tip.title} className="flex items-start gap-3 p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                  <span className="text-2xl">{tip.icon}</span>
+                  <div>
+                    <h5 className="text-white font-medium mb-1">{tip.title}</h5>
+                    <p className="text-[#64748B] text-sm">{tip.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+              <p className="text-purple-300 text-sm">
+                <strong>💡 Pro Tip:</strong> Bundles work best when contracts have a natural relationship. Don't over-bundle—if contracts don't truly share tasks or documents, keeping them separate is cleaner and more maintainable.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+    ],
+  },
   review: {
     title: 'Contract Review Guide',
     description: 'AI-powered contract review with redlines, clause detection, and comparison tools.',

@@ -75,6 +75,25 @@ const guideCategories: GuideCategory[] = [
     href: '/guides/tasks',
   },
   {
+    id: 'bundles',
+    title: 'Contract Bundles',
+    description: 'Group related contracts together and manage shared tasks and documents across the bundle.',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+    color: '#A855F7',
+    topics: [
+      'Creating & Managing Bundles',
+      'Bundle Tasks & Documents',
+      'By Bundle View Mode',
+      'Bundle Badges & Indicators',
+      'Use Cases & Best Practices',
+    ],
+    href: '/guides/bundles',
+  },
+  {
     id: 'review',
     title: 'Contract Review',
     description: 'AI-powered contract review with redlines, clause detection, and comparison tools.',
