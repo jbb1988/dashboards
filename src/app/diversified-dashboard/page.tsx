@@ -20,6 +20,7 @@ import { ProductsTab } from '@/components/diversified/ProductsTab';
 import { StoppedBuyingReport } from '@/components/diversified/StoppedBuyingReport';
 import { AIInsightsPanelV2 } from '@/components/AIInsightsPanelV2';
 import InsightsDrawer from '@/components/diversified/InsightsDrawer';
+import DiversifiedFilterDrawer from '@/components/diversified/DiversifiedFilterDrawer';
 import { SalesTasksTab } from '@/components/diversified/SalesTasksTab';
 import { MetricExplainer, HHIExplainer, YoYChangeExplainer } from '@/components/ui/MetricExplainer';
 
@@ -270,6 +271,26 @@ function FilterChip({ label, selected, onClick, count }: {
       {label}
       {count !== undefined && <span className="ml-1.5 opacity-60">({count})</span>}
     </button>
+  );
+}
+
+// Filter Badge Component
+function FilterBadge({ label, onRemove }: {
+  label: string;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#38BDF8]/10 border border-[#38BDF8]/30 text-[#38BDF8]">
+      <span className="text-[12px] font-medium">{label}</span>
+      <button
+        onClick={onRemove}
+        className="hover:bg-[#38BDF8]/20 rounded p-0.5 transition-colors"
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
   );
 }
 
@@ -651,6 +672,7 @@ export default function DiversifiedDashboard() {
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'class' | 'customer'>('class');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   // Child data for expanded rows
   const [childData, setChildData] = useState<Array<ClassSummary | CustomerSummary>>([]);
@@ -933,6 +955,13 @@ export default function DiversifiedDashboard() {
     setChildData([]);
   };
 
+  // Active filter count
+  const activeFilterCount = [
+    selectedYears.length > 0,
+    selectedMonths.length > 0,
+    selectedClass !== null,
+  ].filter(Boolean).length;
+
   // Max revenue for progress bars
   const maxRevenue = useMemo(() => {
     if (!data) return 1;
@@ -1163,117 +1192,89 @@ export default function DiversifiedDashboard() {
                 </button>
               </motion.div>
 
-              {/* Filters */}
+              {/* Filter Button + Active Filter Badges */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04] mb-6"
+                className="flex items-center gap-4 mb-6"
               >
-                <div className="flex items-center gap-6">
-                  {/* View Toggle - Only on table view */}
-                  {activeTab === 'table' && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">View:</span>
-                        <div className="flex rounded-lg overflow-hidden border border-white/[0.04]">
-                          <button
-                            onClick={() => { setViewMode('class'); setExpandedRow(null); setChildData([]); }}
-                            className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
-                              viewMode === 'class'
-                                ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
-                                : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
-                            }`}
-                          >
-                            By Class
-                          </button>
-                          <button
-                            onClick={() => { setViewMode('customer'); setExpandedRow(null); setChildData([]); }}
-                            className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
-                              viewMode === 'customer'
-                                ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
-                                : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
-                            }`}
-                          >
-                            By Customer
-                          </button>
-                        </div>
-                      </div>
-                      <div className="h-6 w-px bg-white/[0.08]" />
-                    </>
-                  )}
-
-                  {/* Year Filter */}
+                {/* View Toggle - Only on table view */}
+                {activeTab === 'table' && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Year:</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {data.filterOptions.years.map(year => (
-                        <FilterChip
-                          key={year}
-                          label={year.toString()}
-                          selected={selectedYears.includes(year)}
-                          onClick={() => {
-                            setSelectedYears(prev =>
-                              prev.includes(year) ? prev.filter(y => y !== year) : [...prev, year]
-                            );
-                          }}
-                        />
-                      ))}
+                    <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">View:</span>
+                    <div className="flex rounded-lg overflow-hidden border border-white/[0.04]">
+                      <button
+                        onClick={() => { setViewMode('class'); setExpandedRow(null); setChildData([]); }}
+                        className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
+                          viewMode === 'class'
+                            ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                            : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
+                        }`}
+                      >
+                        By Class
+                      </button>
+                      <button
+                        onClick={() => { setViewMode('customer'); setExpandedRow(null); setChildData([]); }}
+                        className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
+                          viewMode === 'customer'
+                            ? 'bg-[#38BDF8]/20 text-[#38BDF8]'
+                            : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
+                        }`}
+                      >
+                        By Customer
+                      </button>
                     </div>
                   </div>
+                )}
 
-                  <div className="h-6 w-px bg-white/[0.08]" />
-
-                  {/* Month Filter */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Month:</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {data.filterOptions.months.map(month => (
-                        <FilterChip
-                          key={month}
-                          label={MONTH_NAMES[month - 1]}
-                          selected={selectedMonths.includes(month)}
-                          onClick={() => {
-                            setSelectedMonths(prev =>
-                              prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]
-                            );
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Class Filter */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
-                      Class:
+                {/* Filter Button */}
+                <button
+                  onClick={() => setFilterDrawerOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-[#151F2E] border border-white/[0.04] hover:border-[#38BDF8]/30 transition-all flex items-center gap-2 text-white hover:bg-[#1A2942]"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span className="text-[13px] font-medium">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] text-[10px] font-semibold">
+                      {activeFilterCount}
                     </span>
-                    <div className="flex flex-wrap gap-1.5 max-w-[500px]">
-                      {data.filterOptions.classes.map((className) => (
-                        <FilterChip
-                          key={className}
-                          label={className}
-                          selected={selectedClass === className}
-                          onClick={() => {
-                            setSelectedClass(selectedClass === className ? null : className);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                  )}
+                </button>
 
-                  <div className="flex-1" />
-
-                  {/* Reset */}
-                  {(selectedYears.length > 0 || selectedMonths.length > 0 || selectedClass || selectedCustomer) && (
-                    <button
-                      onClick={resetFilters}
-                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[#EF4444] bg-[#EF4444]/10 hover:bg-[#EF4444]/20 transition-colors"
-                    >
-                      Reset Filters
-                    </button>
+                {/* Active Filter Badges */}
+                <div className="flex items-center gap-2 flex-wrap flex-1">
+                  {selectedYears.length > 0 && (
+                    <FilterBadge
+                      label={`Year: ${selectedYears.join(', ')}`}
+                      onRemove={() => setSelectedYears([])}
+                    />
+                  )}
+                  {selectedMonths.length > 0 && (
+                    <FilterBadge
+                      label={`Month: ${selectedMonths.map(m => MONTH_NAMES[m-1]).join(', ')}`}
+                      onRemove={() => setSelectedMonths([])}
+                    />
+                  )}
+                  {selectedClass && (
+                    <FilterBadge
+                      label={`Class: ${selectedClass}`}
+                      onRemove={() => setSelectedClass(null)}
+                    />
                   )}
                 </div>
+
+                {/* Reset Filters */}
+                {(selectedYears.length > 0 || selectedMonths.length > 0 || selectedClass || selectedCustomer) && (
+                  <button
+                    onClick={resetFilters}
+                    className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[#EF4444] bg-[#EF4444]/10 hover:bg-[#EF4444]/20 transition-colors"
+                  >
+                    Reset All
+                  </button>
+                )}
               </motion.div>
 
               {/* Main Table - Only show on table view */}
@@ -2008,6 +2009,34 @@ export default function DiversifiedDashboard() {
             setTimeout(() => toast.remove(), 3000);
           }
         }}
+      />
+
+      {/* Filter Drawer */}
+      <DiversifiedFilterDrawer
+        isOpen={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        filters={{
+          selectedYears,
+          selectedMonths,
+          selectedClass,
+          viewMode,
+        }}
+        onFilterChange={(updates) => {
+          if (updates.selectedYears !== undefined) setSelectedYears(updates.selectedYears);
+          if (updates.selectedMonths !== undefined) setSelectedMonths(updates.selectedMonths);
+          if (updates.selectedClass !== undefined) setSelectedClass(updates.selectedClass);
+          if (updates.viewMode !== undefined) {
+            setViewMode(updates.viewMode);
+            setExpandedRow(null);
+            setChildData([]);
+          }
+        }}
+        filterOptions={{
+          years: data?.filterOptions.years || [],
+          months: data?.filterOptions.months || [],
+          classes: data?.filterOptions.classes || [],
+        }}
+        activeTab={activeTab}
       />
     </div>
   );

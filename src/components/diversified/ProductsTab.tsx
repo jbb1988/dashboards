@@ -197,6 +197,32 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
 
   if (!data) return null;
 
+  // Compute class-specific summary when class filter is active
+  const filteredSummary = useMemo(() => {
+    if (!selectedClass || !data) return null;
+
+    // Filter products by selected class
+    const classProducts = data.products.filter(p => p.class_name === selectedClass);
+
+    const totalProducts = classProducts.length;
+    const currentRevenue = classProducts.reduce((sum, p) => sum + p.current_revenue, 0);
+    const priorRevenue = classProducts.reduce((sum, p) => sum + p.prior_revenue, 0);
+    const changePct = priorRevenue > 0
+      ? ((currentRevenue - priorRevenue) / priorRevenue) * 100
+      : currentRevenue > 0 ? 100 : 0;
+    const growingProducts = classProducts.filter(p => p.trend === 'growing').length;
+    const decliningProducts = classProducts.filter(p => p.trend === 'declining').length;
+
+    return {
+      totalProducts,
+      currentRevenue,
+      priorRevenue,
+      changePct,
+      growingProducts,
+      decliningProducts,
+    };
+  }, [selectedClass, data]);
+
   const top10Products = data.products.slice(0, 10);
   const classBreakdown = data.by_class.slice(0, 8);
 
@@ -207,35 +233,35 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
       <div className="grid grid-cols-5 gap-4">
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">
-            Total Products
+            {filteredSummary ? 'Products in Class' : 'Total Products'}
           </div>
           <div className="text-2xl font-bold text-white">
-            {data.summary.total_products}
+            {filteredSummary ? filteredSummary.totalProducts : data.summary.total_products}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">R12 Revenue</div>
           <div className="text-2xl font-bold text-white">
-            {formatCurrency(data.summary.total_current_revenue)}
+            {formatCurrency(filteredSummary ? filteredSummary.currentRevenue : data.summary.total_current_revenue)}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">R12 Change</div>
-          <div className={`text-2xl font-bold ${data.summary.overall_change_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {data.summary.overall_change_pct >= 0 ? '+' : ''}
-            {data.summary.overall_change_pct.toFixed(1)}%
+          <div className={`text-2xl font-bold ${(filteredSummary ? filteredSummary.changePct : data.summary.overall_change_pct) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {(filteredSummary ? filteredSummary.changePct : data.summary.overall_change_pct) >= 0 ? '+' : ''}
+            {(filteredSummary ? filteredSummary.changePct : data.summary.overall_change_pct).toFixed(1)}%
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Growing</div>
           <div className="text-2xl font-bold text-green-400">
-            {data.summary.growing_products}
+            {filteredSummary ? filteredSummary.growingProducts : data.summary.growing_products}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Declining</div>
           <div className="text-2xl font-bold text-red-400">
-            {data.summary.declining_products}
+            {filteredSummary ? filteredSummary.decliningProducts : data.summary.declining_products}
           </div>
         </div>
       </div>
