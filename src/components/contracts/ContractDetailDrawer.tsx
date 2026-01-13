@@ -229,10 +229,12 @@ export default function ContractDetailDrawer({
   useEffect(() => {
     if (contract && !docsFetched) {
       setDocsLoading(true);
-      const id = contract.salesforceId || contract.id;
-      fetch(`/api/contracts/documents?salesforceId=${encodeURIComponent(id)}`)
+      // Pass contractId (UUID) which is more reliable for querying
+      const params = new URLSearchParams({ contractId: contract.id });
+      fetch(`/api/contracts/documents?${params}`)
         .then(res => res.json())
         .then(data => {
+          console.log('Fetched documents:', data.documents?.length || 0, 'for contract', contract.id);
           setDocuments(data.documents || []);
           setDocsFetched(true);
         })
@@ -497,6 +499,7 @@ export default function ContractDetailDrawer({
       }
 
       const docData = await docResponse.json();
+      console.log('Document created:', docData.document?.id, 'for contract:', contract.id);
 
       // Step 5: Auto-push to Salesforce if salesforceId is available
       if (contract.salesforceId && docData.document?.id) {
@@ -508,14 +511,18 @@ export default function ContractDetailDrawer({
           });
           if (!sfResponse.ok) {
             console.warn('Salesforce sync failed:', await sfResponse.json());
+          } else {
+            console.log('Document synced to Salesforce');
           }
         } catch (sfErr) {
           console.warn('Salesforce sync error:', sfErr);
         }
       }
 
-      // Refresh documents list
+      // Refresh documents list - set to false to trigger refetch
+      console.log('Triggering document refetch...');
       setDocsFetched(false);
+      setDocuments([]); // Clear current documents to force fresh fetch
 
       // Notify parent component to refresh contract data
       onUpdate?.();
