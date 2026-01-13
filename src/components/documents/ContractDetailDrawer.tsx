@@ -80,11 +80,11 @@ function formatFileSize(bytes?: number): string {
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '';
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const date = new Date(dateStr);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
 }
 
 // Individual document row within the drawer
@@ -106,12 +106,18 @@ function DocumentRow({
   contractId: string;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const isMissing = doc.status === 'missing';
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onUpload) {
-      onUpload(file, doc.document_type, contractId);
+      setIsUploading(true);
+      try {
+        await onUpload(file, doc.document_type, contractId);
+      } finally {
+        setIsUploading(false);
+      }
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -191,12 +197,24 @@ function DocumentRow({
           {isMissing ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 bg-[#8B5CF6] text-white text-[12px] font-medium rounded-lg hover:bg-[#8B5CF6]/90 transition-colors flex items-center gap-1.5"
+              disabled={isUploading}
+              className={`px-3 py-1.5 text-white text-[12px] font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                isUploading ? 'bg-[#8B5CF6]/50 cursor-not-allowed' : 'bg-[#8B5CF6] hover:bg-[#8B5CF6]/90'
+              }`}
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Upload
+              {isUploading ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload
+                </>
+              )}
             </button>
           ) : (
             <>

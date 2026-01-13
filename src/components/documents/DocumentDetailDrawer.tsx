@@ -56,13 +56,11 @@ function formatFileSize(bytes?: number): string {
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'Unknown';
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const date = new Date(dateStr);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
 }
 
 export default function DocumentDetailDrawer({
@@ -133,10 +131,16 @@ export default function DocumentDetailDrawer({
 
   const isMissing = document.status === 'missing';
   const isPDF = document.file_name?.toLowerCase().endsWith('.pdf');
+  const isDOCX = document.file_name?.toLowerCase().endsWith('.docx') || document.file_name?.toLowerCase().endsWith('.doc');
   const isValidUrl = document.file_url &&
     !document.file_url.startsWith('#local:') &&
     (document.file_url.startsWith('http') || document.file_url.startsWith('/'));
-  const canPreview = isPDF && isValidUrl && !previewError && !isMissing;
+  const canPreview = (isPDF || isDOCX) && isValidUrl && !previewError && !isMissing;
+
+  // For DOCX files, use Google Docs Viewer
+  const previewUrl = isDOCX && isValidUrl
+    ? `https://docs.google.com/gview?url=${encodeURIComponent(document.file_url)}&embedded=true`
+    : document.file_url;
 
   const statusMeta = STATUS_META[document.status] || STATUS_META.draft;
 
@@ -297,7 +301,7 @@ export default function DocumentDetailDrawer({
                     </div>
                   )}
                   <iframe
-                    src={`${document.file_url}#toolbar=0&navpanes=0`}
+                    src={isPDF ? `${previewUrl}#toolbar=0&navpanes=0` : previewUrl}
                     className="w-full h-full border-0"
                     onLoad={() => setIsLoading(false)}
                     onError={() => {
