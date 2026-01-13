@@ -218,6 +218,7 @@ export interface Contract {
   probability: number;
   budgeted: boolean;
   manual_close_probability: number | null;
+  manual_status_override?: boolean; // TRUE when status manually set and should not be overwritten by sync
   is_closed: boolean;
   is_won: boolean;
   created_at?: string;

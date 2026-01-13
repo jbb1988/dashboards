@@ -39,6 +39,7 @@ function transformToContract(opp: any): Contract {
 
 /**
  * POST - Sync Salesforce opportunities to Supabase contracts table
+ * IMPORTANT: Preserves manual status overrides - does not overwrite user's manual status updates
  */
 export async function POST(request: NextRequest) {
   try {
@@ -60,10 +61,33 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 2: Transform to Supabase contract format
-    const contracts = opportunities.map(transformToContract);
+    // Step 2: Get existing contracts to check for manual status overrides
+    const existingContracts = await getContracts();
+    const manualOverrideMap = new Map<string, { status: string }>();
 
-    // Step 3: Upsert to Supabase
+    existingContracts.forEach(contract => {
+      if (contract.manual_status_override && contract.salesforce_id) {
+        manualOverrideMap.set(contract.salesforce_id, {
+          status: contract.status,
+        });
+      }
+    });
+
+    // Step 3: Transform to Supabase contract format
+    const contracts = opportunities.map(opp => {
+      const transformed = transformToContract(opp);
+
+      // Preserve manual status override if exists
+      const manualOverride = manualOverrideMap.get(transformed.salesforce_id);
+      if (manualOverride) {
+        transformed.status = manualOverride.status;
+        (transformed as any).manual_status_override = true; // Keep the flag
+      }
+
+      return transformed;
+    });
+
+    // Step 4: Upsert to Supabase
     const upsertResult = await upsertContracts(contracts);
 
     if (!upsertResult.success) {
@@ -77,10 +101,13 @@ export async function POST(request: NextRequest) {
 
     result.synced = upsertResult.count;
 
+    const preservedCount = manualOverrideMap.size;
+
     return NextResponse.json({
       success: true,
       message: `Successfully synced ${result.synced} contracts from Salesforce to Supabase`,
       result,
+      preservedManualStatuses: preservedCount,
       lastUpdated: new Date().toISOString(),
     });
 
