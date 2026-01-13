@@ -100,9 +100,12 @@ const REQUIRED_DOCUMENT_TYPES = [
 
 // Optional standard documents
 const OPTIONAL_DOCUMENT_TYPES = [
-  'Client Response',
+  'Client Response - MARS STD WTC',
+  'Client Response - MARS MCC TC',
+  'Client Response - MARS EULA',
   'Purchase Order',
   'Amendment',
+  'Other',
 ];
 
 // Format file size

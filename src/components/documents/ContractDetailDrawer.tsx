@@ -15,6 +15,7 @@ interface BundleInfo {
 export interface ContractDocument {
   id: string;
   document_type: string;
+  subtitle?: string;
   file_name?: string;
   file_url?: string;
   file_size?: number;
@@ -64,11 +65,14 @@ interface ContractDetailDrawerProps {
 const DOCUMENT_TYPES = [
   { type: 'Original Contract', required: true },
   { type: 'MARS Redlines', required: true },
-  { type: 'Client Response', required: false },
+  { type: 'Client Response - MARS STD WTC', required: false, subtitle: 'Client redlines to MARS STD WTC' },
+  { type: 'Client Response - MARS MCC TC', required: false, subtitle: 'Client redlines to MARS MCC TC' },
+  { type: 'Client Response - MARS EULA', required: false, subtitle: 'Client redlines to MARS EULA' },
   { type: 'Final Agreement', required: true },
   { type: 'Executed Contract', required: true },
   { type: 'Purchase Order', required: false },
   { type: 'Amendment', required: false },
+  { type: 'Other', required: false, subtitle: 'Additional supporting documents' },
 ];
 
 function formatFileSize(bytes?: number): string {
@@ -167,6 +171,12 @@ function DocumentRow({
                 <span className="text-[10px] text-[#64748B]">v{doc.version}</span>
               )}
             </div>
+
+            {doc.subtitle && (
+              <p className="text-[11px] text-[#64748B] mb-1">
+                {doc.subtitle}
+              </p>
+            )}
 
             {isMissing ? (
               <p className="text-[12px] text-[#64748B]">
@@ -316,6 +326,7 @@ export default function ContractDetailDrawer({
     return {
       id: `missing-${contract.id}-${docType}`,
       document_type: docType,
+      subtitle: typeInfo?.subtitle,
       status: 'missing',
       is_required: typeInfo?.required ?? false,
     };

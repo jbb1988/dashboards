@@ -10,7 +10,9 @@ const DOCUMENT_TYPES = [
   'Final Agreement',
   'Executed Contract',
   // Optional standard
-  'Client Response',
+  'Client Response - MARS STD WTC',
+  'Client Response - MARS MCC TC',
+  'Client Response - MARS EULA',
   'Purchase Order',
   'Amendment',
   // Analysis documents
@@ -38,9 +40,12 @@ const REQUIRED_DOCUMENT_TYPES = [
 ];
 
 const OPTIONAL_DOCUMENT_TYPES = [
-  'Client Response',
+  'Client Response - MARS STD WTC',
+  'Client Response - MARS MCC TC',
+  'Client Response - MARS EULA',
   'Purchase Order',
   'Amendment',
+  'Other',
 ];
 
 // Analysis document types (from Compare tab)
