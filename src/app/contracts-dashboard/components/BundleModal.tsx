@@ -58,10 +58,20 @@ export default function BundleModal({
     }
   }, [isOpen, mode]);
 
-  // Filter contracts for selection
+  // Filter and sort contracts for selection
+  // Contracts with matching names (same account) appear at the top
   const filteredContracts = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    return allContracts.filter(c => {
+
+    // Extract key words from current contract name for matching
+    // e.g., "El Dorado Irrigation District" -> ["el", "dorado", "irrigation", "district"]
+    const currentNameWords = currentContract.name
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(word => word.length > 2); // Ignore short words like "of", "the"
+
+    // Filter contracts
+    const filtered = allContracts.filter(c => {
       if (c.id === currentContract.id) return false; // Exclude current contract
       if (!query) return true;
       return (
@@ -70,7 +80,25 @@ export default function BundleModal({
         c.contractType.some(t => t.toLowerCase().includes(query))
       );
     });
-  }, [allContracts, currentContract.id, searchQuery]);
+
+    // Sort by name similarity - contracts with matching words at top
+    return filtered.sort((a, b) => {
+      const aNameLower = a.name.toLowerCase();
+      const bNameLower = b.name.toLowerCase();
+
+      // Count how many words match from current contract name
+      const aMatches = currentNameWords.filter(word => aNameLower.includes(word)).length;
+      const bMatches = currentNameWords.filter(word => bNameLower.includes(word)).length;
+
+      // Sort by match count (descending) - most matches at top
+      if (aMatches !== bMatches) {
+        return bMatches - aMatches;
+      }
+
+      // If same match count, sort alphabetically
+      return a.name.localeCompare(b.name);
+    });
+  }, [allContracts, currentContract.id, currentContract.name, searchQuery]);
 
   // Reset state when modal opens
   useEffect(() => {
