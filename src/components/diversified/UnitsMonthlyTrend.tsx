@@ -11,21 +11,9 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { ChartContainer, tooltipStyle, CHART_COLORS } from '../charts/ChartContainer';
+import { ChartContainer, tooltipStyle } from '../charts/ChartContainer';
 
-// Array of colors for line charts
-const COLOR_ARRAY = [
-  CHART_COLORS.cyan,
-  CHART_COLORS.emerald,
-  CHART_COLORS.orange,
-  CHART_COLORS.purple,
-  CHART_COLORS.amber,
-  CHART_COLORS.blue,
-  CHART_COLORS.pink,
-  CHART_COLORS.teal,
-  CHART_COLORS.indigo,
-  CHART_COLORS.red,
-];
+const CHART_COLORS = ['#38BDF8', '#22C55E', '#F59E0B', '#A855F7', '#EC4899', '#14B8A6', '#F97316', '#6366F1'];
 
 interface MonthlyTrendData {
   year: number;
@@ -79,7 +67,13 @@ export function UnitsMonthlyTrend({
   // Transform data for chart
   const chartData = useMemo(() => {
     // Group by year/month
-    const monthMap = new Map<string, Record<string, number>>();
+    type MonthDataType = {
+      year: number;
+      month: number;
+      monthName: string;
+      [key: string]: number | string;
+    };
+    const monthMap = new Map<string, MonthDataType>();
 
     for (const item of data) {
       // Only include top classes
@@ -95,7 +89,7 @@ export function UnitsMonthlyTrend({
       }
 
       const monthData = monthMap.get(monthKey)!;
-      monthData[item.class_name] = (monthData[item.class_name] || 0) + item.units;
+      monthData[item.class_name] = (monthData[item.class_name] as number || 0) + item.units;
     }
 
     // Convert to array and sort
@@ -159,10 +153,10 @@ export function UnitsMonthlyTrend({
               key={className}
               type="monotone"
               dataKey={className}
-              stroke={COLOR_ARRAY[idx % COLOR_ARRAY.length]}
+              stroke={CHART_COLORS[idx % CHART_COLORS.length]}
               strokeWidth={2}
               dot={{ r: 3, strokeWidth: 2, fill: '#0F1123' }}
-              activeDot={{ r: 5, strokeWidth: 0, fill: COLOR_ARRAY[idx % COLOR_ARRAY.length] }}
+              activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS[idx % CHART_COLORS.length] }}
               animationDuration={1500}
               animationEasing="ease-out"
               animationBegin={idx * 100}

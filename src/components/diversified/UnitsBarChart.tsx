@@ -13,21 +13,9 @@ import {
   LabelList,
   Legend,
 } from 'recharts';
-import { ChartContainer, tooltipStyle, CHART_COLORS } from '../charts/ChartContainer';
+import { ChartContainer, tooltipStyle } from '../charts/ChartContainer';
 
-// Array of colors for bar charts
-const COLOR_ARRAY = [
-  CHART_COLORS.cyan,
-  CHART_COLORS.emerald,
-  CHART_COLORS.orange,
-  CHART_COLORS.purple,
-  CHART_COLORS.amber,
-  CHART_COLORS.blue,
-  CHART_COLORS.pink,
-  CHART_COLORS.teal,
-  CHART_COLORS.indigo,
-  CHART_COLORS.red,
-];
+const CHART_COLORS = ['#38BDF8', '#22C55E', '#F59E0B', '#A855F7', '#EC4899', '#14B8A6', '#F97316', '#6366F1'];
 
 interface UnitsData {
   class_name: string;
@@ -80,7 +68,7 @@ export function UnitsBarChart({
       current_units: d.current_units,
       prior_units: d.prior_units,
       change_pct: d.units_change_pct,
-      color: COLOR_ARRAY[idx % COLOR_ARRAY.length],
+      color: CHART_COLORS[idx % CHART_COLORS.length],
     }));
   }, [data]);
 
