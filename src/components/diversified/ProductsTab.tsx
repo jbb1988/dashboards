@@ -207,35 +207,35 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
       <div className="grid grid-cols-5 gap-4">
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">
-            {selectedClassData ? 'Products in Class' : 'Total Products'}
+            Total Products
           </div>
           <div className="text-2xl font-bold text-white">
-            {selectedClassData ? selectedClassData.totalProducts : data.summary.total_products}
+            {data.summary.total_products}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">R12 Revenue</div>
           <div className="text-2xl font-bold text-white">
-            {formatCurrency(selectedClassData ? selectedClassData.currentRevenue : data.summary.total_current_revenue)}
+            {formatCurrency(data.summary.total_current_revenue)}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">R12 Change</div>
-          <div className={`text-2xl font-bold ${(selectedClassData ? selectedClassData.changePct : data.summary.overall_change_pct) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {(selectedClassData ? selectedClassData.changePct : data.summary.overall_change_pct) >= 0 ? '+' : ''}
-            {(selectedClassData ? selectedClassData.changePct : data.summary.overall_change_pct).toFixed(1)}%
+          <div className={`text-2xl font-bold ${data.summary.overall_change_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {data.summary.overall_change_pct >= 0 ? '+' : ''}
+            {data.summary.overall_change_pct.toFixed(1)}%
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Growing</div>
           <div className="text-2xl font-bold text-green-400">
-            {selectedClassData ? selectedClassData.growingProducts : data.summary.growing_products}
+            {data.summary.growing_products}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Declining</div>
           <div className="text-2xl font-bold text-red-400">
-            {selectedClassData ? selectedClassData.decliningProducts : data.summary.declining_products}
+            {data.summary.declining_products}
           </div>
         </div>
       </div>
