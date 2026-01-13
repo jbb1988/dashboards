@@ -1243,6 +1243,25 @@ export default function DiversifiedDashboard() {
                     </div>
                   </div>
 
+                  {/* Class Filter */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
+                      Class:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 max-w-[500px]">
+                      {data.filterOptions.classes.map((className) => (
+                        <FilterChip
+                          key={className}
+                          label={className}
+                          selected={selectedClass === className}
+                          onClick={() => {
+                            setSelectedClass(selectedClass === className ? null : className);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex-1" />
 
                   {/* Reset */}
@@ -1367,6 +1386,7 @@ export default function DiversifiedDashboard() {
                     }}
                     selectedYears={selectedYears}
                     selectedMonths={selectedMonths}
+                    selectedClass={selectedClass}
                   />
                 </motion.div>
               )}

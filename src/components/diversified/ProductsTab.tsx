@@ -13,10 +13,6 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { UnitsBarChart } from './UnitsBarChart';
-import { UnitsMonthlyTrend } from './UnitsMonthlyTrend';
-import { RevenueYoYTable } from './RevenueYoYTable';
-import { TopItemsByClass } from './TopItemsByClass';
 
 interface ProductData {
   item_id: string;
@@ -59,50 +55,11 @@ interface ProductsResponse {
   };
 }
 
-interface UnitsData {
-  summary: {
-    total_units_current: number;
-    total_units_prior: number;
-    yoy_change_pct: number;
-    total_revenue_current: number;
-    total_revenue_prior: number;
-    revenue_yoy_change_pct: number;
-    total_classes: number;
-  };
-  by_class: Array<{
-    class_name: string;
-    parent_class: string | null;
-    current_units: number;
-    prior_units: number;
-    units_change_pct: number;
-    current_revenue: number;
-    prior_revenue: number;
-    revenue_change_pct: number;
-    avg_price_per_unit: number;
-  }>;
-  monthly_trends: Array<{
-    year: number;
-    month: number;
-    class_name: string;
-    units: number;
-    revenue: number;
-  }>;
-  top_items_by_class: Record<string, Array<{
-    item_id: string;
-    item_name: string;
-    units: number;
-    revenue: number;
-  }>>;
-  periods: {
-    current: { start: string; end: string };
-    prior: { start: string; end: string };
-  };
-}
-
 interface ProductsTabProps {
   onCustomerClick?: (customerId: string, customerName: string) => void;
   selectedYears?: number[];
   selectedMonths?: number[];
+  selectedClass?: string | null;
 }
 
 const TREND_CONFIG = {
@@ -128,24 +85,15 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: ProductsTabProps) {
+export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, selectedClass }: ProductsTabProps) {
   const [data, setData] = useState<ProductsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'revenue' | 'change' | 'customers'>('revenue');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [filterClass, setFilterClass] = useState<string>('all');
   const [filterTrend, setFilterTrend] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Units analysis state
-  const [unitsData, setUnitsData] = useState<UnitsData | null>(null);
-  const [loadingUnits, setLoadingUnits] = useState(false);
-  const [groupBy, setGroupBy] = useState<'top-level' | 'all'>('all');
-
-  // Selected class for filtering entire view
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -158,6 +106,9 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
         }
         if (selectedMonths && selectedMonths.length > 0) {
           params.set('months', selectedMonths.join(','));
+        }
+        if (selectedClass) {
+          params.set('className', selectedClass);
         }
         const url = `/api/diversified/products${params.toString() ? `?${params.toString()}` : ''}`;
         const response = await fetch(url);
@@ -174,41 +125,7 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
     };
 
     fetchData();
-  }, [selectedYears, selectedMonths]);
-
-  // Fetch units data
-  useEffect(() => {
-    const fetchUnitsData = async () => {
-      setLoadingUnits(true);
-      try {
-        const params = new URLSearchParams();
-        if (selectedYears && selectedYears.length > 0) {
-          params.set('years', selectedYears.join(','));
-        }
-        if (selectedMonths && selectedMonths.length > 0) {
-          params.set('months', selectedMonths.join(','));
-        }
-        if (selectedClass) {
-          params.set('className', selectedClass);
-        }
-        params.set('groupBy', groupBy);
-
-        const url = `/api/diversified/units${params.toString() ? `?${params.toString()}` : ''}`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error('Failed to fetch units data');
-        }
-        const result = await response.json();
-        setUnitsData(result);
-      } catch (err) {
-        console.error('Error fetching units data:', err);
-      } finally {
-        setLoadingUnits(false);
-      }
-    };
-
-    fetchUnitsData();
-  }, [selectedYears, selectedMonths, groupBy, selectedClass]);
+  }, [selectedYears, selectedMonths, selectedClass]);
 
   const filteredAndSortedProducts = useMemo(() => {
     if (!data) return [];
@@ -216,9 +133,6 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
     let filtered = data.products;
 
     // Apply filters
-    if (filterClass !== 'all') {
-      filtered = filtered.filter(p => p.class_name === filterClass);
-    }
     if (filterTrend !== 'all') {
       filtered = filtered.filter(p => p.trend === filterTrend);
     }
@@ -265,36 +179,6 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
     }
   };
 
-  // Compute metrics for selected class
-  const selectedClassData = useMemo(() => {
-    if (!data || !selectedClass) return null;
-
-    const classProducts = data.products.filter(p => p.class_name === selectedClass);
-    const totalCurrentRevenue = classProducts.reduce((sum, p) => sum + p.current_revenue, 0);
-    const totalPriorRevenue = classProducts.reduce((sum, p) => sum + p.prior_revenue, 0);
-    const totalCurrentUnits = classProducts.reduce((sum, p) => sum + p.current_units, 0);
-    const totalPriorUnits = classProducts.reduce((sum, p) => sum + p.prior_units, 0);
-    const changePct = totalPriorRevenue > 0
-      ? ((totalCurrentRevenue - totalPriorRevenue) / totalPriorRevenue) * 100
-      : 0;
-    const unitsChangePct = totalPriorUnits > 0
-      ? ((totalCurrentUnits - totalPriorUnits) / totalPriorUnits) * 100
-      : 0;
-
-    return {
-      className: selectedClass,
-      totalProducts: classProducts.length,
-      currentRevenue: totalCurrentRevenue,
-      priorRevenue: totalPriorRevenue,
-      changePct,
-      currentUnits: totalCurrentUnits,
-      priorUnits: totalPriorUnits,
-      unitsChangePct,
-      growingProducts: classProducts.filter(p => p.trend === 'growing').length,
-      decliningProducts: classProducts.filter(p => p.trend === 'declining').length,
-    };
-  }, [data, selectedClass]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -318,57 +202,6 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
 
   return (
     <div className="space-y-6">
-      {/* Selected Class Banner */}
-      {selectedClass && selectedClassData && (
-        <div className="p-6 rounded-xl bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border-2 border-cyan-500/30">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center">
-                <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-[11px] text-cyan-300 uppercase tracking-wider font-semibold mb-1">Filtering by Class</div>
-                <h2 className="text-[24px] font-bold text-white">{selectedClass}</h2>
-                <div className="text-[12px] text-[#94A3B8] mt-1">{selectedClassData.totalProducts} products in this class</div>
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedClass(null)}
-              className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-[13px] flex items-center gap-2 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Clear Filter
-            </button>
-          </div>
-          {/* Quick Stats */}
-          <div className="grid grid-cols-4 gap-4 pt-4 border-t border-white/10">
-            <div>
-              <div className="text-[10px] text-cyan-300 uppercase tracking-wide mb-1">Revenue</div>
-              <div className="text-[18px] font-bold text-white">{formatCurrency(selectedClassData.currentRevenue)}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-cyan-300 uppercase tracking-wide mb-1">Units</div>
-              <div className="text-[18px] font-bold text-white">{selectedClassData.currentUnits.toLocaleString()}</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-cyan-300 uppercase tracking-wide mb-1">Revenue YoY</div>
-              <div className={`text-[18px] font-bold ${selectedClassData.changePct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {selectedClassData.changePct >= 0 ? '+' : ''}{selectedClassData.changePct.toFixed(1)}%
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] text-cyan-300 uppercase tracking-wide mb-1">Units YoY</div>
-              <div className={`text-[18px] font-bold ${selectedClassData.unitsChangePct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {selectedClassData.unitsChangePct >= 0 ? '+' : ''}{selectedClassData.unitsChangePct.toFixed(1)}%
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-5 gap-4">
@@ -486,18 +319,12 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
                     outerRadius={90}
                     dataKey="revenue"
                     nameKey="class_name"
-                    onClick={(data: any) => {
-                      if (data && data.class_name) {
-                        setSelectedClass(data.class_name);
-                      }
-                    }}
-                    style={{ cursor: 'pointer' }}
                   >
                     {classBreakdown.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={CHART_COLORS[index % CHART_COLORS.length]}
-                        opacity={selectedClass === entry.class_name ? 1 : selectedClass ? 0.3 : 0.8}
+                        opacity={0.8}
                       />
                     ))}
                   </Pie>
@@ -520,91 +347,32 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
             </div>
             <div className="w-1/2 space-y-2">
               {classBreakdown.map((cls, idx) => (
-                <button
+                <div
                   key={cls.class_name}
-                  onClick={() => setSelectedClass(cls.class_name)}
-                  className={`w-full flex items-center gap-2 text-[11px] px-2 py-1.5 rounded transition-all ${
-                    selectedClass === cls.class_name
-                      ? 'bg-cyan-500/20 border border-cyan-500/50'
-                      : 'hover:bg-white/5'
-                  }`}
+                  className="w-full flex items-center gap-2 text-[11px] px-2 py-1.5"
                 >
                   <div
                     className="w-3 h-3 rounded-sm flex-shrink-0"
                     style={{
-                      backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
-                      opacity: selectedClass === cls.class_name ? 1 : selectedClass ? 0.3 : 1
+                      backgroundColor: CHART_COLORS[idx % CHART_COLORS.length]
                     }}
                   />
                   <span
-                    className={`truncate flex-1 text-left ${
-                      selectedClass === cls.class_name ? 'text-white font-semibold' : 'text-[#94A3B8]'
-                    }`}
+                    className="truncate flex-1 text-left text-[#94A3B8]"
                     title={cls.class_name}
                   >
                     {cls.class_name.length > 20 ? `${cls.class_name.slice(0, 20)}...` : cls.class_name}
                   </span>
-                  <span className={`font-medium ${selectedClass === cls.class_name ? 'text-cyan-300' : 'text-white'}`}>
+                  <span className="font-medium text-white">
                     {formatCurrency(cls.revenue)}
                   </span>
-                </button>
+                </div>
               ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Units Analysis Section */}
-      {unitsData && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[16px] font-semibold text-white flex items-center gap-3">
-              <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              Units Sold Analysis
-              <span className="text-[12px] text-[#64748B] bg-[#334155] px-3 py-1 rounded font-normal">
-                {unitsData.summary.total_classes} classes
-              </span>
-            </h2>
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-[#64748B] uppercase">Group By:</span>
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value as 'top-level' | 'all')}
-                className="px-3 py-2 rounded-lg bg-[#0F1722] border border-white/[0.04] text-[12px] text-white focus:outline-none focus:border-[#38BDF8]/50"
-                disabled={loadingUnits}
-              >
-                <option value="all">All Sub-classes</option>
-                <option value="top-level">Top-level Classes</option>
-              </select>
-            </div>
-          </div>
-
-          {loadingUnits ? (
-            <div className="flex items-center justify-center h-[400px] bg-[#151F2E] rounded-xl border border-white/[0.04]">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
-                <p className="text-[13px] text-[#64748B]">Loading units data...</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Charts Row */}
-              <div className="grid grid-cols-2 gap-6">
-                <UnitsBarChart data={unitsData.by_class} />
-                <UnitsMonthlyTrend data={unitsData.monthly_trends} topN={6} />
-              </div>
-
-              {/* Revenue YoY Table */}
-              <RevenueYoYTable data={unitsData.by_class} />
-
-              {/* Top Items by Class */}
-              <TopItemsByClass data={unitsData.top_items_by_class} />
-            </>
-          )}
-        </div>
-      )}
 
       {/* Filters & Search */}
       <div className="flex items-center gap-4 p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
@@ -620,21 +388,6 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths }: 
             placeholder="Search products..."
             className="w-full pl-10 pr-4 py-2 rounded-lg bg-[#0F1722] border border-white/[0.04] text-[13px] text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
           />
-        </div>
-
-        {/* Class Filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-[#64748B] uppercase">Class:</span>
-          <select
-            value={filterClass}
-            onChange={(e) => setFilterClass(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-[#0F1722] border border-white/[0.04] text-[12px] text-white focus:outline-none focus:border-[#38BDF8]/50"
-          >
-            <option value="all">All Classes</option>
-            {data.by_class.map(cls => (
-              <option key={cls.class_name} value={cls.class_name}>{cls.class_name}</option>
-            ))}
-          </select>
         </div>
 
         {/* Trend Filter */}
