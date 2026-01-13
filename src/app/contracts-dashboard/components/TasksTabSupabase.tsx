@@ -1436,12 +1436,23 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Due Date</label>
-                    <input
-                      type="date"
-                      value={editingTask.due_date || ''}
-                      onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
-                      className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm"
-                    />
+                    <div
+                      className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-sm cursor-pointer relative"
+                      onClick={(e) => {
+                        const input = e.currentTarget.querySelector('input');
+                        input?.showPicker?.();
+                      }}
+                    >
+                      <input
+                        type="date"
+                        value={editingTask.due_date || ''}
+                        onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <span className={editingTask.due_date ? 'text-white' : 'text-[#475569]'}>
+                        {editingTask.due_date ? new Date(editingTask.due_date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select due date...'}
+                      </span>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[#64748B] text-xs uppercase tracking-wider mb-2">Status</label>

@@ -325,6 +325,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
           id: contract.contractId,
           contract_name: contract.contractName,
           account_name: account.accountName,
+          opportunity_name: matchingContract?.opportunityName || contract.contractName,
           contract_type: matchingContract?.contractType?.join(', ') || undefined,
           salesforce_id: matchingContract?.salesforceId,
           // Filter fields

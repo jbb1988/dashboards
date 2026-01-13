@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContractDetailDrawer, { ContractItem, ContractDocument } from './ContractDetailDrawer';
 import FilterDrawer, { FilterState } from './FilterDrawer';
@@ -161,7 +161,7 @@ function ContractRow({
           )}
         </div>
         <div className="flex items-center gap-2 text-[13px] text-[#8FA3BF]">
-          <span className="truncate">{contract.account_name}</span>
+          <span className="truncate">{contract.opportunity_name || contract.contract_name}</span>
           {contract.status && (
             <>
               <span className="text-[#475569]">•</span>
@@ -242,6 +242,18 @@ export default function ContractListView({
     DEFAULT_FILTERS
   );
 
+  // Update selectedContract when contracts change (e.g., after document deletion)
+  useEffect(() => {
+    if (selectedContract) {
+      const updatedContract = contracts.find(c => c.id === selectedContract.id);
+      if (updatedContract) {
+        // Always update to get the latest documents data
+        setSelectedContract(updatedContract);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contracts]);
+
   // Count contracts per status
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -280,6 +292,7 @@ export default function ContractListView({
       result = result.filter(c =>
         c.contract_name.toLowerCase().includes(query) ||
         c.account_name.toLowerCase().includes(query) ||
+        (c.opportunity_name?.toLowerCase().includes(query) ?? false) ||
         (c.contract_type?.toLowerCase().includes(query) ?? false)
       );
     }

@@ -30,6 +30,7 @@ export interface ContractItem {
   id: string;
   contract_name: string;
   account_name: string;
+  opportunity_name?: string;
   contract_type?: string;
   salesforce_id?: string;
   // Filter fields
