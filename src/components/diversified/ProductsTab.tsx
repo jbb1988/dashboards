@@ -168,7 +168,7 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
     });
 
     return sorted;
-  }, [data, filterClass, filterTrend, searchTerm, sortBy, sortDir]);
+  }, [data, filterTrend, searchTerm, sortBy, sortDir]);
 
   const handleSort = (column: 'revenue' | 'change' | 'customers') => {
     if (sortBy === column) {
