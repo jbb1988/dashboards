@@ -354,13 +354,15 @@ export default function DocumentDetailDrawer({
             {!isMissing && (
               <div className="flex-shrink-0 border-t border-white/[0.06] bg-[#151F2E]">
                 <div className="px-5 py-4">
+                  {/* File Name - Full width at top */}
+                  <div className="mb-4 pb-4 border-b border-white/[0.04]">
+                    <span className="text-[#64748B] block text-[10px] uppercase tracking-wider font-medium mb-2">File Name</span>
+                    <span className="text-[#8FA3BF] text-[13px] block break-words">
+                      {document.file_name}
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="text-[#64748B] block text-[10px] uppercase tracking-wider font-medium mb-1">File Name</span>
-                      <span className="text-[#8FA3BF] text-[13px] truncate block" title={document.file_name}>
-                        {document.file_name}
-                      </span>
-                    </div>
                     <div>
                       <span className="text-[#64748B] block text-[10px] uppercase tracking-wider font-medium mb-1">Size</span>
                       <span className="text-[#8FA3BF] text-[13px]">{formatFileSize(document.file_size)}</span>
