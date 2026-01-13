@@ -514,8 +514,11 @@ export default function ContractDetailDrawer({
         }
       }
 
-      // Refresh documents
+      // Refresh documents list
       setDocsFetched(false);
+
+      // Notify parent component to refresh contract data
+      onUpdate?.();
     } catch (err) {
       console.error('Upload failed:', err);
     } finally {
