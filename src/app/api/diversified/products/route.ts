@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
     if (years.length > 0) {
       // User has selected specific year(s) - compare against prior year
+      // Use Date.UTC to ensure consistent timezone handling with database dates
       const selectedYears = [...years].sort((a, b) => a - b);
       const minYear = selectedYears[0];
       const maxYear = selectedYears[selectedYears.length - 1];
@@ -33,32 +34,35 @@ export async function GET(request: NextRequest) {
         const minMonth = selectedMonths[0];
         const maxMonth = selectedMonths[selectedMonths.length - 1];
 
-        currentPeriodStart = new Date(minYear, minMonth - 1, 1);
-        currentPeriodEnd = new Date(maxYear, maxMonth, 0); // Last day of max month
+        currentPeriodStart = new Date(Date.UTC(minYear, minMonth - 1, 1));
+        currentPeriodEnd = new Date(Date.UTC(maxYear, maxMonth, 0, 23, 59, 59, 999)); // End of last day
 
         // Prior period: same months in prior year(s)
-        priorPeriodStart = new Date(minYear - 1, minMonth - 1, 1);
-        priorPeriodEnd = new Date(maxYear - 1, maxMonth, 0);
+        priorPeriodStart = new Date(Date.UTC(minYear - 1, minMonth - 1, 1));
+        priorPeriodEnd = new Date(Date.UTC(maxYear - 1, maxMonth, 0, 23, 59, 59, 999));
       } else {
         // All months in selected year(s)
-        currentPeriodStart = new Date(minYear, 0, 1);
-        currentPeriodEnd = new Date(maxYear, 11, 31);
+        currentPeriodStart = new Date(Date.UTC(minYear, 0, 1));
+        currentPeriodEnd = new Date(Date.UTC(maxYear, 11, 31, 23, 59, 59, 999));
 
         // Prior period: same in prior year(s)
-        priorPeriodStart = new Date(minYear - 1, 0, 1);
-        priorPeriodEnd = new Date(maxYear - 1, 11, 31);
+        priorPeriodStart = new Date(Date.UTC(minYear - 1, 0, 1));
+        priorPeriodEnd = new Date(Date.UTC(maxYear - 1, 11, 31, 23, 59, 59, 999));
       }
     } else {
-      // No year filter - use R12 periods from today
+      // No year filter - use R12 periods from today (UTC)
       const now = new Date();
-      currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      currentPeriodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
       currentPeriodStart = new Date(currentPeriodEnd);
-      currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
+      currentPeriodStart.setUTCMonth(currentPeriodStart.getUTCMonth() - 12);
+      currentPeriodStart.setUTCHours(0, 0, 0, 0);
 
       priorPeriodEnd = new Date(currentPeriodStart);
-      priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
+      priorPeriodEnd.setUTCDate(priorPeriodEnd.getUTCDate() - 1);
+      priorPeriodEnd.setUTCHours(23, 59, 59, 999);
       priorPeriodStart = new Date(priorPeriodEnd);
-      priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
+      priorPeriodStart.setUTCMonth(priorPeriodStart.getUTCMonth() - 12);
+      priorPeriodStart.setUTCHours(0, 0, 0, 0);
     }
 
     // Fetch all product data (last 24 months)
