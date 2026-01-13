@@ -3,6 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Bundle info interface
+interface BundleInfo {
+  bundleId: string;
+  bundleName: string;
+  isPrimary: boolean;
+  contractCount: number;
+}
+
 // Document type within a contract
 export interface ContractDocument {
   id: string;
@@ -37,6 +45,7 @@ export interface ContractItem {
     total: number;
     percentage: number;
   };
+  bundleInfo?: BundleInfo | null;
 }
 
 interface ContractDetailDrawerProps {
@@ -47,6 +56,7 @@ interface ContractDetailDrawerProps {
   onShare?: (doc: ContractDocument) => void;
   onView?: (doc: ContractDocument) => void;
   onDelete?: (doc: ContractDocument) => void;
+  openBundleModal?: (contract: ContractItem, mode: 'create' | 'add') => void;
 }
 
 // Required document types in order
@@ -262,6 +272,7 @@ export default function ContractDetailDrawer({
   onShare,
   onView,
   onDelete,
+  openBundleModal,
 }: ContractDetailDrawerProps) {
   // Escape key handler
   useEffect(() => {
@@ -326,9 +337,50 @@ export default function ContractDetailDrawer({
                   </h2>
 
                   {/* Account Name */}
-                  <p className="text-[14px] text-[#8FA3BF] mb-3">
-                    {contract.account_name}
-                  </p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="text-[14px] text-[#8FA3BF]">
+                      {contract.account_name}
+                    </p>
+                    {contract.bundleInfo && (
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#8B5CF6]">
+                        Bundle
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Bundle Info */}
+                  {(contract.bundleInfo || openBundleModal) && (
+                    <div className="mb-3 p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-[#64748B]">Bundle</span>
+                        {contract.bundleInfo ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[12px] text-[#8B5CF6]">
+                              {contract.bundleInfo.bundleName.length > 25
+                                ? `${contract.bundleInfo.bundleName.substring(0, 25)}...`
+                                : contract.bundleInfo.bundleName}
+                            </span>
+                            <span className="text-[9px] text-[#64748B] bg-[#8B5CF6]/10 px-1.5 py-0.5 rounded">
+                              {contract.bundleInfo.contractCount}
+                            </span>
+                            {contract.bundleInfo.isPrimary && (
+                              <span className="text-[9px] text-[#8B5CF6]">Primary</span>
+                            )}
+                          </div>
+                        ) : openBundleModal ? (
+                          <button
+                            onClick={() => openBundleModal(contract, 'create')}
+                            className="text-[11px] text-[#8B5CF6] hover:text-[#A78BFA] transition-colors flex items-center gap-1"
+                          >
+                            Create Bundle
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Progress Bar */}
                   <div className="flex items-center gap-3">

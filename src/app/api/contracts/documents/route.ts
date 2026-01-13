@@ -494,63 +494,88 @@ export async function POST(request: NextRequest) {
     let version = 1;
     let previousVersionId = null;
 
-    if (contractId || salesforceId) {
-      const existingQuery = admin
-        .from('documents')
-        .select('id, version')
-        .eq('document_type', documentType)
-        .eq('is_current_version', true);
+    // Retry logic to handle race conditions
+    let retries = 3;
+    let newDoc = null;
+    let insertError = null;
 
-      if (contractId) {
-        existingQuery.eq('contract_id', contractId);
-      } else {
-        existingQuery.eq('salesforce_id', salesforceId);
+    while (retries > 0) {
+      if (contractId || salesforceId) {
+        const existingQuery = admin
+          .from('documents')
+          .select('id, version')
+          .eq('document_type', documentType)
+          .eq('is_current_version', true);
+
+        if (contractId) {
+          existingQuery.eq('contract_id', contractId);
+        } else {
+          existingQuery.eq('salesforce_id', salesforceId);
+        }
+
+        const { data: existing } = await existingQuery.maybeSingle();
+
+        if (existing) {
+          // Mark old version as not current
+          await admin
+            .from('documents')
+            .update({ is_current_version: false })
+            .eq('id', existing.id);
+
+          version = existing.version + 1;
+          previousVersionId = existing.id;
+        }
       }
 
-      const { data: existing } = await existingQuery.single();
+      // Insert new document
+      const { data, error } = await admin
+        .from('documents')
+        .insert({
+          contract_id: contractId || null,
+          salesforce_id: salesforceId || null,
+          account_name: accountName,
+          opportunity_name: opportunityName || null,
+          opportunity_year: opportunityYear || null,
+          document_type: documentType,
+          status,
+          file_name: fileName,
+          file_url: fileUrl,
+          file_size: fileSize || null,
+          file_mime_type: fileMimeType || null,
+          version,
+          previous_version_id: previousVersionId,
+          is_current_version: true,
+          expiration_date: expirationDate || null,
+          effective_date: effectiveDate || null,
+          uploaded_by: uploadedBy || null,
+          notes: notes || null,
+          metadata,
+        })
+        .select()
+        .single();
 
-      if (existing) {
-        // Mark old version as not current
-        await admin
-          .from('documents')
-          .update({ is_current_version: false })
-          .eq('id', existing.id);
-
-        version = existing.version + 1;
-        previousVersionId = existing.id;
+      // Check for unique constraint violation (23505 is PostgreSQL unique violation code)
+      if (error && error.code === '23505') {
+        // Another upload beat us to it - retry
+        retries--;
+        if (retries > 0) {
+          // Wait a small random time before retrying to avoid thundering herd
+          await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50));
+          continue;
+        }
+        insertError = error;
+      } else if (error) {
+        insertError = error;
+        break;
+      } else {
+        newDoc = data;
+        break;
       }
     }
 
-    // Insert new document
-    const { data: newDoc, error } = await admin
-      .from('documents')
-      .insert({
-        contract_id: contractId || null,
-        salesforce_id: salesforceId || null,
-        account_name: accountName,
-        opportunity_name: opportunityName || null,
-        opportunity_year: opportunityYear || null,
-        document_type: documentType,
-        status,
-        file_name: fileName,
-        file_url: fileUrl,
-        file_size: fileSize || null,
-        file_mime_type: fileMimeType || null,
-        version,
-        previous_version_id: previousVersionId,
-        is_current_version: true,
-        expiration_date: expirationDate || null,
-        effective_date: effectiveDate || null,
-        uploaded_by: uploadedBy || null,
-        notes: notes || null,
-        metadata,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating document:', error);
-      return NextResponse.json({ error: 'Failed to create document', details: error.message }, { status: 500 });
+    if (insertError) {
+      console.error('Error creating document:', insertError);
+      return NextResponse.json({ error: 'Failed to create document', details: insertError.message }, { status: 500 });
     }
 
     return NextResponse.json({

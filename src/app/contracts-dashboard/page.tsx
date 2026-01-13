@@ -2179,7 +2179,7 @@ export default function ContractsDashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
-              <SmartDocumentsTab contracts={data.contracts} />
+              <SmartDocumentsTab contracts={data.contracts} openBundleModal={openBundleModal} />
             </motion.div>
           )}
 

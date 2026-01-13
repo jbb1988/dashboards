@@ -111,12 +111,18 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface SmartDocumentsTabProps {
+  contracts: Contract[];
+  openBundleModal?: (contract: any, mode: 'create' | 'add') => void;
+}
+
 // Main Smart Documents Tab Component
-export default function SmartDocumentsTab({ contracts }: { contracts: Contract[] }) {
+export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartDocumentsTabProps) {
   // State
   const [data, setData] = useState<DocumentsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
+  const [bundleInfoMap, setBundleInfoMap] = useState<Record<string, any>>({});
 
   // Fetch documents data
   const fetchDocuments = useCallback(async () => {
@@ -133,9 +139,46 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
     }
   }, []);
 
+  // Fetch bundle info for all contracts
+  const fetchBundleInfo = useCallback(async () => {
+    if (!contracts || contracts.length === 0) return;
+
+    try {
+      const bundleMap: Record<string, any> = {};
+
+      // Fetch bundle info for each contract
+      await Promise.all(
+        contracts.map(async (contract) => {
+          try {
+            const response = await fetch(`/api/bundles?contractId=${contract.id}`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.bundle) {
+                bundleMap[contract.id] = {
+                  bundleId: data.bundle.id,
+                  bundleName: data.bundle.name,
+                  isPrimary: data.is_primary,
+                  contractCount: data.contracts?.length || 0,
+                };
+              }
+            }
+          } catch (err) {
+            // Silently fail for individual contracts
+            console.log(`Failed to fetch bundle for contract ${contract.id}`);
+          }
+        })
+      );
+
+      setBundleInfoMap(bundleMap);
+    } catch (err) {
+      console.error('Failed to fetch bundle info:', err);
+    }
+  }, [contracts]);
+
   useEffect(() => {
     fetchDocuments();
-  }, [fetchDocuments]);
+    fetchBundleInfo();
+  }, [fetchDocuments, fetchBundleInfo]);
 
   // Handle file upload with Supabase storage and Salesforce sync
   const handleUpload = async (
@@ -295,12 +338,13 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
             total: REQUIRED_DOCUMENT_TYPES.length + OPTIONAL_DOCUMENT_TYPES.length,
             percentage: contract.completeness.percentage,
           },
+          bundleInfo: bundleInfoMap[contract.contractId] || null,
         });
       });
     });
 
     return items;
-  }, [data, contracts]);
+  }, [data, contracts, bundleInfoMap]);
 
   if (loading) {
     return (
@@ -360,6 +404,7 @@ export default function SmartDocumentsTab({ contracts }: { contracts: Contract[]
       {/* Contract List with Side Drawer for Document Management */}
       <ContractListView
         contracts={contractItems}
+        openBundleModal={openBundleModal}
         onUpload={(file, documentType, contractId) => {
           const contract = contractItems.find(c => c.id === contractId);
           handleUpload(

@@ -43,6 +43,7 @@ interface ContractListViewProps {
   onShare?: (doc: ContractDocument) => void;
   onView?: (doc: ContractDocument) => void;
   onDelete?: (doc: ContractDocument) => void;
+  openBundleModal?: (contract: ContractItem, mode: 'create' | 'add') => void;
 }
 
 // Format date for display
@@ -230,6 +231,7 @@ export default function ContractListView({
   onShare,
   onView,
   onDelete,
+  openBundleModal,
 }: ContractListViewProps) {
   const [selectedContract, setSelectedContract] = useState<ContractItem | null>(null);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
@@ -551,6 +553,7 @@ export default function ContractListView({
           setSelectedContract(null);
           onDelete?.(doc);
         }}
+        openBundleModal={openBundleModal}
       />
 
       {/* Filter Drawer */}

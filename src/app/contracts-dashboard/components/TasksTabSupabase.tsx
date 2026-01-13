@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from '@/lib/supabase';
 import { KPICard, KPIIcons } from '@/components/mars-ui';
+import { SearchableContractSelect } from '@/components/SearchableContractSelect';
 import {
   DndContext,
   DragOverlay,
@@ -1099,18 +1100,12 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                 className="col-span-2 bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm placeholder-[#475569]"
                 autoFocus
               />
-              <select
+              <SearchableContractSelect
+                contracts={contracts}
                 value={newTask.contractSalesforceId}
-                onChange={(e) => setNewTask({ ...newTask, contractSalesforceId: e.target.value })}
-                className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-white text-sm"
-              >
-                <option value="">Link to contract...</option>
-                {contracts.map(c => (
-                  <option key={c.id} value={c.salesforceId}>
-                    {c.name}{c.contractType?.length ? ` • ${c.contractType.join(', ')}` : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={(salesforceId) => setNewTask({ ...newTask, contractSalesforceId: salesforceId })}
+                placeholder="Link to contract..."
+              />
               <div
                 className="bg-[#0B1220] border border-white/[0.08] rounded-lg px-4 py-3 text-sm cursor-pointer relative"
                 onClick={(e) => {
