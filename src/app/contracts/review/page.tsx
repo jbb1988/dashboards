@@ -452,7 +452,7 @@ export default function ContractReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           modifiedText: result.modifiedText,
-          filename: uploadedFile?.name || 'contract',
+          filename: uploadedFile?.name || 'contract.docx',
         }),
       });
 
@@ -461,8 +461,13 @@ export default function ContractReviewPage() {
         throw new Error(errorData.error || 'Failed to generate document');
       }
 
+      // Force the blob type to be DOCX to prevent browser from treating it as PDF
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const docxBlob = new Blob([blob], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+
+      const url = URL.createObjectURL(docxBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = uploadedFile?.name?.replace(/\.docx$/i, '-REVISED.docx') || 'contract-REVISED.docx';
@@ -501,8 +506,13 @@ export default function ContractReviewPage() {
         throw new Error(errorData.error || 'Failed to generate document');
       }
 
+      // Force the blob type to be DOCX to prevent browser from treating it as PDF
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const docxBlob = new Blob([blob], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+
+      const url = URL.createObjectURL(docxBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = uploadedFile?.name?.replace(/\.docx$/i, '-ORIGINAL-PLAIN.docx') || 'contract-ORIGINAL-PLAIN.docx';

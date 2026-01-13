@@ -1152,6 +1152,263 @@ export async function getDiversifiedDashboardSummary(filters?: {
 }
 
 /**
+ * Get units sold breakdown by class with YoY comparison
+ */
+export async function getDiversifiedUnitsByClass(filters?: {
+  years?: number[];
+  months?: number[];
+  className?: string;
+  groupByParent?: boolean;
+}): Promise<{
+  byClass: Array<{
+    class_name: string;
+    parent_class: string | null;
+    current_units: number;
+    prior_units: number;
+    units_change_pct: number;
+    current_revenue: number;
+    prior_revenue: number;
+    revenue_change_pct: number;
+    avg_price_per_unit: number;
+  }>;
+  monthlyTrends: Array<{
+    year: number;
+    month: number;
+    class_name: string;
+    units: number;
+    revenue: number;
+  }>;
+  topItemsByClass: Record<string, Array<{
+    item_id: string;
+    item_name: string;
+    units: number;
+    revenue: number;
+  }>>;
+  periods: {
+    current: { start: string; end: string };
+    prior: { start: string; end: string };
+  };
+}> {
+  const admin = getSupabaseAdmin();
+
+  // Calculate R12 periods (current 12 months vs prior 12 months)
+  const now = new Date();
+  const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentPeriodStart = new Date(currentPeriodEnd);
+  currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 12);
+
+  const priorPeriodEnd = new Date(currentPeriodStart);
+  priorPeriodEnd.setDate(priorPeriodEnd.getDate() - 1);
+  const priorPeriodStart = new Date(priorPeriodEnd);
+  priorPeriodStart.setMonth(priorPeriodStart.getMonth() - 12);
+
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+  // Determine years to query
+  const yearsToQuery = filters?.years && filters.years.length > 0
+    ? filters.years
+    : [2024, 2025, 2026];
+
+  // Fetch all data in batches
+  const allData: Array<{
+    item_id: string;
+    item_name: string;
+    class_name: string;
+    parent_class: string | null;
+    transaction_date: string;
+    year: number;
+    month: number;
+    quantity: number;
+    revenue: number;
+  }> = [];
+
+  for (const year of yearsToQuery) {
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = admin
+        .from('diversified_sales')
+        .select('item_id, item_name, class_name, parent_class, transaction_date, year, month, quantity, revenue')
+        .eq('year', year)
+        .range(offset, offset + batchSize - 1);
+
+      // Apply filters
+      if (filters?.months && filters.months.length > 0) {
+        query = query.in('month', filters.months);
+      }
+      if (filters?.className) {
+        query = query.eq('class_name', filters.className);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`Error fetching units data for year ${year}:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...data);
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+  }
+
+  // Aggregate by class
+  const classMap = new Map<string, {
+    class_name: string;
+    parent_class: string | null;
+    current_units: number;
+    prior_units: number;
+    current_revenue: number;
+    prior_revenue: number;
+    items: Map<string, { item_id: string; item_name: string; units: number; revenue: number }>;
+  }>();
+
+  // Monthly trends map
+  const monthlyTrendsMap = new Map<string, {
+    year: number;
+    month: number;
+    class_name: string;
+    units: number;
+    revenue: number;
+  }>();
+
+  for (const row of allData) {
+    const txDate = new Date(row.transaction_date);
+    const classKey = filters?.groupByParent && row.parent_class
+      ? row.parent_class
+      : row.class_name;
+
+    // Initialize class entry
+    if (!classMap.has(classKey)) {
+      classMap.set(classKey, {
+        class_name: classKey,
+        parent_class: row.parent_class,
+        current_units: 0,
+        prior_units: 0,
+        current_revenue: 0,
+        prior_revenue: 0,
+        items: new Map(),
+      });
+    }
+
+    const classData = classMap.get(classKey)!;
+
+    // Aggregate by period
+    if (txDate >= currentPeriodStart && txDate <= currentPeriodEnd) {
+      classData.current_units += row.quantity || 0;
+      classData.current_revenue += row.revenue || 0;
+
+      // Track items
+      const itemKey = row.item_id || row.item_name;
+      if (itemKey) {
+        if (!classData.items.has(itemKey)) {
+          classData.items.set(itemKey, {
+            item_id: row.item_id,
+            item_name: row.item_name,
+            units: 0,
+            revenue: 0,
+          });
+        }
+        classData.items.get(itemKey)!.units += row.quantity || 0;
+        classData.items.get(itemKey)!.revenue += row.revenue || 0;
+      }
+    } else if (txDate >= priorPeriodStart && txDate <= priorPeriodEnd) {
+      classData.prior_units += row.quantity || 0;
+      classData.prior_revenue += row.revenue || 0;
+    }
+
+    // Monthly trends
+    const trendKey = `${row.year}-${row.month}-${classKey}`;
+    if (!monthlyTrendsMap.has(trendKey)) {
+      monthlyTrendsMap.set(trendKey, {
+        year: row.year,
+        month: row.month,
+        class_name: classKey,
+        units: 0,
+        revenue: 0,
+      });
+    }
+    monthlyTrendsMap.get(trendKey)!.units += row.quantity || 0;
+    monthlyTrendsMap.get(trendKey)!.revenue += row.revenue || 0;
+  }
+
+  // Build byClass array with YoY calculations
+  const byClass = Array.from(classMap.values()).map(c => {
+    const units_change_pct = c.prior_units > 0
+      ? ((c.current_units - c.prior_units) / c.prior_units) * 100
+      : c.current_units > 0 ? 100 : 0;
+
+    const revenue_change_pct = c.prior_revenue > 0
+      ? ((c.current_revenue - c.prior_revenue) / c.prior_revenue) * 100
+      : c.current_revenue > 0 ? 100 : 0;
+
+    const avg_price_per_unit = c.current_units > 0
+      ? c.current_revenue / c.current_units
+      : 0;
+
+    return {
+      class_name: c.class_name,
+      parent_class: c.parent_class,
+      current_units: c.current_units,
+      prior_units: c.prior_units,
+      units_change_pct,
+      current_revenue: c.current_revenue,
+      prior_revenue: c.prior_revenue,
+      revenue_change_pct,
+      avg_price_per_unit,
+    };
+  }).sort((a, b) => b.current_units - a.current_units);
+
+  // Build monthly trends array
+  const monthlyTrends = Array.from(monthlyTrendsMap.values())
+    .sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      if (a.month !== b.month) return a.month - b.month;
+      return a.class_name.localeCompare(b.class_name);
+    });
+
+  // Build top items by class (top 10 per class)
+  const topItemsByClass: Record<string, Array<{
+    item_id: string;
+    item_name: string;
+    units: number;
+    revenue: number;
+  }>> = {};
+
+  for (const [className, classData] of classMap.entries()) {
+    const topItems = Array.from(classData.items.values())
+      .sort((a, b) => b.units - a.units)
+      .slice(0, 10);
+    if (topItems.length > 0) {
+      topItemsByClass[className] = topItems;
+    }
+  }
+
+  return {
+    byClass,
+    monthlyTrends,
+    topItemsByClass,
+    periods: {
+      current: {
+        start: formatDate(currentPeriodStart),
+        end: formatDate(currentPeriodEnd),
+      },
+      prior: {
+        start: formatDate(priorPeriodStart),
+        end: formatDate(priorPeriodEnd),
+      },
+    },
+  };
+}
+
+/**
  * Get available years and months for diversified filters
  * Uses separate queries per year to avoid 1000 row limit issue
  */
