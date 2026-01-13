@@ -128,6 +128,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
   const [loading, setLoading] = useState(true);
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
   const [bundleInfoMap, setBundleInfoMap] = useState<Record<string, any>>({});
+  const [filterPreset, setFilterPreset] = useState<'needsAttention' | 'closingSoon' | 'budgeted' | 'complete' | null>(null);
 
   // Fetch documents data
   const fetchDocuments = useCallback(async () => {
@@ -371,6 +372,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
           icon={KPIIcons.document}
           color={colors.accent.blue}
           delay={0.1}
+          onClick={() => setFilterPreset(null)}
         />
         <KPICard
           title="Needs Attention"
@@ -380,6 +382,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
           color={colors.accent.red}
           delay={0.2}
           badge={data?.stats.needsAttention}
+          onClick={() => setFilterPreset('needsAttention')}
         />
         <KPICard
           title="Closing Soon"
@@ -388,6 +391,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
           icon={KPIIcons.calendar}
           color={colors.accent.amber}
           delay={0.3}
+          onClick={() => setFilterPreset('closingSoon')}
         />
         <KPICard
           title="Budgeted"
@@ -396,6 +400,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
           icon={KPIIcons.dollar}
           color={colors.accent.purple}
           delay={0.4}
+          onClick={() => setFilterPreset('budgeted')}
         />
         <KPICard
           title="Complete"
@@ -404,6 +409,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
           icon={KPIIcons.checkCircle}
           color={colors.accent.green}
           delay={0.5}
+          onClick={() => setFilterPreset('complete')}
         />
       </div>
 
@@ -411,6 +417,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
       <ContractListView
         contracts={contractItems}
         openBundleModal={openBundleModal}
+        filterPreset={filterPreset}
         onUpload={async (file, documentType, contractId) => {
           const contract = contractItems.find(c => c.id === contractId);
           await handleUpload(

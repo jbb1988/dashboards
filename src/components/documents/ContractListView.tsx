@@ -6,6 +6,9 @@ import ContractDetailDrawer, { ContractItem, ContractDocument } from './Contract
 import FilterDrawer, { FilterState } from './FilterDrawer';
 import { usePersistedFilters, FILTER_STORAGE_KEYS } from '@/hooks';
 
+// Re-export FilterState for parent components
+export type { FilterState };
+
 // Default filter values
 const DEFAULT_FILTERS: FilterState = {
   searchQuery: '',
@@ -44,6 +47,7 @@ interface ContractListViewProps {
   onView?: (doc: ContractDocument) => void;
   onDelete?: (doc: ContractDocument) => void;
   openBundleModal?: (contract: ContractItem, mode: 'create' | 'add') => void;
+  filterPreset?: 'needsAttention' | 'closingSoon' | 'budgeted' | 'complete' | null;
 }
 
 // Format date for display
@@ -235,6 +239,7 @@ export default function ContractListView({
   onView,
   onDelete,
   openBundleModal,
+  filterPreset,
 }: ContractListViewProps) {
   const [selectedContract, setSelectedContract] = useState<ContractItem | null>(null);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
@@ -244,6 +249,38 @@ export default function ContractListView({
     FILTER_STORAGE_KEYS.DOCUMENTS,
     DEFAULT_FILTERS
   );
+
+  // Apply filter preset when it changes
+  useEffect(() => {
+    if (!filterPreset) return;
+
+    switch (filterPreset) {
+      case 'needsAttention':
+        setFilters({
+          ...DEFAULT_FILTERS,
+          completenessFilter: 'needsAttention',
+        });
+        break;
+      case 'closingSoon':
+        setFilters({
+          ...DEFAULT_FILTERS,
+          dateFilter: '90days',
+        });
+        break;
+      case 'budgeted':
+        setFilters({
+          ...DEFAULT_FILTERS,
+          budgetedFilter: 'budgeted',
+        });
+        break;
+      case 'complete':
+        setFilters({
+          ...DEFAULT_FILTERS,
+          completenessFilter: 'complete',
+        });
+        break;
+    }
+  }, [filterPreset, setFilters]);
 
   // Update selectedContract when contracts change (e.g., after document deletion)
   useEffect(() => {
