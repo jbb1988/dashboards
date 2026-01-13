@@ -2291,8 +2291,27 @@ export default function ContractsDashboard() {
             setBundleModalOpen(false);
             setSelectedContractForBundle(null);
           }}
-          onSuccess={() => {
-            fetchData(); // Refresh to show bundle info
+          onSuccess={async () => {
+            // Refresh main data
+            await fetchData();
+
+            // If detail drawer is open for this contract, fetch fresh data for it
+            if (selectedContract && selectedContract.id === selectedContractForBundle.id) {
+              try {
+                // Fetch the updated contract with bundle info
+                const response = await fetch('/api/contracts');
+                const result = await response.json();
+                const updatedContract = result.contracts?.find((c: Contract) => c.id === selectedContract.id);
+
+                if (updatedContract) {
+                  setSelectedContract(updatedContract);
+                }
+              } catch (error) {
+                console.error('Failed to refresh contract:', error);
+                // Fallback: just close the drawer
+                setSelectedContract(null);
+              }
+            }
           }}
           currentContract={{
             id: selectedContractForBundle.id,
