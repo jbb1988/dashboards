@@ -222,6 +222,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
 
   // Bundle support state
   const [bundles, setBundles] = useState<any[]>([]);
+  const [bundledContractIds, setBundledContractIds] = useState<Set<string>>(new Set());
 
   const [newTask, setNewTask] = useState<{
     title: string;
@@ -276,13 +277,43 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
     }
   }, []);
 
-  // Fetch bundles
+  // Fetch bundles and track which contracts are bundled
   const fetchBundles = useCallback(async () => {
     try {
       const response = await fetch('/api/bundles');
       if (response.ok) {
         const data = await response.json();
-        setBundles(data.bundles || []);
+        const fetchedBundles = data.bundles || [];
+
+        // Map API response to component interface (contract_count -> contractCount)
+        const mappedBundles = fetchedBundles.map((bundle: any) => ({
+          id: bundle.id,
+          name: bundle.name,
+          accountName: bundle.account_name,
+          contractCount: bundle.contract_count || 0,
+        }));
+        setBundles(mappedBundles);
+
+        // Fetch detailed info for each bundle to get contract IDs
+        const contractIdsInBundles = new Set<string>();
+        await Promise.all(
+          fetchedBundles.map(async (bundle: any) => {
+            try {
+              const bundleDetailsResponse = await fetch(`/api/bundles?bundleId=${bundle.id}`);
+              if (bundleDetailsResponse.ok) {
+                const bundleData = await bundleDetailsResponse.json();
+                bundleData.contracts?.forEach((bc: any) => {
+                  if (bc.contract_id) {
+                    contractIdsInBundles.add(bc.contract_id);
+                  }
+                });
+              }
+            } catch (err) {
+              console.error(`Failed to fetch bundle ${bundle.id}:`, err);
+            }
+          })
+        );
+        setBundledContractIds(contractIdsInBundles);
       }
     } catch (err) {
       console.error('Failed to fetch bundles:', err);
@@ -293,6 +324,11 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
     fetchTasks();
     fetchBundles();
   }, [fetchTasks, fetchBundles]);
+
+  // Filter out contracts that are in bundles to avoid duplicates in dropdown
+  const unbundledContracts = useMemo(() => {
+    return contracts.filter(contract => !bundledContractIds.has(contract.id));
+  }, [contracts, bundledContractIds]);
 
   // Task KPIs
   const taskKpis = useMemo(() => {
@@ -1186,7 +1222,7 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                 autoFocus
               />
               <SearchableBundleOrContractSelect
-                contracts={contracts}
+                contracts={unbundledContracts}
                 bundles={bundles}
                 value={
                   newTask.bundleId
