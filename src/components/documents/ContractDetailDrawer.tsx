@@ -129,31 +129,17 @@ function DocumentRow({
   };
 
   return (
-    <div className={`p-4 rounded-xl border transition-all relative ${
-      isUploading
-        ? 'bg-[#8B5CF6]/5 border-[#8B5CF6]/30'
-        : isMissing
+    <div className={`p-4 rounded-xl border transition-all ${
+      isMissing
         ? 'bg-[#0B1220] border-white/[0.04] hover:border-white/[0.08]'
         : 'bg-[#0F1722] border-white/[0.06] hover:border-white/[0.12]'
     }`}>
-      {isUploading && (
-        <div className="absolute inset-0 bg-[#8B5CF6]/10 rounded-xl flex items-center justify-center z-10">
-          <div className="bg-[#151F2E] px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-[#8B5CF6] border-t-transparent rounded-full animate-spin" />
-            <span className="text-white text-sm font-medium">Uploading...</span>
-          </div>
-        </div>
-      )}
       <div className="flex items-start justify-between gap-3">
         {/* Left: Status + Document Info */}
         <div className="flex items-start gap-3 flex-1 min-w-0">
           {/* Status Icon */}
           <div className="flex-shrink-0 mt-0.5">
-            {isUploading ? (
-              <div className="w-6 h-6 rounded-full bg-[#8B5CF6] flex items-center justify-center">
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : isMissing ? (
+            {isMissing ? (
               <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
                 doc.is_required ? 'border-red-500/50' : 'border-[#475569]'
               }`}>
