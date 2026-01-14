@@ -89,10 +89,10 @@ export function AccountSettingsPopover({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.95 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="absolute bottom-full mb-2 bg-[#1A2332] border border-[#2A3544] rounded-lg shadow-2xl overflow-hidden z-50"
+          className="fixed bg-[#1A2332] border border-[#2A3544] rounded-lg shadow-2xl overflow-hidden z-50"
           style={{
-            left: isCollapsed ? '50%' : '8px',
-            transform: isCollapsed ? 'translateX(-50%)' : 'none',
+            bottom: '16px',
+            left: isCollapsed ? '88px' : '272px',
             width: '280px',
           }}
         >
