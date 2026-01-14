@@ -63,9 +63,12 @@ type SortMode = 'dueDate' | 'priority' | 'created' | 'contract' | 'status';
 function formatRelativeDate(dateStr: string | undefined | null): { text: string; isOverdue: boolean; urgency: 'overdue' | 'today' | 'tomorrow' | 'soon' | 'later' | 'none' } {
   if (!dateStr) return { text: 'No due date', isOverdue: false, urgency: 'none' };
 
+  // Parse as local date to avoid timezone issues
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateStr);
+
+  // Parse date as local time by appending T00:00:00
+  const dueDate = new Date(dateStr + 'T00:00:00');
   dueDate.setHours(0, 0, 0, 0);
 
   const diffTime = dueDate.getTime() - today.getTime();
@@ -111,13 +114,23 @@ function DraggableTaskCard({
   index,
   onEdit,
   onDelete,
+  onOpenContractDetail,
+  contracts,
 }: {
   task: Task;
   columnStatus: 'pending' | 'in_progress' | 'completed';
   index: number;
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
+  onOpenContractDetail?: (contractId: string) => void;
+  contracts: Contract[];
 }) {
+  // Find the associated contract for this task
+  const taskContract = task.contract_salesforce_id
+    ? contracts.find(c => c.salesforceId === task.contract_salesforce_id)
+    : task.contract_id
+    ? contracts.find(c => c.id === task.contract_id)
+    : null;
   const {
     attributes,
     listeners,
@@ -188,6 +201,21 @@ function DraggableTaskCard({
           </span>
         </div>
         <div className="flex items-center gap-1">
+          {taskContract && onOpenContractDetail && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenContractDetail(taskContract.id);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="p-1 rounded hover:bg-[#38BDF8]/20 text-[#64748B] hover:text-[#38BDF8] transition-colors"
+              title="View contract details"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -222,6 +250,7 @@ function DraggableTaskCard({
 
 interface TasksTabProps {
   contracts: Contract[];
+  onOpenContractDetail?: (contractId: string) => void;
 }
 
 /**
@@ -233,7 +262,7 @@ interface TasksTabProps {
  * - Inline task creation and editing
  * - Auto-generated task indicators
  */
-export default function TasksTabSupabase({ contracts }: TasksTabProps) {
+export default function TasksTabSupabase({ contracts, onOpenContractDetail }: TasksTabProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('byContract');
@@ -366,11 +395,16 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
     const totalActive = tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
     const overdue = tasks.filter(t => {
       if (t.status === 'completed' || t.status === 'cancelled' || !t.due_date) return false;
-      return new Date(t.due_date) < today;
+      // Use local date parsing for consistent timezone handling
+      const due = new Date(t.due_date + 'T00:00:00');
+      due.setHours(0, 0, 0, 0);
+      return due < today;
     }).length;
     const dueSoon = tasks.filter(t => {
       if (t.status === 'completed' || t.status === 'cancelled' || !t.due_date) return false;
-      const due = new Date(t.due_date);
+      // Use local date parsing for consistent timezone handling
+      const due = new Date(t.due_date + 'T00:00:00');
+      due.setHours(0, 0, 0, 0);
       return due >= today && due <= tomorrow;
     }).length;
     const completed = tasks.filter(t => t.status === 'completed').length;
@@ -531,7 +565,8 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         return;
       }
 
-      const dueDate = new Date(task.due_date);
+      // Use local date parsing for consistent timezone handling
+      const dueDate = new Date(task.due_date + 'T00:00:00');
       dueDate.setHours(0, 0, 0, 0);
 
       if (dueDate < today) groups.overdue.push(task);
@@ -828,7 +863,14 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
 
   // Task Row Component
   const TaskRow = ({ task, showContract = false, index = 0, showSelection = false }: { task: Task; showContract?: boolean; index?: number; showSelection?: boolean }) => {
-    const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'completed' && task.status !== 'cancelled';
+    // Find the associated contract for this task
+    const taskContract = task.contract_salesforce_id
+      ? contracts.find(c => c.salesforceId === task.contract_salesforce_id)
+      : task.contract_id
+      ? contracts.find(c => c.id === task.contract_id)
+      : null;
+    // Use isTaskOverdue helper for consistent timezone handling
+    const isOverdue = isTaskOverdue(task.due_date, task.status);
     const isCompleted = task.status === 'completed';
     const isSelected = selectedTasks.has(task.id!);
     const relativeDate = formatRelativeDate(task.due_date);
@@ -1008,6 +1050,24 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
         }`}>
           {task.priority}
         </span>
+
+        {/* Contract Detail button - only show if task is linked to a contract */}
+        {taskContract && onOpenContractDetail && (
+          <motion.button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenContractDetail(taskContract.id);
+            }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            className="p-1.5 rounded-lg hover:bg-[#38BDF8]/20 text-[#64748B] hover:text-[#38BDF8] transition-colors flex-shrink-0"
+            title="View contract details"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </motion.button>
+        )}
 
         {/* Edit button */}
         <motion.button
@@ -1787,6 +1847,8 @@ export default function TasksTabSupabase({ contracts }: TasksTabProps) {
                           index={idx}
                           onEdit={setEditingTask}
                           onDelete={deleteTask}
+                          onOpenContractDetail={onOpenContractDetail}
+                          contracts={contracts}
                         />
                       ))}
                       {column.tasks.length === 0 && (

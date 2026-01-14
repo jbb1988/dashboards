@@ -2217,13 +2217,21 @@ export default function ContractsDashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
-              <TasksTabSupabase contracts={data.contracts.map(c => ({
-                id: c.id,
-                salesforceId: c.salesforceId,
-                name: c.name,
-                status: c.status,
-                contractType: c.contractType,
-              }))} />
+              <TasksTabSupabase
+                contracts={data.contracts.map(c => ({
+                  id: c.id,
+                  salesforceId: c.salesforceId,
+                  name: c.name,
+                  status: c.status,
+                  contractType: c.contractType,
+                }))}
+                onOpenContractDetail={(contractId) => {
+                  const contract = data.contracts.find(c => c.id === contractId);
+                  if (contract) {
+                    setSelectedContract(contract);
+                  }
+                }}
+              />
             </motion.div>
           )}
 
