@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import { AccountSettingsPopover } from './AccountSettingsPopover';
 
 // Context for sidebar state - allows dashboards to respond to collapse
 export const SidebarContext = createContext<{
@@ -207,8 +208,8 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string>('viewer');
   const [accessibleRoutes, setAccessibleRoutes] = useState<string[]>([]);
-  const [loggingOut, setLoggingOut] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [isAccountPopoverOpen, setIsAccountPopoverOpen] = useState(false);
 
   // Use controlled or internal state
   const isCollapsed = controlledCollapsed ?? internalCollapsed;
@@ -281,12 +282,6 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
       );
     }),
   })).filter(category => category.items.length > 0);
-
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
 
   const toggleCollapsed = () => {
     const newValue = !isCollapsed;
@@ -489,97 +484,62 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
         ))}
       </nav>
 
-      {/* Bottom Section - Data Sources + User Info */}
-      <div className="flex-shrink-0 border-t border-[#1E293B]">
-        {/* Data Sources - only show when expanded */}
-        <AnimatePresence>
-          {!isCollapsed && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="p-4 pb-2"
-            >
-              <p className="text-[10px] font-semibold text-[#475569] uppercase tracking-[0.08em] px-3 mb-2">
-                Data Sources
-              </p>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-3 px-3 py-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#38BDF8]" />
-                  <span className="text-[11px] text-[#8FA3BF]">Salesforce</span>
-                  <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
-                </div>
-                <div className="flex items-center gap-3 px-3 py-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#E16259]" />
-                  <span className="text-[11px] text-[#8FA3BF]">Asana</span>
-                  <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
-                </div>
-                <div className="flex items-center gap-3 px-3 py-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#FFD700]" />
-                  <span className="text-[11px] text-[#8FA3BF]">DocuSign</span>
-                  <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
-                </div>
-                <div className="flex items-center gap-3 px-3 py-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
-                  <span className="text-[11px] text-[#8FA3BF]">NetSuite</span>
-                  <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
-                </div>
-                <div className="flex items-center gap-3 px-3 py-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#0073EA]" />
-                  <span className="text-[11px] text-[#8FA3BF]">Smartsheet</span>
-                  <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
-                </div>
-                <div className="flex items-center gap-3 px-3 py-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
-                  <span className="text-[11px] text-[#8FA3BF]">Excel</span>
-                  <span className="ml-auto text-[9px] text-[#64748B] font-medium">Manual</span>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Collapsed Data Sources indicator */}
-        {isCollapsed && (
-          <div className="flex justify-center py-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" title="Data sources connected" />
-          </div>
-        )}
-
-        {/* User info and Logout */}
+      {/* Bottom Section - User Avatar + Account Settings Popover */}
+      <div className="flex-shrink-0 border-t border-[#1E293B] relative">
+        {/* User Avatar - Clickable to open Account Settings */}
         {user && (
-          <div className={`p-3 pt-2 border-t border-[#1E293B] ${isCollapsed ? 'px-2' : ''}`}>
-            {!isCollapsed && (
-              <div className="flex items-center gap-2 mb-2 px-2">
-                <div className="w-6 h-6 rounded-full bg-[#1E293B] flex items-center justify-center">
-                  <span className="text-[10px] text-[#8FA3BF] font-medium">
-                    {user.email?.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-[#8FA3BF] truncate">{user.email}</p>
+          <div className={`p-3 ${isCollapsed ? 'px-2' : ''}`}>
+            <button
+              onClick={() => setIsAccountPopoverOpen(!isAccountPopoverOpen)}
+              className={`
+                flex items-center gap-3 w-full px-3 py-2.5 rounded-lg
+                bg-[#1E293B] hover:bg-[#2A3544] transition-all group cursor-pointer
+                ${isCollapsed ? 'justify-center px-0' : ''}
+              `}
+              title={isCollapsed ? 'Account Settings' : undefined}
+            >
+              <div className="w-8 h-8 rounded-full bg-[#0F172A] flex items-center justify-center flex-shrink-0 border border-[#2A3544]">
+                <span className="text-sm text-[#8FA3BF] font-medium">
+                  {user.email?.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              {!isCollapsed && (
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-[11px] text-[#8FA3BF] truncate">Account</p>
                   <p className="text-[9px] text-[#475569] capitalize">{userRole}</p>
                 </div>
-              </div>
-            )}
-            <button
-              onClick={handleLogout}
-              disabled={loggingOut}
-              className={`
-                flex items-center gap-2 w-full px-2 py-2 rounded-lg
-                text-[#8FA3BF] hover:bg-[#1E293B] hover:text-white transition-all
-                ${isCollapsed ? 'justify-center' : ''}
-                disabled:opacity-50
-              `}
-              title="Sign out"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              )}
               {!isCollapsed && (
-                <span className="text-[12px]">{loggingOut ? 'Signing out...' : 'Sign out'}</span>
+                <svg
+                  className="w-4 h-4 text-[#64748B] group-hover:text-[#8FA3BF] transition-colors"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
               )}
             </button>
+
+            {/* Account Settings Popover */}
+            <AccountSettingsPopover
+              isOpen={isAccountPopoverOpen}
+              onClose={() => setIsAccountPopoverOpen(false)}
+              userEmail={user.email || ''}
+              userRole={userRole}
+              isCollapsed={isCollapsed}
+            />
           </div>
         )}
       </div>
