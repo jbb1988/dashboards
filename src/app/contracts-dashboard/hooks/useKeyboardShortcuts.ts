@@ -16,6 +16,7 @@ export interface ShortcutAction {
 interface UseKeyboardShortcutsOptions {
   enabled?: boolean;
   onCommandPalette?: () => void;
+  onHelp?: () => void;
 }
 
 /**
@@ -30,7 +31,7 @@ export function useKeyboardShortcuts(
   shortcuts: ShortcutAction[],
   options: UseKeyboardShortcutsOptions = {}
 ) {
-  const { enabled = true, onCommandPalette } = options;
+  const { enabled = true, onCommandPalette, onHelp } = options;
 
   // Track sequence state (for G+P, G+T style shortcuts)
   const sequenceBufferRef = useRef<string[]>([]);
@@ -56,6 +57,13 @@ export function useKeyboardShortcuts(
     if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
       event.preventDefault();
       onCommandPalette?.();
+      return;
+    }
+
+    // Help overlay trigger (?)
+    if (event.key === '?' && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      onHelp?.();
       return;
     }
 
@@ -124,7 +132,7 @@ export function useKeyboardShortcuts(
         }
       }
     }
-  }, [shortcuts, enabled, onCommandPalette]);
+  }, [shortcuts, enabled, onCommandPalette, onHelp]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);

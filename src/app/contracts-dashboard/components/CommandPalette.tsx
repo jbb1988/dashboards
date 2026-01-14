@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 export interface CommandItem {
   id: string;
@@ -12,6 +13,26 @@ export interface CommandItem {
   action: () => void;
   category?: string;
   keywords?: string[];
+}
+
+interface SearchResult {
+  id: string;
+  type: 'contract' | 'document' | 'task';
+  title: string;
+  subtitle?: string;
+  value?: number;
+  status?: string;
+  url?: string;
+  matchedField?: string;
+  documentType?: string;
+  uploadedAt?: string;
+  dueDate?: string;
+}
+
+interface SearchResults {
+  contracts: SearchResult[];
+  documents: SearchResult[];
+  tasks: SearchResult[];
 }
 
 interface CommandPaletteProps {
@@ -52,8 +73,13 @@ const icons = {
     </svg>
   ),
   contract: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  ),
+  document: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
     </svg>
   ),
   external: (
@@ -68,14 +94,33 @@ const icons = {
   ),
 };
 
+const TYPE_ICONS: Record<string, React.ReactNode> = {
+  contract: icons.contract,
+  document: icons.document,
+  task: icons.task,
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  contract: 'text-[#38BDF8]',
+  document: 'text-[#A78BFA]',
+  task: 'text-[#22C55E]',
+};
+
+function formatCurrency(value: number): string {
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+  return `$${value.toLocaleString()}`;
+}
+
 /**
- * Linear-style Command Palette
+ * Unified Command Palette + Global Search
  *
  * Features:
- * - Fuzzy search across commands and contracts
- * - Keyboard navigation (up/down arrows, enter to select)
+ * - Command palette for quick actions
+ * - Global search across contracts, documents, and tasks
+ * - Fuzzy search with keyboard navigation
+ * - Scope filtering (all/contracts/documents/tasks)
  * - Categories with visual grouping
- * - Shortcut hints
  */
 export default function CommandPalette({
   isOpen,
@@ -83,77 +128,175 @@ export default function CommandPalette({
   commands,
   contracts = [],
   onContractSelect,
-  placeholder = 'Type a command or search...',
+  placeholder = 'Search or type a command...',
 }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [searchResults, setSearchResults] = useState<SearchResults>({ contracts: [], documents: [], tasks: [] });
+  const [loading, setLoading] = useState(false);
+  const [activeScope, setActiveScope] = useState<'all' | 'contracts' | 'documents' | 'tasks'>('all');
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Reset state when opened
   useEffect(() => {
     if (isOpen) {
       setQuery('');
       setSelectedIndex(0);
+      setSearchResults({ contracts: [], documents: [], tasks: [] });
+      setActiveScope('all');
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
 
+  // Global search API call with debounce
+  useEffect(() => {
+    if (!query || query.length < 2) {
+      setSearchResults({ contracts: [], documents: [], tasks: [] });
+      setLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/contracts/search?q=${encodeURIComponent(query)}&scope=${activeScope}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSearchResults(data.results);
+        }
+      } catch (err) {
+        console.error('Search failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query, activeScope]);
+
   // Filter and combine results
   const results = useMemo(() => {
     const q = query.toLowerCase().trim();
+    const grouped: Record<string, Array<CommandItem | SearchResult & { action: () => void }>> = {};
 
-    // Filter commands
-    const filteredCommands = q
-      ? commands.filter(cmd =>
-          cmd.label.toLowerCase().includes(q) ||
-          cmd.description?.toLowerCase().includes(q) ||
-          cmd.keywords?.some(k => k.toLowerCase().includes(q)) ||
-          cmd.category?.toLowerCase().includes(q)
-        )
-      : commands;
-
-    // Filter contracts (only when searching)
-    const filteredContracts = q && contracts.length > 0
-      ? contracts
-          .filter(c =>
-            c.name.toLowerCase().includes(q) ||
-            c.salesforceId?.toLowerCase().includes(q) ||
-            c.status.toLowerCase().includes(q)
+    // If query is less than 2 chars, show commands only
+    if (q.length < 2) {
+      const filteredCommands = q
+        ? commands.filter(cmd =>
+            cmd.label.toLowerCase().includes(q) ||
+            cmd.description?.toLowerCase().includes(q) ||
+            cmd.keywords?.some(k => k.toLowerCase().includes(q)) ||
+            cmd.category?.toLowerCase().includes(q)
           )
-          .slice(0, 5) // Limit to 5 contracts
-          .map(c => ({
-            id: `contract-${c.id}`,
-            label: c.name,
-            description: `${c.status} - $${(c.value / 1000).toFixed(0)}K`,
-            icon: icons.contract,
-            category: 'Contracts',
-            action: () => onContractSelect?.(c.id),
-          }))
-      : [];
+        : commands;
 
-    // Group by category
-    const grouped: Record<string, CommandItem[]> = {};
+      // Group commands
+      filteredCommands.forEach(cmd => {
+        const cat = cmd.category || 'Actions';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(cmd);
+      });
 
-    // Add contracts first if searching
-    if (filteredContracts.length > 0) {
-      grouped['Contracts'] = filteredContracts;
+      return grouped;
     }
 
-    // Group commands
-    filteredCommands.forEach(cmd => {
-      const cat = cmd.category || 'Actions';
-      if (!grouped[cat]) grouped[cat] = [];
-      grouped[cat].push(cmd);
-    });
+    // For longer queries, show both filtered commands and API search results
+    const filteredCommands = commands.filter(cmd =>
+      cmd.label.toLowerCase().includes(q) ||
+      cmd.description?.toLowerCase().includes(q) ||
+      cmd.keywords?.some(k => k.toLowerCase().includes(q)) ||
+      cmd.category?.toLowerCase().includes(q)
+    );
+
+    // Add API search results first (higher priority)
+    const { contracts: apiContracts, documents: apiDocuments, tasks: apiTasks } = searchResults;
+
+    // Add contracts from API
+    if (apiContracts.length > 0 && (activeScope === 'all' || activeScope === 'contracts')) {
+      grouped['Contracts'] = apiContracts.map(c => ({
+        ...c,
+        label: c.title,
+        description: c.subtitle,
+        icon: TYPE_ICONS.contract,
+        action: () => {
+          if (c.url) {
+            if (c.url.startsWith('/')) {
+              router.push(c.url);
+            } else {
+              window.open(c.url, '_blank');
+            }
+          }
+        },
+      }));
+    }
+
+    // Add documents from API
+    if (apiDocuments.length > 0 && (activeScope === 'all' || activeScope === 'documents')) {
+      grouped['Documents'] = apiDocuments.map(d => ({
+        ...d,
+        label: d.title,
+        description: d.subtitle,
+        icon: TYPE_ICONS.document,
+        action: () => {
+          if (d.url) {
+            if (d.url.startsWith('/')) {
+              router.push(d.url);
+            } else {
+              window.open(d.url, '_blank');
+            }
+          }
+        },
+      }));
+    }
+
+    // Add tasks from API
+    if (apiTasks.length > 0 && (activeScope === 'all' || activeScope === 'tasks')) {
+      grouped['Tasks'] = apiTasks.map(t => ({
+        ...t,
+        label: t.title,
+        description: t.subtitle,
+        icon: TYPE_ICONS.task,
+        action: () => {
+          if (t.url) {
+            if (t.url.startsWith('/')) {
+              router.push(t.url);
+            } else {
+              window.open(t.url, '_blank');
+            }
+          }
+        },
+      }));
+    }
+
+    // Add filtered commands if any match
+    if (filteredCommands.length > 0) {
+      filteredCommands.forEach(cmd => {
+        const cat = cmd.category || 'Actions';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(cmd);
+      });
+    }
 
     return grouped;
-  }, [query, commands, contracts, onContractSelect]);
+  }, [query, commands, searchResults, activeScope, router]);
 
   // Flat list for keyboard navigation
   const flatResults = useMemo(() => {
     return Object.values(results).flat();
   }, [results]);
+
+  // Count results for scope tabs
+  const resultCounts = useMemo(() => {
+    const { contracts, documents, tasks } = searchResults;
+    return {
+      all: contracts.length + documents.length + tasks.length,
+      contracts: contracts.length,
+      documents: documents.length,
+      tasks: tasks.length,
+    };
+  }, [searchResults]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -203,6 +346,7 @@ export default function CommandPalette({
   if (!isOpen) return null;
 
   let currentFlatIndex = -1;
+  const showScopeTabs = query.length >= 2;
 
   return (
     <AnimatePresence>
@@ -223,7 +367,7 @@ export default function CommandPalette({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -20 }}
           transition={{ duration: 0.15 }}
-          className="absolute top-[15%] left-1/2 -translate-x-1/2 w-full max-w-xl"
+          className="absolute top-[15%] left-1/2 -translate-x-1/2 w-full max-w-2xl"
         >
           <div className="mx-4 bg-[#1A2332] border border-white/[0.08] rounded-xl shadow-2xl overflow-hidden">
             {/* Search input */}
@@ -237,10 +381,37 @@ export default function CommandPalette({
                 placeholder={placeholder}
                 className="flex-1 bg-transparent text-white placeholder-[#64748B] text-[15px] outline-none"
               />
+              {loading && (
+                <div className="w-4 h-4 border-2 border-[#38BDF8] border-t-transparent rounded-full animate-spin" />
+              )}
               <kbd className="px-2 py-0.5 text-[11px] font-medium text-[#64748B] bg-[#0B1220] rounded border border-white/[0.08]">
                 ESC
               </kbd>
             </div>
+
+            {/* Scope Tabs (shown when searching) */}
+            {showScopeTabs && (
+              <div className="flex items-center gap-1 px-4 py-2 border-b border-white/[0.04]">
+                {(['all', 'contracts', 'documents', 'tasks'] as const).map((scope) => (
+                  <button
+                    key={scope}
+                    onClick={() => setActiveScope(scope)}
+                    className={`px-3 py-1 rounded-lg text-sm transition-colors capitalize ${
+                      activeScope === scope
+                        ? 'bg-[#38BDF8]/10 text-[#38BDF8]'
+                        : 'text-[#64748B] hover:text-white hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    {scope}
+                    {resultCounts[scope] > 0 && (
+                      <span className="ml-1.5 px-1.5 py-0.5 bg-white/[0.1] rounded text-xs">
+                        {resultCounts[scope]}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Results */}
             <div
@@ -249,7 +420,7 @@ export default function CommandPalette({
             >
               {Object.entries(results).length === 0 ? (
                 <div className="px-4 py-8 text-center text-[#64748B]">
-                  No results found
+                  {query.length < 2 ? 'Type at least 2 characters to search' : 'No results found'}
                 </div>
               ) : (
                 Object.entries(results).map(([category, items]) => (
@@ -263,6 +434,7 @@ export default function CommandPalette({
                     {items.map((item) => {
                       currentFlatIndex++;
                       const isSelected = currentFlatIndex === selectedIndex;
+                      const isSearchResult = 'type' in item;
 
                       return (
                         <button
@@ -280,7 +452,7 @@ export default function CommandPalette({
                           }`}
                         >
                           {/* Icon */}
-                          <span className={isSelected ? 'text-[#38BDF8]' : 'text-[#64748B]'}>
+                          <span className={isSelected && isSearchResult ? TYPE_COLORS[(item as any).type] : isSelected ? 'text-[#38BDF8]' : 'text-[#64748B]'}>
                             {item.icon || icons.navigate}
                           </span>
 
@@ -294,8 +466,27 @@ export default function CommandPalette({
                             )}
                           </div>
 
-                          {/* Shortcut */}
-                          {item.shortcut && (
+                          {/* Metadata for search results */}
+                          {isSearchResult && (
+                            <div className="flex-shrink-0 text-right">
+                              {(item as SearchResult).value && (
+                                <p className="text-[#22C55E] text-sm font-medium">
+                                  {formatCurrency((item as SearchResult).value!)}
+                                </p>
+                              )}
+                              {(item as SearchResult).status && (
+                                <p className="text-[#64748B] text-xs capitalize">
+                                  {(item as SearchResult).status!.replace(/_/g, ' ')}
+                                </p>
+                              )}
+                              {(item as SearchResult).documentType && (
+                                <p className="text-[#A78BFA] text-xs">{(item as SearchResult).documentType}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Shortcut for commands */}
+                          {!isSearchResult && 'shortcut' in item && item.shortcut && (
                             <kbd className="px-2 py-0.5 text-[11px] font-medium text-[#64748B] bg-[#0B1220] rounded border border-white/[0.08]">
                               {item.shortcut}
                             </kbd>

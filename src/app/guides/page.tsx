@@ -311,12 +311,12 @@ export default function GuidesPage() {
             <h3 className="text-lg font-semibold text-white mb-4">Keyboard Shortcuts</h3>
             <div className="grid grid-cols-4 gap-4">
               {[
-                { key: 'Cmd+K', action: 'Open Command Palette' },
+                { key: 'Cmd+K', action: 'Command Palette / Search' },
                 { key: 'J / K', action: 'Navigate Up/Down' },
                 { key: 'Enter', action: 'Select Item' },
                 { key: 'Escape', action: 'Close/Cancel' },
                 { key: '/', action: 'Focus Search' },
-                { key: 'N', action: 'New Task' },
+                { key: 'T', action: 'New Task' },
                 { key: '?', action: 'Show Shortcuts' },
                 { key: 'G then P', action: 'Go to Pipeline' },
               ].map((shortcut) => (

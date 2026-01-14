@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import SmartDocumentsTab from '@/components/SmartDocumentsTab';
-import GlobalSearch from '@/components/GlobalSearch';
 import CommandPalette, { getDefaultCommands } from './components/CommandPalette';
+import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { StageProgressCompact } from './components/StageProgressDots';
 import TaskBadge from './components/TaskBadge';
@@ -776,6 +776,7 @@ export default function ContractsDashboard() {
   const [salesforceStatus, setSalesforceStatus] = useState<'connected' | 'needs_auth' | 'not_configured'>('connected');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [helpOverlayOpen, setHelpOverlayOpen] = useState(false);
   const [selectedContractIndex, setSelectedContractIndex] = useState(0);
   const [taskStats, setTaskStats] = useState<{ pending: number; overdue: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -872,7 +873,7 @@ export default function ContractsDashboard() {
           fields.Contract_Date__c = item.pendingFields.contract_date;
         }
         if (item.pendingFields.deliver_date) {
-          fields.Deliver_Date__c = item.pendingFields.deliver_date;
+          fields.Delivery_Date__c = item.pendingFields.deliver_date;
         }
         if (item.pendingFields.install_date) {
           fields.Install_Date__c = item.pendingFields.install_date;
@@ -1184,7 +1185,11 @@ export default function ContractsDashboard() {
       { key: 't', sequence: ['g', 't'], description: 'Go to Tasks', action: () => setActiveTab('tasks') },
       { key: 'd', sequence: ['g', 'd'], description: 'Go to Documents', action: () => setActiveTab('documents') },
     ],
-    { enabled: !commandPaletteOpen, onCommandPalette: () => setCommandPaletteOpen(true) }
+    {
+      enabled: !commandPaletteOpen && !helpOverlayOpen,
+      onCommandPalette: () => setCommandPaletteOpen(true),
+      onHelp: () => setHelpOverlayOpen(true)
+    }
   );
 
   // Get unique statuses for filter dropdown - use VALID_STATUSES to ensure all stages appear in correct order
@@ -1523,6 +1528,12 @@ export default function ContractsDashboard() {
         placeholder="Type a command or search contracts..."
       />
 
+      {/* Keyboard Shortcuts Help Overlay */}
+      <KeyboardShortcutsHelp
+        isOpen={helpOverlayOpen}
+        onClose={() => setHelpOverlayOpen(false)}
+      />
+
       {/* Sidebar */}
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
@@ -1563,9 +1574,6 @@ export default function ContractsDashboard() {
                     <span className="text-[11px]">⌘</span>K
                   </kbd>
                 </button>
-
-                {/* Global Search */}
-                <GlobalSearch />
 
                 <div className="text-right">
                   <div className="text-sm text-gray-500 flex items-center gap-2 justify-end">
