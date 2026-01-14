@@ -453,7 +453,7 @@ export default function CommandPalette({
                         >
                           {/* Icon */}
                           <span className={isSelected && isSearchResult ? TYPE_COLORS[(item as any).type] : isSelected ? 'text-[#38BDF8]' : 'text-[#64748B]'}>
-                            {item.icon || icons.navigate}
+                            {'icon' in item ? item.icon : icons.navigate}
                           </span>
 
                           {/* Label & description */}
