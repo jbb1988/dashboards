@@ -287,7 +287,11 @@ export default function ContractDetailDrawer({
     if (contract && !docsFetched) {
       setDocsLoading(true);
       // Pass contractId (UUID) which is more reliable for querying
-      const params = new URLSearchParams({ contractId: contract.id });
+      // Always include bundled documents so docs uploaded to any contract in a bundle appear for all
+      const params = new URLSearchParams({
+        contractId: contract.id,
+        includeBundled: 'true'
+      });
       fetch(`/api/contracts/documents?${params}`)
         .then(res => res.json())
         .then(data => {
