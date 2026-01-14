@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/components/mars-ui';
+import ApprovalsQueue from '@/components/contracts/ApprovalsQueue';
 
 interface Contract {
   id: string;
@@ -139,7 +140,7 @@ export default function ContractReviewPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
+  const [mainTab, setMainTab] = useState<'review' | 'history' | 'approvals'>('review');
   const [history, setHistory] = useState<ReviewHistory[]>([]);
   const [activeTab, setActiveTab] = useState<'paste' | 'upload' | 'compare'>('paste');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -396,6 +397,79 @@ export default function ContractReviewPage() {
     setOriginalDocxBuffer(null);
   }
 
+  // State for approval workflow
+  const [isSendingApproval, setIsSendingApproval] = useState(false);
+  const [lastReviewId, setLastReviewId] = useState<string | null>(null);
+
+  async function handleSendForApproval() {
+    if (!result || !selectedContract || !provisionName.trim()) {
+      alert('Please select a contract, enter a provision name, and complete analysis first');
+      return;
+    }
+
+    setIsSendingApproval(true);
+    try {
+      // Get user email from session or use a default
+      const userEmail = 'legal@example.com'; // TODO: Get from session
+
+      let reviewId = lastReviewId;
+
+      // If no review exists yet, create one first
+      if (!reviewId) {
+        const contractData = contracts.find(c => c.id === selectedContract);
+        const createResponse = await fetch('/api/contracts/review/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contract_id: selectedContract,
+            contract_name: contractData?.name || '',
+            provision_name: provisionName,
+            original_text: result.originalText,
+            redlined_text: result.redlinedText,
+            modified_text: result.modifiedText || '',
+            summary: result.summary,
+            status: 'draft',
+          }),
+        });
+
+        if (!createResponse.ok) {
+          throw new Error('Failed to save review');
+        }
+
+        const createData = await createResponse.json();
+        reviewId = createData.id;
+        setLastReviewId(reviewId);
+      }
+
+      // Send approval request
+      const response = await fetch('/api/contracts/review/request-approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewId,
+          contractName: contracts.find(c => c.id === selectedContract)?.name || 'Contract',
+          submittedBy: userEmail,
+          summaryPreview: result.summary.slice(0, 5),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`Approval request sent to ${data.emailsSent} admin(s)!`);
+        // Refresh history to show new status
+        await fetchHistory();
+      } else {
+        alert(data.error || 'Failed to send approval request');
+      }
+    } catch (err) {
+      console.error('Error sending approval request:', err);
+      alert('Failed to send approval request');
+    } finally {
+      setIsSendingApproval(false);
+    }
+  }
+
   async function handleDeleteHistoryItem(reviewId: string, event: React.MouseEvent) {
     event.stopPropagation(); // Prevent triggering the load action
     if (!confirm('Are you sure you want to delete this review from history?')) {
@@ -433,7 +507,7 @@ export default function ContractReviewPage() {
         timestamp: item.createdAt,
       });
       setActiveTab('paste');
-      setShowHistory(false);
+      setMainTab('review');
     }
   }
 
@@ -948,22 +1022,55 @@ export default function ContractReviewPage() {
         animate={{ marginLeft: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-semibold text-white">Contract Review</h1>
-            <p className="text-[#64748B] text-sm mt-1">Contract provision analysis</p>
+        {/* Header with Tab Navigation */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-white">Contract Review</h1>
+              <p className="text-[#64748B] text-sm mt-1">Contract provision analysis and approvals</p>
+            </div>
           </div>
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="px-4 py-2 rounded-lg bg-[#151F2E] text-[#8FA3BF] hover:text-white hover:bg-[#1E293B] transition-colors text-sm font-medium"
-          >
-            {showHistory ? 'Hide History' : 'View History'}
-          </button>
+
+          {/* Tab Navigation */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMainTab('review')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                mainTab === 'review'
+                  ? 'bg-[#38BDF8] text-white'
+                  : 'bg-[#151F2E] text-[#8FA3BF] hover:bg-[#1E293B]'
+              }`}
+            >
+              Review Contract
+            </button>
+            <button
+              onClick={() => setMainTab('history')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                mainTab === 'history'
+                  ? 'bg-[#38BDF8] text-white'
+                  : 'bg-[#151F2E] text-[#8FA3BF] hover:bg-[#1E293B]'
+              }`}
+            >
+              History
+            </button>
+            <button
+              onClick={() => setMainTab('approvals')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                mainTab === 'approvals'
+                  ? 'bg-[#38BDF8] text-white'
+                  : 'bg-[#151F2E] text-[#8FA3BF] hover:bg-[#1E293B]'
+              }`}
+            >
+              Approvals
+            </button>
+          </div>
         </div>
 
-        {/* KPI Summary */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        {/* Review Tab Content */}
+        {mainTab === 'review' && (
+          <>
+            {/* KPI Summary */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
           <KPICard
             title="Contracts Available"
             value={contracts.length}
@@ -1664,8 +1771,31 @@ export default function ContractReviewPage() {
                   </div>
                 )}
 
+                {/* Send for Approval Button */}
+                <div className="mt-4">
+                  <button
+                    onClick={handleSendForApproval}
+                    disabled={isSendingApproval}
+                    className="w-full py-3 bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isSendingApproval ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Sending for Approval...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Send for Approval
+                      </>
+                    )}
+                  </button>
+                </div>
+
                 {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3 pt-2">
+                <div className="flex flex-wrap gap-3 pt-4">
                   <button
                     onClick={handleCopyRedlines}
                     className="flex-1 min-w-[100px] py-2.5 bg-[#38BDF8]/10 text-[#38BDF8] font-medium rounded-lg hover:bg-[#38BDF8]/20 transition-colors"
@@ -2377,17 +2507,18 @@ export default function ContractReviewPage() {
             )}
           </motion.div>
         </div>
+          </>
+        )}
 
-        {/* History Panel */}
-        <AnimatePresence>
-          {showHistory && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-6 bg-[#111827] rounded-xl border border-white/[0.04] p-6"
-            >
-              <h2 className="text-lg font-semibold text-white mb-4">Review History</h2>
+        {/* History Tab Content */}
+        {mainTab === 'history' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="bg-[#111827] rounded-xl border border-white/[0.04] p-6"
+          >
+            <h2 className="text-lg font-semibold text-white mb-4">Review History</h2>
 
               {history.length > 0 ? (
                 <div className="space-y-2">
@@ -2431,9 +2562,21 @@ export default function ContractReviewPage() {
               ) : (
                 <p className="text-[#475569] text-center py-8">No review history yet</p>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </motion.div>
+        )}
+
+        {/* Approvals Tab Content */}
+        {mainTab === 'approvals' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="bg-[#111827] rounded-xl border border-white/[0.04] p-6"
+          >
+            <h2 className="text-lg font-semibold text-white mb-6">Contract Approvals</h2>
+            <ApprovalsQueue />
+          </motion.div>
+        )}
       </motion.main>
       <style dangerouslySetInnerHTML={{ __html: `.contract-redlines del { background-color: rgba(239, 68, 68, 0.2); color: #f87171; text-decoration: line-through; } .contract-redlines ins { background-color: rgba(34, 197, 94, 0.2); color: #4ade80; text-decoration: underline; }` }} />
 

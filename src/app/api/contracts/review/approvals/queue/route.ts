@@ -1,0 +1,101 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
+
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const status = searchParams.get('status') || 'pending';
+    const limit = parseInt(searchParams.get('limit') || '50');
+
+    const admin = getSupabaseAdmin();
+
+    // Build query based on status filter
+    let query = admin
+      .from('contract_reviews')
+      .select('id, contract_id, contract_name, provision_name, summary, approval_status, approval_token, approver_email, approval_feedback, approved_at, submitted_by_email, submitted_at')
+      .not('approval_token', 'is', null); // Only reviews that have been submitted for approval
+
+    // Apply status filter
+    if (status !== 'all') {
+      query = query.eq('approval_status', status);
+    }
+
+    // Order by submission date (newest first)
+    query = query.order('submitted_at', { ascending: false });
+
+    // Apply limit
+    if (limit > 0) {
+      query = query.limit(limit);
+    }
+
+    const { data: reviews, error } = await query;
+
+    if (error) {
+      console.error('Failed to fetch approval queue:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch approval queue' },
+        { status: 500 }
+      );
+    }
+
+    // Calculate urgency and days in queue
+    const now = new Date();
+    const approvals = (reviews || []).map(review => {
+      const submittedAt = review.submitted_at ? new Date(review.submitted_at) : now;
+      const daysInQueue = Math.floor((now.getTime() - submittedAt.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Determine urgency based on days in queue
+      let urgency: 'critical' | 'high' | 'normal' = 'normal';
+      if (review.approval_status === 'pending') {
+        if (daysInQueue > 5) {
+          urgency = 'critical';
+        } else if (daysInQueue > 2) {
+          urgency = 'high';
+        }
+      }
+
+      return {
+        reviewId: review.id,
+        contractId: review.contract_id,
+        contractName: review.contract_name || review.provision_name || 'Unnamed Contract',
+        provisionName: review.provision_name,
+        submittedBy: review.submitted_by_email,
+        submittedAt: review.submitted_at,
+        approvalStatus: review.approval_status,
+        approver: review.approver_email,
+        approvedAt: review.approved_at,
+        feedback: review.approval_feedback,
+        daysInQueue,
+        summary: review.summary || [],
+        urgency,
+        approvalToken: review.approval_token,
+      };
+    });
+
+    // Calculate counts for all statuses
+    const { data: countData } = await admin
+      .from('contract_reviews')
+      .select('approval_status')
+      .not('approval_token', 'is', null);
+
+    const counts = {
+      total: approvals.length,
+      pending: countData?.filter(r => r.approval_status === 'pending').length || 0,
+      approved: countData?.filter(r => r.approval_status === 'approved').length || 0,
+      rejected: countData?.filter(r => r.approval_status === 'rejected').length || 0,
+      expired: countData?.filter(r => r.approval_status === 'expired').length || 0,
+    };
+
+    return NextResponse.json({
+      approvals,
+      ...counts,
+    });
+
+  } catch (error) {
+    console.error('Error fetching approval queue:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

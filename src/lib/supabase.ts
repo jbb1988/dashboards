@@ -2464,6 +2464,15 @@ export interface ContractReview {
   status: 'draft' | 'sent_to_boss' | 'sent_to_client' | 'approved';
   created_at?: string;
   updated_at?: string;
+  // Approval workflow fields
+  approval_status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  approval_token?: string;
+  approver_email?: string;
+  approval_feedback?: string;
+  approved_at?: string;
+  token_expires_at?: string;
+  submitted_by_email?: string;
+  submitted_at?: string;
 }
 
 /**

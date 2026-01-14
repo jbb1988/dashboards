@@ -266,3 +266,114 @@ export async function sendPasswordResetEmail(params: {
     return { success: false, error: 'Failed to send email' };
   }
 }
+
+/**
+ * Send contract approval request email to admin users
+ */
+export async function sendApprovalRequestEmail(
+  adminEmail: string,
+  contractName: string,
+  submittedBy: string,
+  summaryPreview: string[],
+  approvalToken: string
+): Promise<{ success: boolean; error?: string }> {
+  const approvalUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mars-dashboards.vercel.app'}/contracts/review/approve/${approvalToken}`;
+
+  try {
+    const resend = getResendClient();
+    const { data, error } = await resend.emails.send({
+      from: `${FROM_NAME} Legal <${FROM_EMAIL}>`,
+      to: [adminEmail],
+      subject: `Contract Approval: ${contractName}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contract Approval Request</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0B1220;">
+  <div style="max-width: 600px; margin: 40px auto; background-color: #151F2E; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; overflow: hidden;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #38BDF8 0%, #0189CB 100%); padding: 32px; text-align: center;">
+      <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
+        Contract Approval Request
+      </h1>
+      <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
+        AI-analyzed contract awaiting your review
+      </p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 32px;">
+
+      <!-- Contract Info -->
+      <div style="background-color: #0B1220; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h2 style="margin: 0 0 12px 0; color: white; font-size: 18px; font-weight: 600;">
+          ${contractName}
+        </h2>
+        <p style="margin: 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">Submitted by:</strong> ${submittedBy}
+        </p>
+        <p style="margin: 8px 0 0 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">Date:</strong> ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+        </p>
+      </div>
+
+      <!-- AI Summary -->
+      <div style="margin-bottom: 24px;">
+        <h3 style="margin: 0 0 12px 0; color: white; font-size: 16px; font-weight: 600;">
+          AI Analysis Summary
+        </h3>
+        <div style="background-color: #0B1220; border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 16px;">
+          <ul style="margin: 0; padding-left: 20px; color: #8FA3BF; font-size: 14px; line-height: 1.8;">
+            ${summaryPreview.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+          ${summaryPreview.length >= 5 ? '<p style="margin: 12px 0 0 0; color: #38BDF8; font-size: 13px;">+ More changes in full review</p>' : ''}
+        </div>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${approvalUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); color: white; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);">
+          Review & Approve Contract
+        </a>
+      </div>
+
+      <!-- Link Expiry Notice -->
+      <p style="margin: 24px 0 0 0; padding: 16px; background-color: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 8px; color: #8FA3BF; font-size: 13px; text-align: center;">
+        ⏱️ This approval link expires in 7 days
+      </p>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #0B1220; padding: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
+      <p style="margin: 0; color: #64748B; font-size: 12px;">
+        <span style="color: #0189CB; font-weight: 600;">MARS</span> Company Confidential • Executive Dashboards
+      </p>
+      <p style="margin: 8px 0 0 0; color: #64748B; font-size: 11px;">
+        If you didn't expect this email, please contact your legal team.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('Approval email send error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('Approval request email sent:', data?.id);
+    return { success: true };
+  } catch (err) {
+    console.error('Approval email send exception:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to send email' };
+  }
+}
