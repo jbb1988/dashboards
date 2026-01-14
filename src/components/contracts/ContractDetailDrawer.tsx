@@ -379,13 +379,13 @@ export default function ContractDetailDrawer({
       const result = await response.json();
 
       if (response.ok) {
-        setSaveMessage({ type: 'success', text: 'Synced to Notion!' });
+        setSaveMessage({ type: 'success', text: 'Saved successfully!' });
         setTimeout(() => {
           setIsEditingDates(false);
           setSaveMessage(null);
           onUpdate?.();
         }, 1500);
-      } else {
+      } else{
         setSaveMessage({ type: 'error', text: result.error || 'Failed to update' });
       }
     } catch (err) {

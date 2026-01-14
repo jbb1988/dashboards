@@ -415,7 +415,7 @@ export interface OpportunityUpdateFields {
   CloseDate?: string; // YYYY-MM-DD format
   Award_Date__c?: string;
   Contract_Date__c?: string;
-  Deliver_Date__c?: string;
+  Delivery_Date__c?: string;
   Install_Date__c?: string;
   Cash_Date__c?: string;
   X24_Budget__c?: boolean;
