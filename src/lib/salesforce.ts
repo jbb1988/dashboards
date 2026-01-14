@@ -228,6 +228,8 @@ export async function getContractOpportunities() {
       Delivery_Date__c,
       Install_Date__c,
       Cash_Date__c,
+      Current_Situation__c,
+      Next_Steps__c,
       X24_Budget__c,
       X24_Manual_Close_Probability__c
     FROM Opportunity
@@ -299,6 +301,8 @@ export async function getContractOpportunities() {
       deliverDate,
       installDate,
       cashDate,
+      currentSituation: opp.Current_Situation__c || null,
+      nextSteps: opp.Next_Steps__c || null,
       statusChangeDate: lastStageChange,
       progress: opp.Probability || 0,
       isOverdue: daysUntilDeadline < 0,
@@ -418,6 +422,8 @@ export interface OpportunityUpdateFields {
   Delivery_Date__c?: string;
   Install_Date__c?: string;
   Cash_Date__c?: string;
+  Current_Situation__c?: string;
+  Next_Steps__c?: string;
   X24_Budget__c?: boolean;
   X24_Manual_Close_Probability__c?: number;
   Probability?: number;

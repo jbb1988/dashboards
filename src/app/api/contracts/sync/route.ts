@@ -28,6 +28,8 @@ function transformToContract(opp: any): Contract {
     deliver_date: opp.deliverDate || null,
     install_date: opp.installDate || null,
     cash_date: opp.cashDate || null,
+    current_situation: opp.currentSituation || null,
+    next_steps: opp.nextSteps || null,
     sales_rep: opp.salesRep || 'Unassigned',
     probability: opp.probability || 0,
     budgeted: opp.budgeted || false,

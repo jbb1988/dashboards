@@ -77,6 +77,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Handle CS/NS field (updates BOTH current_situation AND next_steps)
+    if (updates.currentSituation !== undefined) {
+      const value = updates.currentSituation;
+      // Validate length (Salesforce Short Text field limit: 255 chars)
+      if (value && value.length > 255) {
+        return NextResponse.json(
+          { error: 'CS/NS text too long (max 255 characters)' },
+          { status: 400 }
+        );
+      }
+      // Map single CS/NS value to BOTH fields for Salesforce sync
+      updateData.current_situation = value || null;
+      updateData.next_steps = value || null; // Same value!
+    }
+
     console.log(`[UPDATE] Updating contract ${salesforceId} (${contractName || 'unknown'}):`, updateData);
 
     const admin = getSupabaseAdmin();

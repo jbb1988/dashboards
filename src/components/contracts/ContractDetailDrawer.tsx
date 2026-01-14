@@ -73,6 +73,8 @@ export interface Contract {
   deliverDate: string | null;
   installDate: string | null;
   cashDate: string | null;
+  currentSituation?: string | null;
+  nextSteps?: string | null;
   statusChangeDate: string | null;
   progress: number;
   isOverdue: boolean;
@@ -166,6 +168,7 @@ export default function ContractDetailDrawer({
   const [editedDeliverDate, setEditedDeliverDate] = useState('');
   const [editedInstallDate, setEditedInstallDate] = useState('');
   const [editedCashDate, setEditedCashDate] = useState('');
+  const [editedCSSituation, setEditedCSSituation] = useState('');
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Tasks state
@@ -200,6 +203,7 @@ export default function ContractDetailDrawer({
       setEditedDeliverDate(formatDateForInput(contract.deliverDate));
       setEditedInstallDate(formatDateForInput(contract.installDate));
       setEditedCashDate(formatDateForInput(contract.cashDate));
+      setEditedCSSituation(contract.currentSituation || '');
       setTasksFetched(false);
       setTasks([]);
       setDocsFetched(false);
@@ -355,11 +359,35 @@ export default function ContractDetailDrawer({
 
     try {
       const updates: Record<string, any> = {};
+
+      // Check if any dates changed
+      const datesChanged =
+        editedAwardDate !== formatDateForInput(contract.awardDate) ||
+        editedContractDate !== formatDateForInput(contract.contractDate) ||
+        editedDeliverDate !== formatDateForInput(contract.deliverDate) ||
+        editedInstallDate !== formatDateForInput(contract.installDate) ||
+        editedCashDate !== formatDateForInput(contract.cashDate);
+
+      // VALIDATION: If dates changed, CS/NS is REQUIRED
+      if (datesChanged && !editedCSSituation.trim()) {
+        setSaveMessage({
+          type: 'error',
+          text: 'CS/NS is required when updating dates for Salesforce sync'
+        });
+        setIsSavingDates(false);
+        return;
+      }
+
       if (editedAwardDate !== formatDateForInput(contract.awardDate)) updates.awardDate = editedAwardDate || null;
       if (editedContractDate !== formatDateForInput(contract.contractDate)) updates.contractDate = editedContractDate || null;
       if (editedDeliverDate !== formatDateForInput(contract.deliverDate)) updates.deliverDate = editedDeliverDate || null;
       if (editedInstallDate !== formatDateForInput(contract.installDate)) updates.installDate = editedInstallDate || null;
       if (editedCashDate !== formatDateForInput(contract.cashDate)) updates.cashDate = editedCashDate || null;
+
+      // Add CS/NS if changed
+      if (editedCSSituation !== (contract.currentSituation || '')) {
+        updates.currentSituation = editedCSSituation.trim() || null;
+      }
 
       if (Object.keys(updates).length === 0) {
         setIsEditingDates(false);
@@ -818,6 +846,29 @@ export default function ContractDetailDrawer({
                         </div>
                       </div>
 
+                      {/* CS/NS Field - REQUIRED when dates change */}
+                      <div className="mt-4">
+                        <label className="block text-[10px] text-[#64748B] uppercase tracking-wider mb-1.5">
+                          CS/NS (Current Situation / Next Steps) <span className="text-red-400">*</span>
+                        </label>
+                        <textarea
+                          value={editedCSSituation}
+                          onChange={(e) => setEditedCSSituation(e.target.value)}
+                          placeholder="Required when updating dates: Enter current situation and next steps for Salesforce sync..."
+                          rows={3}
+                          maxLength={255}
+                          className="w-full px-3 py-2 bg-[#151F2E] border border-white/[0.1] rounded-lg text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] resize-none placeholder:text-[#64748B]"
+                        />
+                        <div className="mt-1 flex items-center justify-between text-[10px]">
+                          <p className="text-[#64748B]">
+                            Required for Salesforce sync. Updates both Current Situation and Next Steps.
+                          </p>
+                          <p className={`font-mono ${editedCSSituation.length > 240 ? 'text-yellow-400' : 'text-[#64748B]'}`}>
+                            {editedCSSituation.length}/255
+                          </p>
+                        </div>
+                      </div>
+
                       {saveMessage && (
                         <div className={`text-xs ${saveMessage.type === 'success' ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
                           {saveMessage.text}
@@ -834,6 +885,7 @@ export default function ContractDetailDrawer({
                             setEditedDeliverDate(formatDateForInput(contract.deliverDate));
                             setEditedInstallDate(formatDateForInput(contract.installDate));
                             setEditedCashDate(formatDateForInput(contract.cashDate));
+                            setEditedCSSituation(contract.currentSituation || '');
                           }}
                           className="flex-1 px-3 py-2 text-xs text-[#8FA3BF] hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
                         >

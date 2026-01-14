@@ -862,7 +862,7 @@ export default function ContractsDashboard() {
     setSfPushProgress({ current: 0, total: sfSyncPending.length });
 
     try {
-      // Build batch update payload - only date fields sync to Salesforce
+      // Build batch update payload - date fields and CS/NS sync to Salesforce
       const updates = sfSyncPending.map(item => {
         const fields: Record<string, any> = {};
 
@@ -880,6 +880,12 @@ export default function ContractsDashboard() {
         }
         if (item.pendingFields.cash_date) {
           fields.Cash_Date__c = item.pendingFields.cash_date;
+        }
+        if (item.pendingFields.current_situation !== undefined) {
+          fields.Current_Situation__c = item.pendingFields.current_situation;
+        }
+        if (item.pendingFields.next_steps !== undefined) {
+          fields.Next_Steps__c = item.pendingFields.next_steps;
         }
 
         return {

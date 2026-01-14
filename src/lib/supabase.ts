@@ -214,6 +214,8 @@ export interface Contract {
   deliver_date: string | null;
   install_date: string | null;
   cash_date: string | null;
+  current_situation: string | null;
+  next_steps: string | null;
   sales_rep: string;
   probability: number;
   budgeted: boolean;
