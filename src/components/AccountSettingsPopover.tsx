@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DataSourceStatus } from './DataSourceStatus';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 interface AccountSettingsPopoverProps {
@@ -76,7 +76,6 @@ export function AccountSettingsPopover({
   }, [isOpen, onClose]);
 
   const handleSignOut = async () => {
-    const supabase = createClient();
     await supabase.auth.signOut();
     router.push('/login');
   };
