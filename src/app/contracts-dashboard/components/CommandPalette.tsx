@@ -29,6 +29,22 @@ interface SearchResult {
   dueDate?: string;
 }
 
+// Unified type for both commands and search results
+interface ResultItem {
+  id: string;
+  label: string;
+  description?: string;
+  shortcut?: string;
+  icon?: React.ReactNode;
+  action: () => void;
+  category?: string;
+  keywords?: string[];
+  type?: 'contract' | 'document' | 'task';
+  value?: number;
+  status?: string;
+  documentType?: string;
+}
+
 interface SearchResults {
   contracts: SearchResult[];
   documents: SearchResult[];
@@ -179,7 +195,7 @@ export default function CommandPalette({
   // Filter and combine results
   const results = useMemo(() => {
     const q = query.toLowerCase().trim();
-    const grouped: Record<string, Array<CommandItem | SearchResult & { action: () => void }>> = {};
+    const grouped: Record<string, ResultItem[]> = {};
 
     // If query is less than 2 chars, show commands only
     if (q.length < 2) {
@@ -215,11 +231,14 @@ export default function CommandPalette({
 
     // Add contracts from API
     if (apiContracts.length > 0 && (activeScope === 'all' || activeScope === 'contracts')) {
-      grouped['Contracts'] = apiContracts.map(c => ({
-        ...c,
+      grouped['Contracts'] = apiContracts.map((c): ResultItem => ({
+        id: c.id,
+        type: c.type,
         label: c.title,
         description: c.subtitle,
         icon: TYPE_ICONS.contract,
+        value: c.value,
+        status: c.status,
         action: () => {
           if (c.url) {
             if (c.url.startsWith('/')) {
@@ -234,11 +253,13 @@ export default function CommandPalette({
 
     // Add documents from API
     if (apiDocuments.length > 0 && (activeScope === 'all' || activeScope === 'documents')) {
-      grouped['Documents'] = apiDocuments.map(d => ({
-        ...d,
+      grouped['Documents'] = apiDocuments.map((d): ResultItem => ({
+        id: d.id,
+        type: d.type,
         label: d.title,
         description: d.subtitle,
         icon: TYPE_ICONS.document,
+        documentType: d.documentType,
         action: () => {
           if (d.url) {
             if (d.url.startsWith('/')) {
@@ -253,8 +274,9 @@ export default function CommandPalette({
 
     // Add tasks from API
     if (apiTasks.length > 0 && (activeScope === 'all' || activeScope === 'tasks')) {
-      grouped['Tasks'] = apiTasks.map(t => ({
-        ...t,
+      grouped['Tasks'] = apiTasks.map((t): ResultItem => ({
+        id: t.id,
+        type: t.type,
         label: t.title,
         description: t.subtitle,
         icon: TYPE_ICONS.task,
@@ -431,10 +453,10 @@ export default function CommandPalette({
                     </div>
 
                     {/* Items */}
-                    {items.map((item) => {
+                    {items.map((item: ResultItem) => {
                       currentFlatIndex++;
                       const isSelected = currentFlatIndex === selectedIndex;
-                      const isSearchResult = 'type' in item;
+                      const isSearchResult = item.type !== undefined;
 
                       return (
                         <button
@@ -452,8 +474,8 @@ export default function CommandPalette({
                           }`}
                         >
                           {/* Icon */}
-                          <span className={isSelected && isSearchResult ? TYPE_COLORS[(item as any).type] : isSelected ? 'text-[#38BDF8]' : 'text-[#64748B]'}>
-                            {'icon' in item ? item.icon : icons.navigate}
+                          <span className={isSelected && isSearchResult && item.type ? TYPE_COLORS[item.type] : isSelected ? 'text-[#38BDF8]' : 'text-[#64748B]'}>
+                            {item.icon || icons.navigate}
                           </span>
 
                           {/* Label & description */}
@@ -469,24 +491,24 @@ export default function CommandPalette({
                           {/* Metadata for search results */}
                           {isSearchResult && (
                             <div className="flex-shrink-0 text-right">
-                              {(item as SearchResult).value && (
+                              {item.value && (
                                 <p className="text-[#22C55E] text-sm font-medium">
-                                  {formatCurrency((item as SearchResult).value!)}
+                                  {formatCurrency(item.value)}
                                 </p>
                               )}
-                              {(item as SearchResult).status && (
+                              {item.status && (
                                 <p className="text-[#64748B] text-xs capitalize">
-                                  {(item as SearchResult).status!.replace(/_/g, ' ')}
+                                  {item.status.replace(/_/g, ' ')}
                                 </p>
                               )}
-                              {(item as SearchResult).documentType && (
-                                <p className="text-[#A78BFA] text-xs">{(item as SearchResult).documentType}</p>
+                              {item.documentType && (
+                                <p className="text-[#A78BFA] text-xs">{item.documentType}</p>
                               )}
                             </div>
                           )}
 
                           {/* Shortcut for commands */}
-                          {!isSearchResult && 'shortcut' in item && item.shortcut && (
+                          {!isSearchResult && item.shortcut && (
                             <kbd className="px-2 py-0.5 text-[11px] font-medium text-[#64748B] bg-[#0B1220] rounded border border-white/[0.08]">
                               {item.shortcut}
                             </kbd>
