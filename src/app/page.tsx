@@ -321,6 +321,7 @@ export default function Home() {
             <DataSourceBadge name="Asana" color="bg-[#E16259]" delay={0.6} />
             <DataSourceBadge name="DocuSign" color="bg-[#FFD700]" delay={0.7} />
             <DataSourceBadge name="NetSuite" color="bg-[#F97316]" delay={0.8} />
+            <DataSourceBadge name="Smartsheet" color="bg-[#0073EA]" delay={0.9} />
           </motion.div>
         </div>
 

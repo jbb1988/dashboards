@@ -27,6 +27,7 @@ interface ContractsPipelineFilters {
   hideMidContract: boolean;
   contractYearFilter: number[];
   budgetedFilter: boolean;
+  bundledFilter: boolean;
   probabilityMin: number;
   probabilityMax: number;
   activeTab: 'pipeline' | 'tasks' | 'documents';
@@ -43,6 +44,7 @@ const DEFAULT_CONTRACTS_FILTERS: ContractsPipelineFilters = {
   hideMidContract: true,
   contractYearFilter: [],
   budgetedFilter: false,
+  bundledFilter: false,
   probabilityMin: 0,
   probabilityMax: 100,
   activeTab: 'pipeline',
@@ -738,6 +740,7 @@ export default function ContractsDashboard() {
     hideMidContract,
     contractYearFilter,
     budgetedFilter,
+    bundledFilter,
     probabilityMin,
     probabilityMax,
     activeTab,
@@ -760,6 +763,7 @@ export default function ContractsDashboard() {
   const setHideMidContract = (value: boolean) => setFilters(f => ({ ...f, hideMidContract: value }));
   const setContractYearFilter = (value: number[]) => setFilters(f => ({ ...f, contractYearFilter: value }));
   const setBudgetedFilter = (value: boolean) => setFilters(f => ({ ...f, budgetedFilter: value }));
+  const setBundledFilter = (value: boolean) => setFilters(f => ({ ...f, bundledFilter: value }));
   const setProbabilityMin = (value: number) => setFilters(f => ({ ...f, probabilityMin: value }));
   const setProbabilityMax = (value: number) => setFilters(f => ({ ...f, probabilityMax: value }));
   const setActiveTab = (value: 'pipeline' | 'tasks' | 'documents') => setFilters(f => ({ ...f, activeTab: value }));
@@ -1246,6 +1250,9 @@ export default function ContractsDashboard() {
     if (budgetedFilter) {
       filters.push({ key: 'budgeted', label: 'Budgeted', onRemove: () => setBudgetedFilter(false) });
     }
+    if (bundledFilter) {
+      filters.push({ key: 'bundled', label: 'Bundled', onRemove: () => setBundledFilter(false) });
+    }
     if (probabilityMin > 0) {
       filters.push({ key: 'probability', label: `${probabilityMin}%+`, onRemove: () => setProbabilityMin(0) });
     }
@@ -1254,7 +1261,7 @@ export default function ContractsDashboard() {
     }
 
     return filters;
-  }, [statusFilter, dateFilter, yearFilter, contractTypeFilter, contractYearFilter, budgetedFilter, probabilityMin, hideMidContract]);
+  }, [statusFilter, dateFilter, yearFilter, contractTypeFilter, contractYearFilter, budgetedFilter, bundledFilter, probabilityMin, hideMidContract]);
 
   // Filter and sort contracts
   const filteredContracts = useMemo(() => {
@@ -1364,6 +1371,11 @@ export default function ContractsDashboard() {
       filtered = filtered.filter(c => c.budgeted === true);
     }
 
+    // Bundled filter
+    if (bundledFilter) {
+      filtered = filtered.filter(c => c.bundleInfo !== null && c.bundleInfo !== undefined);
+    }
+
     // Probability filter (minimum threshold)
     if (probabilityMin > 0) {
       filtered = filtered.filter(c => {
@@ -1406,7 +1418,7 @@ export default function ContractsDashboard() {
     });
 
     return filtered;
-  }, [data, searchQuery, activeFilter, statusFilter, dateFilter, yearFilter, contractTypeFilter, hideMidContract, contractYearFilter, budgetedFilter, probabilityMin, sortField, sortDirection]);
+  }, [data, searchQuery, activeFilter, statusFilter, dateFilter, yearFilter, contractTypeFilter, hideMidContract, contractYearFilter, budgetedFilter, bundledFilter, probabilityMin, sortField, sortDirection]);
 
   // Calculate KPIs from filtered contracts (reflects ALL filters including search)
   const filteredKpis = useMemo(() => {
@@ -1817,6 +1829,7 @@ export default function ContractsDashboard() {
                             setContractTypeFilter('all');
                             setContractYearFilter([]);
                             setBudgetedFilter(false);
+                            setBundledFilter(false);
                             setProbabilityMin(0);
                             setHideMidContract(false);
                             setSearchQuery('');
@@ -2012,6 +2025,20 @@ export default function ContractsDashboard() {
                                 />
                               </label>
 
+                              {/* Bundled Toggle */}
+                              <label className="flex items-center gap-3 cursor-pointer group">
+                                <div className={`relative w-11 h-6 rounded-full transition-colors ${bundledFilter ? 'bg-[#0189CB]' : 'bg-white/10'}`}>
+                                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${bundledFilter ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </div>
+                                <span className="text-sm text-white group-hover:text-[#0189CB] transition-colors">Bundled Contracts Only</span>
+                                <input
+                                  type="checkbox"
+                                  checked={bundledFilter}
+                                  onChange={e => setBundledFilter(e.target.checked)}
+                                  className="sr-only"
+                                />
+                              </label>
+
                               {/* Minimum Probability */}
                               <div>
                                 <div className="flex items-center justify-between mb-2">
@@ -2100,6 +2127,7 @@ export default function ContractsDashboard() {
                               setContractTypeFilter('all');
                               setContractYearFilter([]);
                               setBudgetedFilter(false);
+                              setBundledFilter(false);
                               setProbabilityMin(0);
                               setHideMidContract(true);
                               setSearchQuery('');

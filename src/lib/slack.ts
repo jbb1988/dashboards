@@ -245,7 +245,7 @@ export async function notifyAcceptanceSignedWithDocument(params: {
     return { success: false, error: messageResult.error, fileUploaded: false };
   }
 
-  // If document is provided and file upload is configured, upload it
+  // If document is provided and file upload is configured, upload it to Slack
   if (documentBuffer && isSlackFileUploadConfigured()) {
     const typeLabel = type === 'project' ? 'Project' : 'MCC';
     const sanitizedName = customerName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_');

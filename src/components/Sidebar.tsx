@@ -184,6 +184,8 @@ function getBadgeDotColor(badge: string): string {
       return 'bg-[#FFD700]'; // Gold - matches DocuSign in data sources
     case 'NetSuite':
       return 'bg-[#F97316]'; // Orange - matches NetSuite in data sources
+    case 'Smartsheet':
+      return 'bg-[#0073EA]'; // Dark Blue - matches Smartsheet in data sources
     case 'Excel':
       return 'bg-[#22C55E]'; // Green - local files
     case 'Claude':
@@ -520,6 +522,11 @@ export default function Sidebar({ isCollapsed: controlledCollapsed, onCollapsedC
                 <div className="flex items-center gap-3 px-3 py-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#F97316]" />
                   <span className="text-[11px] text-[#8FA3BF]">NetSuite</span>
+                  <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#0073EA]" />
+                  <span className="text-[11px] text-[#8FA3BF]">Smartsheet</span>
                   <span className="ml-auto text-[9px] text-[#22C55E] font-medium">Live</span>
                 </div>
                 <div className="flex items-center gap-3 px-3 py-1">
