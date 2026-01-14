@@ -277,35 +277,56 @@ export default function Home() {
 
       {/* Hero Section */}
       <div className="relative z-10 max-w-7xl mx-auto px-8 pt-8 pb-20">
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 relative">
+          {/* Background grid opacity reduction - soft radial mask */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-[#0F1722] opacity-25 blur-[60px] pointer-events-none" />
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#0189CB]/10 border border-[#0189CB]/20 rounded-full mb-6"
+            className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#0189CB]/10 border border-[#0189CB]/20 rounded-full mb-6 relative z-10"
           >
             <div className="w-2 h-2 bg-[#22C55E] rounded-full animate-pulse" />
             <span className="text-sm text-[#38BDF8]">All Systems Operational</span>
           </motion.div>
 
           <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-4xl md:text-5xl font-bold mb-4 leading-tight"
+            initial={{ opacity: 0.95 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.28, delay: 0.2 }}
+            className="text-4xl md:text-5xl mb-3 relative z-10"
+            style={{
+              letterSpacing: '0.015em',
+              lineHeight: '1.12'
+            }}
           >
-            <span className="text-white">Executive </span>
-            <span className="bg-gradient-to-r from-[#0189CB] to-[#38BDF8] bg-clip-text text-transparent">
+            <span className="text-white font-semibold">Executive </span>
+            <span
+              className="bg-gradient-to-r from-[#1A9FE0] to-[#4AC5F8] bg-clip-text text-transparent font-bold"
+            >
               Intelligence
             </span>
-            <span className="text-white"> Platform</span>
+            <span className="text-white font-semibold"> Platform</span>
           </motion.h1>
+
+          {/* Accent underline */}
+          <div className="flex justify-center mb-2 relative z-10">
+            <div
+              className="h-[1px] bg-[#1A9FE0] opacity-40"
+              style={{ width: '45%' }}
+            />
+          </div>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-lg text-[#8FA3BF] max-w-2xl mx-auto mb-8"
+            className="text-lg text-[#8FA3BF] max-w-2xl mx-auto mb-12 relative z-10 font-light"
+            style={{
+              opacity: 0.72,
+              lineHeight: '1.6'
+            }}
           >
             Real-time insights across MARS Company Business Units.
           </motion.p>
