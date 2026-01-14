@@ -130,6 +130,8 @@ function DraggableTaskCard({
     ? contracts.find(c => c.salesforceId === task.contract_salesforce_id)
     : task.contract_id
     ? contracts.find(c => c.id === task.contract_id)
+    : task.contract_name
+    ? contracts.find(c => c.name === task.contract_name)
     : null;
   const {
     attributes,
@@ -868,6 +870,8 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
       ? contracts.find(c => c.salesforceId === task.contract_salesforce_id)
       : task.contract_id
       ? contracts.find(c => c.id === task.contract_id)
+      : task.contract_name
+      ? contracts.find(c => c.name === task.contract_name)
       : null;
     // Use isTaskOverdue helper for consistent timezone handling
     const isOverdue = isTaskOverdue(task.due_date, task.status);
