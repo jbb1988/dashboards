@@ -123,11 +123,12 @@ export default function ProjectsTab({ projects, atRiskProjects, typeBreakdown }:
 
   // Dynamic type breakdown for selected project
   const displayTypeBreakdown = useMemo(() => {
-    if (selectedProjectData && selectedProjectData.lineItems) {
+    if (selectedProjectData && selectedProjectData.lineItems && selectedProjectData.lineItems.length > 0) {
       // Group line items by type and calculate metrics
       const typeMap: Record<string, { type: string; revenue: number; count: number; gpm: number }> = {};
+      const lineItems = selectedProjectData.lineItems; // Store in local variable for type safety
 
-      selectedProjectData.lineItems.forEach(item => {
+      lineItems.forEach(item => {
         const itemType = selectedProjectData.type || 'Unknown';
         if (!typeMap[itemType]) {
           typeMap[itemType] = { type: itemType, revenue: 0, count: 0, gpm: 0 };
@@ -138,7 +139,7 @@ export default function ProjectsTab({ projects, atRiskProjects, typeBreakdown }:
 
       // Calculate GPM for each type
       Object.values(typeMap).forEach(t => {
-        const typeItems = selectedProjectData.lineItems.filter(item =>
+        const typeItems = lineItems.filter(item =>
           (selectedProjectData.type || 'Unknown') === t.type
         );
         const totalCost = typeItems.reduce((sum, item) => sum + item.actualCost, 0);
