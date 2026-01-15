@@ -343,58 +343,82 @@ export async function importCloseoutExcelToDatabase(
     }
   }
 
-  // Upsert projects and work orders to database
-  for (const projectGroup of Object.values(projectGroups)) {
-    try {
-      // Upsert project
-      const { data: projectData, error: projectError } = await supabase
-        .from('closeout_projects')
-        .upsert(
-          projectGroup.project,
-          {
-            onConflict: 'project_name,project_year,project_type',
-            ignoreDuplicates: false,
-          }
-        )
-        .select()
-        .single();
+  // BATCH 1: Upsert all projects at once
+  console.log(`Upserting ${Object.keys(projectGroups).length} projects...`);
+  const allProjects = Object.values(projectGroups).map(pg => pg.project);
 
-      if (projectError) {
-        errors.push(`Project ${projectGroup.project.project_name}: ${projectError.message}`);
-        continue;
+  const { data: projectsData, error: projectsError } = await supabase
+    .from('closeout_projects')
+    .upsert(allProjects, {
+      onConflict: 'project_name,project_year,project_type',
+      ignoreDuplicates: false,
+    })
+    .select('id, project_name, project_year, project_type');
+
+  if (projectsError) {
+    throw new Error(`Failed to upsert projects: ${projectsError.message}`);
+  }
+
+  projectsCreated = projectsData?.length || 0;
+  console.log(`✓ Upserted ${projectsCreated} projects`);
+
+  // Create a map of project key → project ID
+  const projectIdMap: Record<string, string> = {};
+  if (projectsData) {
+    projectsData.forEach((p: any) => {
+      const key = `${p.project_name}|${p.project_year}|${p.project_type}`;
+      projectIdMap[key] = p.id;
+    });
+  }
+
+  // BATCH 2: Delete all existing work orders for these projects (faster than per-project deletes)
+  console.log('Clearing existing work orders...');
+  const projectIds = Object.values(projectIdMap);
+  if (projectIds.length > 0) {
+    await supabase
+      .from('closeout_work_orders')
+      .delete()
+      .in('closeout_project_id', projectIds);
+  }
+
+  // BATCH 3: Insert all work orders at once
+  console.log('Inserting work orders...');
+  const allWorkOrders: any[] = [];
+
+  for (const [projectKey, projectGroup] of Object.entries(projectGroups)) {
+    const projectId = projectIdMap[projectKey];
+    if (!projectId) {
+      errors.push(`Project ${projectGroup.project.project_name}: Could not find project ID`);
+      continue;
+    }
+
+    projectGroup.workOrders.forEach(wo => {
+      allWorkOrders.push({
+        ...wo,
+        closeout_project_id: projectId,
+      });
+    });
+  }
+
+  if (allWorkOrders.length > 0) {
+    // Insert in batches of 1000 to avoid payload size limits
+    const BATCH_SIZE = 1000;
+    for (let i = 0; i < allWorkOrders.length; i += BATCH_SIZE) {
+      const batch = allWorkOrders.slice(i, i + BATCH_SIZE);
+      const { error: woError } = await supabase
+        .from('closeout_work_orders')
+        .insert(batch);
+
+      if (woError) {
+        errors.push(`Work orders batch ${i / BATCH_SIZE + 1}: ${woError.message}`);
+      } else {
+        workOrdersCreated += batch.length;
+        console.log(`✓ Inserted work orders batch ${i / BATCH_SIZE + 1} (${batch.length} records)`);
       }
-
-      const projectId = projectData.id;
-      projectsCreated++;
-
-      // Upsert work orders for this project
-      if (projectGroup.workOrders.length > 0) {
-        const workOrdersWithProjectId = projectGroup.workOrders.map(wo => ({
-          ...wo,
-          closeout_project_id: projectId,
-        }));
-
-        // Delete existing work orders for this project first
-        await supabase
-          .from('closeout_work_orders')
-          .delete()
-          .eq('closeout_project_id', projectId);
-
-        // Insert new work orders
-        const { error: woError } = await supabase
-          .from('closeout_work_orders')
-          .insert(workOrdersWithProjectId);
-
-        if (woError) {
-          errors.push(`Work orders for ${projectGroup.project.project_name}: ${woError.message}`);
-        } else {
-          workOrdersCreated += projectGroup.workOrders.length;
-        }
-      }
-    } catch (error) {
-      errors.push(`Project ${projectGroup.project.project_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  console.log(`✓ Total: ${projectsCreated} projects, ${workOrdersCreated} work orders`)
 
   return {
     projectsCreated,
