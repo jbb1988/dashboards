@@ -48,11 +48,14 @@ interface ContractReviewItem {
 const DOCUMENT_TYPES = [
   { type: 'Original Contract', required: true },
   { type: 'MARS Redlines', required: true },
-  { type: 'Client Response', required: false },
+  { type: 'Client Response - MARS STD WTC', required: false, subtitle: 'Client redlines to MARS STD WTC' },
+  { type: 'Client Response - MARS MCC TC', required: false, subtitle: 'Client redlines to MARS MCC TC' },
+  { type: 'Client Response - MARS EULA', required: false, subtitle: 'Client redlines to MARS EULA' },
   { type: 'Final Agreement', required: true },
   { type: 'Executed Contract', required: true },
   { type: 'Purchase Order', required: false },
   { type: 'Amendment', required: false },
+  { type: 'Other', required: false, subtitle: 'Additional supporting documents' },
 ];
 
 export interface Contract {
@@ -1096,7 +1099,7 @@ export default function ContractDetailDrawer({
                         <div>
                           <h4 className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">Required</h4>
                           <div className="space-y-2">
-                            {requiredDocs.map(({ type }) => {
+                            {requiredDocs.map(({ type, subtitle }) => {
                               const doc = getDocumentByType(type);
                               const hasFile = doc?.file_url;
 
@@ -1123,6 +1126,9 @@ export default function ContractDetailDrawer({
                                     )}
                                     <div className="min-w-0 flex-1">
                                       <span className="text-[12px] text-white font-medium">{type}</span>
+                                      {subtitle && (
+                                        <p className="text-[10px] text-[#64748B]">{subtitle}</p>
+                                      )}
                                       {hasFile && doc.file_name && (
                                         <p className="text-[10px] text-[#64748B] truncate">{doc.file_name}</p>
                                       )}
@@ -1214,7 +1220,7 @@ export default function ContractDetailDrawer({
                         <div>
                           <h4 className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">Optional</h4>
                           <div className="space-y-2">
-                            {optionalDocs.map(({ type }) => {
+                            {optionalDocs.map(({ type, subtitle }) => {
                               const doc = getDocumentByType(type);
                               const hasFile = doc?.file_url;
 
@@ -1239,6 +1245,9 @@ export default function ContractDetailDrawer({
                                     )}
                                     <div className="min-w-0 flex-1">
                                       <span className={`text-[12px] ${hasFile ? 'text-white font-medium' : 'text-[#8FA3BF]'}`}>{type}</span>
+                                      {subtitle && (
+                                        <p className="text-[10px] text-[#64748B]">{subtitle}</p>
+                                      )}
                                       {hasFile && doc.file_name && (
                                         <p className="text-[10px] text-[#64748B] truncate">{doc.file_name}</p>
                                       )}
