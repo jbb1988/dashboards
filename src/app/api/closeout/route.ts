@@ -251,6 +251,28 @@ export async function GET(request: Request) {
         month: number;
         comments: string;
       }[];
+      workOrders?: {
+        woNumber: string;
+        itemDescription: string;
+        budgetRevenue: number;
+        budgetCost: number;
+        budgetGP: number;
+        actualRevenue: number;
+        actualCost: number;
+        actualGP: number;
+        variance: number;
+        netsuiteEnriched: boolean;
+        soNumber?: string;
+        soStatus?: string | null;
+        lineItems?: {
+          itemName: string;
+          itemDescription: string;
+          quantity: number;
+          unitPrice: number;
+          lineAmount: number;
+          costEstimate: number;
+        }[];
+      }[];
     }> = {};
 
     // Month names for formatting
