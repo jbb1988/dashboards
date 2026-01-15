@@ -66,6 +66,7 @@ export default function ProjectsTab({ projects, atRiskProjects, typeBreakdown }:
   const [showAtRiskOnly, setShowAtRiskOnly] = useState(false);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [expandedWO, setExpandedWO] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
   // Filter and sort projects
   const filteredProjects = useMemo(() => {
@@ -99,6 +100,41 @@ export default function ProjectsTab({ projects, atRiskProjects, typeBreakdown }:
       return sortDirection === 'asc' ? -comparison : comparison;
     });
   }, [projects, showAtRiskOnly, searchQuery, sortField, sortDirection]);
+
+  // Get selected project details
+  const selectedProjectData = useMemo(() => {
+    if (!selectedProject) return null;
+    return projects.find(p => p.projectKey === selectedProject);
+  }, [selectedProject, projects]);
+
+  // Dynamic type breakdown for selected project
+  const displayTypeBreakdown = useMemo(() => {
+    if (selectedProjectData && selectedProjectData.lineItems) {
+      // Group line items by type and calculate metrics
+      const typeMap: Record<string, { type: string; revenue: number; count: number; gpm: number }> = {};
+
+      selectedProjectData.lineItems.forEach(item => {
+        const itemType = selectedProjectData.type || 'Unknown';
+        if (!typeMap[itemType]) {
+          typeMap[itemType] = { type: itemType, revenue: 0, count: 0, gpm: 0 };
+        }
+        typeMap[itemType].revenue += item.actualRevenue;
+        typeMap[itemType].count++;
+      });
+
+      // Calculate GPM for each type
+      Object.values(typeMap).forEach(t => {
+        const typeItems = selectedProjectData.lineItems.filter(item =>
+          (selectedProjectData.type || 'Unknown') === t.type
+        );
+        const totalCost = typeItems.reduce((sum, item) => sum + item.actualCost, 0);
+        t.gpm = t.revenue > 0 ? (t.revenue - totalCost) / t.revenue : 0;
+      });
+
+      return Object.values(typeMap).sort((a, b) => b.revenue - a.revenue);
+    }
+    return typeBreakdown;
+  }, [selectedProjectData, typeBreakdown]);
 
   return (
     <div className="grid grid-cols-4 gap-6">
@@ -150,7 +186,10 @@ export default function ProjectsTab({ projects, atRiskProjects, typeBreakdown }:
                 key={project.projectKey}
                 project={project}
                 expanded={expandedProject === project.projectKey}
-                onToggle={() => setExpandedProject(expandedProject === project.projectKey ? null : project.projectKey)}
+                onToggle={() => {
+                  setExpandedProject(expandedProject === project.projectKey ? null : project.projectKey);
+                  setSelectedProject(project.projectKey);
+                }}
                 expandedWO={expandedWO}
                 onWOToggle={setExpandedWO}
               />
@@ -187,8 +226,30 @@ export default function ProjectsTab({ projects, atRiskProjects, typeBreakdown }:
 
         {/* Type Breakdown */}
         <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-4">
-          <h3 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">By Type</h3>
-          {typeBreakdown.slice(0, 5).map((type) => (
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold text-white uppercase tracking-wider">By Type</h3>
+            {selectedProject && (
+              <button
+                onClick={() => {
+                  setSelectedProject(null);
+                  setExpandedProject(null);
+                }}
+                className="text-[9px] text-gray-400 hover:text-white transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {selectedProjectData && (
+            <div className="mb-3 pb-3 border-b border-white/[0.08]">
+              <div className="text-[10px] text-gray-400 mb-1">Selected Project</div>
+              <div className="text-xs text-white font-medium truncate">{selectedProjectData.project}</div>
+              <div className="text-[9px] text-[#22C55E] mt-1">
+                {formatCurrency(selectedProjectData.actualRevenue)} • {formatPercent(selectedProjectData.actualGPM * 100)}
+              </div>
+            </div>
+          )}
+          {displayTypeBreakdown.slice(0, 5).map((type) => (
             <div key={type.type} className="mb-3">
               <div className="flex items-center justify-between text-xs mb-1">
                 <span className="text-gray-300">{type.type}</span>
