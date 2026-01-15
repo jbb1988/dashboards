@@ -52,6 +52,7 @@ export async function GET(request: Request) {
     // Check for cache bust parameter
     const url = new URL(request.url);
     const bustCache = url.searchParams.get('bust') === 'true';
+    const includeEnrichment = url.searchParams.get('includeEnrichment') !== 'false'; // Default true
 
     // Check cache first (unless bust requested)
     const now = Date.now();
@@ -386,6 +387,81 @@ export async function GET(request: Request) {
       }
     });
 
+    // Enrich projects with work orders from database if available
+    let enrichmentPct = 0;
+    if (includeEnrichment) {
+      try {
+        const { getSupabaseAdmin } = await import('@/lib/supabase');
+        const supabase = getSupabaseAdmin();
+
+        // Get all work orders with enrichment status
+        const { data: workOrders } = await supabase
+          .from('closeout_work_orders')
+          .select(`
+            *,
+            netsuite_work_order_details (*)
+          `);
+
+        if (workOrders && workOrders.length > 0) {
+          // Group work orders by project key
+          const woByProject: Record<string, any[]> = {};
+          for (const wo of workOrders) {
+            // Get project to find key
+            const { data: project } = await supabase
+              .from('closeout_projects')
+              .select('project_name, project_year, project_type')
+              .eq('id', wo.closeout_project_id)
+              .single();
+
+            if (project) {
+              const projectKey = `${project.project_name}|${project.project_year}`;
+              if (!woByProject[projectKey]) {
+                woByProject[projectKey] = [];
+              }
+              woByProject[projectKey].push(wo);
+            }
+          }
+
+          // Attach work orders to projects
+          for (const project of projects) {
+            const wos = woByProject[project.projectKey] || [];
+            project.workOrders = wos.map((wo: any) => ({
+              woNumber: wo.wo_number,
+              itemDescription: wo.item_description,
+              budgetRevenue: wo.budget_revenue,
+              budgetCost: wo.budget_cost,
+              budgetGP: wo.budget_gp,
+              actualRevenue: wo.actual_revenue,
+              actualCost: wo.actual_cost,
+              actualGP: wo.actual_gp,
+              variance: wo.variance,
+              netsuiteEnriched: wo.netsuite_enriched,
+              soNumber: wo.netsuite_so_number,
+              soStatus: null, // Would need to fetch from details
+              lineItems: wo.netsuite_enriched && wo.netsuite_work_order_details
+                ? wo.netsuite_work_order_details.map((li: any) => ({
+                    itemName: li.item_name,
+                    itemDescription: li.item_description,
+                    quantity: li.quantity,
+                    unitPrice: li.unit_price,
+                    lineAmount: li.line_amount,
+                    costEstimate: li.cost_estimate,
+                  }))
+                : undefined,
+            }));
+          }
+
+          // Calculate enrichment percentage
+          const totalWOs = workOrders.length;
+          const enrichedWOs = workOrders.filter((wo: any) => wo.netsuite_enriched).length;
+          enrichmentPct = totalWOs > 0 ? Math.round((enrichedWOs / totalWOs) * 100) : 0;
+        }
+      } catch (error) {
+        console.error('Error loading enrichment data:', error);
+        // Continue without enrichment
+      }
+    }
+
     const responseData = {
       kpis: {
         totalRevenue: totalActualRevenue,
@@ -397,6 +473,7 @@ export async function GET(request: Request) {
         budgetVariance: totalActualGP - totalBudgetGP,
         projectCount: projects.length,
         atRiskCount: atRiskProjects.length,
+        enrichmentPct,
       },
       projects,
       atRiskProjects,

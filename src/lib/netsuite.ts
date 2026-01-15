@@ -967,3 +967,182 @@ export async function testSuiteQLAccess(): Promise<{ success: boolean; data: any
     };
   }
 }
+
+/**
+ * Fetch Work Order by transaction number (WO#)
+ * Returns work order header with linked Sales Order reference
+ */
+export async function getWorkOrderByNumber(woNumber: string): Promise<{
+  id: string;
+  tranId: string;
+  tranDate: string;
+  status: string;
+  customerId: string;
+  customerName: string;
+  linkedSalesOrderId?: string;
+  linkedSalesOrderNumber?: string;
+} | null> {
+  if (!woNumber || woNumber.trim() === '') {
+    return null;
+  }
+
+  // SuiteQL query to find work order by tranId
+  // Work orders have type = 'WorkOrd'
+  // The createdFrom field links to the originating Sales Order
+  const query = `
+    SELECT
+      t.id,
+      t.tranid,
+      t.trandate,
+      t.status,
+      t.entity AS customer_id,
+      BUILTIN.DF(t.entity) AS customer_name,
+      t.createdfrom AS linked_so_id,
+      so.tranid AS linked_so_number
+    FROM Transaction t
+    LEFT JOIN Transaction so ON so.id = t.createdfrom
+    WHERE t.type = 'WorkOrd'
+      AND t.tranid = '${woNumber.replace(/'/g, "''")}'
+    LIMIT 1
+  `;
+
+  try {
+    console.log(`Fetching Work Order: ${woNumber}`);
+
+    const response = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: query },
+        params: { limit: '1' },
+      }
+    );
+
+    const row = response.items?.[0];
+    if (!row) {
+      console.log(`Work Order not found: ${woNumber}`);
+      return null;
+    }
+
+    return {
+      id: row.id,
+      tranId: row.tranid,
+      tranDate: row.trandate || '',
+      status: row.status || '',
+      customerId: row.customer_id || '',
+      customerName: row.customer_name || '',
+      linkedSalesOrderId: row.linked_so_id || undefined,
+      linkedSalesOrderNumber: row.linked_so_number || undefined,
+    };
+  } catch (error) {
+    console.error(`Error fetching Work Order ${woNumber}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch Sales Order with line item details
+ * Returns SO header and all line items with quantities, prices, and cost estimates
+ */
+export async function getSalesOrderWithLineItems(soId: string): Promise<{
+  id: string;
+  tranId: string;
+  tranDate: string;
+  status: string;
+  customerId: string;
+  customerName: string;
+  lineItems: Array<{
+    lineId: string;
+    itemId: string;
+    itemName: string;
+    itemDescription: string;
+    itemType: string;
+    quantity: number;
+    unitPrice: number;
+    lineAmount: number;
+    costEstimate: number;
+  }>;
+} | null> {
+  if (!soId || soId.trim() === '') {
+    return null;
+  }
+
+  // SuiteQL query to get SO header + line items
+  // Sales orders have type = 'SalesOrd'
+  // Line items have mainline = 'F' (detail lines, not header line)
+  // Join Item table to get item details
+  const query = `
+    SELECT
+      t.id AS transaction_id,
+      t.tranid AS transaction_number,
+      t.trandate AS transaction_date,
+      t.status,
+      t.entity AS customer_id,
+      BUILTIN.DF(t.entity) AS customer_name,
+      tl.id AS line_id,
+      tl.item AS item_id,
+      BUILTIN.DF(tl.item) AS item_name,
+      i.displayname AS item_description,
+      i.itemtype AS item_type,
+      tl.quantity,
+      tl.rate AS unit_price,
+      tl.amount AS line_amount,
+      tl.costestimate
+    FROM Transaction t
+    INNER JOIN TransactionLine tl ON tl.transaction = t.id
+    LEFT JOIN Item i ON i.id = tl.item
+    WHERE t.id = '${soId.replace(/'/g, "''")}'
+      AND t.type = 'SalesOrd'
+      AND tl.mainline = 'F'
+      AND tl.item IS NOT NULL
+    ORDER BY tl.id
+  `;
+
+  try {
+    console.log(`Fetching Sales Order: ${soId}`);
+
+    const response = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: query },
+        params: { limit: '1000' },
+      }
+    );
+
+    const rows = response.items || [];
+    if (rows.length === 0) {
+      console.log(`Sales Order not found or has no line items: ${soId}`);
+      return null;
+    }
+
+    // First row has the header info
+    const firstRow = rows[0];
+
+    // Transform all rows to line items
+    const lineItems = rows.map(row => ({
+      lineId: row.line_id || '',
+      itemId: row.item_id || '',
+      itemName: row.item_name || '',
+      itemDescription: row.item_description || '',
+      itemType: row.item_type || '',
+      quantity: parseFloat(row.quantity) || 0,
+      unitPrice: parseFloat(row.unit_price) || 0,
+      lineAmount: parseFloat(row.line_amount) || 0,
+      costEstimate: parseFloat(row.costestimate) || 0,
+    }));
+
+    return {
+      id: firstRow.transaction_id,
+      tranId: firstRow.transaction_number,
+      tranDate: firstRow.transaction_date || '',
+      status: firstRow.status || '',
+      customerId: firstRow.customer_id || '',
+      customerName: firstRow.customer_name || '',
+      lineItems,
+    };
+  } catch (error) {
+    console.error(`Error fetching Sales Order ${soId}:`, error);
+    throw error;
+  }
+}
