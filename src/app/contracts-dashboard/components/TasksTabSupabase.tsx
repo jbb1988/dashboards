@@ -299,6 +299,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
   const [sortBy, setSortBy] = useState<SortMode>('dueDate');
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const [expandedDateGroups, setExpandedDateGroups] = useState<Set<string>>(new Set(['overdue', 'today', 'thisWeek']));
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -886,6 +887,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
         exit={{ opacity: 0, x: 10, height: 0 }}
         transition={{ delay: index * 0.03, duration: 0.2 }}
         whileHover={{ scale: 1.005, transition: { duration: 0.1 } }}
+        onClick={() => setSelectedTask(task)}
         className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all cursor-pointer ${
           isSelected ? 'bg-[#38BDF8]/10 border-[#38BDF8]/40' :
           isCompleted ? 'bg-[#0B1220]/30 border-white/[0.02] opacity-50' :
@@ -912,7 +914,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
 
         {/* Status Checkbox */}
         <motion.button
-          onClick={() => toggleTaskStatus(task.id!, isCompleted ? 'pending' : 'completed')}
+          onClick={(e) => { e.stopPropagation(); toggleTaskStatus(task.id!, isCompleted ? 'pending' : 'completed'); }}
           whileTap={{ scale: 0.9 }}
           className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
             isCompleted ? 'bg-[#22C55E] border-[#22C55E]' : 'border-[#475569] hover:border-[#38BDF8] hover:shadow-[0_0_8px_rgba(56,189,248,0.3)]'
@@ -1075,7 +1077,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
 
         {/* Edit button */}
         <motion.button
-          onClick={() => setEditingTask(task)}
+          onClick={(e) => { e.stopPropagation(); setEditingTask(task); }}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           className="p-1.5 rounded-lg hover:bg-white/10 text-[#64748B] hover:text-white transition-colors flex-shrink-0"
@@ -1903,6 +1905,250 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
           </DndContext>
         )}
       </motion.div>
+
+      {/* Task Detail Drawer */}
+      <AnimatePresence>
+        {selectedTask && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-40"
+              onClick={() => setSelectedTask(null)}
+            />
+
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 bottom-0 w-[480px] bg-[#151F2E] border-l border-white/[0.06] shadow-2xl z-50 flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex-shrink-0 border-b border-white/[0.06] bg-[#151F2E]">
+                <div className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0 pr-4">
+                      {/* Status Badge */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${
+                          selectedTask.status === 'completed' ? 'bg-[#22C55E]' :
+                          selectedTask.status === 'in_progress' ? 'bg-[#38BDF8]' :
+                          selectedTask.status === 'cancelled' ? 'bg-[#64748B]' :
+                          isTaskOverdue(selectedTask.due_date, selectedTask.status) ? 'bg-[#EF4444]' :
+                          'bg-[#F59E0B]'
+                        }`} />
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          selectedTask.status === 'completed' ? 'bg-[#22C55E]/15 text-[#22C55E]' :
+                          selectedTask.status === 'in_progress' ? 'bg-[#38BDF8]/15 text-[#38BDF8]' :
+                          selectedTask.status === 'cancelled' ? 'bg-[#64748B]/15 text-[#64748B]' :
+                          isTaskOverdue(selectedTask.due_date, selectedTask.status) ? 'bg-[#EF4444]/15 text-[#EF4444]' :
+                          'bg-[#F59E0B]/15 text-[#F59E0B]'
+                        }`}>
+                          {selectedTask.status === 'in_progress' ? 'In Progress' :
+                           selectedTask.status.charAt(0).toUpperCase() + selectedTask.status.slice(1)}
+                        </span>
+                        {selectedTask.is_auto_generated && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-[#38BDF8]/10 text-[#38BDF8] rounded font-medium">
+                            AUTO-GENERATED
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Task Title */}
+                      <h2 className="text-[18px] font-semibold text-white leading-tight mb-3">
+                        {selectedTask.title}
+                      </h2>
+
+                      {/* Priority Badge */}
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] uppercase px-2 py-1 rounded font-semibold ${
+                          selectedTask.priority === 'urgent' ? 'bg-red-500/15 text-red-400' :
+                          selectedTask.priority === 'high' ? 'bg-orange-500/15 text-orange-400' :
+                          selectedTask.priority === 'medium' ? 'bg-amber-500/15 text-amber-400' :
+                          'bg-[#475569]/20 text-[#64748B]'
+                        }`}>
+                          {selectedTask.priority} Priority
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setSelectedTask(null)}
+                      className="p-2 rounded-lg hover:bg-white/5 text-[#64748B] hover:text-white transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {/* Contract Info */}
+                {selectedTask.contract_name && (
+                  <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Contract</span>
+                    </div>
+                    <p className="text-[14px] text-white font-medium">{selectedTask.contract_name}</p>
+                    {selectedTask.bundle_id && selectedTask.bundle_name && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-[10px] px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded font-medium flex items-center gap-1">
+                          <span>📦</span>
+                          <span>{selectedTask.bundle_name}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Due Date */}
+                {selectedTask.due_date && (
+                  <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-[#F59E0B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Due Date</span>
+                    </div>
+                    <p className={`text-[14px] font-medium ${
+                      isTaskOverdue(selectedTask.due_date, selectedTask.status) ? 'text-[#EF4444]' : 'text-white'
+                    }`}>
+                      {new Date(selectedTask.due_date).toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                      {isTaskOverdue(selectedTask.due_date, selectedTask.status) && (
+                        <span className="ml-2 text-[10px] px-2 py-0.5 bg-red-500/15 text-red-400 rounded font-semibold">
+                          OVERDUE
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* Assignee */}
+                {selectedTask.assignee_email && (
+                  <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-[#38BDF8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Assigned To</span>
+                    </div>
+                    <p className="text-[14px] text-white">{selectedTask.assignee_email}</p>
+                  </div>
+                )}
+
+                {/* Description/Notes */}
+                {selectedTask.description && (
+                  <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Notes</span>
+                    </div>
+                    <p className="text-[13px] text-[#8FA3BF] whitespace-pre-wrap leading-relaxed">
+                      {selectedTask.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Timestamps */}
+                <div className="bg-[#0F1722] rounded-xl border border-white/[0.04] p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-4 h-4 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Timestamps</span>
+                  </div>
+                  <div className="space-y-2 text-[12px]">
+                    {selectedTask.created_at && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#64748B]">Created</span>
+                        <span className="text-[#8FA3BF]">
+                          {new Date(selectedTask.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {selectedTask.updated_at && selectedTask.updated_at !== selectedTask.created_at && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#64748B]">Updated</span>
+                        <span className="text-[#8FA3BF]">
+                          {new Date(selectedTask.updated_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {selectedTask.completed_at && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#64748B]">Completed</span>
+                        <span className="text-[#22C55E]">
+                          {new Date(selectedTask.completed_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex-shrink-0 border-t border-white/[0.06] bg-[#0F1722] px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setEditingTask(selectedTask);
+                      setSelectedTask(null);
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-[#38BDF8] text-white font-medium text-sm rounded-lg hover:bg-[#38BDF8]/90 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    Edit Task
+                  </button>
+                  <button
+                    onClick={() => setSelectedTask(null)}
+                    className="px-4 py-2.5 bg-white/10 text-white font-medium text-sm rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
