@@ -30,6 +30,8 @@ export default function CloseoutDashboard() {
   const [enriching, setEnriching] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('projects');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   // Fetch data
   const fetchData = async (bust = false) => {
@@ -75,47 +77,83 @@ export default function CloseoutDashboard() {
     fetchData();
   }, []);
 
+  // Filter data based on selected year/month
+  const filteredData = useMemo(() => {
+    if (!data) return null;
+
+    // Filter projects
+    let filteredProjects = data.projects || [];
+    if (selectedYear) {
+      filteredProjects = filteredProjects.filter((p: any) => p.projectYear === selectedYear);
+    }
+    if (selectedMonth) {
+      filteredProjects = filteredProjects.filter((p: any) => p.projectMonth === selectedMonth);
+    }
+
+    // Recalculate KPIs for filtered data
+    const totalRevenue = filteredProjects.reduce((sum: number, p: any) => sum + p.actualRevenue, 0);
+    const totalCost = filteredProjects.reduce((sum: number, p: any) => sum + p.actualCost, 0);
+    const totalGP = totalRevenue - totalCost;
+    const overallGPM = totalRevenue > 0 ? totalGP / totalRevenue : 0;
+    const atRiskProjects = filteredProjects.filter((p: any) => p.actualGPM < 0.5 || p.variance < -10000);
+
+    return {
+      ...data,
+      projects: filteredProjects,
+      atRiskProjects,
+      kpis: {
+        ...data.kpis,
+        totalRevenue,
+        totalCost,
+        totalGrossProfit: totalGP,
+        overallGPM,
+        atRiskCount: atRiskProjects.length,
+      },
+    };
+  }, [data, selectedYear, selectedMonth]);
+
   // Calculate tab-specific KPIs
   const kpis = useMemo(() => {
-    if (!data) return null;
+    if (!filteredData) return null;
+    const displayData = filteredData;
 
     switch (activeTab) {
       case 'projects':
         return [
           {
             title: 'Total Revenue',
-            value: formatCurrency(data.kpis.totalRevenue),
-            subtitle: 'Current year',
+            value: formatCurrency(displayData.kpis.totalRevenue),
+            subtitle: selectedYear ? `Year ${selectedYear}` : 'Current year',
             color: '#22C55E',
           },
           {
             title: 'Total Cost',
-            value: formatCurrency(data.kpis.totalCost),
-            subtitle: 'Current year',
+            value: formatCurrency(displayData.kpis.totalCost),
+            subtitle: selectedYear ? `Year ${selectedYear}` : 'Current year',
             color: '#F59E0B',
           },
           {
             title: 'Gross Profit',
-            value: formatCurrency(data.kpis.totalGrossProfit),
-            subtitle: 'Current year',
+            value: formatCurrency(displayData.kpis.totalGrossProfit),
+            subtitle: selectedYear ? `Year ${selectedYear}` : 'Current year',
             color: '#38BDF8',
           },
           {
             title: 'Overall GPM',
-            value: formatPercent(data.kpis.overallGPM * 100),
+            value: formatPercent(displayData.kpis.overallGPM * 100),
             subtitle: 'Margin percentage',
-            color: data.kpis.overallGPM >= 0.6 ? '#22C55E' : data.kpis.overallGPM >= 0.5 ? '#F59E0B' : '#EF4444',
+            color: displayData.kpis.overallGPM >= 0.6 ? '#22C55E' : displayData.kpis.overallGPM >= 0.5 ? '#F59E0B' : '#EF4444',
           },
           {
             title: 'At Risk',
-            value: data.kpis.atRiskCount.toString(),
+            value: displayData.kpis.atRiskCount.toString(),
             subtitle: 'Projects under 50% GPM',
             color: '#EF4444',
           },
         ];
 
       case 'mcc':
-        const mccKPIs = calculateMCCKPIs(data.mccMargins || []);
+        const mccKPIs = calculateMCCKPIs(displayData.mccMargins || []);
         return [
           {
             title: 'MCC Revenue',
@@ -153,37 +191,37 @@ export default function CloseoutDashboard() {
         return [
           {
             title: 'Total Projects',
-            value: data.projects.length.toString(),
-            subtitle: 'All years',
+            value: displayData.projects.length.toString(),
+            subtitle: selectedYear ? `Year ${selectedYear}` : 'All years',
             color: '#38BDF8',
           },
           {
             title: 'Revenue',
-            value: formatCurrency(data.kpis.totalRevenue),
-            subtitle: 'Current year',
+            value: formatCurrency(displayData.kpis.totalRevenue),
+            subtitle: selectedYear ? `Year ${selectedYear}` : 'Current year',
             color: '#22C55E',
           },
           {
             title: 'Avg GPM',
-            value: formatPercent(data.kpis.overallGPM * 100),
+            value: formatPercent(displayData.kpis.overallGPM * 100),
             subtitle: 'Average margin',
-            color: data.kpis.overallGPM >= 0.6 ? '#22C55E' : '#F59E0B',
+            color: displayData.kpis.overallGPM >= 0.6 ? '#22C55E' : '#F59E0B',
           },
           {
             title: 'Budget Variance',
-            value: formatCurrency(data.kpis.budgetVariance || 0),
+            value: formatCurrency(displayData.kpis.budgetVariance || 0),
             subtitle: 'vs Budget',
-            color: (data.kpis.budgetVariance || 0) >= 0 ? '#22C55E' : '#EF4444',
+            color: (displayData.kpis.budgetVariance || 0) >= 0 ? '#22C55E' : '#EF4444',
           },
           {
             title: 'Enrichment',
-            value: `${data.kpis.enrichmentPct || 0}%`,
+            value: `${displayData.kpis.enrichmentPct || 0}%`,
             subtitle: 'NetSuite data',
             color: '#8FA3BF',
           },
         ];
     }
-  }, [data, activeTab]);
+  }, [filteredData, activeTab, selectedYear]);
 
   const mainStyle = {
     marginLeft: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH,
@@ -209,6 +247,47 @@ export default function CloseoutDashboard() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
+                {/* Year Filter */}
+                <select
+                  value={selectedYear || ''}
+                  onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
+                  className="px-3 py-2 rounded-lg bg-[#111827] border border-white/[0.08] text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20"
+                >
+                  <option value="">All Years</option>
+                  {data?.allYears?.map((year: number) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+
+                {/* Month Filter */}
+                <select
+                  value={selectedMonth || ''}
+                  onChange={(e) => setSelectedMonth(e.target.value ? parseInt(e.target.value) : null)}
+                  className="px-3 py-2 rounded-lg bg-[#111827] border border-white/[0.08] text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20"
+                  disabled={!selectedYear}
+                >
+                  <option value="">All Months</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => (
+                    <option key={month} value={month}>
+                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1]}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Clear Filters */}
+                {(selectedYear || selectedMonth) && (
+                  <button
+                    onClick={() => {
+                      setSelectedYear(null);
+                      setSelectedMonth(null);
+                    }}
+                    className="px-3 py-2 rounded-lg bg-[#111827] border border-white/[0.08] text-xs text-gray-400 hover:text-white hover:bg-white/[0.04] transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+
+                <div className="h-6 w-px bg-white/[0.08]"></div>
                 <button
                   onClick={() => fetchData(true)}
                   disabled={loading}
@@ -287,23 +366,23 @@ export default function CloseoutDashboard() {
               </div>
 
               {/* Tab Content */}
-              {activeTab === 'projects' && (
+              {activeTab === 'projects' && filteredData && (
                 <ProjectsTab
-                  projects={data.projects || []}
-                  atRiskProjects={data.atRiskProjects || []}
-                  typeBreakdown={data.typeBreakdown || []}
+                  projects={filteredData.projects || []}
+                  atRiskProjects={filteredData.atRiskProjects || []}
+                  typeBreakdown={filteredData.typeBreakdown || []}
                 />
               )}
-              {activeTab === 'mcc' && (
+              {activeTab === 'mcc' && filteredData && (
                 <MCCTab
-                  mccMargins={data.mccMargins || []}
+                  mccMargins={filteredData.mccMargins || []}
                   years={[2021, 2022, 2023, 2024, 2025]}
                 />
               )}
-              {activeTab === 'analytics' && (
+              {activeTab === 'analytics' && filteredData && (
                 <AnalyticsTab
-                  projects={data.projects || []}
-                  monthly={data.yearSummary ? Object.entries(data.yearSummary).map(([year, stats]: [string, any]) => ({
+                  projects={filteredData.projects || []}
+                  monthly={filteredData.yearSummary ? Object.entries(filteredData.yearSummary).map(([year, stats]: [string, any]) => ({
                     year: parseInt(year),
                     month: 1,
                     monthName: year,
@@ -312,7 +391,7 @@ export default function CloseoutDashboard() {
                     grossProfit: stats.gp,
                     grossProfitPct: stats.gpm * 100,
                   })) : []}
-                  types={data.typeBreakdown || []}
+                  types={filteredData.typeBreakdown || []}
                 />
               )}
             </>

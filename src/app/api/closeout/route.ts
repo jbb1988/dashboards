@@ -37,7 +37,14 @@ interface MarginRow {
   customer: string;
   revenue: Record<number, number>;
   cogs: Record<number, number>;
+  gp: Record<number, number>;
   gpm: Record<number, number>;
+  totalRevenue: number;
+  totalCOGS: number;
+  totalGP: number;
+  avgGPM: number;
+  trend: 'up' | 'down' | 'stable';
+  yearsActive: number;
 }
 
 interface TypeMarginRow {
@@ -160,11 +167,42 @@ export async function GET(request: Request) {
         gpm[year] = typeof gpmVal === 'number' ? gpmVal : 0;
       });
 
+      // Calculate totals and averages for this customer
+      const totalRevenue = Object.values(revenue).reduce((sum, val) => sum + val, 0);
+      const totalCOGS = Object.values(cogs).reduce((sum, val) => sum + val, 0);
+      const totalGP = totalRevenue - totalCOGS;
+      const avgGPM = totalRevenue > 0 ? totalGP / totalRevenue : 0;
+
+      // Calculate trend (compare most recent year to previous)
+      const years = mccYears.filter(y => revenue[y] > 0).sort();
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (years.length >= 2) {
+        const latestYear = years[years.length - 1];
+        const previousYear = years[years.length - 2];
+        const latestGPM = gpm[latestYear] || 0;
+        const previousGPM = gpm[previousYear] || 0;
+        if (latestGPM > previousGPM + 0.05) trend = 'up';
+        else if (latestGPM < previousGPM - 0.05) trend = 'down';
+      }
+
+      // Calculate GP by year
+      const gp: Record<number, number> = {};
+      mccYears.forEach(year => {
+        gp[year] = revenue[year] - cogs[year];
+      });
+
       mccMargins.push({
         customer: row[1],
         revenue,
         cogs,
+        gp,
         gpm,
+        totalRevenue,
+        totalCOGS,
+        totalGP,
+        avgGPM,
+        trend,
+        yearsActive: years.length,
       });
     }
 
