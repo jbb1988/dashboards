@@ -16,6 +16,15 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+interface LineItem {
+  itemName: string;
+  itemDescription: string;
+  quantity: number;
+  unitPrice: number;
+  lineAmount: number;
+  costEstimate: number;
+}
+
 interface WorkOrder {
   woNumber: string;
   itemDescription: string;
@@ -27,15 +36,22 @@ interface WorkOrder {
   actualGP: number;
   variance: number;
   netsuiteEnriched: boolean;
-  soNumber?: string;
-  lineItems?: Array<{
-    itemName: string;
-    itemDescription: string;
-    quantity: number;
-    unitPrice: number;
-    lineAmount: number;
-    costEstimate: number;
-  }>;
+  woStatus?: string;
+  woDate?: string;
+}
+
+interface SalesOrder {
+  soNumber: string;
+  soId: string;
+  soStatus: string | null;
+  soDate: string;
+  customerName: string;
+  netsuiteEnriched: boolean;
+  lineItems: LineItem[]; // SO line items (what was sold - budget)
+  workOrders: WorkOrder[]; // Multiple WOs fulfilling this SO
+  totalRevenue: number;
+  totalCost: number;
+  totalGP: number;
 }
 
 interface Project {
@@ -50,7 +66,8 @@ interface Project {
   budgetGP: number;
   variance: number;
   itemCount: number;
-  workOrders?: WorkOrder[];
+  salesOrders?: SalesOrder[]; // Typically 1 SO per project, but could have multiple
+  unenrichedWorkOrders?: WorkOrder[]; // WOs without NetSuite enrichment
   lineItems?: Array<{
     itemNumber: string;
     itemDescription: string;
@@ -79,6 +96,7 @@ export default function ProjectsTab({ projects, atRiskProjects, typeBreakdown }:
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showAtRiskOnly, setShowAtRiskOnly] = useState(false);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  const [expandedSO, setExpandedSO] = useState<string | null>(null);
   const [expandedWO, setExpandedWO] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
@@ -205,6 +223,8 @@ export default function ProjectsTab({ projects, atRiskProjects, typeBreakdown }:
                   setExpandedProject(expandedProject === project.projectKey ? null : project.projectKey);
                   setSelectedProject(project.projectKey);
                 }}
+                expandedSO={expandedSO}
+                onSOToggle={setExpandedSO}
                 expandedWO={expandedWO}
                 onWOToggle={setExpandedWO}
               />
@@ -289,17 +309,23 @@ function ProjectRow({
   project,
   expanded,
   onToggle,
+  expandedSO,
+  onSOToggle,
   expandedWO,
   onWOToggle
 }: {
   project: Project;
   expanded: boolean;
   onToggle: () => void;
+  expandedSO: string | null;
+  onSOToggle: (so: string | null) => void;
   expandedWO: string | null;
   onWOToggle: (wo: string | null) => void;
 }) {
   const isAtRisk = project.actualGPM < 0.5 || project.variance < -10000;
-  const hasWorkOrders = project.workOrders && project.workOrders.length > 0;
+  const hasSalesOrders = project.salesOrders && project.salesOrders.length > 0;
+  const hasUnenrichedWOs = project.unenrichedWorkOrders && project.unenrichedWorkOrders.length > 0;
+  const hasData = hasSalesOrders || hasUnenrichedWOs;
 
   return (
     <div className={`border-b border-white/[0.04] ${isAtRisk ? 'border-l-2 border-l-[#EF4444]' : ''}`}>
@@ -309,7 +335,7 @@ function ProjectRow({
         onClick={onToggle}
       >
         <div className="col-span-2 flex items-center gap-2">
-          {hasWorkOrders && (expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
+          {hasData && (expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
           <div>
             <div className="text-sm font-medium text-white">{project.project}</div>
             <div className="text-xs text-gray-400">{project.type} • {project.projectYear}</div>
@@ -334,25 +360,67 @@ function ProjectRow({
         </div>
       </div>
 
-      {/* Expanded Work Orders */}
+      {/* Expanded Sales Orders */}
       <AnimatePresence>
-        {expanded && hasWorkOrders && (
+        {expanded && hasData && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             className="bg-[#0B1220] px-4 pb-4 overflow-hidden"
           >
-            <div className="pt-3 space-y-2">
-              <div className="text-xs text-gray-400 uppercase mb-2">Work Orders ({project.workOrders!.length})</div>
-              {project.workOrders!.map((wo) => (
-                <WorkOrderRow
-                  key={wo.woNumber}
-                  workOrder={wo}
-                  expanded={expandedWO === wo.woNumber}
-                  onToggle={() => onWOToggle(expandedWO === wo.woNumber ? null : wo.woNumber)}
-                />
-              ))}
+            <div className="pt-3 space-y-3">
+              {/* Sales Orders */}
+              {hasSalesOrders && (
+                <>
+                  <div className="text-xs text-gray-400 uppercase">
+                    Sales Orders ({project.salesOrders!.length})
+                  </div>
+                  {project.salesOrders!.map((so) => (
+                    <SalesOrderRow
+                      key={so.soNumber}
+                      salesOrder={so}
+                      expanded={expandedSO === so.soNumber}
+                      onToggle={() => onSOToggle(expandedSO === so.soNumber ? null : so.soNumber)}
+                      expandedWO={expandedWO}
+                      onWOToggle={onWOToggle}
+                    />
+                  ))}
+                </>
+              )}
+
+              {/* Unenriched Work Orders */}
+              {hasUnenrichedWOs && (
+                <>
+                  <div className="text-xs text-gray-400 uppercase mt-4">
+                    Work Orders - Not Enriched ({project.unenrichedWorkOrders!.length})
+                  </div>
+                  <div className="space-y-2">
+                    {project.unenrichedWorkOrders!.map((wo) => (
+                      <div key={wo.woNumber} className="border border-white/[0.05] rounded-lg p-3 bg-[#151F2E]">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-white">{wo.woNumber}</span>
+                            <span className="text-[9px] px-2 py-0.5 rounded bg-gray-500/20 text-gray-400">No NetSuite Data</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div>
+                              <span className="text-gray-400">Revenue: </span>
+                              <span className="text-white">{formatCurrency(wo.actualRevenue)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">GP: </span>
+                              <span className={wo.actualGP >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}>
+                                {formatCurrency(wo.actualGP)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </motion.div>
         )}
@@ -361,7 +429,137 @@ function ProjectRow({
   );
 }
 
-// Work Order Row Component
+// Sales Order Row Component
+function SalesOrderRow({
+  salesOrder,
+  expanded,
+  onToggle,
+  expandedWO,
+  onWOToggle
+}: {
+  salesOrder: SalesOrder;
+  expanded: boolean;
+  onToggle: () => void;
+  expandedWO: string | null;
+  onWOToggle: (wo: string | null) => void;
+}) {
+  const soGPM = salesOrder.totalRevenue > 0 ? (salesOrder.totalGP / salesOrder.totalRevenue) * 100 : 0;
+  const hasLineItems = salesOrder.lineItems && salesOrder.lineItems.length > 0;
+  const hasWorkOrders = salesOrder.workOrders && salesOrder.workOrders.length > 0;
+
+  return (
+    <div className="border border-[#22C55E]/20 rounded-lg bg-[#151F2E]">
+      {/* SO Header */}
+      <div
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/[0.02]"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-3">
+          {expanded ? <ChevronDown className="w-3 h-3 text-[#22C55E]" /> : <ChevronRight className="w-3 h-3 text-[#22C55E]" />}
+          <span className="text-xs font-mono text-white font-semibold">SO: {salesOrder.soNumber}</span>
+          <span className="text-[9px] px-2 py-0.5 rounded bg-[#22C55E]/20 text-[#22C55E]">
+            {salesOrder.soStatus || 'Unknown'}
+          </span>
+          <span className="text-[10px] text-gray-400">{salesOrder.customerName}</span>
+        </div>
+        <div className="flex items-center gap-4 text-xs">
+          <div>
+            <span className="text-gray-400">Revenue: </span>
+            <span className="text-white font-medium">{formatCurrency(salesOrder.totalRevenue)}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">GP: </span>
+            <span className={salesOrder.totalGP >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}>
+              {formatCurrency(salesOrder.totalGP)}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400">GPM: </span>
+            <span className="text-white">{formatPercent(soGPM)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded: SO Line Items + Work Orders */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-[#22C55E]/20"
+          >
+            {/* SO Line Items */}
+            {hasLineItems && (
+              <div className="p-3 bg-[#0B1220]">
+                <div className="text-[10px] text-gray-400 uppercase mb-2">
+                  Sales Order Line Items ({salesOrder.lineItems.length}) - What Was Sold
+                </div>
+                <table className="w-full text-[11px]">
+                  <thead className="text-gray-400 border-b border-white/[0.05]">
+                    <tr>
+                      <th className="text-left p-1">Item</th>
+                      <th className="text-left p-1">Description</th>
+                      <th className="text-right p-1">Qty</th>
+                      <th className="text-right p-1">Price</th>
+                      <th className="text-right p-1">Amount</th>
+                      <th className="text-right p-1">Cost Est.</th>
+                      <th className="text-right p-1">GP</th>
+                      <th className="text-right p-1">GPM%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {salesOrder.lineItems.map((item, idx) => {
+                      const lineGP = item.lineAmount - item.costEstimate;
+                      const lineGPM = item.lineAmount > 0 ? (lineGP / item.lineAmount) * 100 : 0;
+                      return (
+                        <tr key={idx} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                          <td className="p-1 font-mono text-white">{item.itemName}</td>
+                          <td className="p-1 text-gray-300 max-w-xs truncate" title={item.itemDescription}>
+                            {item.itemDescription}
+                          </td>
+                          <td className="p-1 text-right text-gray-300">{item.quantity}</td>
+                          <td className="p-1 text-right text-gray-300">{formatCurrency(item.unitPrice)}</td>
+                          <td className="p-1 text-right text-white font-medium">{formatCurrency(item.lineAmount)}</td>
+                          <td className="p-1 text-right text-gray-300">{formatCurrency(item.costEstimate)}</td>
+                          <td className={`p-1 text-right font-medium ${lineGP >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+                            {formatCurrency(lineGP)}
+                          </td>
+                          <td className="p-1 text-right text-white">{formatPercent(lineGPM)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Work Orders fulfilling this SO */}
+            {hasWorkOrders && (
+              <div className="p-3">
+                <div className="text-[10px] text-gray-400 uppercase mb-2">
+                  Work Orders ({salesOrder.workOrders.length}) - Fulfilling This SO
+                </div>
+                <div className="space-y-2">
+                  {salesOrder.workOrders.map((wo) => (
+                    <WorkOrderRow
+                      key={wo.woNumber}
+                      workOrder={wo}
+                      expanded={expandedWO === wo.woNumber}
+                      onToggle={() => onWOToggle(expandedWO === wo.woNumber ? null : wo.woNumber)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Work Order Row Component (nested under SO)
 function WorkOrderRow({
   workOrder,
   expanded,
@@ -372,97 +570,39 @@ function WorkOrderRow({
   onToggle: () => void;
 }) {
   const gpm = workOrder.actualRevenue > 0 ? (workOrder.actualGP / workOrder.actualRevenue) * 100 : 0;
-  const hasLineItems = workOrder.netsuiteEnriched && workOrder.lineItems && workOrder.lineItems.length > 0;
 
   return (
-    <div className="border border-white/[0.05] rounded-lg">
+    <div className="border border-white/[0.05] rounded-lg bg-[#0B1220]">
       {/* WO Header */}
-      <div
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/[0.02]"
-        onClick={onToggle}
-      >
+      <div className="flex items-center justify-between p-3">
         <div className="flex items-center gap-3">
-          {hasLineItems && (expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />)}
-          <span className="text-xs font-mono text-white">{workOrder.woNumber || 'N/A'}</span>
-          {workOrder.netsuiteEnriched && (
-            <span className="text-[9px] px-2 py-0.5 rounded bg-[#22C55E]/20 text-[#22C55E]">Enriched</span>
+          <span className="text-xs font-mono text-white">{workOrder.woNumber}</span>
+          {workOrder.woStatus && (
+            <span className="text-[9px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+              {workOrder.woStatus}
+            </span>
           )}
-          {workOrder.soNumber && (
-            <span className="text-[10px] text-gray-400">SO: {workOrder.soNumber}</span>
-          )}
+          <span className="text-[10px] text-gray-400">{workOrder.itemDescription}</span>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <div>
-            <span className="text-gray-400">Revenue: </span>
-            <span className="text-white font-medium">{formatCurrency(workOrder.actualRevenue)}</span>
+            <span className="text-gray-400">Budget GP: </span>
+            <span className="text-gray-300">{formatCurrency(workOrder.budgetGP)}</span>
           </div>
           <div>
-            <span className="text-gray-400">GP: </span>
+            <span className="text-gray-400">Actual GP: </span>
             <span className={workOrder.actualGP >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}>
               {formatCurrency(workOrder.actualGP)}
             </span>
           </div>
           <div>
-            <span className="text-gray-400">GPM: </span>
-            <span className="text-white">{formatPercent(gpm)}</span>
+            <span className="text-gray-400">Variance: </span>
+            <span className={workOrder.variance >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}>
+              {workOrder.variance >= 0 ? '+' : ''}{formatCurrency(workOrder.variance)}
+            </span>
           </div>
         </div>
       </div>
-
-      {/* Expanded Line Items */}
-      <AnimatePresence>
-        {expanded && hasLineItems && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="border-t border-white/[0.05] p-3 bg-[#151F2E]"
-          >
-            <div className="text-[10px] text-gray-400 uppercase mb-2">SO Line Items ({workOrder.lineItems!.length})</div>
-            <table className="w-full text-[11px]">
-              <thead className="text-gray-400 border-b border-white/[0.05]">
-                <tr>
-                  <th className="text-left p-1">Item</th>
-                  <th className="text-left p-1">Description</th>
-                  <th className="text-right p-1">Qty</th>
-                  <th className="text-right p-1">Price</th>
-                  <th className="text-right p-1">Amount</th>
-                  <th className="text-right p-1">Cost</th>
-                  <th className="text-right p-1">GP</th>
-                  <th className="text-right p-1">GPM%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrder.lineItems!.map((item, idx) => {
-                  const lineGP = item.lineAmount - item.costEstimate;
-                  const lineGPM = item.lineAmount > 0 ? (lineGP / item.lineAmount) * 100 : 0;
-                  return (
-                    <tr key={idx} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                      <td className="p-1 font-mono text-white">{item.itemName}</td>
-                      <td className="p-1 text-gray-300 max-w-xs truncate" title={item.itemDescription}>
-                        {item.itemDescription}
-                      </td>
-                      <td className="p-1 text-right text-gray-300">{item.quantity}</td>
-                      <td className="p-1 text-right text-gray-300">{formatCurrency(item.unitPrice)}</td>
-                      <td className="p-1 text-right text-white font-medium">{formatCurrency(item.lineAmount)}</td>
-                      <td className="p-1 text-right text-gray-300">{formatCurrency(item.costEstimate)}</td>
-                      <td className={`p-1 text-right font-medium ${lineGP >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-                        {formatCurrency(lineGP)}
-                      </td>
-                      <td className="p-1 text-right text-white">{formatPercent(lineGPM)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </motion.div>
-        )}
-        {expanded && !hasLineItems && (
-          <div className="border-t border-white/[0.05] p-3 bg-[#151F2E] text-center text-xs text-gray-400">
-            NetSuite data not available. Click "Enrich from NetSuite" to fetch SO/WO details.
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

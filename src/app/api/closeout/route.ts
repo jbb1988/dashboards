@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import * as path from 'path';
 import * as fs from 'fs';
 import { getExcelFromStorage } from '@/lib/supabase';
+import { getEnrichedWorkOrder } from '@/lib/enrichment-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -299,7 +300,40 @@ export async function GET(request: Request) {
         month: number;
         comments: string;
       }[];
-      workOrders?: {
+      salesOrders?: {
+        soNumber: string;
+        soId: string;
+        soStatus: string | null;
+        soDate: string;
+        customerName: string;
+        netsuiteEnriched: boolean;
+        lineItems: {
+          itemName: string;
+          itemDescription: string;
+          quantity: number;
+          unitPrice: number;
+          lineAmount: number;
+          costEstimate: number;
+        }[];
+        workOrders: {
+          woNumber: string;
+          itemDescription: string;
+          budgetRevenue: number;
+          budgetCost: number;
+          budgetGP: number;
+          actualRevenue: number;
+          actualCost: number;
+          actualGP: number;
+          variance: number;
+          netsuiteEnriched: boolean;
+          woStatus?: string;
+          woDate?: string;
+        }[];
+        totalRevenue: number;
+        totalCost: number;
+        totalGP: number;
+      }[];
+      unenrichedWorkOrders?: {
         woNumber: string;
         itemDescription: string;
         budgetRevenue: number;
@@ -310,16 +344,6 @@ export async function GET(request: Request) {
         actualGP: number;
         variance: number;
         netsuiteEnriched: boolean;
-        soNumber?: string;
-        soStatus?: string | null;
-        lineItems?: {
-          itemName: string;
-          itemDescription: string;
-          quantity: number;
-          unitPrice: number;
-          lineAmount: number;
-          costEstimate: number;
-        }[];
       }[];
     }> = {};
 
@@ -434,12 +458,75 @@ export async function GET(request: Request) {
       wo.variance += row.variance;
     });
 
-    // Attach work orders to projects
+    // Group by Sales Order, then Work Orders under each SO
+    // Hierarchy: Project → Sales Orders → Work Orders → Line Items
     Object.keys(projectSummary).forEach(projectKey => {
       const workOrders = workOrdersByProject[projectKey];
-      if (workOrders) {
-        projectSummary[projectKey].workOrders = Object.values(workOrders);
-      }
+      if (!workOrders) return;
+
+      // Group WOs by their parent Sales Order
+      const salesOrderMap: Record<string, any> = {};
+
+      Object.values(workOrders).forEach((wo: any) => {
+        // Check if this WO has NetSuite enrichment
+        const enrichedData = getEnrichedWorkOrder(wo.woNumber);
+
+        if (enrichedData && enrichedData.soNumber) {
+          const soNumber = enrichedData.soNumber;
+
+          // Create SO entry if it doesn't exist
+          if (!salesOrderMap[soNumber]) {
+            salesOrderMap[soNumber] = {
+              soNumber: soNumber,
+              soId: enrichedData.soId,
+              soStatus: enrichedData.soStatus,
+              soDate: enrichedData.soDate,
+              customerName: enrichedData.customerName,
+              netsuiteEnriched: true,
+              lineItems: enrichedData.lineItems || [], // SO line items (what was sold)
+              workOrders: [], // WOs that fulfill this SO
+              totalRevenue: 0,
+              totalCost: 0,
+              totalGP: 0,
+            };
+          }
+
+          // Add this WO under its parent SO
+          salesOrderMap[soNumber].workOrders.push({
+            ...wo,
+            netsuiteEnriched: true,
+            woStatus: enrichedData.woStatus,
+            woDate: enrichedData.woDate,
+            // WO line items would come from WO-specific query if available
+          });
+
+          // Aggregate financials
+          salesOrderMap[soNumber].totalRevenue += wo.actualRevenue;
+          salesOrderMap[soNumber].totalCost += wo.actualCost;
+          salesOrderMap[soNumber].totalGP += wo.actualGP;
+        } else {
+          // WO not enriched or no SO - show as standalone
+          if (!salesOrderMap['_unenriched']) {
+            salesOrderMap['_unenriched'] = {
+              soNumber: null,
+              netsuiteEnriched: false,
+              workOrders: [],
+              totalRevenue: 0,
+              totalCost: 0,
+              totalGP: 0,
+            };
+          }
+
+          salesOrderMap['_unenriched'].workOrders.push(wo);
+          salesOrderMap['_unenriched'].totalRevenue += wo.actualRevenue;
+          salesOrderMap['_unenriched'].totalCost += wo.actualCost;
+          salesOrderMap['_unenriched'].totalGP += wo.actualGP;
+        }
+      });
+
+      // Attach sales orders to project (instead of just work orders)
+      projectSummary[projectKey].salesOrders = Object.values(salesOrderMap).filter(so => so.soNumber);
+      projectSummary[projectKey].unenrichedWorkOrders = salesOrderMap['_unenriched']?.workOrders || [];
     });
 
     // Calculate derived fields and sort items
@@ -503,78 +590,31 @@ export async function GET(request: Request) {
       }
     });
 
-    // Enrich projects with work orders from database if available
+    // Calculate enrichment percentage based on in-memory cache
     let enrichmentPct = 0;
     if (includeEnrichment) {
       try {
-        const { getSupabaseAdmin } = await import('@/lib/supabase');
-        const supabase = getSupabaseAdmin();
+        // Count how many work orders have enrichment
+        let totalWOs = 0;
+        let enrichedWOs = 0;
 
-        // Get all work orders with enrichment status
-        const { data: workOrders } = await supabase
-          .from('closeout_work_orders')
-          .select(`
-            *,
-            netsuite_work_order_details (*)
-          `);
-
-        if (workOrders && workOrders.length > 0) {
-          // Group work orders by project key
-          const woByProject: Record<string, any[]> = {};
-          for (const wo of workOrders) {
-            // Get project to find key
-            const { data: project } = await supabase
-              .from('closeout_projects')
-              .select('project_name, project_year, project_type')
-              .eq('id', wo.closeout_project_id)
-              .single();
-
-            if (project) {
-              const projectKey = `${project.project_name}|${project.project_year}`;
-              if (!woByProject[projectKey]) {
-                woByProject[projectKey] = [];
-              }
-              woByProject[projectKey].push(wo);
-            }
+        projects.forEach(project => {
+          if (project.salesOrders) {
+            project.salesOrders.forEach(so => {
+              totalWOs += so.workOrders.length;
+              enrichedWOs += so.workOrders.length; // All WOs in salesOrders are enriched
+            });
           }
-
-          // Attach work orders to projects
-          for (const project of projects) {
-            const wos = woByProject[project.projectKey] || [];
-            project.workOrders = wos.map((wo: any) => ({
-              woNumber: wo.wo_number,
-              itemDescription: wo.item_description,
-              budgetRevenue: wo.budget_revenue,
-              budgetCost: wo.budget_cost,
-              budgetGP: wo.budget_gp,
-              actualRevenue: wo.actual_revenue,
-              actualCost: wo.actual_cost,
-              actualGP: wo.actual_gp,
-              variance: wo.variance,
-              netsuiteEnriched: wo.netsuite_enriched,
-              soNumber: wo.netsuite_so_number,
-              soStatus: null, // Would need to fetch from details
-              lineItems: wo.netsuite_enriched && wo.netsuite_work_order_details
-                ? wo.netsuite_work_order_details.map((li: any) => ({
-                    itemName: li.item_name,
-                    itemDescription: li.item_description,
-                    quantity: li.quantity,
-                    unitPrice: li.unit_price,
-                    lineAmount: li.line_amount,
-                    costEstimate: li.cost_estimate,
-                  }))
-                : undefined,
-            }));
+          if (project.unenrichedWorkOrders) {
+            totalWOs += project.unenrichedWorkOrders.length;
+            // These are NOT enriched, so don't increment enrichedWOs
           }
+        });
 
-          // Calculate enrichment percentage
-          const totalWOs = workOrders.length;
-          const enrichedWOs = workOrders.filter((wo: any) => wo.netsuite_enriched).length;
-          enrichmentPct = totalWOs > 0 ? Math.round((enrichedWOs / totalWOs) * 100) : 0;
-        }
+        enrichmentPct = totalWOs > 0 ? Math.round((enrichedWOs / totalWOs) * 100) : 0;
       } catch (error) {
-        console.error('Error loading enrichment data:', error);
-        // Continue without enrichment
+        console.error('Error calculating enrichment percentage:', error);
+        enrichmentPct = 0;
       }
     }
 

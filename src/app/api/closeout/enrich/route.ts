@@ -4,69 +4,57 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getWorkOrdersNeedingEnrichment, enrichWorkOrderFromNetSuite } from '@/lib/closeout';
+import { getWorkOrderByNumber, getSalesOrderWithLineItems } from '@/lib/netsuite';
+import { getEnrichedWorkOrder, setEnrichedWorkOrder } from '@/lib/enrichment-cache';
+import * as XLSX from 'xlsx';
+import * as path from 'path';
+import * as fs from 'fs';
+import { getExcelFromStorage } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const url = new URL(request.url);
+    console.log('Starting NetSuite enrichment from Excel WO numbers...');
 
-    // Parse query parameters
-    const projectId = url.searchParams.get('projectId') || undefined;
-    const woNumber = url.searchParams.get('woNumber') || undefined;
-    const yearParam = url.searchParams.get('year');
-    const year = yearParam ? parseInt(yearParam) : undefined;
-    const forceRefresh = url.searchParams.get('forceRefresh') === 'true';
+    // Get Excel file
+    let fileBuffer: Buffer | null = null;
+    fileBuffer = await getExcelFromStorage('closeout-data.xlsx');
 
-    // Parse body for additional options
-    let bodyParams: any = {};
-    try {
-      const body = await request.text();
-      if (body) {
-        bodyParams = JSON.parse(body);
+    if (!fileBuffer) {
+      const localPath = path.join(process.cwd(), 'data', 'closeout-data.xlsx');
+      if (fs.existsSync(localPath)) {
+        fileBuffer = fs.readFileSync(localPath);
       }
-    } catch {
-      // Body parsing failed, use query params only
     }
 
-    // Merge params
-    const filters = {
-      projectId: bodyParams.projectId || projectId,
-      woNumber: bodyParams.woNumber || woNumber,
-      year: bodyParams.year || year,
-      forceRefresh: bodyParams.forceRefresh || forceRefresh,
-    };
-
-    console.log('Starting NetSuite enrichment with filters:', filters);
-
-    // If specific WO number provided, enrich just that one
-    if (filters.woNumber) {
-      const result = await enrichWorkOrderFromNetSuite(filters.woNumber);
-
+    if (!fileBuffer) {
       return NextResponse.json({
-        success: result.success,
-        stats: {
-          workOrdersProcessed: 1,
-          netsuiteCallsMade: result.success ? 2 : 0, // 1 for WO, 1 for SO
-          lineItemsCached: result.lineItemsAdded,
-          errors: result.error ? [result.error] : [],
-        },
-        message: result.success
-          ? `Successfully enriched WO ${filters.woNumber} with ${result.lineItemsAdded} line items`
-          : `Failed to enrich WO ${filters.woNumber}: ${result.error}`,
-      });
+        error: 'Excel file not found',
+        message: 'closeout-data.xlsx not found in storage or data folder',
+      }, { status: 404 });
     }
 
-    // Otherwise, get list of work orders needing enrichment
-    const workOrders = await getWorkOrdersNeedingEnrichment({
-      year: filters.year,
-      projectId: filters.projectId,
-    });
+    // Parse Excel to get WO numbers
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const costAuditSheet = workbook.Sheets['TB & MCC Cost Audit 2020-Curren'];
+    const costAuditRaw = XLSX.utils.sheet_to_json(costAuditSheet, { header: 1 }) as any[][];
 
-    console.log(`Found ${workOrders.length} work orders needing enrichment`);
+    // Extract unique WO numbers from Column Q (row[16])
+    const woNumbers = new Set<string>();
+    for (let i = 4; i < costAuditRaw.length; i++) {
+      const row = costAuditRaw[i];
+      if (!row[0] || row[0] === 'Open') continue;
 
-    if (workOrders.length === 0) {
+      const woNumber = row[16]?.toString()?.trim();
+      if (woNumber) {
+        woNumbers.add(woNumber);
+      }
+    }
+
+    console.log(`Found ${woNumbers.size} unique WO numbers in Excel`);
+
+    if (woNumbers.size === 0) {
       return NextResponse.json({
         success: true,
         stats: {
@@ -75,36 +63,73 @@ export async function POST(request: Request) {
           lineItemsCached: 0,
           errors: [],
         },
-        message: 'No work orders found needing enrichment',
+        message: 'No work orders found in Excel Column Q',
       });
     }
 
-    // Enrich each work order
+    // Enrich each work order from NetSuite
     const errors: string[] = [];
     let workOrdersProcessed = 0;
     let netsuiteCallsMade = 0;
     let lineItemsCached = 0;
 
-    for (const wo of workOrders) {
+    for (const woNumber of Array.from(woNumbers)) {
       try {
-        const result = await enrichWorkOrderFromNetSuite(wo.wo_number);
-
-        if (result.success) {
+        // Check cache first
+        const cachedData = getEnrichedWorkOrder(woNumber);
+        if (cachedData) {
+          console.log(`✓ Using cached data for WO ${woNumber}`);
           workOrdersProcessed++;
-          netsuiteCallsMade += 2; // 1 for WO, 1 for SO
-          lineItemsCached += result.lineItemsAdded;
-          console.log(`✓ Enriched WO ${wo.wo_number}: ${result.lineItemsAdded} line items`);
-        } else {
-          errors.push(`WO ${wo.wo_number}: ${result.error}`);
-          console.error(`✗ Failed to enrich WO ${wo.wo_number}:`, result.error);
+          lineItemsCached += cachedData.lineItems?.length || 0;
+          continue;
         }
 
-        // Add small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Query NetSuite for Work Order
+        console.log(`Querying NetSuite for WO ${woNumber}...`);
+        const woData = await getWorkOrderByNumber(woNumber);
+        netsuiteCallsMade++;
+
+        if (!woData) {
+          errors.push(`WO ${woNumber}: Not found in NetSuite`);
+          console.warn(`✗ WO ${woNumber} not found in NetSuite`);
+          continue;
+        }
+
+        // Get linked Sales Order if available
+        let soData = null;
+        if (woData.linkedSalesOrderId) {
+          console.log(`Fetching SO ${woData.linkedSalesOrderNumber} for WO ${woNumber}...`);
+          soData = await getSalesOrderWithLineItems(woData.linkedSalesOrderId);
+          netsuiteCallsMade++;
+        }
+
+        // Cache the enriched data
+        const enrichedData = {
+          woNumber: woData.tranId,
+          woId: woData.id,
+          woDate: woData.tranDate,
+          woStatus: woData.status,
+          soNumber: woData.linkedSalesOrderNumber,
+          soId: woData.linkedSalesOrderId,
+          soStatus: soData?.status,
+          soDate: soData?.tranDate,
+          customerId: woData.customerId || soData?.customerId,
+          customerName: woData.customerName || soData?.customerName,
+          lineItems: soData?.lineItems || [],
+        };
+
+        setEnrichedWorkOrder(woNumber, enrichedData);
+
+        workOrdersProcessed++;
+        lineItemsCached += soData?.lineItems?.length || 0;
+        console.log(`✓ Enriched WO ${woNumber} → SO ${woData.linkedSalesOrderNumber} with ${soData?.lineItems?.length || 0} line items`);
+
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`WO ${wo.wo_number}: ${errorMsg}`);
-        console.error(`✗ Error enriching WO ${wo.wo_number}:`, error);
+        errors.push(`WO ${woNumber}: ${errorMsg}`);
+        console.error(`✗ Error enriching WO ${woNumber}:`, error);
       }
     }
 
@@ -116,7 +141,7 @@ export async function POST(request: Request) {
         lineItemsCached,
         errors,
       },
-      message: `Successfully enriched ${workOrdersProcessed} of ${workOrders.length} work orders with ${lineItemsCached} total line items`,
+      message: `Successfully enriched ${workOrdersProcessed} of ${woNumbers.size} work orders with ${lineItemsCached} total line items`,
     });
   } catch (error) {
     console.error('Error in enrichment process:', error);
