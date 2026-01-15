@@ -31,6 +31,7 @@ interface CostAuditRow {
   bVsA: number;
   variance: number;
   comments: string;
+  woNumber: string; // Column Q: Work Order number
 }
 
 interface MarginRow {
@@ -143,6 +144,7 @@ export async function GET(request: Request) {
         bVsA: parseFloat(row[27]) || 0,
         variance: parseFloat(row[28]) || 0,
         comments: row[29]?.toString() || '',
+        woNumber: row[16]?.toString()?.trim() || '', // Column Q: WO#
       });
     }
 
@@ -391,6 +393,52 @@ export async function GET(request: Request) {
           month: row.month,
           comments: row.comments,
         });
+      }
+    });
+
+    // Group work orders by project
+    const workOrdersByProject: Record<string, Record<string, any>> = {};
+    costAuditData.forEach(row => {
+      if (!row.woNumber) return; // Skip rows without WO#
+
+      const projectKey = `${row.project}|${row.year}`;
+      if (!workOrdersByProject[projectKey]) {
+        workOrdersByProject[projectKey] = {};
+      }
+
+      if (!workOrdersByProject[projectKey][row.woNumber]) {
+        workOrdersByProject[projectKey][row.woNumber] = {
+          woNumber: row.woNumber,
+          itemDescription: row.itemDescription,
+          budgetRevenue: 0,
+          budgetCost: 0,
+          budgetGP: 0,
+          actualRevenue: 0,
+          actualCost: 0,
+          actualGP: 0,
+          variance: 0,
+          netsuiteEnriched: false,
+          soNumber: null,
+          lineItems: [],
+        };
+      }
+
+      // Aggregate financials for this work order
+      const wo = workOrdersByProject[projectKey][row.woNumber];
+      wo.budgetRevenue += row.budgetRevenue;
+      wo.budgetCost += row.budgetCost;
+      wo.budgetGP += row.budgetGP;
+      wo.actualRevenue += row.actualRevenue;
+      wo.actualCost += row.actualCost;
+      wo.actualGP += row.actualGP;
+      wo.variance += row.variance;
+    });
+
+    // Attach work orders to projects
+    Object.keys(projectSummary).forEach(projectKey => {
+      const workOrders = workOrdersByProject[projectKey];
+      if (workOrders) {
+        projectSummary[projectKey].workOrders = Object.values(workOrders);
       }
     });
 
