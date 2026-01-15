@@ -85,33 +85,32 @@ export default function CloseoutDashboard() {
           {
             title: 'Total Revenue',
             value: formatCurrency(data.kpis.totalRevenue),
+            subtitle: 'Current year',
             color: '#22C55E',
-            change: null,
           },
           {
             title: 'Total Cost',
             value: formatCurrency(data.kpis.totalCost),
+            subtitle: 'Current year',
             color: '#F59E0B',
-            change: null,
           },
           {
             title: 'Gross Profit',
             value: formatCurrency(data.kpis.totalGrossProfit),
+            subtitle: 'Current year',
             color: '#38BDF8',
-            change: null,
           },
           {
             title: 'Overall GPM',
             value: formatPercent(data.kpis.overallGPM * 100),
+            subtitle: 'Margin percentage',
             color: data.kpis.overallGPM >= 0.6 ? '#22C55E' : data.kpis.overallGPM >= 0.5 ? '#F59E0B' : '#EF4444',
-            change: null,
           },
           {
             title: 'At Risk',
             value: data.kpis.atRiskCount.toString(),
+            subtitle: 'Projects under 50% GPM',
             color: '#EF4444',
-            change: null,
-            clickable: true,
           },
         ];
 
@@ -121,32 +120,32 @@ export default function CloseoutDashboard() {
           {
             title: 'MCC Revenue',
             value: formatCurrency(mccKPIs.totalRevenue),
+            subtitle: 'All years',
             color: '#22C55E',
-            change: null,
           },
           {
             title: 'Gross Profit',
             value: formatCurrency(mccKPIs.totalGP),
+            subtitle: 'All years',
             color: '#38BDF8',
-            change: null,
           },
           {
             title: 'Avg GPM',
             value: formatPercent(mccKPIs.avgGPM * 100),
+            subtitle: 'Average margin',
             color: mccKPIs.avgGPM >= 0.6 ? '#22C55E' : mccKPIs.avgGPM >= 0.5 ? '#F59E0B' : '#EF4444',
-            change: null,
           },
           {
             title: 'Customers',
             value: mccKPIs.customerCount.toString(),
+            subtitle: 'Total customers',
             color: '#8FA3BF',
-            change: null,
           },
           {
             title: 'At Risk',
             value: mccKPIs.atRiskCount.toString(),
+            subtitle: 'Under 50% GPM',
             color: '#EF4444',
-            change: null,
           },
         ];
 
@@ -155,32 +154,32 @@ export default function CloseoutDashboard() {
           {
             title: 'Total Projects',
             value: data.projects.length.toString(),
+            subtitle: 'All years',
             color: '#38BDF8',
-            change: null,
           },
           {
             title: 'Revenue',
             value: formatCurrency(data.kpis.totalRevenue),
+            subtitle: 'Current year',
             color: '#22C55E',
-            change: null,
           },
           {
             title: 'Avg GPM',
             value: formatPercent(data.kpis.overallGPM * 100),
+            subtitle: 'Average margin',
             color: data.kpis.overallGPM >= 0.6 ? '#22C55E' : '#F59E0B',
-            change: null,
           },
           {
             title: 'Budget Variance',
             value: formatCurrency(data.kpis.budgetVariance || 0),
+            subtitle: 'vs Budget',
             color: (data.kpis.budgetVariance || 0) >= 0 ? '#22C55E' : '#EF4444',
-            change: null,
           },
           {
             title: 'Enrichment',
             value: `${data.kpis.enrichmentPct || 0}%`,
+            subtitle: 'NetSuite data',
             color: '#8FA3BF',
-            change: null,
           },
         ];
     }
@@ -259,8 +258,8 @@ export default function CloseoutDashboard() {
                     key={idx}
                     title={kpi.title}
                     value={kpi.value}
+                    subtitle={kpi.subtitle}
                     color={kpi.color}
-                    change={kpi.change}
                   />
                 ))}
               </div>
