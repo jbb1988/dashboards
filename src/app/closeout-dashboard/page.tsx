@@ -7,7 +7,7 @@ import { DashboardBackground, backgroundPresets, KPICard } from '@/components/ma
 import ProjectsTab from './components/ProjectsTab';
 import MCCTab from './components/MCCTab';
 import AnalyticsTab from './components/AnalyticsTab';
-import { RefreshCw, Upload } from 'lucide-react';
+import { RefreshCw, Upload, Database } from 'lucide-react';
 
 type TabType = 'projects' | 'mcc' | 'analytics';
 
@@ -57,6 +57,29 @@ export default function CloseoutDashboard() {
     }
   };
 
+  // Import data from Excel to database
+  const [importing, setImporting] = useState(false);
+
+  const importData = async () => {
+    try {
+      setImporting(true);
+      const response = await fetch('/api/closeout/import', { method: 'POST' });
+      const result = await response.json();
+
+      if (result.success) {
+        // Refresh data after import
+        await fetchData(true);
+        alert(`Successfully imported ${result.stats.workOrdersCreated} work orders`);
+      } else {
+        setError(result.message || 'Import failed');
+      }
+    } catch (err) {
+      setError('Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // Enrich from NetSuite
   const enrichData = async () => {
     try {
@@ -67,8 +90,12 @@ export default function CloseoutDashboard() {
       if (result.success) {
         // Refresh data after enrichment
         await fetchData(true);
+        alert(`Successfully enriched ${result.stats.workOrdersProcessed} work orders with ${result.stats.lineItemsCached} line items`);
       } else {
         setError(result.message || 'Enrichment failed');
+        if (result.stats?.errors && result.stats.errors.length > 0) {
+          console.error('Enrichment errors:', result.stats.errors);
+        }
       }
     } catch (err) {
       setError('Enrichment failed');
@@ -301,8 +328,16 @@ export default function CloseoutDashboard() {
                   Refresh
                 </button>
                 <button
+                  onClick={importData}
+                  disabled={importing || loading}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Database className={`w-4 h-4 ${importing ? 'animate-pulse' : ''}`} />
+                  {importing ? 'Importing...' : 'Import Data'}
+                </button>
+                <button
                   onClick={enrichData}
-                  disabled={enriching || loading}
+                  disabled={enriching || loading || importing}
                   className="px-4 py-2 rounded-lg bg-[#22C55E] text-white text-sm font-medium hover:bg-[#16A34A] transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   <Upload className={`w-4 h-4 ${enriching ? 'animate-bounce' : ''}`} />

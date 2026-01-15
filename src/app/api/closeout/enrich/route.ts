@@ -1,15 +1,15 @@
 /**
  * API Route: /api/closeout/enrich
  * Enrich closeout work orders with NetSuite SO/WO line item details
+ * Stores results in Supabase database for persistence across serverless invocations
  */
 
 import { NextResponse } from 'next/server';
 import { getWorkOrderByNumber, getSalesOrderWithLineItems } from '@/lib/netsuite';
-import { getEnrichedWorkOrder, setEnrichedWorkOrder } from '@/lib/enrichment-cache';
+import { getSupabaseAdmin, getExcelFromStorage } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 import * as path from 'path';
 import * as fs from 'fs';
-import { getExcelFromStorage } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,7 +67,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Enrich each work order from NetSuite
+    // Get Supabase client
+    const supabase = getSupabaseAdmin();
+
+    // Enrich each work order from NetSuite and store in database
     const errors: string[] = [];
     let workOrdersProcessed = 0;
     let netsuiteCallsMade = 0;
@@ -75,12 +78,17 @@ export async function POST(request: Request) {
 
     for (const woNumber of Array.from(woNumbers)) {
       try {
-        // Check cache first
-        const cachedData = getEnrichedWorkOrder(woNumber);
-        if (cachedData) {
-          console.log(`✓ Using cached data for WO ${woNumber}`);
+        // Check if already enriched in database
+        const { data: existingWO } = await supabase
+          .from('closeout_work_orders')
+          .select('netsuite_enriched, netsuite_enriched_at')
+          .eq('wo_number', woNumber)
+          .eq('netsuite_enriched', true)
+          .single();
+
+        if (existingWO) {
+          console.log(`✓ WO ${woNumber} already enriched in database`);
           workOrdersProcessed++;
-          lineItemsCached += cachedData.lineItems?.length || 0;
           continue;
         }
 
@@ -103,25 +111,75 @@ export async function POST(request: Request) {
           netsuiteCallsMade++;
         }
 
-        // Cache the enriched data
-        const enrichedData = {
-          woNumber: woData.tranId,
-          woId: woData.id,
-          woDate: woData.tranDate,
-          woStatus: woData.status,
-          soNumber: woData.linkedSalesOrderNumber,
-          soId: woData.linkedSalesOrderId,
-          soStatus: soData?.status,
-          soDate: soData?.tranDate,
-          customerId: woData.customerId || soData?.customerId,
-          customerName: woData.customerName || soData?.customerName,
-          lineItems: soData?.lineItems || [],
-        };
+        // Update work order with enrichment status
+        const { error: updateError } = await supabase
+          .from('closeout_work_orders')
+          .update({
+            netsuite_enriched: true,
+            netsuite_wo_id: woData.id,
+            netsuite_so_id: woData.linkedSalesOrderId || null,
+            netsuite_so_number: woData.linkedSalesOrderNumber || null,
+            netsuite_enriched_at: new Date().toISOString(),
+          })
+          .eq('wo_number', woNumber);
 
-        setEnrichedWorkOrder(woNumber, enrichedData);
+        if (updateError) {
+          console.error(`Error updating WO ${woNumber}:`, updateError);
+          errors.push(`WO ${woNumber}: Database update failed - ${updateError.message}`);
+          continue;
+        }
+
+        // Store line items in database
+        if (soData && soData.lineItems && soData.lineItems.length > 0) {
+          // Get the closeout_wo_id for this work order
+          const { data: woRecord } = await supabase
+            .from('closeout_work_orders')
+            .select('id')
+            .eq('wo_number', woNumber)
+            .single();
+
+          if (woRecord) {
+            const lineItemRecords = soData.lineItems.map(item => ({
+              closeout_wo_id: woRecord.id,
+              wo_id: woData.id,
+              wo_number: woData.tranId,
+              wo_status: woData.status,
+              wo_date: woData.tranDate || null,
+              so_id: soData.id,
+              so_number: soData.tranId,
+              so_status: soData.status,
+              so_date: soData.tranDate || null,
+              customer_id: woData.customerId || soData.customerId,
+              customer_name: woData.customerName || soData.customerName,
+              line_id: item.lineId,
+              item_id: item.itemId,
+              item_name: item.itemName,
+              item_description: item.itemDescription,
+              item_type: item.itemType,
+              quantity: item.quantity,
+              unit_price: item.unitPrice,
+              line_amount: item.lineAmount,
+              cost_estimate: item.costEstimate,
+              source_type: 'sales_order',
+            }));
+
+            const { error: insertError } = await supabase
+              .from('netsuite_work_order_details')
+              .upsert(lineItemRecords, {
+                onConflict: 'wo_number,line_id',
+                ignoreDuplicates: false,
+              });
+
+            if (insertError) {
+              console.error(`Error inserting line items for WO ${woNumber}:`, insertError);
+              errors.push(`WO ${woNumber}: Line items insert failed - ${insertError.message}`);
+            } else {
+              lineItemsCached += soData.lineItems.length;
+            }
+          }
+        }
 
         workOrdersProcessed++;
-        lineItemsCached += soData?.lineItems?.length || 0;
         console.log(`✓ Enriched WO ${woNumber} → SO ${woData.linkedSalesOrderNumber} with ${soData?.lineItems?.length || 0} line items`);
 
         // Small delay to avoid rate limiting

@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import * as path from 'path';
 import * as fs from 'fs';
-import { getExcelFromStorage } from '@/lib/supabase';
-import { getEnrichedWorkOrder } from '@/lib/enrichment-cache';
+import { getExcelFromStorage, getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -458,6 +457,70 @@ export async function GET(request: Request) {
       wo.variance += row.variance;
     });
 
+    // Load NetSuite enrichment data from database if requested
+    const supabase = getSupabaseAdmin();
+    const woEnrichmentMap: Record<string, any> = {};
+
+    if (includeEnrichment) {
+      try {
+        // Get all enriched work orders with their line items
+        const { data: enrichedWOs } = await supabase
+          .from('closeout_work_orders')
+          .select(`
+            wo_number,
+            netsuite_enriched,
+            netsuite_wo_id,
+            netsuite_so_id,
+            netsuite_so_number,
+            netsuite_work_order_details (
+              wo_status,
+              wo_date,
+              so_number,
+              so_status,
+              so_date,
+              customer_name,
+              line_id,
+              item_name,
+              item_description,
+              quantity,
+              unit_price,
+              line_amount,
+              cost_estimate
+            )
+          `)
+          .eq('netsuite_enriched', true);
+
+        if (enrichedWOs) {
+          enrichedWOs.forEach((wo: any) => {
+            const lineItems = wo.netsuite_work_order_details?.map((li: any) => ({
+              lineId: li.line_id,
+              itemName: li.item_name,
+              itemDescription: li.item_description,
+              quantity: li.quantity,
+              unitPrice: li.unit_price,
+              lineAmount: li.line_amount,
+              costEstimate: li.cost_estimate,
+            })) || [];
+
+            const firstDetail = wo.netsuite_work_order_details?.[0];
+            woEnrichmentMap[wo.wo_number] = {
+              soNumber: wo.netsuite_so_number,
+              soId: wo.netsuite_so_id,
+              soStatus: firstDetail?.so_status,
+              soDate: firstDetail?.so_date,
+              woStatus: firstDetail?.wo_status,
+              woDate: firstDetail?.wo_date,
+              customerName: firstDetail?.customer_name,
+              lineItems,
+            };
+          });
+        }
+      } catch (error) {
+        console.error('Error loading enrichment data from database:', error);
+        // Continue without enrichment
+      }
+    }
+
     // Group by Sales Order, then Work Orders under each SO
     // Hierarchy: Project → Sales Orders → Work Orders → Line Items
     Object.keys(projectSummary).forEach(projectKey => {
@@ -468,8 +531,8 @@ export async function GET(request: Request) {
       const salesOrderMap: Record<string, any> = {};
 
       Object.values(workOrders).forEach((wo: any) => {
-        // Check if this WO has NetSuite enrichment
-        const enrichedData = getEnrichedWorkOrder(wo.woNumber);
+        // Check if this WO has NetSuite enrichment from database
+        const enrichedData = woEnrichmentMap[wo.woNumber];
 
         if (enrichedData && enrichedData.soNumber) {
           const soNumber = enrichedData.soNumber;
@@ -497,7 +560,6 @@ export async function GET(request: Request) {
             netsuiteEnriched: true,
             woStatus: enrichedData.woStatus,
             woDate: enrichedData.woDate,
-            // WO line items would come from WO-specific query if available
           });
 
           // Aggregate financials
