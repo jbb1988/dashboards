@@ -69,12 +69,18 @@ export default function CloseoutDashboard() {
       if (result.success) {
         // Refresh data after import
         await fetchData(true);
-        alert(`Successfully imported ${result.stats.workOrdersCreated} work orders`);
+        alert(`Successfully imported:\n- ${result.stats.projectsCreated} projects\n- ${result.stats.workOrdersCreated} work orders`);
       } else {
-        setError(result.message || 'Import failed');
+        const errorMsg = result.message || 'Import failed';
+        setError(errorMsg);
+        console.error('Import error details:', result.details);
+        alert(`Import failed: ${errorMsg}\n\nCheck browser console for details.`);
       }
     } catch (err) {
-      setError('Import failed');
+      const errorMsg = err instanceof Error ? err.message : 'Import failed';
+      setError(errorMsg);
+      console.error('Import error:', err);
+      alert(`Import failed: ${errorMsg}`);
     } finally {
       setImporting(false);
     }

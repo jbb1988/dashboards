@@ -59,10 +59,17 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Error importing closeout data:', error);
+
+    // Log detailed error for debugging
+    if (error instanceof Error) {
+      console.error('Error stack:', error.stack);
+    }
+
     return NextResponse.json(
       {
         error: 'Import failed',
         message: error instanceof Error ? error.message : 'Unknown error',
+        details: error instanceof Error ? error.stack : String(error),
       },
       { status: 500 }
     );
