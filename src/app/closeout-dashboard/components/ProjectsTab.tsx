@@ -51,6 +51,20 @@ interface Project {
   variance: number;
   itemCount: number;
   workOrders?: WorkOrder[];
+  lineItems?: Array<{
+    itemNumber: string;
+    itemDescription: string;
+    budgetRevenue: number;
+    budgetCost: number;
+    budgetGP: number;
+    actualRevenue: number;
+    actualCost: number;
+    actualGP: number;
+    variance: number;
+    year: number;
+    month: number;
+    comments: string;
+  }>;
 }
 
 interface ProjectsTabProps {
