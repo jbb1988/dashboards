@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 // In-memory cache to avoid re-parsing Excel on every request
 let cachedData: any = null;
 let cacheTimestamp: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (increased for performance)
 
 interface CostAuditRow {
   project: string;
@@ -235,17 +235,25 @@ export async function GET(request: Request) {
       });
     }
 
-    // Calculate KPIs
+    // Calculate KPIs (optimize by using single pass)
     const currentYear = new Date().getFullYear();
-    const currentYearData = costAuditData.filter(d => d.year === currentYear || d.year === currentYear - 1);
+    let totalActualRevenue = 0;
+    let totalActualCost = 0;
+    let totalBudgetRevenue = 0;
+    let totalBudgetCost = 0;
 
-    const totalActualRevenue = currentYearData.reduce((sum, d) => sum + d.actualRevenue, 0);
-    const totalActualCost = currentYearData.reduce((sum, d) => sum + d.actualCost, 0);
+    // Single pass to calculate totals for current/previous year
+    costAuditData.forEach(d => {
+      if (d.year === currentYear || d.year === currentYear - 1) {
+        totalActualRevenue += d.actualRevenue;
+        totalActualCost += d.actualCost;
+        totalBudgetRevenue += d.budgetRevenue;
+        totalBudgetCost += d.budgetCost;
+      }
+    });
+
     const totalActualGP = totalActualRevenue - totalActualCost;
     const overallGPM = totalActualRevenue > 0 ? (totalActualGP / totalActualRevenue) : 0;
-
-    const totalBudgetRevenue = currentYearData.reduce((sum, d) => sum + d.budgetRevenue, 0);
-    const totalBudgetCost = currentYearData.reduce((sum, d) => sum + d.budgetCost, 0);
     const totalBudgetGP = totalBudgetRevenue - totalBudgetCost;
 
     // Group by Customer + Year - each year's work is a SEPARATE project

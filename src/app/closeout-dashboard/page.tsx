@@ -37,7 +37,11 @@ export default function CloseoutDashboard() {
   const fetchData = async (bust = false) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/closeout${bust ? '?bust=true' : ''}`);
+      setError(null); // Clear previous errors
+      const response = await fetch(`/api/closeout${bust ? '?bust=true' : ''}`, {
+        // Add cache control for better performance
+        next: { revalidate: bust ? 0 : 1800 } // 30 minutes cache unless bust
+      });
       const result = await response.json();
 
       if (result.error) {
