@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   try {
     const url = new URL(request.url);
     const forceRefresh = url.searchParams.get('forceRefresh') === 'true';
+    const testProject = url.searchParams.get('testProject') || undefined;  // Filter to single project for testing
 
     // Get Excel file buffer
     let fileBuffer: Buffer | null = null;
@@ -41,8 +42,12 @@ export async function POST(request: Request) {
     }
 
     // Import data to database
-    console.log('Starting closeout data import...');
-    const stats = await importCloseoutExcelToDatabase(fileBuffer);
+    if (testProject) {
+      console.log(`Starting TEST import for project: "${testProject}"`);
+    } else {
+      console.log('Starting closeout data import...');
+    }
+    const stats = await importCloseoutExcelToDatabase(fileBuffer, { testProject });
 
     console.log('Import complete:', stats);
 

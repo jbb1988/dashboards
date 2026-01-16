@@ -196,7 +196,10 @@ export async function getWorkOrdersForProject(
  * Parses closeout worksheet and upserts to closeout_projects and closeout_work_orders tables
  */
 export async function importCloseoutExcelToDatabase(
-  fileBuffer: Buffer
+  fileBuffer: Buffer,
+  options?: {
+    testProject?: string;  // If provided, only import rows matching this project name
+  }
 ): Promise<{
   projectsCreated: number;
   projectsUpdated: number;
@@ -272,6 +275,11 @@ export async function importCloseoutExcelToDatabase(
       // Skip rows with missing critical data
       if (!projectName || projectYear === 0 || !projectType) {
         continue;  // Skip rows without complete project identification
+      }
+
+      // TEST MODE: Filter to single project if testProject specified
+      if (options?.testProject && projectName !== options.testProject) {
+        continue;  // Skip rows that don't match test project
       }
 
       // Create project key
