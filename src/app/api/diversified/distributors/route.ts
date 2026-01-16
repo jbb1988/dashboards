@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
     const yearsParam = searchParams.get('years');
     const monthsParam = searchParams.get('months');
     const className = searchParams.get('className');
+    const viewMode = searchParams.get('view') || 'distributor'; // 'distributor' or 'location'
 
     const years = yearsParam ? yearsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
     const months = monthsParam ? monthsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
@@ -343,6 +344,48 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Return different response based on view mode
+    if (viewMode === 'location') {
+      // Flatten all locations with distributor_name
+      const allLocations = distributors.flatMap(dist =>
+        dist.locations.map(loc => ({
+          ...loc,
+          distributor_name: dist.distributor_name,
+        }))
+      );
+
+      // Sort locations by revenue descending
+      allLocations.sort((a, b) => b.revenue - a.revenue);
+
+      return NextResponse.json({
+        locations: allLocations,
+        summary: {
+          total_distributors: totalDistributors,
+          total_locations: totalLocations,
+          total_revenue: totalRevenue,
+          avg_revenue_per_location: avgRevenuePerLocation,
+          total_growth_opportunities: totalOpportunities,
+          opportunities_by_tier: {
+            high: highOpps,
+            medium: mediumOpps,
+            low: lowOpps
+          }
+        },
+        periods: {
+          current: {
+            start: formatDate(currentPeriodStart),
+            end: formatDate(currentPeriodEnd)
+          },
+          prior: {
+            start: formatDate(priorPeriodStart),
+            end: formatDate(priorPeriodEnd)
+          }
+        },
+        categories: Array.from(allCategories).sort()
+      });
+    }
+
+    // Default: Return distributor view
     return NextResponse.json({
       distributors,
       summary: {
@@ -372,21 +415,26 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching distributor data:', error);
-    return NextResponse.json(
-      {
-        error: 'Failed to fetch distributor data',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        distributors: [],
-        summary: {
-          total_distributors: 0,
-          total_locations: 0,
-          total_revenue: 0,
-          avg_revenue_per_location: 0,
-          total_growth_opportunities: 0,
-          opportunities_by_tier: { high: 0, medium: 0, low: 0 }
-        }
-      },
-      { status: 500 }
-    );
+
+    const errorResponse = {
+      error: 'Failed to fetch distributor data',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      summary: {
+        total_distributors: 0,
+        total_locations: 0,
+        total_revenue: 0,
+        avg_revenue_per_location: 0,
+        total_growth_opportunities: 0,
+        opportunities_by_tier: { high: 0, medium: 0, low: 0 }
+      }
+    };
+
+    // Add appropriate data field based on view mode
+    const { searchParams: errorSearchParams } = new URL(request.url);
+    if (errorSearchParams.get('view') === 'location') {
+      return NextResponse.json({ ...errorResponse, locations: [] }, { status: 500 });
+    } else {
+      return NextResponse.json({ ...errorResponse, distributors: [] }, { status: 500 });
+    }
   }
 }

@@ -38,7 +38,11 @@ export default function CloseoutDashboard() {
     try {
       setLoading(true);
       setError(null); // Clear previous errors
-      const response = await fetch(`/api/closeout${bust ? '?bust=true' : ''}`, {
+      const params = new URLSearchParams();
+      if (bust) params.append('bust', 'true');
+      params.append('includeEnrichment', 'true'); // Always include enrichment data
+
+      const response = await fetch(`/api/closeout?${params.toString()}`, {
         // Add cache control for better performance
         next: { revalidate: bust ? 0 : 1800 } // 30 minutes cache unless bust
       });
@@ -101,15 +105,27 @@ export default function CloseoutDashboard() {
       const response = await fetch(url, { method: 'POST' });
       const result = await response.json();
 
-      if (result.success) {
+      if (result.success || result.stats) {
         // Refresh data after enrichment
         await fetchData(true);
-        alert(`${result.message}`);
+
+        const stats = result.stats;
+        let message = result.message;
+
+        // Add error details if any
+        if (stats.errors && stats.errors.length > 0) {
+          console.error('Enrichment errors:', stats.errors);
+          message += `\n\nErrors (${stats.errors.length}):\n` + stats.errors.slice(0, 5).join('\n');
+          if (stats.errors.length > 5) {
+            message += `\n... and ${stats.errors.length - 5} more (check console)`;
+          }
+        }
+
+        alert(message);
       } else {
         setError(result.message || 'Enrichment failed');
-        if (result.stats?.errors && result.stats.errors.length > 0) {
-          console.error('Enrichment errors:', result.stats.errors);
-        }
+        console.error('Enrichment failed:', result);
+        alert(`Enrichment failed: ${result.message || 'Unknown error'}`);
       }
     } catch (err) {
       setError('Enrichment failed');

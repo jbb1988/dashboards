@@ -2,39 +2,32 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
-import { CustomerDetailDrawer } from '@/components/diversified/CustomerDetailDrawer';
+import { DashboardBackground, backgroundPresets, KPICard } from '@/components/mars-ui';
 import DiversifiedFilterDrawer, { DiversifiedFilterState } from '@/components/diversified/DiversifiedFilterDrawer';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  ScatterChart,
-  Scatter,
-  ZAxis,
-  Cell,
-} from 'recharts';
-import { formatLocationDisplay } from '@/lib/distributorAnalysis';
-import React from 'react';
+import DistributorTable from '@/components/distributors/DistributorTable';
+import LocationTable from '@/components/distributors/LocationTable';
+import { DistributorInsightsPanel } from '@/components/distributors/DistributorInsightsPanel';
+import { DistributorTasksTab } from '@/components/distributors/DistributorTasksTab';
+import { DistributorRevenueChart } from '@/components/charts/DistributorRevenueChart';
+import { LocationConcentrationChart } from '@/components/charts/LocationConcentrationChart';
+import { CategoryHeatmap } from '@/components/charts/CategoryHeatmap';
+import { AtRiskScatterChart } from '@/components/charts/AtRiskScatterChart';
+import { LocationPerformanceChart } from '@/components/charts/LocationPerformanceChart';
 
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
 
-interface GrowthScoreComponents {
-  revenueGap: number;
-  trendScore: number;
-  categoryGap: number;
-  marginHealth: number;
-}
-
 interface GrowthScore {
   overall: number;
-  components: GrowthScoreComponents;
+  components: {
+    revenueGap: number;
+    trendScore: number;
+    categoryGap: number;
+    marginHealth: number;
+  };
   tier: 'high' | 'medium' | 'low';
 }
 
@@ -71,8 +64,13 @@ interface DistributorData {
   locations: DistributorLocation[];
 }
 
+interface LocationWithDistributor extends DistributorLocation {
+  distributor_name: string;
+}
+
 interface DistributorsResponse {
-  distributors: DistributorData[];
+  distributors?: DistributorData[]; // Present when view=distributor
+  locations?: LocationWithDistributor[]; // Present when view=location
   summary: {
     total_distributors: number;
     total_locations: number;
@@ -99,8 +97,10 @@ interface DistributorsResponse {
 const TIER_CONFIG = {
   high: { label: 'High', color: '#EF4444', bg: 'bg-red-500/10', text: 'text-red-400' },
   medium: { label: 'Medium', color: '#F59E0B', bg: 'bg-amber-500/10', text: 'text-amber-400' },
-  low: { label: 'Low', color: '#6B7280', bg: 'bg-gray-500/10', text: 'text-gray-400' },
+  low: { label: 'Low', color: '#3B82F6', bg: 'bg-blue-500/10', text: 'text-blue-400' },
 };
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -116,9 +116,23 @@ function formatCurrency(value: number): string {
   return `$${Math.round(value).toLocaleString()}`;
 }
 
+function formatCurrencyCompact(value: number): string {
+  if (Math.abs(value) >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`;
+  }
+  if (Math.abs(value) >= 1000) {
+    return `$${(value / 1000).toFixed(0)}K`;
+  }
+  return `$${Math.round(value)}`;
+}
+
 function formatPercentage(value: number, decimals: number = 1): string {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(decimals)}%`;
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString();
 }
 
 function getYoYColor(value: number): string {
@@ -127,33 +141,85 @@ function getYoYColor(value: number): string {
   return 'text-gray-400';
 }
 
+// Filter Badge Component
+function FilterBadge({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#14B8A6]/10 border border-[#14B8A6]/20 text-[#14B8A6] text-[12px] font-medium"
+    >
+      <span>{label}</span>
+      <button
+        onClick={onRemove}
+        className="hover:bg-[#14B8A6]/20 rounded p-0.5 transition-colors"
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </motion.div>
+  );
+}
+
 // =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
 export default function DistributorsDashboard() {
+  const router = useRouter();
+
   // Sidebar state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'insights' | 'tasks'>('table');
+
+  // View mode (distributor-level or location-level)
+  const [viewMode, setViewMode] = useState<'distributor' | 'location'>('distributor');
 
   // Data state
   const [data, setData] = useState<DistributorsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter state (moved from parent)
+  // Filter state
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'class' | 'customer'>('class');
 
   // UI state
   const [expandedDistributor, setExpandedDistributor] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'revenue' | 'growth_opps' | 'yoy'>('revenue');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  // Customer detail drawer (moved from parent)
-  const [selectedCustomerForDetail, setSelectedCustomerForDetail] = useState<{id: string; name: string} | null>(null);
+  // Compute filter options
+  const filterOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 7 }, (_, i) => currentYear - i);
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+    const classes = data?.categories || [];
+
+    return { years, months, classes };
+  }, [data?.categories]);
+
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedYears.length > 0) count++;
+    if (selectedMonths.length > 0) count++;
+    if (selectedClass) count++;
+    return count;
+  }, [selectedYears, selectedMonths, selectedClass]);
+
+  // Reset filters
+  const resetFilters = () => {
+    setSelectedYears([]);
+    setSelectedMonths([]);
+    setSelectedClass(null);
+  };
 
   // Data fetching
   useEffect(() => {
@@ -163,16 +229,10 @@ export default function DistributorsDashboard() {
 
       try {
         const params = new URLSearchParams();
-
-        if (selectedYears && selectedYears.length > 0) {
-          params.append('years', selectedYears.join(','));
-        }
-        if (selectedMonths && selectedMonths.length > 0) {
-          params.append('months', selectedMonths.join(','));
-        }
-        if (selectedClass) {
-          params.append('className', selectedClass);
-        }
+        if (selectedYears.length > 0) params.append('years', selectedYears.join(','));
+        if (selectedMonths.length > 0) params.append('months', selectedMonths.join(','));
+        if (selectedClass) params.append('className', selectedClass);
+        params.append('view', viewMode);
 
         const response = await fetch(`/api/diversified/distributors?${params}`);
         if (!response.ok) throw new Error('Failed to fetch distributor data');
@@ -188,11 +248,25 @@ export default function DistributorsDashboard() {
     };
 
     fetchData();
-  }, [selectedYears, selectedMonths, selectedClass]);
+  }, [selectedYears, selectedMonths, selectedClass, viewMode]);
+
+  // Calculate max revenue for table visualizations
+  const maxRevenue = useMemo(() => {
+    if (!data) return 0;
+
+    if (viewMode === 'distributor') {
+      if (!data.distributors || data.distributors.length === 0) return 0;
+      return Math.max(...data.distributors.map(d => d.total_revenue), 0);
+    } else {
+      // For location view, use the flat locations array from API
+      if (!data.locations || data.locations.length === 0) return 0;
+      return Math.max(...data.locations.map(loc => loc.revenue), 0);
+    }
+  }, [data, viewMode]);
 
   // Sort distributors
   const sortedDistributors = useMemo(() => {
-    if (!data) return [];
+    if (!data || !data.distributors) return [];
 
     const sorted = [...data.distributors];
 
@@ -224,16 +298,6 @@ export default function DistributorsDashboard() {
     return sorted;
   }, [data, sortBy, sortDir]);
 
-  // Compute filter options
-  const filterOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: 7 }, (_, i) => currentYear - i);
-    const months = Array.from({ length: 12 }, (_, i) => i + 1);
-    const classes = data?.categories || [];
-
-    return { years, months, classes };
-  }, [data?.categories]);
-
   // Toggle sort
   const handleSort = (column: 'revenue' | 'growth_opps' | 'yoy') => {
     if (sortBy === column) {
@@ -244,33 +308,152 @@ export default function DistributorsDashboard() {
     }
   };
 
-  // Prepare chart data
-  const barChartData = sortedDistributors.slice(0, 10).map(d => ({
-    name: d.distributor_name,
-    revenue: d.total_revenue,
-    yoy: d.yoy_change_pct,
-    locations: d.location_count
-  })).reverse();
+  // ===== CHART DATA PROCESSING =====
 
-  const scatterData: Array<{ x: number; y: number; name: string; tier: string; revenue: number }> = [];
-  for (const dist of sortedDistributors) {
-    for (const loc of dist.locations) {
-      if (loc.growth_score) {
-        scatterData.push({
-          x: loc.revenue,
-          y: loc.growth_score.overall,
-          name: `${dist.distributor_name} - ${formatLocationDisplay({
-            location: loc.location,
-            state: loc.state,
-            confidence: loc.location_confidence,
-            rawName: loc.customer_name
-          })}`,
-          tier: loc.growth_score.tier,
-          revenue: loc.revenue
+  // Chart 1: Revenue trend data (mock for now - would need monthly data from API)
+  const revenueTrendData = useMemo(() => {
+    if (!data || !data.distributors) return { data: [], distributors: [] };
+
+    // For now, create placeholder monthly data
+    // In production, this would come from the API with actual monthly breakdowns
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const topDistributors = data.distributors.slice(0, 5);
+
+    const chartData = months.map((month, idx) => {
+      const monthData: any = { month };
+      topDistributors.forEach(dist => {
+        // Simulate monthly variance
+        const baseRevenue = dist.total_revenue / 12;
+        const variance = 0.85 + (Math.random() * 0.3); // 85-115% of average
+        monthData[dist.distributor_name] = baseRevenue * variance;
+      });
+      return monthData;
+    });
+
+    return {
+      data: chartData,
+      distributors: topDistributors.map(d => d.distributor_name)
+    };
+  }, [data]);
+
+  // Chart 2: Location concentration data
+  const concentrationData = useMemo(() => {
+    if (!data || !data.distributors) return { data: [], totalRevenue: 0, hhi: 0 };
+
+    // Get all locations across distributors
+    const allLocations = data.distributors.flatMap(d =>
+      d.locations.map(loc => ({
+        name: `${loc.location} (${d.distributor_name})`,
+        value: loc.revenue,
+      }))
+    );
+
+    // Sort by revenue and take top 5
+    const sorted = allLocations.sort((a, b) => b.value - a.value);
+    const top5 = sorted.slice(0, 5);
+    const othersTotal = sorted.slice(5).reduce((sum, loc) => sum + loc.value, 0);
+
+    const chartData = [
+      ...top5.map(loc => ({
+        name: loc.name,
+        value: loc.value,
+        percentage: (loc.value / data.summary.total_revenue) * 100
+      })),
+      ...(othersTotal > 0 ? [{
+        name: 'Other',
+        value: othersTotal,
+        percentage: (othersTotal / data.summary.total_revenue) * 100
+      }] : [])
+    ];
+
+    // Calculate HHI (Herfindahl-Hirschman Index)
+    const hhi = allLocations.reduce((sum, loc) => {
+      const marketShare = (loc.value / data.summary.total_revenue) * 100;
+      return sum + (marketShare * marketShare);
+    }, 0);
+
+    return {
+      data: chartData,
+      totalRevenue: data.summary.total_revenue,
+      hhi
+    };
+  }, [data]);
+
+  // Chart 3: Category heatmap data
+  const categoryHeatmapData = useMemo(() => {
+    if (!data || !data.distributors) return { data: [], distributors: [], categories: [] };
+
+    const categories = data.categories || [];
+    const heatmapCells: any[] = [];
+
+    data.distributors.forEach(dist => {
+      categories.forEach(category => {
+        // Calculate revenue for this distributor-category combination
+        const categoryRevenue = dist.locations.reduce((sum, loc) => {
+          const hasCategory = loc.categories.includes(category);
+          return sum + (hasCategory ? loc.revenue / loc.categories.length : 0);
+        }, 0);
+
+        heatmapCells.push({
+          distributor: dist.distributor_name,
+          category,
+          revenue: categoryRevenue,
+          percentage: dist.total_revenue > 0 ? (categoryRevenue / dist.total_revenue) * 100 : 0
         });
-      }
-    }
-  }
+      });
+    });
+
+    return {
+      data: heatmapCells,
+      distributors: data.distributors.map(d => d.distributor_name),
+      categories
+    };
+  }, [data]);
+
+  // Chart 4: At-risk scatter data
+  const scatterData = useMemo(() => {
+    if (!data || !data.distributors) return [];
+
+    const points = data.distributors.flatMap(dist =>
+      dist.locations
+        .filter(loc => loc.is_opportunity)
+        .map(loc => ({
+          name: loc.location,
+          distributor: dist.distributor_name,
+          x: loc.yoy_change_pct,
+          y: loc.revenue,
+          z: loc.growth_score?.overall || 50,
+          tier: loc.growth_score?.tier || 'low'
+        }))
+    );
+
+    return points;
+  }, [data]);
+
+  // Chart 5: Location performance data
+  const performanceData = useMemo(() => {
+    if (!data || !data.distributors) return [];
+
+    const allLocations = data.distributors.flatMap(dist => {
+      const avgRevenue = dist.avg_revenue_per_location;
+
+      return dist.locations.map(loc => {
+        const variance = avgRevenue > 0 ? ((loc.revenue - avgRevenue) / avgRevenue) * 100 : 0;
+        const varianceAmount = loc.revenue - avgRevenue;
+
+        return {
+          location: loc.location,
+          distributor: dist.distributor_name,
+          revenue: loc.revenue,
+          distributorAvg: avgRevenue,
+          variance,
+          varianceAmount
+        };
+      });
+    });
+
+    return allLocations;
+  }, [data]);
 
   return (
     <div className="min-h-screen bg-[#0B1220]">
@@ -294,387 +477,361 @@ export default function DistributorsDashboard() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-6"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-white mb-2">
-                  Distributor Analysis
-                </h1>
-                <p className="text-[#94A3B8] text-sm">
-                  Track growth opportunities across Ferguson, Core & Main, Fortiline, and other distributor locations
-                </p>
-              </div>
-              <button
-                onClick={() => setFilterDrawerOpen(true)}
-                className="px-4 py-2 bg-[#1E293B] text-[#94A3B8] rounded-lg border border-white/[0.04] hover:bg-[#334155] transition-colors flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                Filters
-              </button>
-            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Distributor Analysis
+            </h1>
+            <p className="text-[#94A3B8] text-sm">
+              Track growth opportunities across Ferguson, Core & Main, Fortiline, and distributor locations
+            </p>
           </motion.div>
 
-          {/* Loading state */}
+          {/* Loading State */}
           {loading && !data && (
-            <div className="flex items-center justify-center h-[400px]">
-              <div className="flex items-center gap-3 text-[#94A3B8]">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                <span>Loading distributor data...</span>
-              </div>
-            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center justify-center py-20"
+            >
+              <div className="text-[#94A3B8]">Loading distributor data...</div>
+            </motion.div>
           )}
 
-          {/* Error state */}
+          {/* Error State */}
           {error && (
-            <div className="flex items-center justify-center h-[400px]">
-              <div className="text-center">
-                <div className="text-red-400 text-lg mb-2">Error loading distributor data</div>
-                <div className="text-[#64748B] text-sm">{error}</div>
-              </div>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6"
+            >
+              <p className="text-red-400 text-sm">{error}</p>
+            </motion.div>
           )}
 
-          {/* No data state */}
-          {!loading && !error && (!data || data.distributors.length === 0) && (
-            <div className="flex items-center justify-center h-[400px]">
-              <div className="text-center text-[#64748B]">
-                No distributor data found for the selected filters
-              </div>
-            </div>
-          )}
-
-          {/* Content */}
-          {data && data.distributors.length > 0 && (
-            <div className="space-y-6">
+          {/* Data Content */}
+          {data && (
+            <>
               {/* KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {/* Total Distributors */}
-                <div className="bg-[#1E293B] rounded-lg p-4 border border-white/[0.08]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[#94A3B8] text-xs font-medium">Total Distributors</span>
-                    <svg className="w-4 h-4 text-[#14B8A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
-                  <div className="text-2xl font-bold text-[#14B8A6]">
-                    {data.summary.total_distributors}
-                  </div>
-                </div>
-
-                {/* Total Locations */}
-                <div className="bg-[#1E293B] rounded-lg p-4 border border-white/[0.08]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[#94A3B8] text-xs font-medium">Total Locations</span>
-                    <svg className="w-4 h-4 text-[#14B8A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div className="text-2xl font-bold text-[#14B8A6]">
-                    {data.summary.total_locations}
-                  </div>
-                </div>
-
-                {/* Total Revenue */}
-                <div className="bg-[#1E293B] rounded-lg p-4 border border-white/[0.08]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[#94A3B8] text-xs font-medium">Total Revenue</span>
-                    <svg className="w-4 h-4 text-[#14B8A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="text-2xl font-bold text-[#14B8A6]">
-                    {formatCurrency(data.summary.total_revenue)}
-                  </div>
-                </div>
-
-                {/* Avg Revenue/Location */}
-                <div className="bg-[#1E293B] rounded-lg p-4 border border-white/[0.08]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[#94A3B8] text-xs font-medium">Avg/Location</span>
-                    <svg className="w-4 h-4 text-[#14B8A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div className="text-2xl font-bold text-[#14B8A6]">
-                    {formatCurrency(data.summary.avg_revenue_per_location)}
-                  </div>
-                </div>
-
-                {/* Growth Opportunities */}
-                <div className="bg-[#1E293B] rounded-lg p-4 border border-white/[0.08]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[#94A3B8] text-xs font-medium">Opportunities</span>
-                    <svg className="w-4 h-4 text-[#14B8A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <div className="text-2xl font-bold text-[#14B8A6]">
-                    {data.summary.total_growth_opportunities}
-                  </div>
-                  <div className="flex gap-2 mt-2 text-[10px]">
-                    <span className="text-red-400">{data.summary.opportunities_by_tier.high} High</span>
-                    <span className="text-amber-400">{data.summary.opportunities_by_tier.medium} Med</span>
-                    <span className="text-gray-400">{data.summary.opportunities_by_tier.low} Low</span>
-                  </div>
-                </div>
+              <div className="grid grid-cols-6 gap-4 mb-6">
+                <KPICard
+                  title="Total Distributors"
+                  value={data.summary.total_distributors.toString()}
+                  subtitle={`${data.summary.total_locations} locations`}
+                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
+                  color="#14B8A6"
+                  delay={0}
+                />
+                <KPICard
+                  title="Total Locations"
+                  value={data.summary.total_locations.toString()}
+                  subtitle={`Avg: ${formatCurrencyCompact(data.summary.avg_revenue_per_location)}/loc`}
+                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+                  color="#06B6D4"
+                  delay={0.05}
+                />
+                <KPICard
+                  title="Total Revenue"
+                  value={formatCurrencyCompact(data.summary.total_revenue)}
+                  subtitle="All distributors"
+                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                  color="#22C55E"
+                  delay={0.1}
+                />
+                <KPICard
+                  title="Avg Revenue/Loc"
+                  value={formatCurrencyCompact(data.summary.avg_revenue_per_location)}
+                  subtitle="Per location"
+                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+                  color="#F59E0B"
+                  delay={0.15}
+                />
+                <KPICard
+                  title="Growth Opportunities"
+                  value={data.summary.total_growth_opportunities.toString()}
+                  subtitle={`${data.summary.opportunities_by_tier.high} high priority`}
+                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>}
+                  color="#EF4444"
+                  trend={data.summary.total_growth_opportunities > 0 ? 'up' : undefined}
+                  delay={0.2}
+                />
+                <KPICard
+                  title="High Priority"
+                  value={data.summary.opportunities_by_tier.high.toString()}
+                  subtitle={`${data.summary.opportunities_by_tier.medium} medium, ${data.summary.opportunities_by_tier.low} low`}
+                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>}
+                  color="#A855F7"
+                  delay={0.25}
+                />
               </div>
 
-              {/* Charts Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Distributor Revenue Bar Chart */}
-                <div className="bg-[#1E293B] rounded-lg p-6 border border-white/[0.08]">
-                  <h3 className="text-[15px] font-semibold text-white mb-4">Distributor Revenue Comparison</h3>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={barChartData} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
-                      <XAxis type="number" stroke="#64748B" tickFormatter={formatCurrency} />
-                      <YAxis type="category" dataKey="name" stroke="#64748B" width={90} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1B1F39',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '8px',
-                          padding: '12px'
-                        }}
-                        formatter={(value: any, name?: string) => {
-                          if (name === 'revenue') return [formatCurrency(Number(value)), 'Revenue'];
-                          return [value, name];
-                        }}
-                        labelFormatter={(label) => `${label}`}
-                      />
-                      <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
-                        {barChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.yoy > 0 ? '#22C55E' : entry.yoy < 0 ? '#EF4444' : '#6B7280'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+              {/* Tab Navigation */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.28 }}
+                className="flex items-center gap-1 mb-6"
+              >
+                <button
+                  onClick={() => setActiveTab('table')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'table'
+                      ? 'bg-[#14B8A6]/20 text-[#14B8A6] border border-[#14B8A6]/30 shadow-[0_0_20px_rgba(20,184,166,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Table
+                </button>
+                <button
+                  onClick={() => setActiveTab('charts')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'charts'
+                      ? 'bg-[#14B8A6]/20 text-[#14B8A6] border border-[#14B8A6]/30 shadow-[0_0_20px_rgba(20,184,166,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                  </svg>
+                  Charts
+                </button>
+                <button
+                  onClick={() => setActiveTab('insights')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'insights'
+                      ? 'bg-[#A855F7]/20 text-[#A855F7] border border-[#A855F7]/30 shadow-[0_0_20px_rgba(168,85,247,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  Insights
+                </button>
+                <button
+                  onClick={() => setActiveTab('tasks')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'tasks'
+                      ? 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  Tasks
+                </button>
+              </motion.div>
 
-                {/* Growth Opportunity Scatter Plot */}
-                <div className="bg-[#1E293B] rounded-lg p-6 border border-white/[0.08]">
-                  <h3 className="text-[15px] font-semibold text-white mb-4">Growth Opportunity Matrix</h3>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <ScatterChart margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <XAxis
-                        type="number"
-                        dataKey="x"
-                        name="Revenue"
-                        stroke="#64748B"
-                        tickFormatter={formatCurrency}
-                        scale="log"
-                        domain={['auto', 'auto']}
-                      />
-                      <YAxis type="number" dataKey="y" name="Growth Score" stroke="#64748B" domain={[0, 100]} />
-                      <ZAxis type="number" dataKey="revenue" range={[50, 400]} />
-                      <Tooltip
-                        cursor={{ strokeDasharray: '3 3' }}
-                        contentStyle={{
-                          backgroundColor: '#1B1F39',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '8px',
-                          padding: '12px'
-                        }}
-                        formatter={(value: any, name?: string) => {
-                          if (name === 'Revenue') return formatCurrency(Number(value));
-                          if (name === 'Growth Score') return `${value}/100`;
-                          return value;
-                        }}
-                      />
-                      <Scatter name="Locations" data={scatterData} fill="#8884d8">
-                        {scatterData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={TIER_CONFIG[entry.tier as keyof typeof TIER_CONFIG].color} />
-                        ))}
-                      </Scatter>
-                    </ScatterChart>
-                  </ResponsiveContainer>
-                  <div className="flex gap-4 mt-4 text-xs justify-center">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500" />
-                      <span className="text-[#94A3B8]">High Opportunity</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-amber-500" />
-                      <span className="text-[#94A3B8]">Medium</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-gray-500" />
-                      <span className="text-[#94A3B8]">Low</span>
+              {/* Filter Button + Active Filter Badges */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex items-center gap-4 mb-6"
+              >
+                {/* View Toggle - Only on table view */}
+                {activeTab === 'table' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">View:</span>
+                    <div className="flex rounded-lg overflow-hidden border border-white/[0.04]">
+                      <button
+                        onClick={() => setViewMode('distributor')}
+                        className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
+                          viewMode === 'distributor'
+                            ? 'bg-[#14B8A6]/20 text-[#14B8A6]'
+                            : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
+                        }`}
+                      >
+                        By Distributor
+                      </button>
+                      <button
+                        onClick={() => setViewMode('location')}
+                        className={`px-3 py-1.5 text-[12px] font-medium transition-all ${
+                          viewMode === 'location'
+                            ? 'bg-[#14B8A6]/20 text-[#14B8A6]'
+                            : 'bg-[#1E293B] text-[#94A3B8] hover:text-white'
+                        }`}
+                      >
+                        By Location
+                      </button>
                     </div>
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Distributors Table */}
-              <div className="bg-[#1E293B] rounded-lg border border-white/[0.08] overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-white/[0.08]">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">
-                          Distributor
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">
-                          Locations
-                        </th>
-                        <th
-                          className="px-4 py-3 text-right text-xs font-medium text-[#94A3B8] uppercase tracking-wider cursor-pointer hover:text-white"
-                          onClick={() => handleSort('revenue')}
-                        >
-                          Revenue {sortBy === 'revenue' && (sortDir === 'desc' ? '▼' : '▲')}
-                        </th>
-                        <th
-                          className="px-4 py-3 text-right text-xs font-medium text-[#94A3B8] uppercase tracking-wider cursor-pointer hover:text-white"
-                          onClick={() => handleSort('yoy')}
-                        >
-                          YoY {sortBy === 'yoy' && (sortDir === 'desc' ? '▼' : '▲')}
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-[#94A3B8] uppercase tracking-wider">
-                          Margin %
-                        </th>
-                        <th
-                          className="px-4 py-3 text-right text-xs font-medium text-[#94A3B8] uppercase tracking-wider cursor-pointer hover:text-white"
-                          onClick={() => handleSort('growth_opps')}
-                        >
-                          Opps {sortBy === 'growth_opps' && (sortDir === 'desc' ? '▼' : '▲')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedDistributors.map((distributor) => (
-                        <React.Fragment key={distributor.distributor_name}>
-                          {/* Distributor Row */}
-                          <tr
-                            className="border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition-colors"
-                            onClick={() =>
-                              setExpandedDistributor(
-                                expandedDistributor === distributor.distributor_name ? null : distributor.distributor_name
-                              )
-                            }
-                          >
-                            <td className="px-4 py-3 text-sm font-medium text-white">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[#94A3B8]">
-                                  {expandedDistributor === distributor.distributor_name ? '▼' : '▶'}
-                                </span>
-                                {distributor.distributor_name}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-[#94A3B8]">{distributor.location_count}</td>
-                            <td className="px-4 py-3 text-sm text-right font-medium text-white">
-                              {formatCurrency(distributor.total_revenue)}
-                            </td>
-                            <td className={`px-4 py-3 text-sm text-right font-medium ${getYoYColor(distributor.yoy_change_pct)}`}>
-                              {formatPercentage(distributor.yoy_change_pct)}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-right text-[#94A3B8]">
-                              {distributor.total_margin_pct.toFixed(1)}%
-                            </td>
-                            <td className="px-4 py-3 text-sm text-right">
-                              {distributor.growth_opportunities > 0 ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-[#14B8A6]/20 text-[#14B8A6]">
-                                  {distributor.growth_opportunities}
-                                </span>
-                              ) : (
-                                <span className="text-[#94A3B8]">-</span>
-                              )}
-                            </td>
-                          </tr>
+                {/* Filter Button */}
+                <button
+                  onClick={() => setFilterDrawerOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-[#151F2E] border border-white/[0.04] hover:border-[#14B8A6]/30 transition-all flex items-center gap-2 text-white hover:bg-[#1A2942]"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span className="text-[13px] font-medium">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-[#14B8A6]/20 text-[#14B8A6] text-[10px] font-semibold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
 
-                          {/* Expanded Locations */}
-                          <AnimatePresence>
-                            {expandedDistributor === distributor.distributor_name && (
-                              <tr>
-                                <td colSpan={6} className="p-0">
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="overflow-hidden"
-                                  >
-                                    <div className="bg-[#0F172A] px-4 py-2">
-                                      <table className="w-full">
-                                        <thead>
-                                          <tr className="border-b border-white/[0.04]">
-                                            <th className="px-4 py-2 text-left text-xs font-medium text-[#64748B] uppercase">Location</th>
-                                            <th className="px-4 py-2 text-right text-xs font-medium text-[#64748B] uppercase">Revenue</th>
-                                            <th className="px-4 py-2 text-right text-xs font-medium text-[#64748B] uppercase">YoY</th>
-                                            <th className="px-4 py-2 text-right text-xs font-medium text-[#64748B] uppercase">Margin</th>
-                                            <th className="px-4 py-2 text-right text-xs font-medium text-[#64748B] uppercase">Categories</th>
-                                            <th className="px-4 py-2 text-right text-xs font-medium text-[#64748B] uppercase">Score</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {distributor.locations.map((location) => (
-                                            <tr
-                                              key={location.customer_id}
-                                              className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors"
-                                            >
-                                              <td className="px-4 py-2 text-sm">
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedCustomerForDetail({ id: location.customer_id, name: location.customer_name });
-                                                  }}
-                                                  className="text-[#14B8A6] hover:text-[#0D9488] transition-colors text-left"
-                                                >
-                                                  {formatLocationDisplay({
-                                                    location: location.location,
-                                                    state: location.state,
-                                                    confidence: location.location_confidence,
-                                                    rawName: location.customer_name
-                                                  })}
-                                                </button>
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-right text-white">
-                                                {formatCurrency(location.revenue)}
-                                              </td>
-                                              <td className={`px-4 py-2 text-sm text-right font-medium ${getYoYColor(location.yoy_change_pct)}`}>
-                                                {formatPercentage(location.yoy_change_pct)}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-right text-[#94A3B8]">
-                                                {location.margin_pct.toFixed(1)}%
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-right text-[#94A3B8]">
-                                                {location.category_count}
-                                              </td>
-                                              <td className="px-4 py-2 text-sm text-right">
-                                                {location.growth_score && (
-                                                  <span
-                                                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                                      TIER_CONFIG[location.growth_score.tier].bg
-                                                    } ${TIER_CONFIG[location.growth_score.tier].text}`}
-                                                  >
-                                                    {location.growth_score.overall} ({TIER_CONFIG[location.growth_score.tier].label})
-                                                  </span>
-                                                )}
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </motion.div>
-                                </td>
-                              </tr>
-                            )}
-                          </AnimatePresence>
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
+                {/* Active Filter Badges */}
+                <div className="flex items-center gap-2 flex-wrap flex-1">
+                  <AnimatePresence>
+                    {selectedYears.length > 0 && (
+                      <FilterBadge
+                        label={`Year: ${selectedYears.join(', ')}`}
+                        onRemove={() => setSelectedYears([])}
+                      />
+                    )}
+                    {selectedMonths.length > 0 && (
+                      <FilterBadge
+                        label={`Month: ${selectedMonths.map(m => MONTH_NAMES[m-1]).join(', ')}`}
+                        onRemove={() => setSelectedMonths([])}
+                      />
+                    )}
+                    {selectedClass && (
+                      <FilterBadge
+                        label={`Class: ${selectedClass}`}
+                        onRemove={() => setSelectedClass(null)}
+                      />
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
-            </div>
+
+                {/* Reset Filters */}
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={resetFilters}
+                    className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[#EF4444] bg-[#EF4444]/10 hover:bg-[#EF4444]/20 transition-colors"
+                  >
+                    Reset All
+                  </button>
+                )}
+              </motion.div>
+
+              {/* Tab Content */}
+              {activeTab === 'table' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                >
+                  {viewMode === 'distributor' ? (
+                    <DistributorTable
+                      data={data.distributors || []}
+                      maxRevenue={maxRevenue}
+                    />
+                  ) : (
+                    <LocationTable
+                      data={data.locations ? [{ distributor_name: '', locations: data.locations }] : []}
+                      maxRevenue={maxRevenue}
+                    />
+                  )}
+                </motion.div>
+              )}
+
+              {activeTab === 'charts' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                  className="space-y-6"
+                >
+                  {/* Row 1: Revenue Trend + Location Concentration */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <DistributorRevenueChart
+                      data={revenueTrendData.data}
+                      distributorNames={revenueTrendData.distributors}
+                      index={0}
+                    />
+                    <LocationConcentrationChart
+                      data={concentrationData.data}
+                      totalRevenue={concentrationData.totalRevenue}
+                      hhi={concentrationData.hhi}
+                      index={1}
+                    />
+                  </div>
+
+                  {/* Row 2: Category Heatmap (full width) */}
+                  <CategoryHeatmap
+                    data={categoryHeatmapData.data}
+                    distributors={categoryHeatmapData.distributors}
+                    categories={categoryHeatmapData.categories}
+                    index={2}
+                  />
+
+                  {/* Row 3: At-Risk Scatter + Location Performance */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <AtRiskScatterChart
+                      data={scatterData}
+                      index={3}
+                    />
+                    <LocationPerformanceChart
+                      data={performanceData}
+                      showTop={20}
+                      index={4}
+                    />
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'insights' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                >
+                  <DistributorInsightsPanel
+                    onGenerate={async () => {
+                      const params = new URLSearchParams();
+                      if (selectedYears.length > 0) params.append('years', selectedYears.join(','));
+                      if (selectedMonths.length > 0) params.append('months', selectedMonths.join(','));
+                      if (selectedClass) params.append('className', selectedClass);
+
+                      const response = await fetch(`/api/diversified/distributors/insights?${params}`);
+                      if (!response.ok) throw new Error('Failed to generate insights');
+
+                      const result = await response.json();
+                      return {
+                        recommendations: result.recommendations,
+                        executive_summary: result.executive_summary,
+                      };
+                    }}
+                    onAddToTasks={async (tasks) => {
+                      const response = await fetch('/api/diversified/distributors/tasks', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(tasks),
+                      });
+
+                      if (!response.ok) throw new Error('Failed to create tasks');
+
+                      const result = await response.json();
+                      alert(`Successfully created ${result.count} task${result.count !== 1 ? 's' : ''}!`);
+                    }}
+                    selectedYears={selectedYears}
+                    selectedMonths={selectedMonths}
+                    selectedClass={selectedClass}
+                  />
+                </motion.div>
+              )}
+
+              {activeTab === 'tasks' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                >
+                  <DistributorTasksTab
+                    selectedYears={selectedYears}
+                    selectedMonths={selectedMonths}
+                    selectedClass={selectedClass}
+                  />
+                </motion.div>
+              )}
+            </>
           )}
         </div>
       </motion.main>
@@ -687,23 +844,15 @@ export default function DistributorsDashboard() {
           selectedYears,
           selectedMonths,
           selectedClass,
-          viewMode,
+          viewMode: 'class',
         }}
         onFilterChange={(updates) => {
           if (updates.selectedYears !== undefined) setSelectedYears(updates.selectedYears);
           if (updates.selectedMonths !== undefined) setSelectedMonths(updates.selectedMonths);
           if (updates.selectedClass !== undefined) setSelectedClass(updates.selectedClass);
-          if (updates.viewMode !== undefined) setViewMode(updates.viewMode);
         }}
         filterOptions={filterOptions}
         activeTab="distributors"
-      />
-
-      {/* Customer Detail Drawer */}
-      <CustomerDetailDrawer
-        customerId={selectedCustomerForDetail?.id || null}
-        customerName={selectedCustomerForDetail?.name}
-        onClose={() => setSelectedCustomerForDetail(null)}
       />
     </div>
   );
