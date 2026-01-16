@@ -2,59 +2,75 @@
  * API Route: /api/closeout/enrich
  * Enrich closeout work orders with NetSuite SO/WO line item details
  * Stores results in Supabase database for persistence across serverless invocations
+ *
+ * Query Parameters:
+ * - year: Filter by project year (e.g., 2025)
+ * - type: Filter by project type (e.g., TB, MCC)
+ * - projectId: Enrich only work orders for specific project
+ * - forceRefresh: Re-fetch from NetSuite even if already enriched
  */
 
 import { NextResponse } from 'next/server';
 import { getWorkOrderByNumber, getSalesOrderWithLineItems } from '@/lib/netsuite';
-import { getSupabaseAdmin, getExcelFromStorage } from '@/lib/supabase';
-import * as XLSX from 'xlsx';
-import * as path from 'path';
-import * as fs from 'fs';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    console.log('Starting NetSuite enrichment from Excel WO numbers...');
+    // Parse query parameters for filtering
+    const url = new URL(request.url);
+    const year = url.searchParams.get('year') ? parseInt(url.searchParams.get('year')!) : undefined;
+    const type = url.searchParams.get('type') || undefined;
+    const projectId = url.searchParams.get('projectId') || undefined;
+    const forceRefresh = url.searchParams.get('forceRefresh') === 'true';
 
-    // Get Excel file
-    let fileBuffer: Buffer | null = null;
-    fileBuffer = await getExcelFromStorage('closeout-data.xlsx');
+    console.log('Starting NetSuite enrichment with filters:', { year, type, projectId, forceRefresh });
 
-    if (!fileBuffer) {
-      const localPath = path.join(process.cwd(), 'data', 'closeout-data.xlsx');
-      if (fs.existsSync(localPath)) {
-        fileBuffer = fs.readFileSync(localPath);
-      }
+    // Get Supabase client
+    const supabase = getSupabaseAdmin();
+
+    // Build query to get work orders to enrich
+    let query = supabase
+      .from('closeout_work_orders')
+      .select(`
+        wo_number,
+        netsuite_enriched,
+        closeout_projects!inner (
+          id,
+          project_name,
+          project_year,
+          project_type
+        )
+      `)
+      .not('wo_number', 'is', null)
+      .neq('wo_number', '');
+
+    // Apply filters based on query params
+    if (year) {
+      query = query.eq('closeout_projects.project_year', year);
     }
 
-    if (!fileBuffer) {
-      return NextResponse.json({
-        error: 'Excel file not found',
-        message: 'closeout-data.xlsx not found in storage or data folder',
-      }, { status: 404 });
+    if (type) {
+      query = query.eq('closeout_projects.project_type', type);
     }
 
-    // Parse Excel to get WO numbers
-    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    const costAuditSheet = workbook.Sheets['TB & MCC Cost Audit 2020-Curren'];
-    const costAuditRaw = XLSX.utils.sheet_to_json(costAuditSheet, { header: 1 }) as any[][];
-
-    // Extract unique WO numbers from Column Q (row[16])
-    const woNumbers = new Set<string>();
-    for (let i = 4; i < costAuditRaw.length; i++) {
-      const row = costAuditRaw[i];
-      if (!row[0] || row[0] === 'Open') continue;
-
-      const woNumber = row[16]?.toString()?.trim();
-      if (woNumber) {
-        woNumbers.add(woNumber);
-      }
+    if (projectId) {
+      query = query.eq('closeout_projects.id', projectId);
     }
 
-    console.log(`Found ${woNumbers.size} unique WO numbers in Excel`);
+    // If not forcing refresh, only get unenriched work orders
+    if (!forceRefresh) {
+      query = query.or('netsuite_enriched.is.null,netsuite_enriched.eq.false');
+    }
 
-    if (woNumbers.size === 0) {
+    const { data: workOrders, error: queryError } = await query;
+
+    if (queryError) {
+      throw new Error(`Failed to query work orders: ${queryError.message}`);
+    }
+
+    if (!workOrders || workOrders.length === 0) {
       return NextResponse.json({
         success: true,
         stats: {
@@ -63,12 +79,11 @@ export async function POST(request: Request) {
           lineItemsCached: 0,
           errors: [],
         },
-        message: 'No work orders found in Excel Column Q',
+        message: 'No work orders found matching filters',
       });
     }
 
-    // Get Supabase client
-    const supabase = getSupabaseAdmin();
+    console.log(`Found ${workOrders.length} work orders to enrich`);
 
     // Enrich each work order from NetSuite and store in database
     const errors: string[] = [];
@@ -76,17 +91,12 @@ export async function POST(request: Request) {
     let netsuiteCallsMade = 0;
     let lineItemsCached = 0;
 
-    for (const woNumber of Array.from(woNumbers)) {
-      try {
-        // Check if already enriched in database
-        const { data: existingWO } = await supabase
-          .from('closeout_work_orders')
-          .select('netsuite_enriched, netsuite_enriched_at')
-          .eq('wo_number', woNumber)
-          .eq('netsuite_enriched', true)
-          .single();
+    for (const wo of workOrders) {
+      const woNumber = wo.wo_number;
 
-        if (existingWO) {
+      try {
+        // Skip if already enriched (unless forcing refresh)
+        if (wo.netsuite_enriched && !forceRefresh) {
           console.log(`✓ WO ${woNumber} already enriched in database`);
           workOrdersProcessed++;
           continue;
@@ -191,6 +201,13 @@ export async function POST(request: Request) {
       }
     }
 
+    // Build filter description for message
+    const filterDesc = [];
+    if (year) filterDesc.push(`year=${year}`);
+    if (type) filterDesc.push(`type=${type}`);
+    if (projectId) filterDesc.push(`projectId=${projectId}`);
+    const filterText = filterDesc.length > 0 ? ` (filtered by ${filterDesc.join(', ')})` : '';
+
     return NextResponse.json({
       success: workOrdersProcessed > 0,
       stats: {
@@ -199,7 +216,7 @@ export async function POST(request: Request) {
         lineItemsCached,
         errors,
       },
-      message: `Successfully enriched ${workOrdersProcessed} of ${woNumbers.size} work orders with ${lineItemsCached} total line items`,
+      message: `Successfully enriched ${workOrdersProcessed} of ${workOrders.length} work orders with ${lineItemsCached} total line items${filterText}`,
     });
   } catch (error) {
     console.error('Error in enrichment process:', error);

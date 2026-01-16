@@ -90,13 +90,21 @@ export default function CloseoutDashboard() {
   const enrichData = async () => {
     try {
       setEnriching(true);
-      const response = await fetch('/api/closeout/enrich', { method: 'POST' });
+
+      // Build query params based on current filters
+      const params = new URLSearchParams();
+      if (selectedYear) {
+        params.append('year', selectedYear.toString());
+      }
+
+      const url = `/api/closeout/enrich${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url, { method: 'POST' });
       const result = await response.json();
 
       if (result.success) {
         // Refresh data after enrichment
         await fetchData(true);
-        alert(`Successfully enriched ${result.stats.workOrdersProcessed} work orders with ${result.stats.lineItemsCached} line items`);
+        alert(`${result.message}`);
       } else {
         setError(result.message || 'Enrichment failed');
         if (result.stats?.errors && result.stats.errors.length > 0) {
@@ -347,7 +355,11 @@ export default function CloseoutDashboard() {
                   className="px-4 py-2 rounded-lg bg-[#22C55E] text-white text-sm font-medium hover:bg-[#16A34A] transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   <Upload className={`w-4 h-4 ${enriching ? 'animate-bounce' : ''}`} />
-                  {enriching ? 'Enriching...' : 'Enrich from NetSuite'}
+                  {enriching
+                    ? 'Enriching...'
+                    : selectedYear
+                    ? `Enrich ${selectedYear} Data`
+                    : 'Enrich from NetSuite'}
                 </button>
               </div>
             </div>
