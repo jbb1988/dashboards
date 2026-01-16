@@ -988,21 +988,22 @@ export async function getWorkOrderByNumber(woNumber: string): Promise<{
 
   // SuiteQL query to find work order by tranId
   // Work orders have type = 'WorkOrd'
-  // The createdFrom field links to the originating Sales Order
+  // The createdFrom field is in TransactionLine (mainline), not Transaction
   const query = `
     SELECT
-      t.id,
-      t.tranid,
-      t.trandate,
-      t.status,
-      t.entity AS customer_id,
-      BUILTIN.DF(t.entity) AS customer_name,
-      t.createdFrom AS linked_so_id,
+      wo.id,
+      wo.tranid,
+      wo.trandate,
+      wo.status,
+      wo.entity AS customer_id,
+      BUILTIN.DF(wo.entity) AS customer_name,
+      woline.createdfrom AS linked_so_id,
       so.tranid AS linked_so_number
-    FROM Transaction t
-    LEFT JOIN Transaction so ON so.id = t.createdFrom
-    WHERE t.type = 'WorkOrd'
-      AND t.tranid = '${woNumber.replace(/'/g, "''")}'
+    FROM Transaction wo
+    INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
+    LEFT JOIN Transaction so ON so.id = woline.createdfrom
+    WHERE wo.type = 'WorkOrd'
+      AND wo.tranid = '${woNumber.replace(/'/g, "''")}'
   `;
 
   try {
