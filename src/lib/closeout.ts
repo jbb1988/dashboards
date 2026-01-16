@@ -248,14 +248,14 @@ export async function importCloseoutExcelToDatabase(
         monthVal = rawMonth;
       }
 
-      const projectName = row[0]?.toString() || '';
+      const projectName = (row[0]?.toString() || '').trim();  // Trim whitespace
       const opportunityId = row[1]?.toString() || null;
-      const projectType = row[2]?.toString() || '';
+      const projectType = (row[2]?.toString() || '').trim();  // Trim whitespace
       const projectYear = parseInt(row[3]) || 0;
       const projectMonth = monthVal;
 
       const invoiceNum = row[5]?.toString() || null;
-      const woNumber = row[16]?.toString() || '';  // Column Q: WO#
+      const woNumber = (row[16]?.toString() || '').trim();  // Column Q: WO#, trim whitespace
       const itemDescription = row[10]?.toString() || null;
 
       const budgetRevenue = parseFloat(row[11]) || 0;
@@ -268,6 +268,11 @@ export async function importCloseoutExcelToDatabase(
 
       const variance = parseFloat(row[28]) || 0;
       const comments = row[29]?.toString() || null;
+
+      // Skip rows with missing critical data
+      if (!projectName || projectYear === 0 || !projectType) {
+        continue;  // Skip rows without complete project identification
+      }
 
       // Create project key
       const projectKey = `${projectName}|${projectYear}|${projectType}`;
@@ -342,6 +347,23 @@ export async function importCloseoutExcelToDatabase(
       p.variance_pct = ((p.variance || 0) / Math.abs(p.budget_gp)) * 100;
     }
   }
+
+  // DIAGNOSTIC: Show breakdown by year and sample projects
+  const yearBreakdown: Record<number, number> = {};
+  const typeBreakdown: Record<string, number> = {};
+  Object.values(projectGroups).forEach(pg => {
+    const year = pg.project.project_year;
+    const type = pg.project.project_type || '(empty)';
+    yearBreakdown[year] = (yearBreakdown[year] || 0) + 1;
+    typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
+  });
+  console.log('Project breakdown by year:', yearBreakdown);
+  console.log('Project breakdown by type:', typeBreakdown);
+  console.log(`Total unique projects: ${Object.keys(projectGroups).length}`);
+  console.log('Sample project keys (first 20):');
+  Object.keys(projectGroups).slice(0, 20).forEach((key, idx) => {
+    console.log(`  ${idx + 1}. "${key}"`);
+  });
 
   // BATCH 1: Upsert all projects at once
   console.log(`Upserting ${Object.keys(projectGroups).length} projects...`);
