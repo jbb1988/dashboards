@@ -997,10 +997,10 @@ export async function getWorkOrderByNumber(woNumber: string): Promise<{
       t.status,
       t.entity AS customer_id,
       BUILTIN.DF(t.entity) AS customer_name,
-      t.createdfrom AS linked_so_id,
+      t.createdFrom AS linked_so_id,
       so.tranid AS linked_so_number
     FROM Transaction t
-    LEFT JOIN Transaction so ON so.id = t.createdfrom
+    LEFT JOIN Transaction so ON so.id = t.createdFrom
     WHERE t.type = 'WorkOrd'
       AND t.tranid = '${woNumber.replace(/'/g, "''")}'
   `;
