@@ -458,13 +458,12 @@ export async function GET(request: Request) {
     });
 
     // Load NetSuite enrichment data from database if requested
-    // Key by "project|year|woNumber" to ensure WOs are only enriched for their specific project-year
     const supabase = getSupabaseAdmin();
     const woEnrichmentMap: Record<string, any> = {};
 
     if (includeEnrichment) {
       try {
-        // Get all enriched work orders with their line items AND project info for filtering
+        // Get all enriched work orders with their line items
         const { data: enrichedWOs } = await supabase
           .from('closeout_work_orders')
           .select(`
@@ -473,11 +472,6 @@ export async function GET(request: Request) {
             netsuite_wo_id,
             netsuite_so_id,
             netsuite_so_number,
-            closeout_projects!inner (
-              project_name,
-              project_year,
-              project_type
-            ),
             netsuite_work_order_details (
               wo_status,
               wo_date,
@@ -509,11 +503,9 @@ export async function GET(request: Request) {
             })) || [];
 
             const firstDetail = wo.netsuite_work_order_details?.[0];
-            const project = wo.closeout_projects;
 
-            // Use composite key: project|year|woNumber to ensure correct association
-            const enrichmentKey = `${project.project_name}|${project.project_year}|${wo.wo_number}`;
-            woEnrichmentMap[enrichmentKey] = {
+            // WO numbers are unique globally, simple key
+            woEnrichmentMap[wo.wo_number] = {
               soNumber: wo.netsuite_so_number,
               soId: wo.netsuite_so_id,
               soStatus: firstDetail?.so_status,
@@ -537,17 +529,12 @@ export async function GET(request: Request) {
       const workOrders = workOrdersByProject[projectKey];
       if (!workOrders) return;
 
-      // Extract project name and year from key
-      const [projectName, projectYearStr] = projectKey.split('|');
-
       // Group WOs by their parent Sales Order
       const salesOrderMap: Record<string, any> = {};
 
       Object.values(workOrders).forEach((wo: any) => {
         // Check if this WO has NetSuite enrichment from database
-        // Use composite key to match work order to correct project-year
-        const enrichmentKey = `${projectName}|${projectYearStr}|${wo.woNumber}`;
-        const enrichedData = woEnrichmentMap[enrichmentKey];
+        const enrichedData = woEnrichmentMap[wo.woNumber];
 
         if (enrichedData && enrichedData.soNumber) {
           const soNumber = enrichedData.soNumber;
