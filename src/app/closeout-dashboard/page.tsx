@@ -392,13 +392,13 @@ export default function CloseoutDashboard() {
           {
             title: 'Total Projects',
             value: displayData.projects.length.toString(),
-            subtitle: selectedYear ? `Year ${selectedYear}` : 'All years',
+            subtitle: selectedYears.length > 0 ? selectedYears.join(', ') : 'All years',
             color: '#38BDF8',
           },
           {
             title: 'Revenue',
             value: formatCurrency(displayData.kpis.totalRevenue),
-            subtitle: selectedYear ? `Year ${selectedYear}` : 'Current year',
+            subtitle: selectedYears.length > 0 ? selectedYears.join(', ') : 'All years',
             color: '#22C55E',
           },
           {
