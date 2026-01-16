@@ -23,6 +23,27 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+// Live Timer Component
+function LiveTimer({ startTime }: { startTime: number }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!startTime) return;
+
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 100); // Update every 100ms for smooth counting
+
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  return (
+    <div className="text-sm text-gray-400">
+      <span className="font-mono">{elapsed}s</span> elapsed
+    </div>
+  );
+}
+
 export default function CloseoutDashboard() {
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(false); // Start false - don't load until user selects year
@@ -134,13 +155,28 @@ export default function CloseoutDashboard() {
     }
   };
 
-  // Combined Load & Enrich workflow
+  // Combined Load & Enrich workflow with progress tracking
   const [loadingAndEnriching, setLoadingAndEnriching] = useState(false);
+  const [loadingStep, setLoadingStep] = useState<'import' | 'enrich' | 'display' | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState({
+    step: '',
+    detail: '',
+    startTime: 0,
+  });
 
   const loadAndEnrichData = async () => {
+    const startTime = Date.now();
+
     try {
+      // IMMEDIATE feedback - show loading state right away
       setLoadingAndEnriching(true);
       setError(null);
+      setLoadingStep('import');
+      setLoadingProgress({
+        step: 'Step 1 of 3: Importing from Excel',
+        detail: 'Reading closeout worksheet and saving to database...',
+        startTime,
+      });
 
       // Step 1: Import from Excel to database
       console.log('Step 1: Importing data from Excel...');
@@ -151,9 +187,17 @@ export default function CloseoutDashboard() {
         throw new Error(importResult.message || 'Import failed');
       }
 
-      console.log(`Import complete: ${importResult.stats.projectsCreated} projects, ${importResult.stats.workOrdersCreated} work orders`);
+      const importTime = Math.round((Date.now() - startTime) / 1000);
+      console.log(`Import complete in ${importTime}s: ${importResult.stats.projectsCreated} projects, ${importResult.stats.workOrdersCreated} work orders`);
 
       // Step 2: Enrich from NetSuite (filtered by selected year)
+      setLoadingStep('enrich');
+      setLoadingProgress({
+        step: 'Step 2 of 3: Enriching from NetSuite',
+        detail: `Fetching Sales Order details for ${selectedYear} work orders... This may take 30-60 seconds.`,
+        startTime,
+      });
+
       console.log(`Step 2: Enriching ${selectedYear} data from NetSuite...`);
       const params = new URLSearchParams();
       params.append('year', selectedYear.toString());
@@ -165,14 +209,25 @@ export default function CloseoutDashboard() {
         console.error('Enrichment errors:', enrichResult.stats.errors);
       }
 
-      console.log(`Enrichment complete: ${enrichResult.stats.workOrdersProcessed} work orders enriched`);
+      const enrichTime = Math.round((Date.now() - startTime) / 1000);
+      console.log(`Enrichment complete in ${enrichTime}s: ${enrichResult.stats.workOrdersProcessed} work orders enriched`);
 
       // Step 3: Load the data into UI
+      setLoadingStep('display');
+      setLoadingProgress({
+        step: 'Step 3 of 3: Building Dashboard',
+        detail: 'Loading enriched data and rendering visualizations...',
+        startTime,
+      });
+
       console.log('Step 3: Loading data into dashboard...');
       await fetchData(true);
 
+      const totalTime = Math.round((Date.now() - startTime) / 1000);
+      console.log(`Total time: ${totalTime}s`);
+
       alert(
-        `✅ Data loaded successfully!\n\n` +
+        `✅ Data loaded successfully in ${totalTime} seconds!\n\n` +
         `📊 Imported: ${importResult.stats.projectsCreated} projects, ${importResult.stats.workOrdersCreated} work orders\n` +
         `🔗 Enriched: ${enrichResult.stats.workOrdersProcessed} work orders with ${enrichResult.stats.lineItemsCached} line items\n\n` +
         (enrichResult.stats.errors && enrichResult.stats.errors.length > 0
@@ -186,6 +241,7 @@ export default function CloseoutDashboard() {
       alert(`❌ Failed: ${errorMsg}`);
     } finally {
       setLoadingAndEnriching(false);
+      setLoadingStep(null);
     }
   };
 
@@ -385,10 +441,23 @@ export default function CloseoutDashboard() {
                   <button
                     onClick={loadAndEnrichData}
                     disabled={loadingAndEnriching}
-                    className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white text-sm font-semibold hover:from-[#16A34A] hover:to-[#15803D] transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-[#22C55E]/20"
+                    className={`px-6 py-2.5 rounded-lg text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg ${
+                      loadingAndEnriching
+                        ? 'bg-[#22C55E]/50 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-[#22C55E] to-[#16A34A] hover:from-[#16A34A] hover:to-[#15803D] shadow-[#22C55E]/20 hover:shadow-[#22C55E]/40'
+                    }`}
                   >
-                    <Database className={`w-4 h-4 ${loadingAndEnriching ? 'animate-pulse' : ''}`} />
-                    {loadingAndEnriching ? `Loading ${selectedYear}...` : `Load ${selectedYear} Data`}
+                    {loadingAndEnriching ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Loading {selectedYear}...
+                      </>
+                    ) : (
+                      <>
+                        <Database className="w-4 h-4" />
+                        Load {selectedYear} Data
+                      </>
+                    )}
                   </button>
                 )}
 
@@ -438,18 +507,84 @@ export default function CloseoutDashboard() {
             </div>
           )}
 
-          {/* Loading State */}
+          {/* Loading State with Live Progress */}
           {loadingAndEnriching && (
             <div className="flex items-center justify-center py-20">
-              <div className="text-center">
-                <Database className="w-12 h-12 animate-pulse mx-auto mb-4 text-[#22C55E]" />
-                <h3 className="text-xl font-semibold text-white mb-2">Loading {selectedYear} Data...</h3>
-                <div className="space-y-2 text-sm text-gray-400">
-                  <p>Step 1: Importing from Excel...</p>
-                  <p>Step 2: Enriching from NetSuite...</p>
-                  <p>Step 3: Building dashboard...</p>
+              <div className="text-center max-w-2xl">
+                {/* Animated Icon */}
+                <div className="relative mb-6">
+                  <Database className="w-16 h-16 mx-auto text-[#22C55E] animate-pulse" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-24 h-24 border-4 border-[#22C55E]/20 border-t-[#22C55E] rounded-full animate-spin"></div>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-4">This may take 30-60 seconds</p>
+
+                {/* Current Step */}
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  {loadingProgress.step}
+                </h3>
+                <p className="text-gray-400 mb-6">{loadingProgress.detail}</p>
+
+                {/* Progress Steps */}
+                <div className="flex items-center justify-center gap-4 mb-6">
+                  {/* Step 1: Import */}
+                  <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                    loadingStep === 'import'
+                      ? 'bg-[#22C55E]/10 border-[#22C55E] text-[#22C55E]'
+                      : loadingStep && loadingStep !== 'import'
+                      ? 'bg-[#22C55E]/5 border-[#22C55E]/30 text-[#22C55E]/60'
+                      : 'bg-gray-500/10 border-gray-500/30 text-gray-500'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      loadingStep === 'import' ? 'bg-[#22C55E] animate-pulse' :
+                      loadingStep && loadingStep !== 'import' ? 'bg-[#22C55E]' : 'bg-gray-500'
+                    }`}></div>
+                    <span className="text-xs font-medium">Import</span>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="text-gray-600">→</div>
+
+                  {/* Step 2: Enrich */}
+                  <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                    loadingStep === 'enrich'
+                      ? 'bg-[#22C55E]/10 border-[#22C55E] text-[#22C55E]'
+                      : loadingStep === 'display'
+                      ? 'bg-[#22C55E]/5 border-[#22C55E]/30 text-[#22C55E]/60'
+                      : 'bg-gray-500/10 border-gray-500/30 text-gray-500'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      loadingStep === 'enrich' ? 'bg-[#22C55E] animate-pulse' :
+                      loadingStep === 'display' ? 'bg-[#22C55E]' : 'bg-gray-500'
+                    }`}></div>
+                    <span className="text-xs font-medium">Enrich</span>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="text-gray-600">→</div>
+
+                  {/* Step 3: Display */}
+                  <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                    loadingStep === 'display'
+                      ? 'bg-[#22C55E]/10 border-[#22C55E] text-[#22C55E]'
+                      : 'bg-gray-500/10 border-gray-500/30 text-gray-500'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      loadingStep === 'display' ? 'bg-[#22C55E] animate-pulse' : 'bg-gray-500'
+                    }`}></div>
+                    <span className="text-xs font-medium">Display</span>
+                  </div>
+                </div>
+
+                {/* Time Elapsed */}
+                <LiveTimer startTime={loadingProgress.startTime} />
+
+                {/* Tip */}
+                <p className="text-xs text-gray-500 mt-4">
+                  {loadingStep === 'import' && '⚡ Parsing Excel and saving to database...'}
+                  {loadingStep === 'enrich' && '🔗 Querying NetSuite for Sales Order line items...'}
+                  {loadingStep === 'display' && '📊 Rendering dashboard with enriched data...'}
+                </p>
               </div>
             </div>
           )}
