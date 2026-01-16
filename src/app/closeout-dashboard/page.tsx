@@ -545,13 +545,13 @@ export default function CloseoutDashboard() {
                   <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
                     loadingStep === 'import'
                       ? 'bg-[#22C55E]/10 border-[#22C55E] text-[#22C55E]'
-                      : loadingStep && loadingStep !== 'import'
+                      : (loadingStep === 'enrich' || loadingStep === 'display')
                       ? 'bg-[#22C55E]/5 border-[#22C55E]/30 text-[#22C55E]/60'
                       : 'bg-gray-500/10 border-gray-500/30 text-gray-500'
                   }`}>
                     <div className={`w-2 h-2 rounded-full ${
                       loadingStep === 'import' ? 'bg-[#22C55E] animate-pulse' :
-                      loadingStep && loadingStep !== 'import' ? 'bg-[#22C55E]' : 'bg-gray-500'
+                      (loadingStep === 'enrich' || loadingStep === 'display') ? 'bg-[#22C55E]' : 'bg-gray-500'
                     }`}></div>
                     <span className="text-xs font-medium">Import</span>
                   </div>
