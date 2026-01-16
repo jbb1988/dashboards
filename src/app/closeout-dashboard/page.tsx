@@ -25,12 +25,12 @@ function formatPercent(value: number): string {
 
 export default function CloseoutDashboard() {
   const [data, setData] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start false - don't load until user selects year
   const [error, setError] = useState<string | null>(null);
   const [enriching, setEnriching] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('projects');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(2025); // Default to current year
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   // Fetch data
@@ -134,9 +134,65 @@ export default function CloseoutDashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Combined Load & Enrich workflow
+  const [loadingAndEnriching, setLoadingAndEnriching] = useState(false);
+
+  const loadAndEnrichData = async () => {
+    try {
+      setLoadingAndEnriching(true);
+      setError(null);
+
+      // Step 1: Import from Excel to database
+      console.log('Step 1: Importing data from Excel...');
+      const importResponse = await fetch('/api/closeout/import', { method: 'POST' });
+      const importResult = await importResponse.json();
+
+      if (!importResult.success) {
+        throw new Error(importResult.message || 'Import failed');
+      }
+
+      console.log(`Import complete: ${importResult.stats.projectsCreated} projects, ${importResult.stats.workOrdersCreated} work orders`);
+
+      // Step 2: Enrich from NetSuite (filtered by selected year)
+      console.log(`Step 2: Enriching ${selectedYear} data from NetSuite...`);
+      const params = new URLSearchParams();
+      params.append('year', selectedYear.toString());
+
+      const enrichResponse = await fetch(`/api/closeout/enrich?${params.toString()}`, { method: 'POST' });
+      const enrichResult = await enrichResponse.json();
+
+      if (enrichResult.stats?.errors && enrichResult.stats.errors.length > 0) {
+        console.error('Enrichment errors:', enrichResult.stats.errors);
+      }
+
+      console.log(`Enrichment complete: ${enrichResult.stats.workOrdersProcessed} work orders enriched`);
+
+      // Step 3: Load the data into UI
+      console.log('Step 3: Loading data into dashboard...');
+      await fetchData(true);
+
+      alert(
+        `✅ Data loaded successfully!\n\n` +
+        `📊 Imported: ${importResult.stats.projectsCreated} projects, ${importResult.stats.workOrdersCreated} work orders\n` +
+        `🔗 Enriched: ${enrichResult.stats.workOrdersProcessed} work orders with ${enrichResult.stats.lineItemsCached} line items\n\n` +
+        (enrichResult.stats.errors && enrichResult.stats.errors.length > 0
+          ? `⚠️ ${enrichResult.stats.errors.length} errors (check console)`
+          : `✨ No errors!`)
+      );
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Load & Enrich failed';
+      setError(errorMsg);
+      console.error('Load & Enrich error:', err);
+      alert(`❌ Failed: ${errorMsg}`);
+    } finally {
+      setLoadingAndEnriching(false);
+    }
+  };
+
+  // Don't auto-load data - wait for user to select year and click Load button
+  // useEffect(() => {
+  //   fetchData();
+  // }, []);
 
   // Filter data based on selected year/month
   const filteredData = useMemo(() => {
@@ -308,87 +364,92 @@ export default function CloseoutDashboard() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {/* Year Filter */}
+                {/* Year Filter - Available Years */}
                 <select
-                  value={selectedYear || ''}
-                  onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
-                  className="px-3 py-2 rounded-lg bg-[#111827] border border-white/[0.08] text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="px-4 py-2.5 rounded-lg bg-[#111827] border border-[#22C55E]/30 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/40"
                 >
-                  <option value="">All Years</option>
-                  {data?.allYears?.map((year: number) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
+                  <option value={2025}>2025</option>
+                  <option value={2024}>2024</option>
+                  <option value={2023}>2023</option>
+                  <option value={2022}>2022</option>
+                  <option value={2021}>2021</option>
+                  <option value={2020}>2020</option>
                 </select>
 
-                {/* Month Filter */}
-                <select
-                  value={selectedMonth || ''}
-                  onChange={(e) => setSelectedMonth(e.target.value ? parseInt(e.target.value) : null)}
-                  className="px-3 py-2 rounded-lg bg-[#111827] border border-white/[0.08] text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/20"
-                  disabled={!selectedYear}
-                >
-                  <option value="">All Months</option>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => (
-                    <option key={month} value={month}>
-                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1]}
-                    </option>
-                  ))}
-                </select>
+                <div className="h-6 w-px bg-white/[0.08]"></div>
 
-                {/* Clear Filters */}
-                {(selectedYear || selectedMonth) && (
+                {/* Primary Action: Load & Enrich Data */}
+                {!data && (
                   <button
-                    onClick={() => {
-                      setSelectedYear(null);
-                      setSelectedMonth(null);
-                    }}
-                    className="px-3 py-2 rounded-lg bg-[#111827] border border-white/[0.08] text-xs text-gray-400 hover:text-white hover:bg-white/[0.04] transition-colors"
+                    onClick={loadAndEnrichData}
+                    disabled={loadingAndEnriching}
+                    className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white text-sm font-semibold hover:from-[#16A34A] hover:to-[#15803D] transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-[#22C55E]/20"
                   >
-                    Clear
+                    <Database className={`w-4 h-4 ${loadingAndEnriching ? 'animate-pulse' : ''}`} />
+                    {loadingAndEnriching ? `Loading ${selectedYear}...` : `Load ${selectedYear} Data`}
                   </button>
                 )}
 
-                <div className="h-6 w-px bg-white/[0.08]"></div>
-                <button
-                  onClick={() => fetchData(true)}
-                  disabled={loading}
-                  className="px-4 py-2 rounded-lg bg-[#111827] border border-white/[0.08] text-sm font-medium text-white hover:bg-white/[0.04] transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
-                <button
-                  onClick={importData}
-                  disabled={importing || loading}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  <Database className={`w-4 h-4 ${importing ? 'animate-pulse' : ''}`} />
-                  {importing ? 'Importing...' : 'Import Data'}
-                </button>
-                <button
-                  onClick={enrichData}
-                  disabled={enriching || loading || importing}
-                  className="px-4 py-2 rounded-lg bg-[#22C55E] text-white text-sm font-medium hover:bg-[#16A34A] transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  <Upload className={`w-4 h-4 ${enriching ? 'animate-bounce' : ''}`} />
-                  {enriching
-                    ? 'Enriching...'
-                    : selectedYear
-                    ? `Enrich ${selectedYear} Data`
-                    : 'Enrich from NetSuite'}
-                </button>
+                {/* Secondary Actions: After data is loaded */}
+                {data && (
+                  <>
+                    <button
+                      onClick={() => fetchData(true)}
+                      disabled={loading}
+                      className="px-4 py-2 rounded-lg bg-[#111827] border border-white/[0.08] text-sm font-medium text-white hover:bg-white/[0.04] transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </button>
+                    <button
+                      onClick={loadAndEnrichData}
+                      disabled={loadingAndEnriching}
+                      className="px-4 py-2 rounded-lg bg-[#22C55E] text-white text-sm font-medium hover:bg-[#16A34A] transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <Upload className={`w-4 h-4 ${loadingAndEnriching ? 'animate-bounce' : ''}`} />
+                      {loadingAndEnriching ? `Loading ${selectedYear}...` : `Reload ${selectedYear}`}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
         </header>
 
         <main className="max-w-[1600px] mx-auto px-8 py-6">
+          {/* Empty State - No Data Loaded Yet */}
+          {!data && !loadingAndEnriching && !error && (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center max-w-md">
+                <Database className="w-16 h-16 mx-auto mb-6 text-[#22C55E]/40" />
+                <h2 className="text-2xl font-bold text-white mb-3">Ready to Load Data</h2>
+                <p className="text-gray-400 mb-6">
+                  Select a year above and click <span className="text-[#22C55E] font-semibold">"Load {selectedYear} Data"</span> to import
+                  from Excel and enrich with NetSuite details.
+                </p>
+                <div className="bg-[#111827] border border-white/[0.08] rounded-lg p-4 text-left text-sm text-gray-400">
+                  <p className="mb-2">📊 Imports projects and work orders from Excel</p>
+                  <p className="mb-2">🔗 Enriches with Sales Order line items from NetSuite</p>
+                  <p>⚡ Optimized to load only the selected year (~30-60 seconds)</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Loading State */}
-          {loading && !data && (
+          {loadingAndEnriching && (
             <div className="flex items-center justify-center py-20">
               <div className="text-center">
-                <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-[#22C55E]" />
-                <p className="text-gray-400">Loading profitability data...</p>
+                <Database className="w-12 h-12 animate-pulse mx-auto mb-4 text-[#22C55E]" />
+                <h3 className="text-xl font-semibold text-white mb-2">Loading {selectedYear} Data...</h3>
+                <div className="space-y-2 text-sm text-gray-400">
+                  <p>Step 1: Importing from Excel...</p>
+                  <p>Step 2: Enriching from NetSuite...</p>
+                  <p>Step 3: Building dashboard...</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-4">This may take 30-60 seconds</p>
               </div>
             </div>
           )}
