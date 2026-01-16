@@ -971,6 +971,12 @@ export async function testSuiteQLAccess(): Promise<{ success: boolean; data: any
 /**
  * Fetch Work Order by transaction number (WO#)
  * Returns work order header with linked Sales Order reference
+ *
+ * Automatically tries multiple WO number formats to handle different NetSuite configurations:
+ * - As-is (e.g., "4158")
+ * - With "WO" prefix (e.g., "WO4158")
+ * - With "WO-" prefix (e.g., "WO-4158")
+ * - Padded with zeros (e.g., "004158")
  */
 export async function getWorkOrderByNumber(woNumber: string): Promise<{
   id: string;
@@ -986,58 +992,109 @@ export async function getWorkOrderByNumber(woNumber: string): Promise<{
     return null;
   }
 
-  // SuiteQL query to find work order by tranId
-  // Work orders have type = 'WorkOrd'
-  // The createdFrom field is in TransactionLine (mainline), not Transaction
-  const query = `
-    SELECT
-      wo.id,
-      wo.tranid,
-      wo.trandate,
-      wo.status,
-      wo.entity AS customer_id,
-      BUILTIN.DF(wo.entity) AS customer_name,
-      woline.createdfrom AS linked_so_id,
-      so.tranid AS linked_so_number
-    FROM Transaction wo
-    INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
-    LEFT JOIN Transaction so ON so.id = woline.createdfrom
-    WHERE wo.type = 'WorkOrd'
-      AND wo.tranid = '${woNumber.replace(/'/g, "''")}'
-  `;
+  // Generate all possible WO number formats to try
+  const cleanNumber = woNumber.trim();
+  const formatsToTry = [
+    cleanNumber,                                    // As-is: "4158"
+    `WO${cleanNumber}`,                            // With prefix: "WO4158"
+    `WO-${cleanNumber}`,                           // With dash: "WO-4158"
+    `WO ${cleanNumber}`,                           // With space: "WO 4158"
+    cleanNumber.padStart(6, '0'),                  // Padded: "004158"
+    `WO${cleanNumber.padStart(6, '0')}`,          // Prefix + padded: "WO004158"
+  ];
 
-  try {
-    console.log(`Fetching Work Order: ${woNumber}`);
+  // Remove duplicates
+  const uniqueFormats = [...new Set(formatsToTry)];
 
-    const response = await netsuiteRequest<{ items: any[] }>(
-      '/services/rest/query/v1/suiteql',
-      {
-        method: 'POST',
-        body: { q: query },
-        params: { limit: '1' },
+  console.log(`Fetching Work Order: ${woNumber} (trying ${uniqueFormats.length} formats)`);
+
+  // Try each format until we find a match
+  for (const format of uniqueFormats) {
+    try {
+      // SuiteQL query to find work order by tranId
+      // Work orders have type = 'WorkOrd'
+      // The createdFrom field is in TransactionLine (mainline), not Transaction
+      const query = `
+        SELECT
+          wo.id,
+          wo.tranid,
+          wo.trandate,
+          wo.status,
+          wo.entity AS customer_id,
+          BUILTIN.DF(wo.entity) AS customer_name,
+          woline.createdfrom AS linked_so_id,
+          so.tranid AS linked_so_number
+        FROM Transaction wo
+        INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
+        LEFT JOIN Transaction so ON so.id = woline.createdfrom
+        WHERE wo.type = 'WorkOrd'
+          AND wo.tranid = '${format.replace(/'/g, "''")}'
+      `;
+
+      const response = await netsuiteRequest<{ items: any[] }>(
+        '/services/rest/query/v1/suiteql',
+        {
+          method: 'POST',
+          body: { q: query },
+          params: { limit: '1' },
+        }
+      );
+
+      const row = response.items?.[0];
+      if (row) {
+        console.log(`✓ Work Order found using format: "${format}" (original: "${woNumber}")`);
+        return {
+          id: row.id,
+          tranId: row.tranid,
+          tranDate: row.trandate || '',
+          status: row.status || '',
+          customerId: row.customer_id || '',
+          customerName: row.customer_name || '',
+          linkedSalesOrderId: row.linked_so_id || undefined,
+          linkedSalesOrderNumber: row.linked_so_number || undefined,
+        };
       }
-    );
-
-    const row = response.items?.[0];
-    if (!row) {
-      console.log(`Work Order not found: ${woNumber}`);
-      return null;
+    } catch (error) {
+      // If this format fails, try the next one
+      console.log(`  ✗ Format "${format}" failed, trying next...`);
+      continue;
     }
-
-    return {
-      id: row.id,
-      tranId: row.tranid,
-      tranDate: row.trandate || '',
-      status: row.status || '',
-      customerId: row.customer_id || '',
-      customerName: row.customer_name || '',
-      linkedSalesOrderId: row.linked_so_id || undefined,
-      linkedSalesOrderNumber: row.linked_so_number || undefined,
-    };
-  } catch (error) {
-    console.error(`Error fetching Work Order ${woNumber}:`, error);
-    throw error;
   }
+
+  // None of the formats worked as WorkOrd - try to find it as ANY transaction type for diagnostic purposes
+  console.log(`⚠ Work Order not found with type='WorkOrd', searching for any transaction type...`);
+
+  for (const format of uniqueFormats) {
+    try {
+      const diagnosticQuery = `
+        SELECT id, tranid, type, status
+        FROM Transaction
+        WHERE tranid = '${format.replace(/'/g, "''")}'
+      `;
+
+      const response = await netsuiteRequest<{ items: any[] }>(
+        '/services/rest/query/v1/suiteql',
+        {
+          method: 'POST',
+          body: { q: diagnosticQuery },
+          params: { limit: '1' },
+        }
+      );
+
+      const row = response.items?.[0];
+      if (row) {
+        console.log(`⚠ DIAGNOSTIC: Found transaction "${format}" but type is "${row.type}", not "WorkOrd"`);
+        console.log(`   Full record: ${JSON.stringify(row)}`);
+        // Don't return it since it's not a Work Order
+        break;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+
+  console.log(`✗ Work Order not found: ${woNumber} (tried formats: ${uniqueFormats.join(', ')})`);
+  return null;
 }
 
 /**
