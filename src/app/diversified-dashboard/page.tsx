@@ -22,7 +22,6 @@ import { AIInsightsPanelV2 } from '@/components/AIInsightsPanelV2';
 import InsightsDrawer from '@/components/diversified/InsightsDrawer';
 import DiversifiedFilterDrawer from '@/components/diversified/DiversifiedFilterDrawer';
 import { SalesTasksTab } from '@/components/diversified/SalesTasksTab';
-import { DistributorsTab } from '@/components/diversified/DistributorsTab';
 import { MetricExplainer, HHIExplainer, YoYChangeExplainer } from '@/components/ui/MetricExplainer';
 
 interface ClassSummary {
@@ -626,7 +625,7 @@ export default function DiversifiedDashboard() {
   const [syncing, setSyncing] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights' | 'tasks' | 'distributors'>('table');
+  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights' | 'tasks'>('table');
   const [budgetData, setBudgetData] = useState<BudgetData[]>([]);
 
   // Customer detail drawer state
@@ -1190,19 +1189,6 @@ export default function DiversifiedDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                   Tasks
-                </button>
-                <button
-                  onClick={() => setActiveTab('distributors')}
-                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
-                    activeTab === 'distributors'
-                      ? 'bg-[#14B8A6]/20 text-[#14B8A6] border border-[#14B8A6]/30 shadow-[0_0_20px_rgba(20,184,166,0.15)]'
-                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  Distributors
                 </button>
               </motion.div>
 
@@ -1927,24 +1913,6 @@ export default function DiversifiedDashboard() {
                   transition={{ duration: 0.3 }}
                 >
                   <SalesTasksTab
-                    onCustomerClick={(customerId, customerName) => {
-                      setSelectedCustomerForDetail({ id: customerId, name: customerName });
-                    }}
-                  />
-                </motion.div>
-              )}
-
-              {/* Distributors Tab */}
-              {activeTab === 'distributors' && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <DistributorsTab
-                    selectedYears={selectedYears}
-                    selectedMonths={selectedMonths}
-                    selectedClass={selectedClass}
                     onCustomerClick={(customerId, customerName) => {
                       setSelectedCustomerForDetail({ id: customerId, name: customerName });
                     }}
