@@ -1003,7 +1003,6 @@ export async function getWorkOrderByNumber(woNumber: string): Promise<{
     LEFT JOIN Transaction so ON so.id = t.createdfrom
     WHERE t.type = 'WorkOrd'
       AND t.tranid = '${woNumber.replace(/'/g, "''")}'
-    LIMIT 1
   `;
 
   try {
