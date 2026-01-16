@@ -1203,3 +1203,394 @@ export async function getSalesOrderWithLineItems(soId: string): Promise<{
     throw error;
   }
 }
+
+/**
+ * BULK SYNC FUNCTIONS
+ * These functions fetch ALL work orders and sales orders from NetSuite
+ * for populating standalone cache tables
+ */
+
+export interface WorkOrderRecord {
+  netsuite_id: string;
+  wo_number: string;
+  wo_date: string | null;
+  posting_period: string | null;
+  status: string | null;
+  memo: string | null;
+  created_from_so_id: string | null;
+  created_from_so_number: string | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  subsidiary_id: string | null;
+  subsidiary_name: string | null;
+  location_id: string | null;
+  location_name: string | null;
+  class_id: string | null;
+  class_name: string | null;
+  department_id: string | null;
+  department_name: string | null;
+}
+
+/**
+ * Fetch ALL work orders from NetSuite within date range
+ * Used to populate standalone netsuite_work_orders table
+ */
+export async function getAllWorkOrders(options?: {
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string;   // YYYY-MM-DD
+  status?: string[];
+  limit?: number;
+}): Promise<WorkOrderRecord[]> {
+  const { limit = 5000 } = options || {};
+
+  // Build date filter - NetSuite uses MM/DD/YYYY format
+  let dateFilter = '';
+  if (options?.startDate) {
+    const [y, m, d] = options.startDate.split('-');
+    dateFilter += ` AND wo.trandate >= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+  }
+  if (options?.endDate) {
+    const [y, m, d] = options.endDate.split('-');
+    dateFilter += ` AND wo.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+  }
+
+  // Build status filter
+  let statusFilter = '';
+  if (options?.status && options.status.length > 0) {
+    const statuses = options.status.map(s => `'${s.replace(/'/g, "''")}'`).join(',');
+    statusFilter = ` AND wo.status IN (${statuses})`;
+  }
+
+  const query = `
+    SELECT
+      wo.id,
+      wo.tranid,
+      wo.trandate,
+      BUILTIN.DF(wo.postingperiod) AS posting_period,
+      wo.status,
+      wo.memo,
+      woline.createdfrom AS created_from_so_id,
+      so.tranid AS created_from_so_number,
+      wo.entity AS customer_id,
+      BUILTIN.DF(wo.entity) AS customer_name,
+      wo.subsidiary AS subsidiary_id,
+      BUILTIN.DF(wo.subsidiary) AS subsidiary_name,
+      wo.location AS location_id,
+      BUILTIN.DF(wo.location) AS location_name,
+      wo.class AS class_id,
+      BUILTIN.DF(wo.class) AS class_name,
+      wo.department AS department_id,
+      BUILTIN.DF(wo.department) AS department_name
+    FROM Transaction wo
+    INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
+    LEFT JOIN Transaction so ON so.id = woline.createdfrom
+    WHERE wo.type = 'WorkOrd'
+      ${dateFilter}
+      ${statusFilter}
+    ORDER BY wo.trandate DESC
+  `;
+
+  try {
+    console.log(`Fetching all work orders (limit: ${limit})...`);
+    console.log(`Date range: ${options?.startDate || 'all'} to ${options?.endDate || 'all'}`);
+
+    const response = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: query },
+        params: { limit: limit.toString() },
+      }
+    );
+
+    const workOrders: WorkOrderRecord[] = (response.items || []).map(row => ({
+      netsuite_id: row.id || '',
+      wo_number: row.tranid || '',
+      wo_date: row.trandate || null,
+      posting_period: row.posting_period || null,
+      status: row.status || null,
+      memo: row.memo || null,
+      created_from_so_id: row.created_from_so_id || null,
+      created_from_so_number: row.created_from_so_number || null,
+      customer_id: row.customer_id || null,
+      customer_name: row.customer_name || null,
+      subsidiary_id: row.subsidiary_id || null,
+      subsidiary_name: row.subsidiary_name || null,
+      location_id: row.location_id || null,
+      location_name: row.location_name || null,
+      class_id: row.class_id || null,
+      class_name: row.class_name || null,
+      department_id: row.department_id || null,
+      department_name: row.department_name || null,
+    }));
+
+    console.log(`Fetched ${workOrders.length} work orders from NetSuite`);
+    return workOrders;
+  } catch (error) {
+    console.error('Error fetching all work orders:', error);
+    throw error;
+  }
+}
+
+export interface SalesOrderRecord {
+  netsuite_id: string;
+  so_number: string;
+  so_date: string | null;
+  posting_period: string | null;
+  status: string | null;
+  memo: string | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  subtotal: number | null;
+  discount_total: number | null;
+  tax_total: number | null;
+  total_amount: number | null;
+  terms: string | null;
+  ship_method: string | null;
+  ship_date: string | null;
+  expected_ship_date: string | null;
+  subsidiary_id: string | null;
+  subsidiary_name: string | null;
+  location_id: string | null;
+  location_name: string | null;
+  class_id: string | null;
+  class_name: string | null;
+  department_id: string | null;
+  department_name: string | null;
+  sales_rep_id: string | null;
+  sales_rep_name: string | null;
+}
+
+export interface SalesOrderLineRecord {
+  netsuite_line_id: string;
+  line_number: number;
+  item_id: string | null;
+  item_name: string | null;
+  item_description: string | null;
+  item_type: string | null;
+  quantity: number | null;
+  quantity_committed: number | null;
+  quantity_fulfilled: number | null;
+  quantity_billed: number | null;
+  rate: number | null;
+  amount: number | null;
+  cost_estimate: number | null;
+  cost_estimate_type: string | null;
+  class_id: string | null;
+  class_name: string | null;
+  department_id: string | null;
+  department_name: string | null;
+  location_id: string | null;
+  location_name: string | null;
+  expected_ship_date: string | null;
+  is_closed: boolean;
+  closed_date: string | null;
+}
+
+/**
+ * Fetch ALL sales orders from NetSuite within date range
+ * Used to populate standalone netsuite_sales_orders table
+ */
+export async function getAllSalesOrders(options?: {
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string;   // YYYY-MM-DD
+  status?: string[];
+  includeLineItems?: boolean;
+  limit?: number;
+}): Promise<{ headers: SalesOrderRecord[]; linesBySOId: Record<string, SalesOrderLineRecord[]> }> {
+  const { limit = 5000, includeLineItems = true } = options || {};
+
+  // Build date filter
+  let dateFilter = '';
+  if (options?.startDate) {
+    const [y, m, d] = options.startDate.split('-');
+    dateFilter += ` AND so.trandate >= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+  }
+  if (options?.endDate) {
+    const [y, m, d] = options.endDate.split('-');
+    dateFilter += ` AND so.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+  }
+
+  // Build status filter
+  let statusFilter = '';
+  if (options?.status && options.status.length > 0) {
+    const statuses = options.status.map(s => `'${s.replace(/'/g, "''")}'`).join(',');
+    statusFilter = ` AND so.status IN (${statuses})`;
+  }
+
+  const headerQuery = `
+    SELECT
+      so.id,
+      so.tranid,
+      so.trandate,
+      BUILTIN.DF(so.postingperiod) AS posting_period,
+      so.status,
+      so.memo,
+      so.entity AS customer_id,
+      BUILTIN.DF(so.entity) AS customer_name,
+      so.subtotal,
+      so.discounttotal,
+      so.taxtotal,
+      so.total,
+      BUILTIN.DF(so.terms) AS terms,
+      BUILTIN.DF(so.shipmethod) AS ship_method,
+      so.shipdate,
+      so.expectedshipdate,
+      so.subsidiary AS subsidiary_id,
+      BUILTIN.DF(so.subsidiary) AS subsidiary_name,
+      so.location AS location_id,
+      BUILTIN.DF(so.location) AS location_name,
+      so.class AS class_id,
+      BUILTIN.DF(so.class) AS class_name,
+      so.department AS department_id,
+      BUILTIN.DF(so.department) AS department_name,
+      so.salesrep AS sales_rep_id,
+      BUILTIN.DF(so.salesrep) AS sales_rep_name
+    FROM Transaction so
+    WHERE so.type = 'SalesOrd'
+      ${dateFilter}
+      ${statusFilter}
+    ORDER BY so.trandate DESC
+  `;
+
+  try {
+    console.log(`Fetching all sales orders (limit: ${limit})...`);
+    console.log(`Date range: ${options?.startDate || 'all'} to ${options?.endDate || 'all'}`);
+    console.log(`Include line items: ${includeLineItems}`);
+
+    const response = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: headerQuery },
+        params: { limit: limit.toString() },
+      }
+    );
+
+    const headers: SalesOrderRecord[] = (response.items || []).map(row => ({
+      netsuite_id: row.id || '',
+      so_number: row.tranid || '',
+      so_date: row.trandate || null,
+      posting_period: row.posting_period || null,
+      status: row.status || null,
+      memo: row.memo || null,
+      customer_id: row.customer_id || null,
+      customer_name: row.customer_name || null,
+      subtotal: parseFloat(row.subtotal) || null,
+      discount_total: parseFloat(row.discounttotal) || null,
+      tax_total: parseFloat(row.taxtotal) || null,
+      total_amount: parseFloat(row.total) || null,
+      terms: row.terms || null,
+      ship_method: row.ship_method || null,
+      ship_date: row.shipdate || null,
+      expected_ship_date: row.expectedshipdate || null,
+      subsidiary_id: row.subsidiary_id || null,
+      subsidiary_name: row.subsidiary_name || null,
+      location_id: row.location_id || null,
+      location_name: row.location_name || null,
+      class_id: row.class_id || null,
+      class_name: row.class_name || null,
+      department_id: row.department_id || null,
+      department_name: row.department_name || null,
+      sales_rep_id: row.sales_rep_id || null,
+      sales_rep_name: row.sales_rep_name || null,
+    }));
+
+    console.log(`Fetched ${headers.length} sales orders from NetSuite`);
+
+    // Fetch line items if requested
+    const linesBySOId: Record<string, SalesOrderLineRecord[]> = {};
+
+    if (includeLineItems && headers.length > 0) {
+      console.log('Fetching line items for all sales orders...');
+
+      // Build IN clause with all SO IDs
+      const soIds = headers.map(h => `'${h.netsuite_id.replace(/'/g, "''")}'`).join(',');
+
+      const lineQuery = `
+        SELECT
+          tl.transaction AS so_id,
+          tl.id AS line_id,
+          tl.lineid AS line_number,
+          tl.item AS item_id,
+          BUILTIN.DF(tl.item) AS item_name,
+          i.displayname AS item_description,
+          i.itemtype AS item_type,
+          tl.quantity,
+          tl.quantitycommitted,
+          tl.quantityfulfilled,
+          tl.quantitybilled,
+          tl.rate,
+          tl.amount,
+          tl.costestimate,
+          tl.costestimatetype,
+          tl.class AS class_id,
+          BUILTIN.DF(tl.class) AS class_name,
+          tl.department AS department_id,
+          BUILTIN.DF(tl.department) AS department_name,
+          tl.location AS location_id,
+          BUILTIN.DF(tl.location) AS location_name,
+          tl.expectedshipdate,
+          tl.isclosed,
+          tl.closedate
+        FROM TransactionLine tl
+        LEFT JOIN Item i ON i.id = tl.item
+        WHERE tl.transaction IN (${soIds})
+          AND tl.mainline = 'F'
+          AND tl.item IS NOT NULL
+        ORDER BY tl.transaction, tl.lineid
+      `;
+
+      const lineResponse = await netsuiteRequest<{ items: any[] }>(
+        '/services/rest/query/v1/suiteql',
+        {
+          method: 'POST',
+          body: { q: lineQuery },
+          params: { limit: '100000' }, // High limit for all lines
+        }
+      );
+
+      // Group lines by SO ID
+      for (const row of lineResponse.items || []) {
+        const soId = row.so_id || '';
+        if (!linesBySOId[soId]) {
+          linesBySOId[soId] = [];
+        }
+
+        linesBySOId[soId].push({
+          netsuite_line_id: row.line_id || '',
+          line_number: parseInt(row.line_number) || 0,
+          item_id: row.item_id || null,
+          item_name: row.item_name || null,
+          item_description: row.item_description || null,
+          item_type: row.item_type || null,
+          quantity: parseFloat(row.quantity) || null,
+          quantity_committed: parseFloat(row.quantitycommitted) || null,
+          quantity_fulfilled: parseFloat(row.quantityfulfilled) || null,
+          quantity_billed: parseFloat(row.quantitybilled) || null,
+          rate: parseFloat(row.rate) || null,
+          amount: parseFloat(row.amount) || null,
+          cost_estimate: parseFloat(row.costestimate) || null,
+          cost_estimate_type: row.costestimatetype || null,
+          class_id: row.class_id || null,
+          class_name: row.class_name || null,
+          department_id: row.department_id || null,
+          department_name: row.department_name || null,
+          location_id: row.location_id || null,
+          location_name: row.location_name || null,
+          expected_ship_date: row.expectedshipdate || null,
+          is_closed: row.isclosed === 'T',
+          closed_date: row.closedate || null,
+        });
+      }
+
+      const totalLines = Object.values(linesBySOId).reduce((sum, lines) => sum + lines.length, 0);
+      console.log(`Fetched ${totalLines} line items across ${headers.length} sales orders`);
+    }
+
+    return { headers, linesBySOId };
+  } catch (error) {
+    console.error('Error fetching all sales orders:', error);
+    throw error;
+  }
+}
