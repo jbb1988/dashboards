@@ -360,9 +360,11 @@ export async function importCloseoutExcelToDatabase(
   const yearBreakdown: Record<number, number> = {};
   const typeBreakdown: Record<string, number> = {};
   Object.values(projectGroups).forEach(pg => {
-    const year = pg.project.project_year;
+    const year = pg.project.project_year || 0;
     const type = pg.project.project_type || '(empty)';
-    yearBreakdown[year] = (yearBreakdown[year] || 0) + 1;
+    if (year > 0) {
+      yearBreakdown[year] = (yearBreakdown[year] || 0) + 1;
+    }
     typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
   });
   console.log('Project breakdown by year:', yearBreakdown);
