@@ -1231,6 +1231,25 @@ export interface WorkOrderRecord {
   department_name: string | null;
 }
 
+export interface WorkOrderLineRecord {
+  netsuite_line_id: string;
+  line_number: number;
+  item_id: string | null;
+  item_name: string | null;
+  item_description: string | null;
+  item_type: string | null;
+  quantity: number | null;
+  quantity_completed: number | null;
+  unit_cost: number | null;
+  line_cost: number | null;
+  class_id: string | null;
+  class_name: string | null;
+  location_id: string | null;
+  location_name: string | null;
+  expected_completion_date: string | null;
+  is_closed: boolean;
+}
+
 /**
  * Fetch ALL work orders from NetSuite within date range
  * Used to populate standalone netsuite_work_orders table
@@ -1328,6 +1347,80 @@ export async function getAllWorkOrders(options?: {
     return workOrders;
   } catch (error) {
     console.error('Error fetching all work orders:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch line items for a specific work order
+ * Used to populate netsuite_work_order_lines table
+ */
+export async function getWorkOrderLines(woId: string): Promise<WorkOrderLineRecord[]> {
+  if (!woId || woId.trim() === '') {
+    return [];
+  }
+
+  const query = `
+    SELECT
+      tl.id AS line_id,
+      tl.lineid AS line_number,
+      tl.item AS item_id,
+      BUILTIN.DF(tl.item) AS item_name,
+      i.displayname AS item_description,
+      i.itemtype AS item_type,
+      tl.quantity,
+      tl.quantitycommitted AS quantity_completed,
+      tl.costestimate AS unit_cost,
+      tl.amount AS line_cost,
+      tl.class AS class_id,
+      BUILTIN.DF(tl.class) AS class_name,
+      tl.location AS location_id,
+      BUILTIN.DF(tl.location) AS location_name,
+      tl.expectedshipdate AS expected_completion_date,
+      tl.isclosed
+    FROM TransactionLine tl
+    LEFT JOIN Item i ON i.id = tl.item
+    WHERE tl.transaction = '${woId.replace(/'/g, "''")}'
+      AND tl.mainline = 'F'
+      AND tl.item IS NOT NULL
+    ORDER BY tl.lineid
+  `;
+
+  try {
+    console.log(`Fetching line items for WO ${woId}...`);
+
+    const response = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: query },
+        params: { limit: '1000' },
+      }
+    );
+
+    const lines: WorkOrderLineRecord[] = (response.items || []).map(row => ({
+      netsuite_line_id: row.line_id || '',
+      line_number: parseInt(row.line_number) || 0,
+      item_id: row.item_id || null,
+      item_name: row.item_name || null,
+      item_description: row.item_description || null,
+      item_type: row.item_type || null,
+      quantity: parseFloat(row.quantity) || null,
+      quantity_completed: parseFloat(row.quantity_completed) || null,
+      unit_cost: parseFloat(row.unit_cost) || null,
+      line_cost: parseFloat(row.line_cost) || null,
+      class_id: row.class_id || null,
+      class_name: row.class_name || null,
+      location_id: row.location_id || null,
+      location_name: row.location_name || null,
+      expected_completion_date: row.expected_completion_date || null,
+      is_closed: row.isclosed === 'T',
+    }));
+
+    console.log(`Fetched ${lines.length} line items for WO ${woId}`);
+    return lines;
+  } catch (error) {
+    console.error(`Error fetching line items for WO ${woId}:`, error);
     throw error;
   }
 }
