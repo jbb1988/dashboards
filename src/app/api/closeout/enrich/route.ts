@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getWorkOrderByNumber, getSalesOrderWithLineItems } from '@/lib/netsuite';
+import { getWorkOrderByNumber, getSalesOrderWithLineItems, executeSuiteQL } from '@/lib/netsuite';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +26,27 @@ export async function POST(request: Request) {
     const forceRefresh = url.searchParams.get('forceRefresh') === 'true';
 
     console.log('Starting NetSuite enrichment with filters:', { years, type, projectId, forceRefresh });
+
+    // DIAGNOSTIC: Check what Work Orders actually exist in NetSuite
+    console.log('\n=== DIAGNOSTIC: Checking NetSuite Work Order format ===');
+    try {
+      const sampleWOQuery = `
+        SELECT id, tranid, trandate, status
+        FROM Transaction
+        WHERE type = 'WorkOrd'
+        ORDER BY trandate DESC
+        LIMIT 20
+      `;
+      const sampleWOs = await executeSuiteQL(sampleWOQuery);
+      console.log(`Found ${sampleWOs.length} sample Work Orders in NetSuite:`);
+      console.log('Sample tranIds:', sampleWOs.map((wo: any) => wo.tranid).join(', '));
+      if (sampleWOs.length > 0) {
+        console.log('First WO example:', JSON.stringify(sampleWOs[0]));
+      }
+    } catch (diagError) {
+      console.error('Diagnostic query failed:', diagError);
+    }
+    console.log('=== End diagnostic ===\n');
 
     // Get Supabase client
     const supabase = getSupabaseAdmin();
@@ -84,6 +105,7 @@ export async function POST(request: Request) {
     }
 
     console.log(`Found ${workOrders.length} work orders to enrich`);
+    console.log('First 10 WO numbers from database:', workOrders.slice(0, 10).map(wo => wo.wo_number).join(', '));
 
     // Enrich each work order from NetSuite and store in database
     const errors: string[] = [];
