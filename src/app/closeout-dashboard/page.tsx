@@ -51,8 +51,18 @@ export default function CloseoutDashboard() {
   const [enriching, setEnriching] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('projects');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number>(2025); // Default to current year
+  const [selectedYears, setSelectedYears] = useState<number[]>([2025]); // Default to current year
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+
+  const availableYears = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+
+  const toggleYear = (year: number) => {
+    setSelectedYears(prev =>
+      prev.includes(year)
+        ? prev.filter(y => y !== year)
+        : [...prev, year].sort((a, b) => b - a)
+    );
+  };
 
   // Fetch data
   const fetchData = async (bust = false) => {
@@ -118,9 +128,9 @@ export default function CloseoutDashboard() {
 
       // Build query params based on current filters
       const params = new URLSearchParams();
-      if (selectedYear) {
-        params.append('year', selectedYear.toString());
-      }
+      selectedYears.forEach(year => {
+        params.append('year', year.toString());
+      });
 
       const url = `/api/closeout/enrich${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url, { method: 'POST' });
@@ -190,17 +200,20 @@ export default function CloseoutDashboard() {
       const importTime = Math.round((Date.now() - startTime) / 1000);
       console.log(`Import complete in ${importTime}s: ${importResult.stats.projectsCreated} projects, ${importResult.stats.workOrdersCreated} work orders`);
 
-      // Step 2: Enrich from NetSuite (filtered by selected year)
+      // Step 2: Enrich from NetSuite (filtered by selected years)
       setLoadingStep('enrich');
+      const yearText = selectedYears.length === 1 ? selectedYears[0].toString() : selectedYears.join(', ');
       setLoadingProgress({
         step: 'Step 2 of 3: Enriching from NetSuite',
-        detail: `Fetching Sales Order details for ${selectedYear} work orders... This may take 30-60 seconds.`,
+        detail: `Fetching Sales Order details for ${yearText} work orders... This may take 30-60 seconds.`,
         startTime,
       });
 
-      console.log(`Step 2: Enriching ${selectedYear} data from NetSuite...`);
+      console.log(`Step 2: Enriching ${yearText} data from NetSuite...`);
       const params = new URLSearchParams();
-      params.append('year', selectedYear.toString());
+      selectedYears.forEach(year => {
+        params.append('year', year.toString());
+      });
 
       const enrichResponse = await fetch(`/api/closeout/enrich?${params.toString()}`, { method: 'POST' });
       const enrichResult = await enrichResponse.json();
@@ -264,14 +277,14 @@ export default function CloseoutDashboard() {
   //   fetchData();
   // }, []);
 
-  // Filter data based on selected year/month
+  // Filter data based on selected years/month
   const filteredData = useMemo(() => {
     if (!data) return null;
 
     // Filter projects
     let filteredProjects = data.projects || [];
-    if (selectedYear) {
-      filteredProjects = filteredProjects.filter((p: any) => p.projectYear === selectedYear);
+    if (selectedYears.length > 0) {
+      filteredProjects = filteredProjects.filter((p: any) => selectedYears.includes(p.projectYear));
     }
     if (selectedMonth) {
       filteredProjects = filteredProjects.filter((p: any) => p.projectMonth === selectedMonth);
@@ -297,7 +310,7 @@ export default function CloseoutDashboard() {
         atRiskCount: atRiskProjects.length,
       },
     };
-  }, [data, selectedYear, selectedMonth]);
+  }, [data, selectedYears, selectedMonth]);
 
   // Calculate tab-specific KPIs
   const kpis = useMemo(() => {
@@ -310,19 +323,19 @@ export default function CloseoutDashboard() {
           {
             title: 'Total Revenue',
             value: formatCurrency(displayData.kpis.totalRevenue),
-            subtitle: selectedYear ? `Year ${selectedYear}` : 'Current year',
+            subtitle: selectedYears.length > 0 ? selectedYears.join(', ') : 'All years',
             color: '#22C55E',
           },
           {
             title: 'Total Cost',
             value: formatCurrency(displayData.kpis.totalCost),
-            subtitle: selectedYear ? `Year ${selectedYear}` : 'Current year',
+            subtitle: selectedYears.length > 0 ? selectedYears.join(', ') : 'All years',
             color: '#F59E0B',
           },
           {
             title: 'Gross Profit',
             value: formatCurrency(displayData.kpis.totalGrossProfit),
-            subtitle: selectedYear ? `Year ${selectedYear}` : 'Current year',
+            subtitle: selectedYears.length > 0 ? selectedYears.join(', ') : 'All years',
             color: '#38BDF8',
           },
           {
@@ -408,7 +421,7 @@ export default function CloseoutDashboard() {
           },
         ];
     }
-  }, [filteredData, activeTab, selectedYear]);
+  }, [filteredData, activeTab, selectedYears]);
 
   const mainStyle = {
     marginLeft: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH,
@@ -434,19 +447,23 @@ export default function CloseoutDashboard() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {/* Year Filter - Available Years */}
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  className="px-4 py-2.5 rounded-lg bg-[#111827] border border-[#22C55E]/30 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#22C55E]/40"
-                >
-                  <option value={2025}>2025</option>
-                  <option value={2024}>2024</option>
-                  <option value={2023}>2023</option>
-                  <option value={2022}>2022</option>
-                  <option value={2021}>2021</option>
-                  <option value={2020}>2020</option>
-                </select>
+                {/* Year Filter - Multi-select */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 font-medium">Years:</span>
+                  {availableYears.map(year => (
+                    <button
+                      key={year}
+                      onClick={() => toggleYear(year)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        selectedYears.includes(year)
+                          ? 'bg-[#22C55E] text-white'
+                          : 'bg-[#111827] text-gray-400 hover:bg-[#1F2937] hover:text-white border border-white/[0.08]'
+                      }`}
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
 
                 <div className="h-6 w-px bg-white/[0.08]"></div>
 
@@ -464,12 +481,12 @@ export default function CloseoutDashboard() {
                     {loadingAndEnriching ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        Loading {selectedYear}...
+                        Loading {selectedYears.join(', ')}...
                       </>
                     ) : (
                       <>
                         <Database className="w-4 h-4" />
-                        Load {selectedYear} Data
+                        Load {selectedYears.join(', ')} Data
                       </>
                     )}
                   </button>
@@ -492,7 +509,7 @@ export default function CloseoutDashboard() {
                       className="px-4 py-2 rounded-lg bg-[#22C55E] text-white text-sm font-medium hover:bg-[#16A34A] transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                       <Upload className={`w-4 h-4 ${loadingAndEnriching ? 'animate-bounce' : ''}`} />
-                      {loadingAndEnriching ? `Loading ${selectedYear}...` : `Reload ${selectedYear}`}
+                      {loadingAndEnriching ? `Loading ${selectedYears.join(', ')}...` : `Reload ${selectedYears.join(', ')}`}
                     </button>
                   </>
                 )}
@@ -509,7 +526,7 @@ export default function CloseoutDashboard() {
                 <Database className="w-16 h-16 mx-auto mb-6 text-[#22C55E]/40" />
                 <h2 className="text-2xl font-bold text-white mb-3">Ready to Load Data</h2>
                 <p className="text-gray-400 mb-6">
-                  Select a year above and click <span className="text-[#22C55E] font-semibold">"Load {selectedYear} Data"</span> to import
+                  Select year(s) above and click <span className="text-[#22C55E] font-semibold">"Load {selectedYears.join(', ')} Data"</span> to import
                   from Excel and enrich with NetSuite details.
                 </p>
                 <div className="bg-[#111827] border border-white/[0.08] rounded-lg p-4 text-left text-sm text-gray-400">

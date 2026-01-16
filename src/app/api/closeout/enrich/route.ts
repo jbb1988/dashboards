@@ -20,12 +20,12 @@ export async function POST(request: Request) {
   try {
     // Parse query parameters for filtering
     const url = new URL(request.url);
-    const year = url.searchParams.get('year') ? parseInt(url.searchParams.get('year')!) : undefined;
+    const years = url.searchParams.getAll('year').map(y => parseInt(y)).filter(y => !isNaN(y));
     const type = url.searchParams.get('type') || undefined;
     const projectId = url.searchParams.get('projectId') || undefined;
     const forceRefresh = url.searchParams.get('forceRefresh') === 'true';
 
-    console.log('Starting NetSuite enrichment with filters:', { year, type, projectId, forceRefresh });
+    console.log('Starting NetSuite enrichment with filters:', { years, type, projectId, forceRefresh });
 
     // Get Supabase client
     const supabase = getSupabaseAdmin();
@@ -47,8 +47,8 @@ export async function POST(request: Request) {
       .neq('wo_number', '');
 
     // Apply filters based on query params
-    if (year) {
-      query = query.eq('closeout_projects.project_year', year);
+    if (years.length > 0) {
+      query = query.in('closeout_projects.project_year', years);
     }
 
     if (type) {
@@ -203,7 +203,7 @@ export async function POST(request: Request) {
 
     // Build filter description for message
     const filterDesc = [];
-    if (year) filterDesc.push(`year=${year}`);
+    if (years.length > 0) filterDesc.push(`years=${years.join(',')}`);
     if (type) filterDesc.push(`type=${type}`);
     if (projectId) filterDesc.push(`projectId=${projectId}`);
     const filterText = filterDesc.length > 0 ? ` (filtered by ${filterDesc.join(', ')})` : '';
