@@ -207,6 +207,10 @@ export default function CloseoutDashboard() {
 
       if (enrichResult.stats?.errors && enrichResult.stats.errors.length > 0) {
         console.error('Enrichment errors:', enrichResult.stats.errors);
+        console.log('First 10 errors:');
+        enrichResult.stats.errors.slice(0, 10).forEach((err: string, idx: number) => {
+          console.log(`${idx + 1}. ${err}`);
+        });
       }
 
       const enrichTime = Math.round((Date.now() - startTime) / 1000);
@@ -226,13 +230,23 @@ export default function CloseoutDashboard() {
       const totalTime = Math.round((Date.now() - startTime) / 1000);
       console.log(`Total time: ${totalTime}s`);
 
+      // Build error summary for alert
+      let errorSummary = '';
+      if (enrichResult.stats.errors && enrichResult.stats.errors.length > 0) {
+        errorSummary = `⚠️ ${enrichResult.stats.errors.length} errors:\n\n`;
+        errorSummary += enrichResult.stats.errors.slice(0, 3).join('\n');
+        if (enrichResult.stats.errors.length > 3) {
+          errorSummary += `\n\n... and ${enrichResult.stats.errors.length - 3} more (see console)`;
+        }
+      } else {
+        errorSummary = '✨ No errors!';
+      }
+
       alert(
-        `✅ Data loaded successfully in ${totalTime} seconds!\n\n` +
+        `${enrichResult.stats.workOrdersProcessed > 0 ? '✅' : '⚠️'} Data loaded in ${totalTime} seconds!\n\n` +
         `📊 Imported: ${importResult.stats.projectsCreated} projects, ${importResult.stats.workOrdersCreated} work orders\n` +
         `🔗 Enriched: ${enrichResult.stats.workOrdersProcessed} work orders with ${enrichResult.stats.lineItemsCached} line items\n\n` +
-        (enrichResult.stats.errors && enrichResult.stats.errors.length > 0
-          ? `⚠️ ${enrichResult.stats.errors.length} errors (check console)`
-          : `✨ No errors!`)
+        errorSummary
       );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Load & Enrich failed';
