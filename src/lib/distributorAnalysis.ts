@@ -77,6 +77,7 @@ const DISTRIBUTORS = [
   { name: 'Core & Main', patterns: ['core & main', 'core and main', 'core&main', 'core main'] },
   { name: 'Fortiline', patterns: ['fortiline'] },
   { name: 'Consolidated Pipe', patterns: ['consolidated pipe', 'consolidated supply'] },
+  { name: 'Hayes Pipe & Supply', patterns: ['hayes pipe', 'hayes pipe & supply'] },
 ];
 
 // Major US cities for location extraction
