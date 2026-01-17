@@ -571,22 +571,41 @@ Respond ONLY with JSON.`;
     const response = await callAI(prompt, 2500);
     const result = extractJSON(response) as { recommendations: AIRecommendation[] };
 
-    // Validate recommendations and filter invalid ones
+    console.log(`[AI INSIGHTS] AI generated ${result.recommendations.length} raw recommendations`);
+
+    // DUAL POST-VALIDATION: Text-based + Ownership flag checking
     const validRecommendations = result.recommendations.filter(r => {
-      // Don't recommend VEROflow equipment to calibration-only customers
-      // (calibration purchases indicate they already own VEROflow equipment)
+      // Extract customer name from recommendation title
+      const customerMatch = r.title.match(/(?:Call|Contact|Follow up with|Quote|Reach out to|Email|Quick Win:)\s+([^-–—]+?)(?:\s+(?:about|on|for|regarding|-|–|—)|$)/i);
+      const customerName = customerMatch?.[1]?.trim();
+
+      // Check 1: Text-based validation for VEROflow equipment recommendations
       if (r.recommendation.toLowerCase().includes('veroflow equipment') ||
           r.recommendation.toLowerCase().includes('veroflow meter') ||
-          r.recommendation.toLowerCase().includes('purchase veroflow')) {
-
-        const customerName = r.title.match(/(?:Call|Contact|Follow up with|Quote|Quick Win:)\s+([^-–—]+?)(?:\s+(?:about|on|for|regarding|-|–|—)|$)/i)?.[1]?.trim();
+          r.recommendation.toLowerCase().includes('purchase veroflow') ||
+          r.recommendation.toLowerCase().includes('buy veroflow') ||
+          r.recommendation.toLowerCase().includes('sell veroflow equipment') ||
+          r.recommendation.toLowerCase().includes('quote veroflow equipment')) {
 
         if (customerName) {
           const quickWin = quickWins.find(q => q.customer_name.includes(customerName));
 
-          // If customer already buys calibration, they own VEROflow equipment
+          // Check 2: Ownership flag validation (from enriched data)
+          // Note: The owns_veroflow_equipment flag was added during enrichment
+          // but we need to check the original typical_products array
+          if (quickWin) {
+            const ownsVeroflow = quickWin.typical_products?.some(p => p.toLowerCase().includes('calibration')) || false;
+
+            if (ownsVeroflow) {
+              console.warn(`[AI VALIDATION] ❌ Filtered: "${r.title}" - Customer owns VEROflow (buys calibration)`);
+              console.warn(`[AI VALIDATION]    Customer: ${customerName}, Typical Products: ${quickWin.typical_products?.join(', ')}`);
+              return false;
+            }
+          }
+
+          // Check 3: Product list validation (existing, enhanced)
           if (quickWin?.typical_products?.some(p => p.toLowerCase().includes('calibration'))) {
-            console.warn(`[AI VALIDATION] Filtered invalid recommendation: ${r.title} - Customer already owns VEROflow (buys calibration services)`);
+            console.warn(`[AI VALIDATION] ❌ Filtered: "${r.title}" - Customer buys calibration (owns equipment)`);
             return false;
           }
         }
@@ -595,11 +614,26 @@ Respond ONLY with JSON.`;
       return true;
     });
 
-    // Log quality metrics
-    if (validRecommendations.length < result.recommendations.length) {
-      console.log(`[AI INSIGHTS] Generated ${result.recommendations.length} recommendations`);
-      console.log(`[AI INSIGHTS] Filtered ${result.recommendations.length - validRecommendations.length} invalid recommendations`);
+    // Log validation summary
+    const filteredCount = result.recommendations.length - validRecommendations.length;
+    if (filteredCount > 0) {
+      console.log(`[AI VALIDATION] ✅ Filtered ${filteredCount} invalid VEROflow recommendations`);
+      console.log(`[AI INSIGHTS] Filtered recommendations:`);
+      result.recommendations
+        .filter(r => !validRecommendations.includes(r))
+        .forEach(r => {
+          console.log(`  - ${r.title}`);
+          console.log(`    Reason: ${r.recommendation.substring(0, 100)}...`);
+        });
     }
+
+    console.log(`[AI INSIGHTS] Post-validation: ${validRecommendations.length} valid recommendations`);
+
+    // Quality metrics
+    const qualityScore = result.recommendations.length > 0
+      ? (validRecommendations.length / result.recommendations.length * 100)
+      : 100;
+    console.log(`[AI INSIGHTS] Quality Score: ${qualityScore.toFixed(1)}% (target: >95%)`)
 
     // Mark these as general but with quick win context
     return validRecommendations.map(r => ({

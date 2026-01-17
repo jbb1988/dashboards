@@ -1351,18 +1351,27 @@ export async function getWorkOrderLines(woId: string): Promise<WorkOrderLineReco
     return [];
   }
 
+  // Query with item details and costs
+  // Work order lines store costs in rate/netamount fields
+  // Join to Item table for item name and description
   const query = `
     SELECT
       tl.id AS line_id,
       tl.linesequencenumber AS line_number,
       tl.item AS item_id,
+      i.itemid AS item_name,
+      i.displayname AS item_display_name,
+      i.description AS item_description,
       tl.itemtype AS item_type,
       tl.quantity,
       tl.quantityshiprecv AS quantity_completed,
+      tl.rate AS unit_cost,
+      tl.netamount AS line_cost,
       tl.location AS location_id,
       tl.class AS class_id,
       tl.isclosed
     FROM transactionline tl
+    LEFT JOIN item i ON i.id = tl.item
     WHERE tl.transaction = '${woId.replace(/'/g, "''")}'
       AND tl.mainline = 'F'
       AND tl.item IS NOT NULL
@@ -1385,13 +1394,13 @@ export async function getWorkOrderLines(woId: string): Promise<WorkOrderLineReco
       netsuite_line_id: row.line_id || '',
       line_number: parseInt(row.line_number) || 0,
       item_id: row.item_id || null,
-      item_name: null,
-      item_description: null,
+      item_name: row.item_name || row.item_display_name || null,
+      item_description: row.item_description || null,
       item_type: row.item_type || null,
       quantity: parseFloat(row.quantity) || null,
       quantity_completed: parseFloat(row.quantity_completed) || null,
-      unit_cost: null,
-      line_cost: null,
+      unit_cost: parseFloat(row.unit_cost) || null,
+      line_cost: parseFloat(row.line_cost) || null,
       class_id: row.class_id || null,
       class_name: null,
       location_id: row.location_id || null,
