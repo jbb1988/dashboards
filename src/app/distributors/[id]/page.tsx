@@ -202,22 +202,18 @@ export default function DistributorDetailPage() {
   const handleCreateTaskFromAction = (action: any) => {
     // Transform PriorityAction into AIRecommendation format
     const recommendation: AIRecommendation = {
-      id: action.id,
       category: action.category,
       title: action.title,
-      description: action.description,
+      problem: action.description,
+      recommendation: action.impact,
+      expected_impact: `Opportunity: $${(action.metrics.opportunity / 1000).toFixed(1)}k`,
       priority: action.priority === 'critical' ? 'high' : action.priority,
-      actionItems: [
+      action_items: [
         action.impact,
         `Effort: ${action.effort}`,
         `Opportunity: $${(action.metrics.opportunity / 1000).toFixed(1)}k`
       ],
-      metadata: {
-        distributor_name: data?.distributor_name,
-        customer_id: data?.customer_id,
-        customer_name: data?.customer_name,
-        location: data?.location,
-      }
+      customer_segment: `${data?.distributor_name} - ${data?.location}`,
     };
 
     setSelectedRecommendation(recommendation);
@@ -228,22 +224,18 @@ export default function DistributorDetailPage() {
   const handleCreateTaskFromGrowthOpp = (opportunity: any, index: number) => {
     // Transform Growth Opportunity into AIRecommendation format
     const recommendation: AIRecommendation = {
-      id: `growth-opp-${index}`,
       category: 'expansion',
       title: `Expand into ${opportunity.category} category`,
-      description: `This location is not purchasing ${opportunity.category} products, but ${opportunity.purchased_by_pct}% of other ${data?.distributor_name} locations do. This represents a cross-sell opportunity.`,
+      problem: `This location is not purchasing ${opportunity.category} products, but ${opportunity.purchased_by_pct}% of other ${data?.distributor_name} locations do.`,
+      recommendation: opportunity.action,
+      expected_impact: `Estimated opportunity: ${formatCurrency(opportunity.estimated_opportunity)}`,
       priority: 'medium',
-      actionItems: [
+      action_items: [
         opportunity.action,
         `Purchased by ${opportunity.purchased_by_pct}% of peer locations`,
         `Estimated opportunity: ${formatCurrency(opportunity.estimated_opportunity)}`
       ],
-      metadata: {
-        distributor_name: data?.distributor_name,
-        customer_id: data?.customer_id,
-        customer_name: data?.customer_name,
-        location: data?.location,
-      }
+      customer_segment: `${data?.distributor_name} - ${data?.location}`,
     };
 
     setSelectedRecommendation(recommendation);
