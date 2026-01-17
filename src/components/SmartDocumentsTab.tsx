@@ -426,6 +426,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
         contracts={contractItems}
         openBundleModal={openBundleModal}
         filterPreset={filterPreset}
+        focusMode={focusMode}
         onUpload={async (file, documentType, contractId) => {
           const contract = contractItems.find(c => c.id === contractId);
           await handleUpload(

@@ -48,6 +48,7 @@ interface ContractListViewProps {
   onDelete?: (doc: ContractDocument) => void;
   openBundleModal?: (contract: ContractItem, mode: 'create' | 'add') => void;
   filterPreset?: 'needsAttention' | 'closingSoon' | 'budgeted' | 'complete' | null;
+  focusMode?: boolean;
 }
 
 // Format date for display
@@ -240,6 +241,7 @@ export default function ContractListView({
   onDelete,
   openBundleModal,
   filterPreset,
+  focusMode = false,
 }: ContractListViewProps) {
   const [selectedContract, setSelectedContract] = useState<ContractItem | null>(null);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
@@ -281,6 +283,13 @@ export default function ContractListView({
         break;
     }
   }, [filterPreset, setFilters]);
+
+  // Clear filters when focus mode is activated
+  useEffect(() => {
+    if (focusMode) {
+      setFilters(DEFAULT_FILTERS);
+    }
+  }, [focusMode, setFilters]);
 
   // Update selectedContract when contracts change (e.g., after document deletion)
   useEffect(() => {
