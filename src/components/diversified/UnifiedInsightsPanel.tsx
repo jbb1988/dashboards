@@ -10,7 +10,7 @@ export interface AIRecommendation {
   recommendation: string;
   expected_impact: string;
   action_items: string[];
-  category: 'attrition' | 'growth' | 'crosssell' | 'concentration' | 'general';
+  category: 'attrition' | 'growth' | 'crosssell' | 'concentration' | 'general' | 'attrisk' | 'categorygap' | 'expansion';
   customer_segment?: string;
 }
 
