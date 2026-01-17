@@ -1568,35 +1568,6 @@ export default function DiversifiedDashboard() {
                         </button>
                       </div>
 
-                      {/* Alerts Banner */}
-                      {insightsData.alerts.length > 0 && insightsSubTab === 'overview' && (
-                        <div className="space-y-2">
-                          {insightsData.alerts.slice(0, 3).map((alert, idx) => (
-                            <motion.div
-                              key={idx}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: idx * 0.1 }}
-                              className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
-                                alert.type === 'danger'
-                                  ? 'bg-[#EF4444]/10 border-[#EF4444]/30 text-[#EF4444]'
-                                  : alert.type === 'warning'
-                                  ? 'bg-[#F59E0B]/10 border-[#F59E0B]/30 text-[#F59E0B]'
-                                  : 'bg-[#38BDF8]/10 border-[#38BDF8]/30 text-[#38BDF8]'
-                              }`}
-                            >
-                              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                              </svg>
-                              <div className="flex-1">
-                                <span className="font-medium">{alert.title}:</span>
-                                <span className="ml-1 opacity-90">{alert.message}</span>
-                              </div>
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-
                       {/* Overview Sub-Tab Content */}
                       {insightsSubTab === 'overview' && (
                         <div className="space-y-6">
