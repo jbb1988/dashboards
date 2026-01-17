@@ -457,68 +457,119 @@ export async function GET(request: Request) {
       wo.variance += row.variance;
     });
 
-    // Load NetSuite enrichment data from database if requested
+    // Load NetSuite enrichment data from standalone NetSuite tables
     const supabase = getSupabaseAdmin();
     const woEnrichmentMap: Record<string, any> = {};
 
     if (includeEnrichment) {
       try {
-        // Get all enriched work orders with their line items
-        const { data: enrichedWOs } = await supabase
-          .from('closeout_work_orders')
+        // Get all work orders with their linked sales orders and line items
+        const { data: workOrders } = await supabase
+          .from('netsuite_work_orders')
           .select(`
             wo_number,
-            netsuite_enriched,
-            netsuite_wo_id,
-            netsuite_so_id,
-            netsuite_so_number,
-            netsuite_work_order_details (
-              wo_status,
-              wo_date,
-              so_number,
-              so_status,
-              so_date,
-              customer_name,
-              line_id,
+            wo_date,
+            status,
+            created_from_so_number,
+            customer_name,
+            netsuite_work_order_lines (
+              item_id,
               item_name,
               item_description,
               quantity,
-              unit_price,
-              line_amount,
-              cost_estimate
+              unit_cost,
+              line_cost
             )
-          `)
-          .eq('netsuite_enriched', true);
+          `);
 
-        if (enrichedWOs) {
-          enrichedWOs.forEach((wo: any) => {
-            const lineItems = wo.netsuite_work_order_details?.map((li: any) => ({
-              lineId: li.line_id,
-              itemName: li.item_name,
-              itemDescription: li.item_description,
-              quantity: li.quantity,
-              unitPrice: li.unit_price,
-              lineAmount: li.line_amount,
-              costEstimate: li.cost_estimate,
-            })) || [];
+        if (workOrders) {
+          // Build a map of work orders
+          const woMap: Record<string, any> = {};
+          workOrders.forEach((wo: any) => {
+            woMap[wo.wo_number] = wo;
+          });
 
-            const firstDetail = wo.netsuite_work_order_details?.[0];
+          // Get all unique sales order numbers referenced by work orders
+          const soNumbers = [...new Set(
+            workOrders
+              .map((wo: any) => wo.created_from_so_number)
+              .filter((soNum): soNum is string => !!soNum)
+          )];
 
-            // WO numbers are unique globally, simple key
-            woEnrichmentMap[wo.wo_number] = {
-              soNumber: wo.netsuite_so_number,
-              soId: wo.netsuite_so_id,
-              soStatus: firstDetail?.so_status,
-              soDate: firstDetail?.so_date,
-              woStatus: firstDetail?.wo_status,
-              woDate: firstDetail?.wo_date,
-              customerName: firstDetail?.customer_name,
-              lineItems,
+          // Fetch sales orders and their line items in one query
+          let salesOrders: any[] = [];
+          if (soNumbers.length > 0) {
+            const { data: soData } = await supabase
+              .from('netsuite_sales_orders')
+              .select(`
+                so_number,
+                so_date,
+                status,
+                customer_name,
+                netsuite_sales_order_lines (
+                  item_id,
+                  item_name,
+                  item_description,
+                  quantity,
+                  rate,
+                  amount,
+                  cost_estimate
+                )
+              `)
+              .in('so_number', soNumbers);
+
+            salesOrders = soData || [];
+          }
+
+          // Build SO map
+          const soMap: Record<string, any> = {};
+          salesOrders.forEach((so: any) => {
+            soMap[so.so_number] = so;
+          });
+
+          // Build enrichment map - support both "WO6922" and "6922" formats
+          workOrders.forEach((wo: any) => {
+            const linkedSO = wo.created_from_so_number ? soMap[wo.created_from_so_number] : null;
+
+            const enrichmentData = {
+              soNumber: wo.created_from_so_number,
+              soId: null, // Not needed for display
+              soStatus: linkedSO?.status || null,
+              soDate: linkedSO?.so_date || null,
+              woStatus: wo.status,
+              woDate: wo.wo_date,
+              customerName: wo.customer_name || linkedSO?.customer_name || null,
+              lineItems: linkedSO?.netsuite_sales_order_lines?.map((li: any) => ({
+                lineId: li.item_id,
+                itemName: li.item_name,
+                itemDescription: li.item_description,
+                quantity: li.quantity,
+                unitPrice: li.rate,
+                lineAmount: li.amount,
+                costEstimate: li.cost_estimate,
+              })) || [],
+              woLineItems: wo.netsuite_work_order_lines?.map((li: any) => ({
+                itemId: li.item_id,
+                itemName: li.item_name,
+                itemDescription: li.item_description,
+                quantity: li.quantity,
+                unitCost: li.unit_cost,
+                lineCost: li.line_cost,
+              })) || [],
             };
+
+            // Store under both formats: "WO6922" and "6922"
+            woEnrichmentMap[wo.wo_number] = enrichmentData;
+
+            // Also store without "WO" prefix for Excel compatibility
+            const numericPart = wo.wo_number.replace(/^WO/i, '');
+            if (numericPart !== wo.wo_number) {
+              woEnrichmentMap[numericPart] = enrichmentData;
+            }
           });
         }
       } catch (error) {
-        console.error('Error loading enrichment data from database:', error);
+        console.error('Error loading enrichment data from NetSuite tables:', error);
         // Continue without enrichment
       }
     }

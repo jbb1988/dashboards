@@ -3,5 +3,11 @@
     "src/app/api/contracts/review/upload/route.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/netsuite/scheduled-sync",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }

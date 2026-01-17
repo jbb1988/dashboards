@@ -29,6 +29,7 @@ export interface BundleWithContracts extends ContractBundle {
     contract?: {
       id: string;
       name: string;
+      salesforce_id?: string;
       value: number;
       status: string;
       contract_type: string[];
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
           contracts (
             id,
             name,
+            salesforce_id,
             value,
             status,
             contract_type
@@ -118,6 +120,7 @@ export async function GET(request: NextRequest) {
           contracts (
             id,
             name,
+            salesforce_id,
             value,
             status,
             contract_type

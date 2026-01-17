@@ -1214,21 +1214,18 @@ export interface WorkOrderRecord {
   netsuite_id: string;
   wo_number: string;
   wo_date: string | null;
-  posting_period: string | null;
   status: string | null;
-  memo: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  customer_id: string | null;
   created_from_so_id: string | null;
   created_from_so_number: string | null;
-  customer_id: string | null;
-  customer_name: string | null;
-  subsidiary_id: string | null;
-  subsidiary_name: string | null;
-  location_id: string | null;
-  location_name: string | null;
-  class_id: string | null;
-  class_name: string | null;
-  department_id: string | null;
-  department_name: string | null;
+  bill_of_materials_id: string | null;
+  bill_of_materials_revision_id: string | null;
+  manufacturing_routing_id: string | null;
+  item_id: string | null;
+  assembly_description: string | null;
+  serial_number: string | null;
 }
 
 export interface WorkOrderLineRecord {
@@ -1285,24 +1282,21 @@ export async function getAllWorkOrders(options?: {
       wo.id,
       wo.tranid,
       wo.trandate,
-      BUILTIN.DF(wo.postingperiod) AS posting_period,
       wo.status,
-      wo.memo,
+      wo.startdate,
+      wo.enddate,
+      wo.entity AS customer_id,
+      wo.billofmaterials,
+      wo.billofmaterialsrevision,
+      wo.manufacturingrouting,
       woline.createdfrom AS created_from_so_id,
       so.tranid AS created_from_so_number,
-      wo.entity AS customer_id,
-      BUILTIN.DF(wo.entity) AS customer_name,
-      wo.subsidiary AS subsidiary_id,
-      BUILTIN.DF(wo.subsidiary) AS subsidiary_name,
-      wo.location AS location_id,
-      BUILTIN.DF(wo.location) AS location_name,
-      wo.class AS class_id,
-      BUILTIN.DF(wo.class) AS class_name,
-      wo.department AS department_id,
-      BUILTIN.DF(wo.department) AS department_name
-    FROM Transaction wo
-    INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
-    LEFT JOIN Transaction so ON so.id = woline.createdfrom
+      wo.custbodyitemid,
+      wo.custbodyiqsassydescription AS assembly_description,
+      wo.custbodycustserialmst AS serial_number
+    FROM transaction wo
+    INNER JOIN transactionline woline ON woline.transaction = wo.id AND woline.mainline = 'T'
+    LEFT JOIN transaction so ON so.id = woline.createdfrom
     WHERE wo.type = 'WorkOrd'
       ${dateFilter}
       ${statusFilter}
@@ -1326,21 +1320,18 @@ export async function getAllWorkOrders(options?: {
       netsuite_id: row.id || '',
       wo_number: row.tranid || '',
       wo_date: row.trandate || null,
-      posting_period: row.posting_period || null,
       status: row.status || null,
-      memo: row.memo || null,
+      start_date: row.startdate || null,
+      end_date: row.enddate || null,
+      customer_id: row.customer_id || null,
       created_from_so_id: row.created_from_so_id || null,
       created_from_so_number: row.created_from_so_number || null,
-      customer_id: row.customer_id || null,
-      customer_name: row.customer_name || null,
-      subsidiary_id: row.subsidiary_id || null,
-      subsidiary_name: row.subsidiary_name || null,
-      location_id: row.location_id || null,
-      location_name: row.location_name || null,
-      class_id: row.class_id || null,
-      class_name: row.class_name || null,
-      department_id: row.department_id || null,
-      department_name: row.department_name || null,
+      bill_of_materials_id: row.billofmaterials || null,
+      bill_of_materials_revision_id: row.billofmaterialsrevision || null,
+      manufacturing_routing_id: row.manufacturingrouting || null,
+      item_id: row.custbodyitemid || null,
+      assembly_description: row.assembly_description || null,
+      serial_number: row.serial_number || null,
     }));
 
     console.log(`Fetched ${workOrders.length} work orders from NetSuite`);
@@ -1363,27 +1354,19 @@ export async function getWorkOrderLines(woId: string): Promise<WorkOrderLineReco
   const query = `
     SELECT
       tl.id AS line_id,
-      tl.lineid AS line_number,
+      tl.linesequencenumber AS line_number,
       tl.item AS item_id,
-      BUILTIN.DF(tl.item) AS item_name,
-      i.displayname AS item_description,
-      i.itemtype AS item_type,
+      tl.itemtype AS item_type,
       tl.quantity,
-      tl.quantitycommitted AS quantity_completed,
-      tl.costestimate AS unit_cost,
-      tl.amount AS line_cost,
-      tl.class AS class_id,
-      BUILTIN.DF(tl.class) AS class_name,
+      tl.quantityshiprecv AS quantity_completed,
       tl.location AS location_id,
-      BUILTIN.DF(tl.location) AS location_name,
-      tl.expectedshipdate AS expected_completion_date,
+      tl.class AS class_id,
       tl.isclosed
-    FROM TransactionLine tl
-    LEFT JOIN Item i ON i.id = tl.item
+    FROM transactionline tl
     WHERE tl.transaction = '${woId.replace(/'/g, "''")}'
       AND tl.mainline = 'F'
       AND tl.item IS NOT NULL
-    ORDER BY tl.lineid
+    ORDER BY tl.linesequencenumber
   `;
 
   try {
@@ -1402,18 +1385,18 @@ export async function getWorkOrderLines(woId: string): Promise<WorkOrderLineReco
       netsuite_line_id: row.line_id || '',
       line_number: parseInt(row.line_number) || 0,
       item_id: row.item_id || null,
-      item_name: row.item_name || null,
-      item_description: row.item_description || null,
+      item_name: null,
+      item_description: null,
       item_type: row.item_type || null,
       quantity: parseFloat(row.quantity) || null,
       quantity_completed: parseFloat(row.quantity_completed) || null,
-      unit_cost: parseFloat(row.unit_cost) || null,
-      line_cost: parseFloat(row.line_cost) || null,
+      unit_cost: null,
+      line_cost: null,
       class_id: row.class_id || null,
-      class_name: row.class_name || null,
+      class_name: null,
       location_id: row.location_id || null,
-      location_name: row.location_name || null,
-      expected_completion_date: row.expected_completion_date || null,
+      location_name: null,
+      expected_completion_date: null,
       is_closed: row.isclosed === 'T',
     }));
 
@@ -1521,25 +1504,16 @@ export async function getAllSalesOrders(options?: {
       so.memo,
       so.entity AS customer_id,
       BUILTIN.DF(so.entity) AS customer_name,
-      so.subtotal,
-      so.discounttotal,
       so.taxtotal,
       so.total,
       BUILTIN.DF(so.terms) AS terms,
       BUILTIN.DF(so.shipmethod) AS ship_method,
       so.shipdate,
-      so.expectedshipdate,
       so.subsidiary AS subsidiary_id,
       BUILTIN.DF(so.subsidiary) AS subsidiary_name,
       so.location AS location_id,
-      BUILTIN.DF(so.location) AS location_name,
-      so.class AS class_id,
-      BUILTIN.DF(so.class) AS class_name,
-      so.department AS department_id,
-      BUILTIN.DF(so.department) AS department_name,
-      so.salesrep AS sales_rep_id,
-      BUILTIN.DF(so.salesrep) AS sales_rep_name
-    FROM Transaction so
+      BUILTIN.DF(so.location) AS location_name
+    FROM transaction so
     WHERE so.type = 'SalesOrd'
       ${dateFilter}
       ${statusFilter}
@@ -1569,24 +1543,24 @@ export async function getAllSalesOrders(options?: {
       memo: row.memo || null,
       customer_id: row.customer_id || null,
       customer_name: row.customer_name || null,
-      subtotal: parseFloat(row.subtotal) || null,
-      discount_total: parseFloat(row.discounttotal) || null,
+      subtotal: null, // Field not available in SuiteQL for SalesOrd
+      discount_total: null, // Field not available in SuiteQL for SalesOrd
       tax_total: parseFloat(row.taxtotal) || null,
       total_amount: parseFloat(row.total) || null,
       terms: row.terms || null,
       ship_method: row.ship_method || null,
       ship_date: row.shipdate || null,
-      expected_ship_date: row.expectedshipdate || null,
+      expected_ship_date: null, // Field not available in SuiteQL for SalesOrd
       subsidiary_id: row.subsidiary_id || null,
       subsidiary_name: row.subsidiary_name || null,
       location_id: row.location_id || null,
       location_name: row.location_name || null,
-      class_id: row.class_id || null,
-      class_name: row.class_name || null,
-      department_id: row.department_id || null,
-      department_name: row.department_name || null,
-      sales_rep_id: row.sales_rep_id || null,
-      sales_rep_name: row.sales_rep_name || null,
+      class_id: null, // Field not available in SuiteQL for SalesOrd
+      class_name: null, // Field not available in SuiteQL for SalesOrd
+      department_id: null, // Field not available in SuiteQL for SalesOrd
+      department_name: null, // Field not available in SuiteQL for SalesOrd
+      sales_rep_id: null, // Field not available in SuiteQL for SalesOrd
+      sales_rep_name: null, // Field not available in SuiteQL for SalesOrd
     }));
 
     console.log(`Fetched ${headers.length} sales orders from NetSuite`);
@@ -1604,34 +1578,20 @@ export async function getAllSalesOrders(options?: {
         SELECT
           tl.transaction AS so_id,
           tl.id AS line_id,
-          tl.lineid AS line_number,
+          tl.linesequencenumber AS line_number,
           tl.item AS item_id,
-          BUILTIN.DF(tl.item) AS item_name,
-          i.displayname AS item_description,
-          i.itemtype AS item_type,
+          tl.itemtype AS item_type,
           tl.quantity,
-          tl.quantitycommitted,
-          tl.quantityfulfilled,
-          tl.quantitybilled,
           tl.rate,
           tl.amount,
           tl.costestimate,
-          tl.costestimatetype,
-          tl.class AS class_id,
-          BUILTIN.DF(tl.class) AS class_name,
-          tl.department AS department_id,
-          BUILTIN.DF(tl.department) AS department_name,
           tl.location AS location_id,
-          BUILTIN.DF(tl.location) AS location_name,
-          tl.expectedshipdate,
-          tl.isclosed,
-          tl.closedate
-        FROM TransactionLine tl
-        LEFT JOIN Item i ON i.id = tl.item
+          tl.isclosed
+        FROM transactionline tl
         WHERE tl.transaction IN (${soIds})
           AND tl.mainline = 'F'
           AND tl.item IS NOT NULL
-        ORDER BY tl.transaction, tl.lineid
+        ORDER BY tl.transaction, tl.linesequencenumber
       `;
 
       const lineResponse = await netsuiteRequest<{ items: any[] }>(
@@ -1639,7 +1599,7 @@ export async function getAllSalesOrders(options?: {
         {
           method: 'POST',
           body: { q: lineQuery },
-          params: { limit: '100000' }, // High limit for all lines
+          params: { limit: '1000' }, // Max allowed by NetSuite
         }
       );
 
@@ -1654,26 +1614,26 @@ export async function getAllSalesOrders(options?: {
           netsuite_line_id: row.line_id || '',
           line_number: parseInt(row.line_number) || 0,
           item_id: row.item_id || null,
-          item_name: row.item_name || null,
-          item_description: row.item_description || null,
+          item_name: null, // Not queried to avoid JOIN overhead
+          item_description: null, // Not queried to avoid JOIN overhead
           item_type: row.item_type || null,
           quantity: parseFloat(row.quantity) || null,
-          quantity_committed: parseFloat(row.quantitycommitted) || null,
-          quantity_fulfilled: parseFloat(row.quantityfulfilled) || null,
-          quantity_billed: parseFloat(row.quantitybilled) || null,
+          quantity_committed: null, // Field not available in SuiteQL
+          quantity_fulfilled: null, // Field not available in SuiteQL
+          quantity_billed: null, // Field not available in SuiteQL
           rate: parseFloat(row.rate) || null,
           amount: parseFloat(row.amount) || null,
           cost_estimate: parseFloat(row.costestimate) || null,
-          cost_estimate_type: row.costestimatetype || null,
-          class_id: row.class_id || null,
-          class_name: row.class_name || null,
-          department_id: row.department_id || null,
-          department_name: row.department_name || null,
+          cost_estimate_type: null, // Field not available in SuiteQL
+          class_id: null, // Field not available in SuiteQL
+          class_name: null, // Field not available in SuiteQL
+          department_id: null, // Field not available in SuiteQL
+          department_name: null, // Field not available in SuiteQL
           location_id: row.location_id || null,
-          location_name: row.location_name || null,
-          expected_ship_date: row.expectedshipdate || null,
+          location_name: null, // Not queried to avoid BUILTIN overhead
+          expected_ship_date: null, // Field not available in SuiteQL
           is_closed: row.isclosed === 'T',
-          closed_date: row.closedate || null,
+          closed_date: null, // Field not available in SuiteQL
         });
       }
 

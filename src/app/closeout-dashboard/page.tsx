@@ -7,9 +7,10 @@ import { DashboardBackground, backgroundPresets, KPICard } from '@/components/ma
 import ProjectsTab from './components/ProjectsTab';
 import MCCTab from './components/MCCTab';
 import AnalyticsTab from './components/AnalyticsTab';
-import { RefreshCw, Upload, Database } from 'lucide-react';
+import ProfitabilityDashboard from './components/ProfitabilityDashboard';
+import { RefreshCw, Upload, Database, TrendingUp } from 'lucide-react';
 
-type TabType = 'projects' | 'mcc' | 'analytics';
+type TabType = 'projects' | 'mcc' | 'analytics' | 'profitability';
 
 // Format currency
 function formatCurrency(value: number): string {
@@ -49,7 +50,7 @@ export default function CloseoutDashboard() {
   const [loading, setLoading] = useState(false); // Start false - don't load until user selects year
   const [error, setError] = useState<string | null>(null);
   const [enriching, setEnriching] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('projects');
+  const [activeTab, setActiveTab] = useState<TabType>('profitability');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedYears, setSelectedYears] = useState<number[]>([2025]); // Default to current year
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
@@ -542,8 +543,8 @@ export default function CloseoutDashboard() {
         </header>
 
         <main className="max-w-[1600px] mx-auto px-8 py-6">
-          {/* Empty State - No Data Loaded Yet */}
-          {!data && !loadingAndEnriching && !error && (
+          {/* Empty State - No Data Loaded Yet (only for non-profitability tabs) */}
+          {activeTab !== 'profitability' && !data && !loadingAndEnriching && !error && (
             <div className="flex items-center justify-center py-20">
               <div className="text-center max-w-md">
                 <Database className="w-16 h-16 mx-auto mb-6 text-[#22C55E]/40" />
@@ -561,8 +562,8 @@ export default function CloseoutDashboard() {
             </div>
           )}
 
-          {/* Loading State with Live Progress */}
-          {loadingAndEnriching && (
+          {/* Loading State with Live Progress (only for non-profitability tabs) */}
+          {activeTab !== 'profitability' && loadingAndEnriching && (
             <div className="flex items-center justify-center py-20">
               <div className="text-center max-w-2xl">
                 {/* Animated Icon */}
@@ -650,8 +651,44 @@ export default function CloseoutDashboard() {
             </div>
           )}
 
-          {/* Main Content */}
-          {data && (
+          {/* Tab Navigation - Always visible */}
+          <div className="flex gap-1 mb-6 p-1 bg-[#111827] rounded-lg w-fit border border-white/[0.04]">
+            <TabButton
+              active={activeTab === 'profitability'}
+              onClick={() => setActiveTab('profitability')}
+            >
+              <span className="flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Profitability (NetSuite)
+              </span>
+            </TabButton>
+            <TabButton
+              active={activeTab === 'projects'}
+              onClick={() => setActiveTab('projects')}
+            >
+              Projects (Excel)
+            </TabButton>
+            <TabButton
+              active={activeTab === 'mcc'}
+              onClick={() => setActiveTab('mcc')}
+            >
+              MCC
+            </TabButton>
+            <TabButton
+              active={activeTab === 'analytics'}
+              onClick={() => setActiveTab('analytics')}
+            >
+              Analytics
+            </TabButton>
+          </div>
+
+          {/* Profitability Tab - Works independently with pre-synced NetSuite data */}
+          {activeTab === 'profitability' && (
+            <ProfitabilityDashboard />
+          )}
+
+          {/* Main Content - Requires Excel data load */}
+          {activeTab !== 'profitability' && data && (
             <>
               {/* KPI Cards */}
               <div className="grid grid-cols-5 gap-4 mb-8">
@@ -664,28 +701,6 @@ export default function CloseoutDashboard() {
                     color={kpi.color}
                   />
                 ))}
-              </div>
-
-              {/* Tab Navigation */}
-              <div className="flex gap-1 mb-6 p-1 bg-[#111827] rounded-lg w-fit border border-white/[0.04]">
-                <TabButton
-                  active={activeTab === 'projects'}
-                  onClick={() => setActiveTab('projects')}
-                >
-                  Projects
-                </TabButton>
-                <TabButton
-                  active={activeTab === 'mcc'}
-                  onClick={() => setActiveTab('mcc')}
-                >
-                  MCC
-                </TabButton>
-                <TabButton
-                  active={activeTab === 'analytics'}
-                  onClick={() => setActiveTab('analytics')}
-                >
-                  Analytics
-                </TabButton>
               </div>
 
               {/* Tab Content */}
