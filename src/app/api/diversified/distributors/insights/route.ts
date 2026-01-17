@@ -244,8 +244,8 @@ export async function GET(request: NextRequest) {
       distributorName: string
     ): ProductContext => {
       // Build top categories sorted by revenue
-      const topCategories = Array.from(metrics.category_revenue.entries())
-        .map(([name, revenue]: [string, number]) => ({
+      const topCategories = (Array.from(metrics.category_revenue.entries()) as [string, number][])
+        .map(([name, revenue]) => ({
           name,
           revenue,
           percentage: metrics.current_revenue > 0 ? (revenue / metrics.current_revenue) * 100 : 0,
