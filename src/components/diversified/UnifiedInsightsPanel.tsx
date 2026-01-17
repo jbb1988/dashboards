@@ -127,6 +127,7 @@ export function UnifiedInsightsPanel({
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [error, setError] = useState<string>('');
+  const [tasksCreated, setTasksCreated] = useState<Set<number>>(new Set()); // Track which insights have tasks
 
   // Update state when props change
   useEffect(() => {
@@ -135,6 +136,7 @@ export function UnifiedInsightsPanel({
       setExecutiveSummary(initialExecutiveSummary);
       setGeneratedAt(initialGeneratedAt);
       setState('loaded');
+      setTasksCreated(new Set()); // Reset task tracking when loading new insights
     }
   }, [initialRecommendations, initialExecutiveSummary, initialGeneratedAt]);
 
@@ -148,6 +150,7 @@ export function UnifiedInsightsPanel({
       setExecutiveSummary(result.executive_summary);
       setGeneratedAt(new Date().toISOString());
       setState('loaded');
+      setTasksCreated(new Set()); // Reset task tracking when generating new insights
 
       // Auto-select quick-wins if any exist
       const hasQuickWins = result.recommendations.some(r => r.priority === 'high');
@@ -592,10 +595,32 @@ export function UnifiedInsightsPanel({
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => onCreateTask(rec)}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white text-[13px] font-medium rounded-lg transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40"
+                    onClick={() => {
+                      onCreateTask(rec);
+                      // Mark this insight as having a task created
+                      setTasksCreated(prev => {
+                        const next = new Set(prev);
+                        next.add(index);
+                        return next;
+                      });
+                    }}
+                    className={`flex-1 px-4 py-2.5 text-white text-[13px] font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                      tasksCreated.has(index)
+                        ? 'bg-green-500/20 border border-green-500/30 text-green-400 cursor-default'
+                        : 'bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40'
+                    }`}
+                    disabled={tasksCreated.has(index)}
                   >
-                    Add Task
+                    {tasksCreated.has(index) ? (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Added
+                      </>
+                    ) : (
+                      'Add Task'
+                    )}
                   </button>
                   <button
                     onClick={() => toggleCard(index)}
