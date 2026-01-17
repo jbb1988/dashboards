@@ -284,10 +284,14 @@ export default function ContractListView({
     }
   }, [filterPreset, setFilters]);
 
-  // Clear filters when focus mode is activated
+  // Set focus mode filters when activated (budgeted contracts within 90 days)
   useEffect(() => {
     if (focusMode) {
-      setFilters(DEFAULT_FILTERS);
+      setFilters({
+        ...DEFAULT_FILTERS,
+        budgetedFilter: 'budgeted',
+        dateFilter: '90',
+      });
     }
   }, [focusMode, setFilters]);
 
