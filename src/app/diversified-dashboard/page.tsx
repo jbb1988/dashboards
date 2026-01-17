@@ -17,6 +17,7 @@ import {
 } from '@/components/charts';
 import { CustomerDetailDrawer } from '@/components/diversified/CustomerDetailDrawer';
 import { ProductsTab } from '@/components/diversified/ProductsTab';
+import { VEROflowTab } from '@/components/diversified/VEROflowTab';
 import { StoppedBuyingReport } from '@/components/diversified/StoppedBuyingReport';
 import { UnifiedInsightsPanel } from '@/components/diversified/UnifiedInsightsPanel';
 import { CreateTaskModal } from '@/components/diversified/CreateTaskModal';
@@ -668,7 +669,7 @@ export default function DiversifiedDashboard() {
   const [syncing, setSyncing] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights' | 'tasks'>('table');
+  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights' | 'tasks' | 'veroflow'>('table');
   const [budgetData, setBudgetData] = useState<BudgetData[]>([]);
 
   // Customer detail drawer state
@@ -1230,6 +1231,19 @@ export default function DiversifiedDashboard() {
                   </svg>
                   Tasks
                 </button>
+                <button
+                  onClick={() => setActiveTab('veroflow')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'veroflow'
+                      ? 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/30 shadow-[0_0_20px_rgba(56,189,248,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  VEROflow
+                </button>
               </motion.div>
 
               {/* Filter Button + Active Filter Badges */}
@@ -1781,6 +1795,22 @@ export default function DiversifiedDashboard() {
                   <SalesTasksTab
                     onCustomerClick={(customerId, customerName) => {
                       setSelectedCustomerForDetail({ id: customerId, name: customerName });
+                    }}
+                  />
+                </motion.div>
+              )}
+
+              {/* VEROflow Tab */}
+              {activeTab === 'veroflow' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <VEROflowTab
+                    filters={{
+                      years: selectedYears,
+                      months: selectedMonths,
                     }}
                   />
                 </motion.div>

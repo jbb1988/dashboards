@@ -467,9 +467,20 @@ async function generateQuickWinInsights(
   const totalRepeatValue = repeatOrders.reduce((sum, q) => sum + q.estimated_value, 0);
   const totalCrossSellValue = crossSells.reduce((sum, q) => sum + q.estimated_value, 0);
 
+  // PRE-AI DATA ENRICHMENT: Identify VEROflow equipment owners
+  // Build explicit VEROflow owners list for system prompt
+  const veroflowOwners = quickWins
+    .filter(qw => qw.typical_products?.some(p => p.toLowerCase().includes('calibration')))
+    .map(qw => qw.customer_name);
+
+  console.log(`[AI INSIGHTS] Starting generation at ${new Date().toISOString()}`);
+  console.log(`[AI INSIGHTS] Input: ${quickWins.length} quick wins, ${veroflowOwners.length} VEROflow owners identified`);
+
   // Enrich with segment data if available
   const enrichRepeat = (q: QuickWinOpportunity) => {
     const behavior = behaviorMap?.get(q.customer_id || q.customer_name);
+    // Check if customer buys calibration (proof of VEROflow ownership)
+    const ownsVeroflow = q.typical_products?.some(p => p.toLowerCase().includes('calibration')) || false;
     return {
       customer: q.customer_name,
       type: q.customer_type,
@@ -480,11 +491,14 @@ async function generateQuickWinInsights(
       typical_order: formatCurrency(q.typical_order_value || 0),
       products: q.typical_products?.join(', '),
       script: q.call_script,
+      owns_veroflow_equipment: ownsVeroflow,
     };
   };
 
   const enrichCrossSell = (q: QuickWinOpportunity) => {
     const behavior = behaviorMap?.get(q.customer_id || q.customer_name);
+    // Check if customer buys calibration (proof of VEROflow ownership)
+    const ownsVeroflow = q.typical_products?.some(p => p.toLowerCase().includes('calibration')) || false;
     return {
       customer: q.customer_name,
       type: q.customer_type,
@@ -495,10 +509,19 @@ async function generateQuickWinInsights(
       why: q.similar_customers_buy,
       potential: formatCurrency(q.estimated_value),
       script: q.call_script,
+      owns_veroflow_equipment: ownsVeroflow,
     };
   };
 
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
+
+VERIFIED VEROFLOW EQUIPMENT OWNERS (via calibration purchases):
+${veroflowOwners.length > 0 ? veroflowOwners.join(', ') : 'None identified in current data'}
+
+CRITICAL: Customers in this list ALREADY OWN VEROflow equipment (they buy calibration services).
+- DO recommend: more calibration services, calibration frequency increase, VEROflow accessories, VEROflow cart kits
+- DO NOT recommend: VEROflow equipment purchase (they already own it)
+- Each customer object includes "owns_veroflow_equipment: true/false" flag - check this before recommending!
 
 QUICK WINS - These customers are ready to buy TODAY.
 NOTE: These have been PRE-FILTERED for eligibility based on customer segments.
@@ -513,7 +536,7 @@ Total potential: ${formatCurrency(totalRepeatValue)}
 === CROSS-SELL OPPORTUNITIES ===
 These are DIVERSE BUYERS who buy multiple product categories and are missing ones that similar customers carry.
 IMPORTANT: Distributors get consumables (Flanges, Gaskets), Utilities get equipment (VEROflow).
-CRITICAL: If a customer buys calibration, they ALREADY OWN VEROflow - NEVER pitch them new equipment!
+CRITICAL: Check "owns_veroflow_equipment" flag! If true, they ALREADY OWN VEROflow - NEVER pitch them new equipment!
 ${crossSells.length > 0 ? JSON.stringify(crossSells.map(enrichCrossSell), null, 2) : 'None found'}
 Total potential: ${formatCurrency(totalCrossSellValue)}
 

@@ -72,26 +72,22 @@ export async function POST(request: Request) {
           .eq('netsuite_id', wo.netsuite_id)
           .single();
 
-        // Prepare record
+        // Prepare record (only fields available from WorkOrderRecord)
         const record = {
           netsuite_id: wo.netsuite_id,
           wo_number: wo.wo_number,
           wo_date: wo.wo_date,
-          posting_period: wo.posting_period,
           status: wo.status,
-          memo: wo.memo,
           created_from_so_id: wo.created_from_so_id,
           created_from_so_number: wo.created_from_so_number,
           customer_id: wo.customer_id,
-          customer_name: wo.customer_name,
-          subsidiary_id: wo.subsidiary_id,
-          subsidiary_name: wo.subsidiary_name,
-          location_id: wo.location_id,
-          location_name: wo.location_name,
-          class_id: wo.class_id,
-          class_name: wo.class_name,
-          department_id: wo.department_id,
-          department_name: wo.department_name,
+          start_date: wo.start_date,
+          end_date: wo.end_date,
+          bill_of_materials_id: wo.bill_of_materials_id,
+          manufacturing_routing_id: wo.manufacturing_routing_id,
+          item_id: wo.item_id,
+          assembly_description: wo.assembly_description,
+          serial_number: wo.serial_number,
           synced_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
