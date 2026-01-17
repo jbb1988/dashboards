@@ -18,7 +18,9 @@ import {
 import { CustomerDetailDrawer } from '@/components/diversified/CustomerDetailDrawer';
 import { ProductsTab } from '@/components/diversified/ProductsTab';
 import { StoppedBuyingReport } from '@/components/diversified/StoppedBuyingReport';
-import { AIInsightsPanelV2 } from '@/components/AIInsightsPanelV2';
+import { UnifiedInsightsPanel } from '@/components/diversified/UnifiedInsightsPanel';
+import { CreateTaskModal } from '@/components/diversified/CreateTaskModal';
+import type { AIRecommendation } from '@/components/diversified/UnifiedInsightsPanel';
 import InsightsDrawer from '@/components/diversified/InsightsDrawer';
 import DiversifiedFilterDrawer from '@/components/diversified/DiversifiedFilterDrawer';
 import { SalesTasksTab } from '@/components/diversified/SalesTasksTab';
@@ -685,15 +687,7 @@ export default function DiversifiedDashboard() {
 
   // AI Insights drawer state
   const [insightsDrawerOpen, setInsightsDrawerOpen] = useState(false);
-  const [aiRecommendations, setAiRecommendations] = useState<Array<{
-    priority: 'high' | 'medium' | 'low';
-    title: string;
-    problem: string;
-    recommendation: string;
-    expected_impact: string;
-    action_items: string[];
-    category: 'attrition' | 'growth' | 'crosssell' | 'concentration' | 'general';
-  }>>([]);
+  const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
   const [aiExecutiveSummary, setAiExecutiveSummary] = useState('');
   const [insightsGeneratedAt, setInsightsGeneratedAt] = useState<string | null>(null);
   const [loadingSavedInsights, setLoadingSavedInsights] = useState(false);
@@ -705,6 +699,11 @@ export default function DiversifiedDashboard() {
     executive_summary: string;
   }>>([]);
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+
+  // Task creation modal state
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskModalInsight, setTaskModalInsight] = useState<AIRecommendation | null>(null);
+  const [taskModalActionItem, setTaskModalActionItem] = useState<string>('');
 
   // Filter state
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
@@ -1598,211 +1597,66 @@ export default function DiversifiedDashboard() {
                         </div>
                       )}
 
-                      {/* Insights KPI Cards */}
-                      {insightsSubTab === 'overview' && (
-                        <div className="grid grid-cols-6 gap-4">
-                          <KPICard
-                            title="At-Risk Customers"
-                            value={insightsData.summary.at_risk_customers.toString()}
-                            subtitle={`${formatCurrencyCompact(insightsData.summary.at_risk_revenue)} at risk`}
-                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>}
-                            color="#EF4444"
-                            delay={0}
-                          />
-                          <KPICard
-                            title={insightsMode === 'rolling12' ? 'R12 Revenue' : `${yoyCurrentYear} vs ${yoyPriorYear}`}
-                            value={`${insightsData.summary.yoy_revenue_change_pct >= 0 ? '+' : ''}${insightsData.summary.yoy_revenue_change_pct.toFixed(1)}%`}
-                            subtitle={insightsMode === 'rolling12' ? 'vs prior 12 months' : 'full year comparison'}
-                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
-                            color={insightsData.summary.yoy_revenue_change_pct >= 0 ? '#22C55E' : '#EF4444'}
-                            trend={insightsData.summary.yoy_revenue_change_pct >= 0 ? 'up' : 'down'}
-                            delay={0.05}
-                          />
-                          <KPICard
-                            title="Cross-Sell Potential"
-                            value={formatCurrencyCompact(insightsData.summary.cross_sell_potential)}
-                            subtitle={`${insightsData.crossSell.length} opportunities`}
-                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                            color="#A855F7"
-                            delay={0.1}
-                          />
-                          <KPICard
-                            title="Concentration"
-                            value={insightsData.summary.hhi_interpretation.charAt(0).toUpperCase() + insightsData.summary.hhi_interpretation.slice(1)}
-                            subtitle={`HHI: ${insightsData.summary.hhi_index.toLocaleString()}`}
-                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /></svg>}
-                            color={insightsData.summary.hhi_interpretation === 'diversified' ? '#22C55E' : insightsData.summary.hhi_interpretation === 'moderate' ? '#F59E0B' : '#EF4444'}
-                            delay={0.15}
-                          />
-                          <KPICard
-                            title="New Customers"
-                            value={insightsData.summary.new_customers_12mo.toString()}
-                            subtitle="last 12 months"
-                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>}
-                            color="#22C55E"
-                            delay={0.2}
-                          />
-                          <KPICard
-                            title="Churned Revenue"
-                            value={formatCurrencyCompact(insightsData.summary.churned_revenue)}
-                            subtitle={`${insightsData.summary.churned_customers} customers`}
-                            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>}
-                            color="#EF4444"
-                            delay={0.25}
-                          />
-                        </div>
-                      )}
-
                       {/* Overview Sub-Tab Content */}
                       {insightsSubTab === 'overview' && (
                         <div className="space-y-6">
-                          {/* Row 1: Attrition + Concentration */}
-                          <div className="grid grid-cols-2 gap-6">
-                            <AttritionBarChart
-                              data={insightsData.attrition.slice(0, 10)}
-                              index={0}
-                            />
-                            <ConcentrationChart
-                              data={insightsData.concentration}
-                              index={1}
-                            />
-                          </div>
+                          {/* NEW: Unified AI Insights Panel */}
+                          <UnifiedInsightsPanel
+                            onGenerate={async () => {
+                              const response = await fetch('/api/diversified/insights/ai', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(insightsData),
+                              });
+                              if (!response.ok) throw new Error('Failed to generate AI insights');
+                              const result = await response.json();
 
-                          {/* AI Insights Panel */}
-                          <div className="space-y-4">
-                            <AIInsightsPanelV2
-                              onGenerate={async () => {
-                                const response = await fetch('/api/diversified/insights/ai', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify(insightsData),
-                                });
-                                if (!response.ok) throw new Error('Failed to generate AI insights');
-                                const result = await response.json();
-                                // Store the recommendations for the drawer
-                                setAiRecommendations(result.recommendations || []);
-                                setAiExecutiveSummary(result.executive_summary || '');
-                                setInsightsGeneratedAt(result.generated_at || new Date().toISOString());
-                                // Auto-save to Supabase so insights persist
-                                await saveInsights(
-                                  result.recommendations || [],
-                                  result.executive_summary || '',
-                                  result.generated_at || new Date().toISOString()
-                                );
-                                return result;
-                              }}
-                            />
+                              // Store the recommendations for the drawer
+                              setAiRecommendations(result.recommendations || []);
+                              setAiExecutiveSummary(result.executive_summary || '');
+                              setInsightsGeneratedAt(result.generated_at || new Date().toISOString());
 
-                            {/* Open Insights Drawer Button - only show if we have recommendations */}
-                            {aiRecommendations.length > 0 && (
-                              <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="space-y-2"
-                              >
-                                <button
-                                  onClick={() => setInsightsDrawerOpen(true)}
-                                  className="w-full py-3 px-4 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-xl text-purple-400 font-medium text-[13px] transition-all flex items-center justify-center gap-2"
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                  </svg>
-                                  View Full Analysis & Action Plan
-                                  <span className="text-[11px] text-purple-400/70">
-                                    ({aiRecommendations.length} recommendations)
-                                  </span>
-                                </button>
+                              // Auto-save to Supabase so insights persist
+                              await saveInsights(
+                                result.recommendations || [],
+                                result.executive_summary || '',
+                                result.generated_at || new Date().toISOString()
+                              );
 
-                                {/* Timestamp and History */}
-                                <div className="flex items-center justify-between">
-                                  {insightsGeneratedAt && (
-                                    <div className="flex items-center gap-2 text-[11px] text-[#64748B]">
-                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                      </svg>
-                                      <span>
-                                        {new Date(insightsGeneratedAt).toLocaleDateString('en-US', {
-                                          month: 'short',
-                                          day: 'numeric',
-                                          hour: 'numeric',
-                                          minute: '2-digit'
-                                        })}
-                                      </span>
-                                    </div>
-                                  )}
+                              return result;
+                            }}
+                            onCreateTask={(recommendation, actionItem) => {
+                              setTaskModalInsight(recommendation);
+                              setTaskModalActionItem(actionItem || '');
+                              setTaskModalOpen(true);
+                            }}
+                            onViewFullAnalysis={() => setInsightsDrawerOpen(true)}
+                            initialRecommendations={aiRecommendations}
+                            initialExecutiveSummary={aiExecutiveSummary}
+                            initialGeneratedAt={insightsGeneratedAt || undefined}
+                            insightsHistory={insightsHistory}
+                            onLoadHistoricalInsight={loadHistoricalInsight}
+                          />
 
-                                  {/* History Dropdown */}
-                                  {insightsHistory.length > 1 && (
-                                    <div className="relative">
-                                      <button
-                                        onClick={() => setShowHistoryDropdown(!showHistoryDropdown)}
-                                        className="flex items-center gap-1 text-[11px] text-[#64748B] hover:text-purple-400 transition-colors"
-                                      >
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        History ({insightsHistory.length})
-                                        <svg className={`w-3 h-3 transition-transform ${showHistoryDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                      </button>
-
-                                      {showHistoryDropdown && (
-                                        <>
-                                          <div
-                                            className="fixed inset-0 z-10"
-                                            onClick={() => setShowHistoryDropdown(false)}
-                                          />
-                                          <div className="absolute right-0 mt-2 w-72 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden">
-                                            <div className="px-3 py-2 border-b border-white/10">
-                                              <span className="text-[10px] text-[#64748B] uppercase tracking-wider font-semibold">
-                                                Previous Insights
-                                              </span>
-                                            </div>
-                                            <div className="max-h-64 overflow-y-auto">
-                                              {insightsHistory.map((item) => (
-                                                <button
-                                                  key={item.id}
-                                                  onClick={() => loadHistoricalInsight(item.id)}
-                                                  className={`w-full px-3 py-2.5 text-left hover:bg-white/5 transition-colors border-b border-white/[0.04] last:border-b-0 ${
-                                                    currentInsightId === item.id ? 'bg-purple-500/10' : ''
-                                                  }`}
-                                                >
-                                                  <div className="flex items-center justify-between mb-1">
-                                                    <span className="text-[12px] text-white font-medium">
-                                                      {new Date(item.generated_at || item.created_at).toLocaleDateString('en-US', {
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                        year: 'numeric'
-                                                      })}
-                                                    </span>
-                                                    <span className="text-[10px] text-[#64748B]">
-                                                      {new Date(item.generated_at || item.created_at).toLocaleTimeString('en-US', {
-                                                        hour: 'numeric',
-                                                        minute: '2-digit'
-                                                      })}
-                                                    </span>
-                                                  </div>
-                                                  <p className="text-[11px] text-[#94A3B8] line-clamp-2">
-                                                    {item.executive_summary.slice(0, 100)}...
-                                                  </p>
-                                                  {currentInsightId === item.id && (
-                                                    <span className="text-[9px] text-purple-400 uppercase mt-1 inline-block">
-                                                      Currently viewing
-                                                    </span>
-                                                  )}
-                                                </button>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </motion.div>
-                            )}
-                          </div>
+                          {/* Optional: Background charts below insights - only show if we have recommendations */}
+                          {aiRecommendations.length > 0 && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                              <div className="bg-[#0F1123] rounded-lg p-6">
+                                <h3 className="text-sm font-semibold text-white mb-4">Top 10 At-Risk Customers</h3>
+                                <AttritionBarChart
+                                  data={insightsData.attrition.slice(0, 10)}
+                                  index={0}
+                                />
+                              </div>
+                              <div className="bg-[#0F1123] rounded-lg p-6">
+                                <h3 className="text-sm font-semibold text-white mb-4">Customer Concentration</h3>
+                                <ConcentrationChart
+                                  data={insightsData.concentration}
+                                  index={1}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -2051,6 +1905,47 @@ export default function DiversifiedDashboard() {
           }
         }}
       />
+
+      {/* Task Creation Modal */}
+      {taskModalInsight && (
+        <CreateTaskModal
+          isOpen={taskModalOpen}
+          onClose={() => {
+            setTaskModalOpen(false);
+            setTaskModalInsight(null);
+            setTaskModalActionItem('');
+          }}
+          onSave={async (taskData) => {
+            const response = await fetch('/api/diversified/tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(taskData),
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to create task in Asana');
+            }
+
+            // Show success toast
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-[100] flex items-center gap-2';
+            toast.innerHTML = `
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              <span>Task created in Asana!</span>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+
+            setTaskModalOpen(false);
+            setTaskModalInsight(null);
+            setTaskModalActionItem('');
+          }}
+          insight={taskModalInsight}
+          actionItem={taskModalActionItem}
+        />
+      )}
 
       {/* Filter Drawer */}
       <DiversifiedFilterDrawer

@@ -323,7 +323,8 @@ Respond ONLY with JSON.`;
 }
 
 async function generateCrossSellInsights(
-  opportunities: CrossSellOpportunity[]
+  opportunities: CrossSellOpportunity[],
+  behaviorMap?: Map<string, CustomerBehavior>
 ): Promise<AIRecommendation[]> {
   const topOpportunities = opportunities.slice(0, 15);
 
@@ -336,18 +337,36 @@ async function generateCrossSellInsights(
   // Get our cross-sell rules
   const crossSellRules = DIVERSIFIED_PRODUCTS.crossSellRules;
 
+  // Enrich opportunities with customer segment context
+  const enrichedOpportunities = topOpportunities.slice(0, 8).map(o => {
+    const behavior = behaviorMap?.get(o.customer_id || o.customer_name);
+    return {
+      customer: o.customer_name,
+      segment: behavior?.segment || 'unknown',
+      product_focus: behavior?.product_focus || 'unknown',
+      class_count: behavior?.class_count || 0,
+      buys: o.current_classes.slice(0, 3).join(', '),
+      should_also_buy: o.recommended_class,
+      potential: formatCurrency(o.estimated_revenue),
+      eligible_for_crosssell: behavior?.cross_sell_eligible ?? true, // Use the built-in eligibility flag
+    };
+  });
+
   const prompt = `${SALES_INTELLIGENCE_CONTEXT}
+
+CRITICAL CONTEXT:
+- Each customer includes their SEGMENT (steady_repeater, project_buyer, seasonal, new_account, irregular)
+- Each customer has PRODUCT_FOCUS (single_product, narrow, diverse) showing buying variety
+- ONLY recommend cross-sells to customers with eligible_for_crosssell = true
+- These are typically customers with diverse or narrow product focus, or steady repeaters
+- SKIP single-product focused customers (they buy what they need by design, don't push)
+- For each customer, you'll see their class_count (number of product categories they buy)
 
 OUR CROSS-SELL RULES:
 ${crossSellRules.map(r => `- If buying ${r.when}, suggest ${r.suggest.join(', ')} (${r.reason})`).join('\n')}
 
 CUSTOMERS WHO COULD BUY MORE PRODUCTS:
-${JSON.stringify(topOpportunities.slice(0, 8).map(o => ({
-  customer: o.customer_name,
-  buys: o.current_classes.slice(0, 3).join(', '),
-  should_also_buy: o.recommended_class,
-  potential: formatCurrency(o.estimated_revenue),
-})), null, 2)}
+${JSON.stringify(enrichedOpportunities, null, 2)}
 
 Total potential: ${formatCurrency(totalPotential)}
 
@@ -528,8 +547,39 @@ Respond ONLY with JSON.`;
   try {
     const response = await callAI(prompt, 2500);
     const result = extractJSON(response) as { recommendations: AIRecommendation[] };
+
+    // Validate recommendations and filter invalid ones
+    const validRecommendations = result.recommendations.filter(r => {
+      // Don't recommend VEROflow equipment to calibration-only customers
+      // (calibration purchases indicate they already own VEROflow equipment)
+      if (r.recommendation.toLowerCase().includes('veroflow equipment') ||
+          r.recommendation.toLowerCase().includes('veroflow meter') ||
+          r.recommendation.toLowerCase().includes('purchase veroflow')) {
+
+        const customerName = r.title.match(/(?:Call|Contact|Follow up with|Quote|Quick Win:)\s+([^-–—]+?)(?:\s+(?:about|on|for|regarding|-|–|—)|$)/i)?.[1]?.trim();
+
+        if (customerName) {
+          const quickWin = quickWins.find(q => q.customer_name.includes(customerName));
+
+          // If customer already buys calibration, they own VEROflow equipment
+          if (quickWin?.typical_products?.some(p => p.toLowerCase().includes('calibration'))) {
+            console.warn(`[AI VALIDATION] Filtered invalid recommendation: ${r.title} - Customer already owns VEROflow (buys calibration services)`);
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
+
+    // Log quality metrics
+    if (validRecommendations.length < result.recommendations.length) {
+      console.log(`[AI INSIGHTS] Generated ${result.recommendations.length} recommendations`);
+      console.log(`[AI INSIGHTS] Filtered ${result.recommendations.length - validRecommendations.length} invalid recommendations`);
+    }
+
     // Mark these as general but with quick win context
-    return result.recommendations.map(r => ({
+    return validRecommendations.map(r => ({
       ...r,
       category: 'general' as const,
       title: r.title.includes('Quick Win') ? r.title : `Quick Win: ${r.title}`,
@@ -675,7 +725,7 @@ export async function POST(request: NextRequest) {
       const crossSell = await generateCrossSellOpportunities(filters);
       crossSellPotential = crossSell.reduce((sum, o) => sum + o.estimated_revenue, 0);
 
-      const crossSellInsights = await generateCrossSellInsights(crossSell);
+      const crossSellInsights = await generateCrossSellInsights(crossSell, behaviorMap);
       allRecommendations.push(...crossSellInsights);
     }
 
