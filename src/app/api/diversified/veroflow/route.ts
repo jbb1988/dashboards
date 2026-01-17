@@ -9,24 +9,48 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+type VEROflowType = 'VF-1' | 'VF-4' | 'unknown';
+
 interface EquipmentPurchase {
   item_name: string;
   item_description: string;
   quantity: number;
   revenue: number;
   date: string;
+  equipment_type: VEROflowType;
+}
+
+interface EquipmentByType {
+  vf1_units: EquipmentPurchase[];
+  vf4_units: EquipmentPurchase[];
+  unknown_units: EquipmentPurchase[];
+  vf1_count: number;
+  vf4_count: number;
+  vf1_revenue: number;
+  vf4_revenue: number;
+}
+
+interface CalibrationData {
+  total_calibrations: number;
+  total_revenue: number;
+  last_calibration_date: string | null;
+  vf1_calibrations: number;
+  vf4_calibrations: number;
+  both_types_calibrations: number;
+  vf1_last_calibration: string | null;
+  vf4_last_calibration: string | null;
 }
 
 interface VEROflowCustomer {
   customer_id: string;
   customer_name: string;
-  equipment_purchases: EquipmentPurchase[];
+  equipment: EquipmentByType;
   equipment_revenue: number;
   first_equipment_purchase: string | null;
+  calibration: CalibrationData;
   has_calibration: boolean;
-  calibration_revenue: number;
-  last_calibration_date: string | null;
-  calibration_count: number;
+  owns_vf1_needs_calibration: boolean;
+  owns_vf4_needs_calibration: boolean;
 }
 
 interface VEROflowSummary {
@@ -36,6 +60,116 @@ interface VEROflowSummary {
   total_equipment_revenue: number;
   total_calibration_revenue: number;
   opportunities: number;
+  vf1_metrics: {
+    customers: number;
+    units_sold: number;
+    equipment_revenue: number;
+    calibrations: number;
+    calibration_revenue: number;
+    calibration_adoption_rate: number;
+    opportunities: number;
+  };
+  vf4_metrics: {
+    customers: number;
+    units_sold: number;
+    equipment_revenue: number;
+    calibrations: number;
+    calibration_revenue: number;
+    calibration_adoption_rate: number;
+    opportunities: number;
+  };
+  both_types_customers: number;
+}
+
+// Equipment type detection function
+function detectEquipmentType(itemDescription: string): VEROflowType {
+  const desc = itemDescription.toLowerCase();
+
+  // VF-4 patterns (check first - more specific)
+  if (desc.includes('vf-4') || desc.includes('vf4') ||
+      desc.includes('veroflow-4') || desc.includes('veroflow 4') ||
+      desc.includes('touch')) {
+    return 'VF-4';
+  }
+
+  // VF-1 patterns
+  if (desc.includes('vf-1') || desc.includes('vf1') ||
+      desc.includes('veroflow-1') || desc.includes('veroflow 1')) {
+    return 'VF-1';
+  }
+
+  return 'unknown';
+}
+
+// Calibration apportionment logic
+function apportionCalibrations(
+  vf1Count: number,
+  vf4Count: number,
+  totalCalibrations: number,
+  calibrationRevenue: number,
+  calibrationDates: string[]
+): CalibrationData {
+  const totalUnits = vf1Count + vf4Count;
+  const lastCalibration = calibrationDates.length > 0
+    ? calibrationDates.reduce((latest, current) => current > latest ? current : latest)
+    : null;
+
+  // Only VF-1 units
+  if (vf4Count === 0 && vf1Count > 0) {
+    return {
+      total_calibrations: totalCalibrations,
+      total_revenue: calibrationRevenue,
+      last_calibration_date: lastCalibration,
+      vf1_calibrations: totalCalibrations,
+      vf4_calibrations: 0,
+      both_types_calibrations: 0,
+      vf1_last_calibration: lastCalibration,
+      vf4_last_calibration: null,
+    };
+  }
+
+  // Only VF-4 units
+  if (vf1Count === 0 && vf4Count > 0) {
+    return {
+      total_calibrations: totalCalibrations,
+      total_revenue: calibrationRevenue,
+      last_calibration_date: lastCalibration,
+      vf1_calibrations: 0,
+      vf4_calibrations: totalCalibrations,
+      both_types_calibrations: 0,
+      vf1_last_calibration: null,
+      vf4_last_calibration: lastCalibration,
+    };
+  }
+
+  // Both types: split proportionally
+  if (vf1Count > 0 && vf4Count > 0) {
+    const vf1Ratio = vf1Count / totalUnits;
+    const vf4Ratio = vf4Count / totalUnits;
+
+    return {
+      total_calibrations: totalCalibrations,
+      total_revenue: calibrationRevenue,
+      last_calibration_date: lastCalibration,
+      vf1_calibrations: Math.round(totalCalibrations * vf1Ratio),
+      vf4_calibrations: Math.round(totalCalibrations * vf4Ratio),
+      both_types_calibrations: totalCalibrations,
+      vf1_last_calibration: lastCalibration,
+      vf4_last_calibration: lastCalibration,
+    };
+  }
+
+  // No equipment but has calibrations (purchased before data history)
+  return {
+    total_calibrations: totalCalibrations,
+    total_revenue: calibrationRevenue,
+    last_calibration_date: lastCalibration,
+    vf1_calibrations: 0,
+    vf4_calibrations: 0,
+    both_types_calibrations: 0,
+    vf1_last_calibration: null,
+    vf4_last_calibration: null,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -78,6 +212,7 @@ export async function GET(request: NextRequest) {
     // Aggregate by customer
     const customerMap = new Map<string, VEROflowCustomer>();
 
+    // First pass: aggregate equipment and calibrations
     for (const sale of veroflowSales || []) {
       // Determine if this is equipment or calibration
       const className = (sale.class_name || '').toLowerCase();
@@ -88,26 +223,59 @@ export async function GET(request: NextRequest) {
         customerMap.set(sale.customer_id, {
           customer_id: sale.customer_id,
           customer_name: sale.customer_name,
-          equipment_purchases: [],
+          equipment: {
+            vf1_units: [],
+            vf4_units: [],
+            unknown_units: [],
+            vf1_count: 0,
+            vf4_count: 0,
+            vf1_revenue: 0,
+            vf4_revenue: 0,
+          },
           equipment_revenue: 0,
           first_equipment_purchase: null,
+          calibration: {
+            total_calibrations: 0,
+            total_revenue: 0,
+            last_calibration_date: null,
+            vf1_calibrations: 0,
+            vf4_calibrations: 0,
+            both_types_calibrations: 0,
+            vf1_last_calibration: null,
+            vf4_last_calibration: null,
+          },
           has_calibration: false,
-          calibration_revenue: 0,
-          last_calibration_date: null,
-          calibration_count: 0,
+          owns_vf1_needs_calibration: false,
+          owns_vf4_needs_calibration: false,
         });
       }
 
       const customer = customerMap.get(sale.customer_id)!;
 
       if (isEquipment) {
-        customer.equipment_purchases.push({
+        const equipmentType = detectEquipmentType(sale.item_description || sale.item_name || '');
+        const purchase: EquipmentPurchase = {
           item_name: sale.item_name || 'Unknown',
           item_description: sale.item_description || sale.item_name || 'Unknown Item',
           quantity: sale.quantity || 0,
           revenue: sale.revenue || 0,
           date: sale.transaction_date || '',
-        });
+          equipment_type: equipmentType,
+        };
+
+        // Add to appropriate array based on type
+        if (equipmentType === 'VF-1') {
+          customer.equipment.vf1_units.push(purchase);
+          customer.equipment.vf1_count += purchase.quantity;
+          customer.equipment.vf1_revenue += purchase.revenue;
+        } else if (equipmentType === 'VF-4') {
+          customer.equipment.vf4_units.push(purchase);
+          customer.equipment.vf4_count += purchase.quantity;
+          customer.equipment.vf4_revenue += purchase.revenue;
+        } else {
+          customer.equipment.unknown_units.push(purchase);
+        }
+
         customer.equipment_revenue += sale.revenue || 0;
 
         const saleDate = sale.transaction_date || '';
@@ -115,27 +283,111 @@ export async function GET(request: NextRequest) {
           customer.first_equipment_purchase = saleDate;
         }
       }
+    }
+
+    // Second pass: apportion calibrations based on equipment owned
+    const calibrationDatesMap = new Map<string, string[]>();
+    const calibrationRevenueMap = new Map<string, number>();
+    const calibrationCountMap = new Map<string, number>();
+
+    for (const sale of veroflowSales || []) {
+      const className = (sale.class_name || '').toLowerCase();
+      const isCalibration = className.includes('calibration');
 
       if (isCalibration) {
-        customer.has_calibration = true;
-        customer.calibration_revenue += sale.revenue || 0;
-        customer.calibration_count += 1;
-
-        const saleDate = sale.transaction_date || '';
-        if (!customer.last_calibration_date || saleDate > customer.last_calibration_date) {
-          customer.last_calibration_date = saleDate;
+        if (!calibrationDatesMap.has(sale.customer_id)) {
+          calibrationDatesMap.set(sale.customer_id, []);
+          calibrationRevenueMap.set(sale.customer_id, 0);
+          calibrationCountMap.set(sale.customer_id, 0);
         }
+
+        calibrationDatesMap.get(sale.customer_id)!.push(sale.transaction_date || '');
+        calibrationRevenueMap.set(
+          sale.customer_id,
+          (calibrationRevenueMap.get(sale.customer_id) || 0) + (sale.revenue || 0)
+        );
+        calibrationCountMap.set(
+          sale.customer_id,
+          (calibrationCountMap.get(sale.customer_id) || 0) + 1
+        );
       }
     }
 
-    // Convert to array and calculate metrics
+    // Apply apportionment to each customer
+    for (const [customerId, customer] of customerMap.entries()) {
+      const calibrationDates = calibrationDatesMap.get(customerId) || [];
+      const calibrationRevenue = calibrationRevenueMap.get(customerId) || 0;
+      const calibrationCount = calibrationCountMap.get(customerId) || 0;
+
+      if (calibrationCount > 0) {
+        customer.has_calibration = true;
+        customer.calibration = apportionCalibrations(
+          customer.equipment.vf1_count,
+          customer.equipment.vf4_count,
+          calibrationCount,
+          calibrationRevenue,
+          calibrationDates
+        );
+      }
+
+      // Set opportunity flags
+      customer.owns_vf1_needs_calibration = customer.equipment.vf1_count > 0 && !customer.has_calibration;
+      customer.owns_vf4_needs_calibration = customer.equipment.vf4_count > 0 && !customer.has_calibration;
+    }
+
+    // Convert to array and calculate summary metrics
     const customers = Array.from(customerMap.values());
     const totalCustomers = customers.length;
     const customersWithCalibration = customers.filter(c => c.has_calibration).length;
     const calibrationAdoptionRate = totalCustomers > 0 ? (customersWithCalibration / totalCustomers) * 100 : 0;
     const totalEquipmentRevenue = customers.reduce((sum, c) => sum + c.equipment_revenue, 0);
-    const totalCalibrationRevenue = customers.reduce((sum, c) => sum + c.calibration_revenue, 0);
+    const totalCalibrationRevenue = customers.reduce((sum, c) => sum + c.calibration.total_revenue, 0);
     const opportunities = customers.filter(c => c.equipment_revenue > 0 && !c.has_calibration).length;
+
+    // Calculate VF-1 specific metrics
+    const vf1Customers = customers.filter(c => c.equipment.vf1_count > 0);
+    const vf1CustomersWithCalibration = vf1Customers.filter(c => c.has_calibration);
+    const vf1Metrics = {
+      customers: vf1Customers.length,
+      units_sold: vf1Customers.reduce((sum, c) => sum + c.equipment.vf1_count, 0),
+      equipment_revenue: vf1Customers.reduce((sum, c) => sum + c.equipment.vf1_revenue, 0),
+      calibrations: vf1Customers.reduce((sum, c) => sum + c.calibration.vf1_calibrations, 0),
+      calibration_revenue: vf1CustomersWithCalibration.reduce((sum, c) => {
+        const totalUnits = c.equipment.vf1_count + c.equipment.vf4_count;
+        if (totalUnits === 0) return sum;
+        const vf1Ratio = c.equipment.vf1_count / totalUnits;
+        return sum + (c.calibration.total_revenue * vf1Ratio);
+      }, 0),
+      calibration_adoption_rate: vf1Customers.length > 0
+        ? (vf1CustomersWithCalibration.length / vf1Customers.length) * 100
+        : 0,
+      opportunities: vf1Customers.filter(c => c.owns_vf1_needs_calibration).length,
+    };
+
+    // Calculate VF-4 specific metrics
+    const vf4Customers = customers.filter(c => c.equipment.vf4_count > 0);
+    const vf4CustomersWithCalibration = vf4Customers.filter(c => c.has_calibration);
+    const vf4Metrics = {
+      customers: vf4Customers.length,
+      units_sold: vf4Customers.reduce((sum, c) => sum + c.equipment.vf4_count, 0),
+      equipment_revenue: vf4Customers.reduce((sum, c) => sum + c.equipment.vf4_revenue, 0),
+      calibrations: vf4Customers.reduce((sum, c) => sum + c.calibration.vf4_calibrations, 0),
+      calibration_revenue: vf4CustomersWithCalibration.reduce((sum, c) => {
+        const totalUnits = c.equipment.vf1_count + c.equipment.vf4_count;
+        if (totalUnits === 0) return sum;
+        const vf4Ratio = c.equipment.vf4_count / totalUnits;
+        return sum + (c.calibration.total_revenue * vf4Ratio);
+      }, 0),
+      calibration_adoption_rate: vf4Customers.length > 0
+        ? (vf4CustomersWithCalibration.length / vf4Customers.length) * 100
+        : 0,
+      opportunities: vf4Customers.filter(c => c.owns_vf4_needs_calibration).length,
+    };
+
+    // Count customers with both types
+    const bothTypesCustomers = customers.filter(
+      c => c.equipment.vf1_count > 0 && c.equipment.vf4_count > 0
+    ).length;
 
     // Sort customers by equipment revenue (descending)
     const sortedCustomers = customers.sort((a, b) => b.equipment_revenue - a.equipment_revenue);
@@ -147,6 +399,9 @@ export async function GET(request: NextRequest) {
       total_equipment_revenue: totalEquipmentRevenue,
       total_calibration_revenue: totalCalibrationRevenue,
       opportunities,
+      vf1_metrics: vf1Metrics,
+      vf4_metrics: vf4Metrics,
+      both_types_customers: bothTypesCustomers,
     };
 
     return NextResponse.json({
