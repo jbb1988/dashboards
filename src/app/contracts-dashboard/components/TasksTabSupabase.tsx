@@ -253,6 +253,7 @@ function DraggableTaskCard({
 interface TasksTabProps {
   contracts: Contract[];
   onOpenContractDetail?: (contractId: string) => void;
+  focusMode?: boolean;
 }
 
 /**
@@ -264,7 +265,7 @@ interface TasksTabProps {
  * - Inline task creation and editing
  * - Auto-generated task indicators
  */
-export default function TasksTabSupabase({ contracts, onOpenContractDetail }: TasksTabProps) {
+export default function TasksTabSupabase({ contracts, onOpenContractDetail, focusMode = false }: TasksTabProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('byContract');
@@ -316,6 +317,14 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Clear filters when focus mode is activated
+  useEffect(() => {
+    if (focusMode) {
+      setFilter('all');
+      setSearchQuery('');
+    }
+  }, [focusMode]);
 
   // Fetch tasks from Supabase
   const fetchTasks = useCallback(async () => {
@@ -582,6 +591,67 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
   }, [filteredTasks]);
 
   // Handlers
+
+  // Auto-update CS/NS in Salesforce with task title
+  const updateCSNSWithTaskTitle = async (taskTitle: string) => {
+    let salesforceId: string | undefined;
+    let contractName: string | undefined;
+
+    if (newTask.bundleId) {
+      // For bundles, get the primary contract's salesforceId
+      try {
+        const bundleResponse = await fetch(`/api/bundles?bundleId=${newTask.bundleId}`);
+        if (bundleResponse.ok) {
+          const bundle = await bundleResponse.json();
+          const primaryContract = bundle.contracts?.find((c: { is_primary: boolean; contracts?: { salesforce_id?: string; name?: string } }) => c.is_primary);
+          if (primaryContract?.contracts?.salesforce_id) {
+            salesforceId = primaryContract.contracts.salesforce_id;
+            contractName = primaryContract.contracts.name;
+          } else if (bundle.contracts?.length > 0) {
+            // Fallback: use first contract
+            salesforceId = bundle.contracts[0].contracts?.salesforce_id;
+            contractName = bundle.contracts[0].contracts?.name;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch bundle for CS/NS update:', err);
+        return;
+      }
+    } else if (newTask.contractSalesforceId) {
+      salesforceId = newTask.contractSalesforceId;
+      const contract = contracts.find(c => c.salesforceId === newTask.contractSalesforceId);
+      contractName = contract?.name;
+    }
+
+    if (!salesforceId) {
+      console.warn('No salesforceId available for CS/NS update');
+      return;
+    }
+
+    try {
+      const updateResponse = await fetch('/api/contracts/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          salesforceId,
+          contractName,
+          updates: {
+            currentSituation: taskTitle.substring(0, 255) // Truncate to SF limit
+          }
+        }),
+      });
+
+      if (updateResponse.ok) {
+        const result = await updateResponse.json();
+        if (result.bundleInfo) {
+          console.log(`CS/NS updated for ${result.bundleInfo.contractCount} bundled contracts`);
+        }
+      }
+    } catch (err) {
+      console.error('Error updating CS/NS:', err);
+    }
+  };
+
   const handleAddTask = async () => {
     if (!newTask.title.trim()) return;
 
@@ -606,6 +676,11 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail }: Ta
       });
 
       if (response.ok) {
+        // AUTO-UPDATE CS/NS with task title
+        if (newTask.contractSalesforceId || newTask.bundleId) {
+          await updateCSNSWithTaskTitle(newTask.title.trim());
+        }
+
         await fetchTasks();
         setNewTask({ title: '', contractSalesforceId: '', dueDate: '', priority: 'medium', description: '' });
         setShowAddTask(false);

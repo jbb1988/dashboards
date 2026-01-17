@@ -119,10 +119,11 @@ function formatFileSize(bytes: number | null): string {
 interface SmartDocumentsTabProps {
   contracts: Contract[];
   openBundleModal?: (contract: any, mode: 'create' | 'add') => void;
+  focusMode?: boolean;
 }
 
 // Main Smart Documents Tab Component
-export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartDocumentsTabProps) {
+export default function SmartDocumentsTab({ contracts, openBundleModal, focusMode = false }: SmartDocumentsTabProps) {
   // State
   const [data, setData] = useState<DocumentsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -185,6 +186,13 @@ export default function SmartDocumentsTab({ contracts, openBundleModal }: SmartD
     fetchDocuments();
     fetchBundleInfo();
   }, [fetchDocuments, fetchBundleInfo]);
+
+  // Clear filters when focus mode is activated
+  useEffect(() => {
+    if (focusMode) {
+      setFilterPreset(null);
+    }
+  }, [focusMode]);
 
   // Handle file upload with Supabase storage and Salesforce sync
   const handleUpload = async (

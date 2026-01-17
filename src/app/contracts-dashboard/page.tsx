@@ -2253,7 +2253,7 @@ export default function ContractsDashboard() {
               className="space-y-6"
             >
               <TasksTabSupabase
-                contracts={data.contracts.map(c => ({
+                contracts={filteredContracts.map(c => ({
                   id: c.id,
                   salesforceId: c.salesforceId,
                   name: c.name,
@@ -2261,11 +2261,12 @@ export default function ContractsDashboard() {
                   contractType: c.contractType,
                 }))}
                 onOpenContractDetail={(contractId) => {
-                  const contract = data.contracts.find(c => c.id === contractId);
+                  const contract = filteredContracts.find(c => c.id === contractId);
                   if (contract) {
                     setSelectedContract(contract);
                   }
                 }}
+                focusMode={focusMode}
               />
             </motion.div>
           )}
@@ -2277,7 +2278,7 @@ export default function ContractsDashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
-              <SmartDocumentsTab contracts={data.contracts} openBundleModal={openBundleModal} />
+              <SmartDocumentsTab contracts={filteredContracts} openBundleModal={openBundleModal} focusMode={focusMode} />
             </motion.div>
           )}
 
