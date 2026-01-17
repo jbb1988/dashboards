@@ -19,7 +19,7 @@ export interface SavedInsight {
   generated_at: string;
   created_at: string;
   executive_summary: string;
-  recommendations: AIRecommendation[];
+  recommendations?: AIRecommendation[];
 }
 
 interface UnifiedInsightsPanelProps {
