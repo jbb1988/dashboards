@@ -130,6 +130,32 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (action === 'preview' && envelopeId) {
+      // Preview the combined PDF document (inline, not download)
+      if (!hasDocuSign) {
+        return NextResponse.json({
+          error: 'DocuSign not configured',
+          message: 'Cannot preview documents without DocuSign authentication',
+        }, { status: 400 });
+      }
+
+      try {
+        const pdfBuffer = await getDocumentDownload(envelopeId, 'combined');
+        return new NextResponse(new Uint8Array(pdfBuffer), {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="envelope-${envelopeId}.pdf"`,
+          },
+        });
+      } catch (error) {
+        console.error('Document preview error:', error);
+        return NextResponse.json({
+          error: 'Failed to preview document',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        }, { status: 500 });
+      }
+    }
+
     // Get single envelope detail
     if (envelopeId && hasDocuSign && !useMock) {
       try {

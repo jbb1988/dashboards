@@ -58,6 +58,8 @@ export default function DocuSignDetailDrawer({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(true);
+  const [previewLoading, setPreviewLoading] = useState(true);
 
   const statusColor = getStatusColor(envelope.status);
   const statusLabel = getStatusLabel(envelope.status);
@@ -123,7 +125,7 @@ export default function DocuSignDetailDrawer({
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed right-0 top-0 bottom-0 w-[480px] bg-[#151F2E] border-l border-white/[0.06] shadow-2xl z-50 overflow-y-auto"
+        className="fixed right-0 top-0 bottom-0 w-full max-w-5xl bg-[#151F2E] border-l border-white/[0.06] shadow-2xl z-50 flex flex-col"
       >
         {/* Header */}
         <div className="sticky top-0 bg-[#0F1722] border-b border-white/[0.06] px-6 py-4 flex items-center justify-between">
@@ -145,8 +147,10 @@ export default function DocuSignDetailDrawer({
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
+        {/* Content - Two Column Layout */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Column - Details */}
+          <div className="w-96 border-r border-white/[0.06] overflow-y-auto p-6 space-y-6">
           {/* Title & Status */}
           <div>
             <h3 className="text-[18px] font-semibold text-white mb-3">{envelope.emailSubject}</h3>
@@ -328,6 +332,88 @@ export default function DocuSignDetailDrawer({
                 Send Reminder
               </button>
             )}
+          </div>
+          </div>
+
+          {/* Right Column - Document Preview */}
+          <div className="flex-1 flex flex-col bg-[#0F1722]">
+            {/* Preview Header */}
+            <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#8FA3BF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <h4 className="text-[14px] font-medium text-white">Document Preview</h4>
+              </div>
+              <button
+                onClick={() => setShowPreview(!showPreview)}
+                className="p-1.5 rounded-lg hover:bg-white/5 text-[#8FA3BF] hover:text-white transition-colors"
+              >
+                {showPreview ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {/* Preview Area */}
+            <div className="flex-1 overflow-hidden relative">
+              {showPreview ? (
+                <>
+                  {previewLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#0F1722]">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-[#64748B] text-sm">Loading document preview...</span>
+                      </div>
+                    </div>
+                  )}
+                  {previewError ? (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-center px-6">
+                        <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[#0B1220] flex items-center justify-center">
+                          <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <p className="text-[#8FA3BF] text-sm mb-1">Preview failed to load</p>
+                        <p className="text-[#64748B] text-xs max-w-xs mx-auto">{previewError}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <iframe
+                      src={`/api/docusign?action=preview&envelopeId=${envelope.envelopeId}`}
+                      className="w-full h-full border-0"
+                      onLoad={() => setPreviewLoading(false)}
+                      onError={() => {
+                        setPreviewLoading(false);
+                        setPreviewError('Failed to load document preview. The document may not be available yet.');
+                      }}
+                      title={envelope.emailSubject}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center px-6">
+                    <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[#0B1220] flex items-center justify-center">
+                      <svg className="w-10 h-10 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    </div>
+                    <p className="text-[#8FA3BF] text-sm mb-1">Preview hidden</p>
+                    <p className="text-[#64748B] text-xs max-w-xs mx-auto">Click the eye icon to show the document preview</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </motion.div>
