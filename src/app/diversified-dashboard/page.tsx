@@ -33,6 +33,8 @@ interface ClassSummary {
   total_gross_profit: number;
   avg_gross_profit_pct: number;
   transaction_count: number;
+  top_items?: ItemSummary[];
+  item_count?: number;
 }
 
 interface ItemSummary {
@@ -403,12 +405,13 @@ function ExpandableRow({
   const name = type === 'class' ? (data as ClassSummary).class_name : (data as CustomerSummary).customer_name;
   const category = type === 'class' ? (data as ClassSummary).class_category : '';
 
-  // Hover state for item tooltip (only for class view showing customers)
+  // Hover state for item tooltip (for both class view showing customers AND customer view showing classes)
   const [hoveredCustomer, setHoveredCustomer] = useState<CustomerSummary | null>(null);
+  const [hoveredClass, setHoveredClass] = useState<ClassSummary | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleMouseEnter = (customer: CustomerSummary, e: React.MouseEvent) => {
+  const handleMouseEnterCustomer = (customer: CustomerSummary, e: React.MouseEvent) => {
     // Clear any existing timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
@@ -416,6 +419,23 @@ function ExpandableRow({
     // Set tooltip after 200ms delay
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveredCustomer(customer);
+      setHoveredClass(null);
+      setTooltipPosition({
+        x: e.clientX + 15,
+        y: e.clientY + 10
+      });
+    }, 200);
+  };
+
+  const handleMouseEnterClass = (classData: ClassSummary, e: React.MouseEvent) => {
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    // Set tooltip after 200ms delay
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredClass(classData);
+      setHoveredCustomer(null);
       setTooltipPosition({
         x: e.clientX + 15,
         y: e.clientY + 10
@@ -429,10 +449,11 @@ function ExpandableRow({
       hoverTimeoutRef.current = null;
     }
     setHoveredCustomer(null);
+    setHoveredClass(null);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (hoveredCustomer) {
+    if (hoveredCustomer || hoveredClass) {
       setTooltipPosition({
         x: e.clientX + 15,
         y: e.clientY + 10
@@ -540,22 +561,25 @@ function ExpandableRow({
                 const childGpColor = child.avg_gross_profit_pct >= 50 ? '#22C55E' : child.avg_gross_profit_pct >= 40 ? '#F59E0B' : '#EF4444';
                 const isCustomerRow = type === 'class';
                 const customerData = isCustomerRow ? (child as CustomerSummary) : null;
-                const hasItemData = customerData?.top_items && customerData.top_items.length > 0;
+                const classData = !isCustomerRow ? (child as ClassSummary) : null;
+                const hasItemData = isCustomerRow
+                  ? (customerData?.top_items && customerData.top_items.length > 0)
+                  : (classData?.top_items && classData.top_items.length > 0);
 
                 return (
                   <div
                     key={idx}
-                    className={`grid gap-4 px-4 py-2.5 ${idx % 2 === 0 ? 'bg-[#0B1220]' : 'bg-[#0F1729]'} hover:bg-[#1a2740] transition-colors ${isCustomerRow && hasItemData ? 'cursor-pointer' : ''}`}
+                    className={`grid gap-4 px-4 py-2.5 ${idx % 2 === 0 ? 'bg-[#0B1220]' : 'bg-[#0F1729]'} hover:bg-[#1a2740] transition-colors ${hasItemData ? 'cursor-pointer' : ''}`}
                     style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px' }}
-                    onMouseEnter={isCustomerRow && customerData ? (e) => handleMouseEnter(customerData, e) : undefined}
-                    onMouseLeave={isCustomerRow ? handleMouseLeave : undefined}
-                    onMouseMove={isCustomerRow ? handleMouseMove : undefined}
+                    onMouseEnter={isCustomerRow && customerData ? (e) => handleMouseEnterCustomer(customerData, e) : (!isCustomerRow && classData ? (e) => handleMouseEnterClass(classData, e) : undefined)}
+                    onMouseLeave={handleMouseLeave}
+                    onMouseMove={handleMouseMove}
                   >
                     <div className="text-[13px] text-[#CBD5E1] flex items-center gap-2">
                       {childName}
-                      {isCustomerRow && hasItemData && (
+                      {hasItemData && (
                         <span className="text-[10px] text-[#64748B] bg-white/[0.04] px-1.5 py-0.5 rounded">
-                          {customerData.item_count} items
+                          {isCustomerRow ? customerData!.item_count : classData!.item_count} items
                         </span>
                       )}
                     </div>
@@ -581,6 +605,23 @@ function ExpandableRow({
               {hoveredCustomer && type === 'class' && (
                 <ItemTooltip
                   customer={hoveredCustomer}
+                  position={tooltipPosition}
+                />
+              )}
+              {hoveredClass && type === 'customer' && (
+                <ItemTooltip
+                  customer={{
+                    customer_id: hoveredClass.class_name,
+                    customer_name: hoveredClass.class_name,
+                    total_units: hoveredClass.total_units,
+                    total_revenue: hoveredClass.total_revenue,
+                    total_cost: hoveredClass.total_cost,
+                    total_gross_profit: hoveredClass.total_gross_profit,
+                    avg_gross_profit_pct: hoveredClass.avg_gross_profit_pct,
+                    transaction_count: hoveredClass.transaction_count,
+                    top_items: hoveredClass.top_items,
+                    item_count: hoveredClass.item_count,
+                  }}
                   position={tooltipPosition}
                 />
               )}

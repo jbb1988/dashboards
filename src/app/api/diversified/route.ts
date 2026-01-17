@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // If a customer is selected, we can get their classes
+      // If a customer is selected, we can get their classes WITH item breakdown
       if (customerIdParam) {
         // Get class breakdown for this customer
         const customerSales = await getSupabaseSales({
@@ -170,6 +170,9 @@ export async function GET(request: NextRequest) {
           total_gross_profit: number;
         }>();
 
+        // Also track items per class for this customer
+        const classItemMap = new Map<string, Map<string, { item_name: string; quantity: number; revenue: number }>>();
+
         for (const sale of customerSales) {
           if (!classMap.has(sale.class_name)) {
             classMap.set(sale.class_name, {
@@ -186,14 +189,39 @@ export async function GET(request: NextRequest) {
           agg.total_revenue += sale.revenue || 0;
           agg.total_cost += sale.cost || 0;
           agg.total_gross_profit += sale.gross_profit || 0;
+
+          // Track items per class
+          if (!classItemMap.has(sale.class_name)) {
+            classItemMap.set(sale.class_name, new Map());
+          }
+          const itemMap = classItemMap.get(sale.class_name)!;
+
+          // Use item_id as key for grouping, but display item_description
+          const itemKey = sale.item_id || sale.item_name || 'Unknown';
+          const displayName = sale.item_description || sale.item_name || sale.item_id || 'Unknown Item';
+
+          if (!itemMap.has(itemKey)) {
+            itemMap.set(itemKey, { item_name: displayName, quantity: 0, revenue: 0 });
+          }
+          const item = itemMap.get(itemKey)!;
+          item.quantity += sale.quantity || 0;
+          item.revenue += sale.revenue || 0;
         }
 
+        // Attach top 5 items to each class
         byClass = Array.from(classMap.values())
-          .map(c => ({
-            ...c,
-            avg_gross_profit_pct: c.total_revenue > 0 ? (c.total_gross_profit / c.total_revenue) * 100 : 0,
-            transaction_count: 0,
-          }))
+          .map(c => {
+            const itemMap = classItemMap.get(c.class_name);
+            const allItems = itemMap ? Array.from(itemMap.values()).sort((a, b) => b.revenue - a.revenue) : [];
+
+            return {
+              ...c,
+              avg_gross_profit_pct: c.total_revenue > 0 ? (c.total_gross_profit / c.total_revenue) * 100 : 0,
+              transaction_count: 0,
+              top_items: allItems.slice(0, 5),
+              item_count: allItems.length,
+            };
+          })
           .sort((a, b) => b.total_revenue - a.total_revenue);
       }
     }
