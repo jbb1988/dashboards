@@ -15,6 +15,14 @@ interface EquipmentPurchase {
   equipment_type: VEROflowType;
 }
 
+interface CalibrationService {
+  item_name: string;
+  item_description: string;
+  quantity: number;
+  revenue: number;
+  date: string;
+}
+
 interface EquipmentByType {
   vf1_units: EquipmentPurchase[];
   vf4_units: EquipmentPurchase[];
@@ -34,6 +42,7 @@ interface CalibrationData {
   both_types_calibrations: number;
   vf1_last_calibration: string | null;
   vf4_last_calibration: string | null;
+  calibration_services: CalibrationService[];
 }
 
 interface VEROflowCustomer {
@@ -842,11 +851,11 @@ export function VEROflowTab({ filters }: VEROflowTabProps) {
                               )}
 
                               {/* Calibration Summary */}
-                              {customer.has_calibration && (
-                                <div className="mt-4 pt-4 border-t border-white/10">
+                              {customer.has_calibration && customer.calibration.calibration_services.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
                                   <div className="flex items-center justify-between">
                                     <div className="text-[11px] font-semibold text-[#94A3B8] uppercase">
-                                      Calibration History
+                                      Calibration Services ({customer.calibration.total_calibrations})
                                     </div>
                                     <div className="flex items-center gap-4 text-[11px]">
                                       {customer.calibration.vf1_calibrations > 0 && (
@@ -859,6 +868,37 @@ export function VEROflowTab({ filters }: VEROflowTabProps) {
                                           VF-4: {customer.calibration.vf4_calibrations} calibrations
                                         </span>
                                       )}
+                                    </div>
+                                  </div>
+
+                                  {/* Individual Calibration Service Line Items */}
+                                  <div className="space-y-2">
+                                    {customer.calibration.calibration_services.map((service, idx) => (
+                                      <div key={idx} className="py-2 px-3 bg-green-500/5 rounded-lg border border-green-500/20">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex-1">
+                                            <div className="text-[12px] font-medium text-white">
+                                              {service.item_description}
+                                            </div>
+                                            <div className="text-[11px] text-[#64748B] mt-0.5">
+                                              Service Date: {formatDate(service.date)} • Qty: {service.quantity}
+                                            </div>
+                                          </div>
+                                          <div className="text-[13px] font-medium text-green-400">
+                                            {formatCurrency(service.revenue)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Total Revenue Summary */}
+                                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                                    <div className="text-[11px] font-medium text-[#94A3B8]">
+                                      Total Calibration Revenue
+                                    </div>
+                                    <div className="text-[13px] font-bold text-green-400">
+                                      {formatCurrency(customer.calibration.total_revenue)}
                                     </div>
                                   </div>
                                 </div>

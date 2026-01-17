@@ -30,6 +30,14 @@ interface EquipmentByType {
   vf4_revenue: number;
 }
 
+interface CalibrationService {
+  item_name: string;
+  item_description: string;
+  quantity: number;
+  revenue: number;
+  date: string;
+}
+
 interface CalibrationData {
   total_calibrations: number;
   total_revenue: number;
@@ -39,6 +47,7 @@ interface CalibrationData {
   both_types_calibrations: number;
   vf1_last_calibration: string | null;
   vf4_last_calibration: string | null;
+  calibration_services: CalibrationService[];
 }
 
 interface VEROflowCustomer {
@@ -107,7 +116,8 @@ function apportionCalibrations(
   vf4Count: number,
   totalCalibrations: number,
   calibrationRevenue: number,
-  calibrationDates: string[]
+  calibrationDates: string[],
+  calibrationServices: CalibrationService[]
 ): CalibrationData {
   const totalUnits = vf1Count + vf4Count;
   const lastCalibration = calibrationDates.length > 0
@@ -125,6 +135,7 @@ function apportionCalibrations(
       both_types_calibrations: 0,
       vf1_last_calibration: lastCalibration,
       vf4_last_calibration: null,
+      calibration_services: calibrationServices,
     };
   }
 
@@ -139,6 +150,7 @@ function apportionCalibrations(
       both_types_calibrations: 0,
       vf1_last_calibration: null,
       vf4_last_calibration: lastCalibration,
+      calibration_services: calibrationServices,
     };
   }
 
@@ -156,6 +168,7 @@ function apportionCalibrations(
       both_types_calibrations: totalCalibrations,
       vf1_last_calibration: lastCalibration,
       vf4_last_calibration: lastCalibration,
+      calibration_services: calibrationServices,
     };
   }
 
@@ -169,6 +182,7 @@ function apportionCalibrations(
     both_types_calibrations: 0,
     vf1_last_calibration: null,
     vf4_last_calibration: null,
+    calibration_services: calibrationServices,
   };
 }
 
@@ -243,6 +257,7 @@ export async function GET(request: NextRequest) {
             both_types_calibrations: 0,
             vf1_last_calibration: null,
             vf4_last_calibration: null,
+            calibration_services: [],
           },
           has_calibration: false,
           owns_vf1_needs_calibration: false,
@@ -289,6 +304,7 @@ export async function GET(request: NextRequest) {
     const calibrationDatesMap = new Map<string, string[]>();
     const calibrationRevenueMap = new Map<string, number>();
     const calibrationCountMap = new Map<string, number>();
+    const calibrationServicesMap = new Map<string, CalibrationService[]>();
 
     for (const sale of veroflowSales || []) {
       const className = (sale.class_name || '').toLowerCase();
@@ -299,6 +315,7 @@ export async function GET(request: NextRequest) {
           calibrationDatesMap.set(sale.customer_id, []);
           calibrationRevenueMap.set(sale.customer_id, 0);
           calibrationCountMap.set(sale.customer_id, 0);
+          calibrationServicesMap.set(sale.customer_id, []);
         }
 
         calibrationDatesMap.get(sale.customer_id)!.push(sale.transaction_date || '');
@@ -310,6 +327,13 @@ export async function GET(request: NextRequest) {
           sale.customer_id,
           (calibrationCountMap.get(sale.customer_id) || 0) + 1
         );
+        calibrationServicesMap.get(sale.customer_id)!.push({
+          item_name: sale.item_name || 'Unknown Service',
+          item_description: sale.item_description || sale.item_name || 'Calibration Service',
+          quantity: sale.quantity || 0,
+          revenue: sale.revenue || 0,
+          date: sale.transaction_date || '',
+        });
       }
     }
 
@@ -318,6 +342,7 @@ export async function GET(request: NextRequest) {
       const calibrationDates = calibrationDatesMap.get(customerId) || [];
       const calibrationRevenue = calibrationRevenueMap.get(customerId) || 0;
       const calibrationCount = calibrationCountMap.get(customerId) || 0;
+      const calibrationServices = calibrationServicesMap.get(customerId) || [];
 
       if (calibrationCount > 0) {
         customer.has_calibration = true;
@@ -326,7 +351,8 @@ export async function GET(request: NextRequest) {
           customer.equipment.vf4_count,
           calibrationCount,
           calibrationRevenue,
-          calibrationDates
+          calibrationDates,
+          calibrationServices
         );
       }
 
