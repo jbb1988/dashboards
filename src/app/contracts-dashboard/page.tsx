@@ -351,7 +351,6 @@ function ContractRow({
   contract,
   index,
   onUpdate,
-  focusMode = false,
   pendingStatus,
   onPendingStatusChange,
   openBundleModal,
@@ -360,7 +359,6 @@ function ContractRow({
   contract: Contract;
   index: number;
   onUpdate?: () => void;
-  focusMode?: boolean;
   pendingStatus?: string;
   onPendingStatusChange?: (contractId: string, salesforceId: string | undefined, contractName: string, notionName: string | undefined, newStatus: string, originalStatus: string) => void;
   openBundleModal?: (contract: Contract, mode: 'create' | 'add') => void;
@@ -450,11 +448,6 @@ function ContractRow({
   // Alternating row background
   const isEvenRow = index % 2 === 0;
 
-  // Focus Mode: determine if this row is "critical" (overdue, <30 days, high value)
-  const isCritical = contract.isOverdue ||
-    (contract.daysUntilDeadline !== undefined && contract.daysUntilDeadline <= 30 && contract.daysUntilDeadline >= 0) ||
-    contract.value >= 500000;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -468,8 +461,6 @@ function ContractRow({
             ? 'bg-[#151F2E] hover:bg-[#1a2740]'
             : 'bg-[#131B28] hover:bg-[#182437]'
         } ${contract.budgeted ? 'border-l-2 border-[#22C55E]/40' : ''}
-        ${focusMode && !isCritical ? 'opacity-40' : ''}
-        ${focusMode && isCritical ? 'ring-1 ring-[#F59E0B]/30 bg-[#F59E0B]/5' : ''}
         hover:shadow-[0_0_20px_rgba(56,189,248,0.05)]`}
       >
         <div className="grid gap-4 px-6 py-[14px] items-center" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
@@ -1395,6 +1386,23 @@ export default function ContractsDashboard() {
       });
     }
 
+    // Focus Mode filter - next 90 days, all types, budgeted only
+    if (focusMode) {
+      const today = new Date();
+      const ninetyDaysFromNow = new Date(today);
+      ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+
+      filtered = filtered.filter(c => {
+        // Must be budgeted
+        if (!c.budgeted) return false;
+
+        // Must have a close date within next 90 days
+        if (!c.closeDate) return false;
+        const closeDate = new Date(c.closeDate);
+        return closeDate >= today && closeDate <= ninetyDaysFromNow;
+      });
+    }
+
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -1429,7 +1437,7 @@ export default function ContractsDashboard() {
     });
 
     return filtered;
-  }, [data, searchQuery, activeFilter, statusFilter, dateFilter, yearFilter, contractTypeFilter, hideMidContract, contractYearFilter, budgetedFilter, bundledFilter, probabilityMin, sortField, sortDirection]);
+  }, [data, searchQuery, activeFilter, statusFilter, dateFilter, yearFilter, contractTypeFilter, hideMidContract, contractYearFilter, budgetedFilter, bundledFilter, probabilityMin, sortField, sortDirection, focusMode]);
 
   // Calculate KPIs from filtered contracts (reflects ALL filters including search)
   const filteredKpis = useMemo(() => {
@@ -1600,7 +1608,21 @@ export default function ContractsDashboard() {
                 {/* Focus Mode Toggle */}
                 <div className="relative group">
                   <button
-                    onClick={() => setFocusMode(!focusMode)}
+                    onClick={() => {
+                      if (!focusMode) {
+                        // Entering focus mode - clear other filters
+                        setActiveFilter('all');
+                        setStatusFilter([]);
+                        setDateFilter('all');
+                        setContractTypeFilter('all');
+                        setContractYearFilter([]);
+                        setBudgetedFilter(false);
+                        setBundledFilter(false);
+                        setProbabilityMin(0);
+                        setHideMidContract(false);
+                      }
+                      setFocusMode(!focusMode);
+                    }}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 flex items-center gap-2 ${
                       focusMode
                         ? 'bg-[#F59E0B]/20 text-[#F59E0B] ring-1 ring-[#F59E0B]/30'
@@ -1617,7 +1639,7 @@ export default function ContractsDashboard() {
                   <div className="absolute top-full right-0 mt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
                     <div className="bg-[#1E293B] border border-white/10 rounded-lg p-3 shadow-xl">
                       <p className="text-[12px] text-[#94A3B8] leading-relaxed">
-                        Highlights overdue, closing within 30 days, and high-value contracts. Dims lower priority items.
+                        Shows only budgeted contracts closing in the next 90 days. Clears all other filters.
                       </p>
                     </div>
                   </div>
@@ -2205,7 +2227,6 @@ export default function ContractsDashboard() {
                         contract={contract}
                         index={index}
                         onUpdate={handleDataRefresh}
-                        focusMode={focusMode}
                         pendingStatus={pendingChanges[contract.id]?.newStatus}
                         onPendingStatusChange={handlePendingStatusChange}
                         openBundleModal={openBundleModal}
