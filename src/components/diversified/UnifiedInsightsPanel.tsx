@@ -105,8 +105,6 @@ const SEGMENT_STYLES: Record<string, { badge: string; label: string }> = {
   irregular: { badge: 'bg-gray-500/20 text-gray-400 border-gray-500/30', label: 'Irregular' },
 };
 
-type FilterTab = 'quick-wins' | 'all' | 'attrition' | 'growth' | 'crosssell';
-
 export function UnifiedInsightsPanel({
   onGenerate,
   onCreateTask,
@@ -123,7 +121,6 @@ export function UnifiedInsightsPanel({
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>(initialRecommendations);
   const [executiveSummary, setExecutiveSummary] = useState<string>(initialExecutiveSummary);
   const [generatedAt, setGeneratedAt] = useState<string | undefined>(initialGeneratedAt);
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('quick-wins');
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [error, setError] = useState<string>('');
@@ -151,14 +148,6 @@ export function UnifiedInsightsPanel({
       setGeneratedAt(new Date().toISOString());
       setState('loaded');
       setTasksCreated(new Set()); // Reset task tracking when generating new insights
-
-      // Auto-select quick-wins if any exist
-      const hasQuickWins = result.recommendations.some(r => r.priority === 'high');
-      if (hasQuickWins) {
-        setActiveFilter('quick-wins');
-      } else {
-        setActiveFilter('all');
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate insights');
       setState('error');
@@ -177,12 +166,8 @@ export function UnifiedInsightsPanel({
     });
   };
 
-  // Filter recommendations based on active tab
-  const filteredRecommendations = recommendations.filter(r => {
-    if (activeFilter === 'quick-wins') return r.priority === 'high';
-    if (activeFilter === 'all') return true;
-    return r.category === activeFilter;
-  });
+  // Show all recommendations (no filtering needed since tabs were removed)
+  const filteredRecommendations = recommendations;
 
   // Calculate stats
   const stats = {
@@ -407,80 +392,6 @@ export function UnifiedInsightsPanel({
           {executiveSummary}
         </p>
       </motion.div>
-
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => setActiveFilter('quick-wins')}
-          className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${
-            activeFilter === 'quick-wins'
-              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              : 'bg-white/5 text-[#94A3B8] border border-white/10 hover:bg-white/10'
-          }`}
-        >
-          Quick Wins
-          {recommendations.filter(r => r.priority === 'high').length > 0 && (
-            <span className="ml-2 text-[11px] opacity-70">
-              ({recommendations.filter(r => r.priority === 'high').length})
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveFilter('all')}
-          className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${
-            activeFilter === 'all'
-              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-              : 'bg-white/5 text-[#94A3B8] border border-white/10 hover:bg-white/10'
-          }`}
-        >
-          All Insights ({recommendations.length})
-        </button>
-        <button
-          onClick={() => setActiveFilter('attrition')}
-          className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${
-            activeFilter === 'attrition'
-              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-              : 'bg-white/5 text-[#94A3B8] border border-white/10 hover:bg-white/10'
-          }`}
-        >
-          Attrition
-          {recommendations.filter(r => r.category === 'attrition').length > 0 && (
-            <span className="ml-2 text-[11px] opacity-70">
-              ({recommendations.filter(r => r.category === 'attrition').length})
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveFilter('growth')}
-          className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${
-            activeFilter === 'growth'
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-white/5 text-[#94A3B8] border border-white/10 hover:bg-white/10'
-          }`}
-        >
-          Growth
-          {recommendations.filter(r => r.category === 'growth').length > 0 && (
-            <span className="ml-2 text-[11px] opacity-70">
-              ({recommendations.filter(r => r.category === 'growth').length})
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveFilter('crosssell')}
-          className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${
-            activeFilter === 'crosssell'
-              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-              : 'bg-white/5 text-[#94A3B8] border border-white/10 hover:bg-white/10'
-          }`}
-        >
-          Cross-Sell
-          {recommendations.filter(r => r.category === 'crosssell').length > 0 && (
-            <span className="ml-2 text-[11px] opacity-70">
-              ({recommendations.filter(r => r.category === 'crosssell').length})
-            </span>
-          )}
-        </button>
-      </div>
 
       {/* Insight Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
