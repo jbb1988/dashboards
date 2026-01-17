@@ -16,6 +16,12 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
+import LocationHealthCard from '@/components/distributors/LocationHealthCard';
+import PriorityActionsPanel from '@/components/distributors/PriorityActionsPanel';
+import CompetitivePositionCard from '@/components/distributors/CompetitivePositionCard';
+import PeerBenchmarkingTable from '@/components/distributors/PeerBenchmarkingTable';
+import { CreateTaskModal } from '@/components/diversified/CreateTaskModal';
+import type { AIRecommendation } from '@/components/diversified/UnifiedInsightsPanel';
 
 // Icon Components
 const ArrowUpIcon = ({ className }: { className?: string }) => (
@@ -108,6 +114,39 @@ const formatCurrency = (value: number) => {
 // Format percentage
 const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
+// StatRow Component for Quick Stats
+function StatRow({
+  label,
+  value,
+  trend,
+  sublabel
+}: {
+  label: string;
+  value: string;
+  trend?: number;
+  sublabel?: string;
+}) {
+  const isPositive = trend !== undefined && trend >= 0;
+  const isNegative = trend !== undefined && trend < 0;
+
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-[#64748B]">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold text-white">{value}</span>
+        {sublabel && (
+          <span className="text-xs text-[#64748B]">{sublabel}</span>
+        )}
+        {trend !== undefined && (
+          <span className={`text-xs ${isPositive ? 'text-[#10B981]' : isNegative ? 'text-[#EF4444]' : 'text-[#64748B]'}`}>
+            {isPositive ? '▲' : isNegative ? '▼' : ''}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DistributorDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -116,6 +155,11 @@ export default function DistributorDetailPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Task creation modal state
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<AIRecommendation | null>(null);
+  const [growthOppTasksCreated, setGrowthOppTasksCreated] = useState<Set<number>>(new Set());
 
   // Determine if this is a location or distributor view
   const isLocationView = useMemo(() => {
@@ -153,6 +197,78 @@ export default function DistributorDetailPage() {
 
     fetchData();
   }, [id, isLocationView]);
+
+  // Handle task creation from priority actions
+  const handleCreateTaskFromAction = (action: any) => {
+    // Transform PriorityAction into AIRecommendation format
+    const recommendation: AIRecommendation = {
+      id: action.id,
+      category: action.category,
+      title: action.title,
+      description: action.description,
+      priority: action.priority === 'critical' ? 'high' : action.priority,
+      actionItems: [
+        action.impact,
+        `Effort: ${action.effort}`,
+        `Opportunity: $${(action.metrics.opportunity / 1000).toFixed(1)}k`
+      ],
+      metadata: {
+        distributor_name: data?.distributor_name,
+        customer_id: data?.customer_id,
+        customer_name: data?.customer_name,
+        location: data?.location,
+      }
+    };
+
+    setSelectedRecommendation(recommendation);
+    setIsTaskModalOpen(true);
+  };
+
+  // Handle task creation from growth opportunities
+  const handleCreateTaskFromGrowthOpp = (opportunity: any, index: number) => {
+    // Transform Growth Opportunity into AIRecommendation format
+    const recommendation: AIRecommendation = {
+      id: `growth-opp-${index}`,
+      category: 'expansion',
+      title: `Expand into ${opportunity.category} category`,
+      description: `This location is not purchasing ${opportunity.category} products, but ${opportunity.purchased_by_pct}% of other ${data?.distributor_name} locations do. This represents a cross-sell opportunity.`,
+      priority: 'medium',
+      actionItems: [
+        opportunity.action,
+        `Purchased by ${opportunity.purchased_by_pct}% of peer locations`,
+        `Estimated opportunity: ${formatCurrency(opportunity.estimated_opportunity)}`
+      ],
+      metadata: {
+        distributor_name: data?.distributor_name,
+        customer_id: data?.customer_id,
+        customer_name: data?.customer_name,
+        location: data?.location,
+      }
+    };
+
+    setSelectedRecommendation(recommendation);
+    setIsTaskModalOpen(true);
+    setGrowthOppTasksCreated(prev => new Set(prev).add(index));
+  };
+
+  // Handle task save
+  const handleTaskSave = async (taskData: any) => {
+    try {
+      const response = await fetch('/api/diversified/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData),
+      });
+
+      if (!response.ok) throw new Error('Failed to create task');
+
+      setIsTaskModalOpen(false);
+      setSelectedRecommendation(null);
+    } catch (error) {
+      console.error('Error creating task:', error);
+      throw error;
+    }
+  };
 
   if (loading) {
     return (
@@ -311,6 +427,110 @@ export default function DistributorDetailPage() {
           </div>
         )}
 
+        {/* Strategic Intelligence Dashboard (Location View Only) */}
+        {isLocationView && data.health_score && (
+          <>
+            {/* Health Score Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.5 }}
+              className="mb-6"
+            >
+              <LocationHealthCard healthScore={data.health_score} />
+            </motion.div>
+
+            {/* Priority Actions Panel */}
+            {data.priority_actions && data.priority_actions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+                className="mb-6"
+              >
+                <PriorityActionsPanel
+                  actions={data.priority_actions}
+                  onCreateTask={handleCreateTaskFromAction}
+                />
+              </motion.div>
+            )}
+
+            {/* Two-Column Layout: Competitive Position & Quick Stats */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Competitive Position */}
+              {data.competitive_position && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.7 }}
+                >
+                  <CompetitivePositionCard
+                    position={data.competitive_position}
+                    totalLocations={data.distributor_metrics?.total_locations || data.peer_location_count}
+                  />
+                </motion.div>
+              )}
+
+              {/* Quick Stats */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.7 }}
+                className="p-6 rounded-xl bg-[#151F2E] border border-white/[0.06]"
+              >
+                <h3 className="text-sm font-semibold text-white mb-4">Quick Stats</h3>
+                <div className="space-y-3">
+                  <StatRow
+                    label="R12 Revenue"
+                    value={formatCurrency(data.revenue)}
+                    trend={data.yoy_change_pct}
+                  />
+                  <StatRow
+                    label="Avg Order Value"
+                    value={formatCurrency(data.revenue / (data.recent_transactions?.length || 12))}
+                  />
+                  <StatRow
+                    label="Categories"
+                    value={data.category_count.toString()}
+                    sublabel="purchased"
+                  />
+                  <StatRow
+                    label="Avg Margin"
+                    value={formatPercent(data.margin_pct)}
+                  />
+                  <StatRow
+                    label="vs Dist. Avg"
+                    value={`${data.variance_from_avg >= 0 ? '+' : ''}${formatPercent(data.variance_from_avg)}`}
+                    trend={data.variance_from_avg}
+                  />
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Peer Benchmarking */}
+            {data.similar_locations && data.similar_locations.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.8 }}
+                className="mb-6"
+              >
+                <PeerBenchmarkingTable
+                  currentLocation={{
+                    customer_id: data.customer_id,
+                    customer_name: data.customer_name,
+                    revenue: data.revenue,
+                    category_count: data.category_count,
+                    margin_pct: data.margin_pct,
+                  }}
+                  peers={data.similar_locations}
+                  transactionCount={data.recent_transactions?.length || 12}
+                />
+              </motion.div>
+            )}
+          </>
+        )}
+
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Revenue Trend */}
@@ -463,8 +683,25 @@ export default function DistributorDetailPage() {
                       <div className="text-xs text-[#64748B]">Est. Opportunity</div>
                     </div>
                   </div>
-                  <button className="mt-2 px-4 py-2 bg-[#14B8A6]/10 text-[#14B8A6] rounded-lg text-sm hover:bg-[#14B8A6]/20 transition-colors">
-                    {opp.action}
+                  <button
+                    onClick={() => handleCreateTaskFromGrowthOpp(opp, index)}
+                    disabled={growthOppTasksCreated.has(index)}
+                    className={`mt-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+                      growthOppTasksCreated.has(index)
+                        ? 'bg-green-500/20 text-green-300 border border-green-500/30 cursor-not-allowed'
+                        : 'bg-[#14B8A6]/10 text-[#14B8A6] hover:bg-[#14B8A6]/20'
+                    }`}
+                  >
+                    {growthOppTasksCreated.has(index) ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        Task Created
+                      </span>
+                    ) : (
+                      opp.action
+                    )}
                   </button>
                 </div>
               ))}
@@ -571,6 +808,19 @@ export default function DistributorDetailPage() {
           </motion.div>
         )}
       </div>
+
+      {/* Task Creation Modal */}
+      {selectedRecommendation && (
+        <CreateTaskModal
+          isOpen={isTaskModalOpen}
+          onClose={() => {
+            setIsTaskModalOpen(false);
+            setSelectedRecommendation(null);
+          }}
+          insight={selectedRecommendation}
+          onSave={handleTaskSave}
+        />
+      )}
     </div>
   );
 }

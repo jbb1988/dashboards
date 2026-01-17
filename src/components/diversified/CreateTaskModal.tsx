@@ -29,6 +29,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   crosssell: 'Cross-Sell',
   concentration: 'Concentration',
   general: 'General',
+
+  // Distributor-specific categories
+  attrisk: 'At Risk',
+  categorygap: 'Category Gap',
+  expansion: 'Expansion Opportunity',
+  inactive: 'Inactive Location',
+  newlocation: 'New Location Onboarding',
 };
 
 export function CreateTaskModal({

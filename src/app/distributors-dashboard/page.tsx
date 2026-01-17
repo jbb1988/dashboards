@@ -15,6 +15,8 @@ import { LocationConcentrationChart } from '@/components/charts/LocationConcentr
 import { CategoryHeatmap } from '@/components/charts/CategoryHeatmap';
 import { AtRiskScatterChart } from '@/components/charts/AtRiskScatterChart';
 import { LocationPerformanceChart } from '@/components/charts/LocationPerformanceChart';
+import { CreateTaskModal } from '@/components/diversified/CreateTaskModal';
+import type { AIRecommendation } from '@/components/diversified/UnifiedInsightsPanel';
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -194,6 +196,37 @@ export default function DistributorsDashboard() {
   const [expandedDistributor, setExpandedDistributor] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'revenue' | 'growth_opps' | 'yoy'>('revenue');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  // Modal state for task creation
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<AIRecommendation | null>(null);
+  const [selectedActionItem, setSelectedActionItem] = useState<string | undefined>(undefined);
+
+  // Handle task creation from insights
+  const handleCreateTask = (recommendation: AIRecommendation, actionItem?: string) => {
+    setSelectedRecommendation(recommendation);
+    setSelectedActionItem(actionItem);
+    setIsTaskModalOpen(true);
+  };
+
+  // Handle task save
+  const handleTaskSave = async (taskData: any) => {
+    try {
+      const response = await fetch('/api/diversified/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData),
+      });
+
+      if (!response.ok) throw new Error('Failed to create task');
+
+      // Close modal on success
+      setIsTaskModalOpen(false);
+    } catch (error) {
+      console.error('Error creating task:', error);
+      throw error;
+    }
+  };
 
   // Compute filter options
   const filterOptions = useMemo(() => {
@@ -799,18 +832,7 @@ export default function DistributorsDashboard() {
                         executive_summary: result.executive_summary,
                       };
                     }}
-                    onAddToTasks={async (tasks) => {
-                      const response = await fetch('/api/diversified/distributors/tasks', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(tasks),
-                      });
-
-                      if (!response.ok) throw new Error('Failed to create tasks');
-
-                      const result = await response.json();
-                      alert(`Successfully created ${result.count} task${result.count !== 1 ? 's' : ''}!`);
-                    }}
+                    onCreateTask={handleCreateTask}
                     selectedYears={selectedYears}
                     selectedMonths={selectedMonths}
                     selectedClass={selectedClass}
@@ -854,6 +876,17 @@ export default function DistributorsDashboard() {
         filterOptions={filterOptions}
         activeTab="distributors"
       />
+
+      {/* Task Creation Modal */}
+      {selectedRecommendation && (
+        <CreateTaskModal
+          isOpen={isTaskModalOpen}
+          onClose={() => setIsTaskModalOpen(false)}
+          insight={selectedRecommendation}
+          actionItem={selectedActionItem}
+          onSave={handleTaskSave}
+        />
+      )}
     </div>
   );
 }

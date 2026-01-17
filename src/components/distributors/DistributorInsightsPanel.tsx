@@ -2,6 +2,28 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CategoryBadgeList from './CategoryBadgeList';
+import ActivityStatusBadge from './ActivityStatusBadge';
+
+interface ProductContext {
+  top_categories: Array<{
+    name: string;
+    revenue: number;
+    percentage: number;
+  }>;
+  category_count: number;
+  last_purchase_date: string;
+  recent_activity: {
+    days_since_purchase: number;
+    transaction_count_30d: number;
+    status: 'active' | 'warning' | 'inactive';
+  };
+  missing_categories?: Array<{
+    name: string;
+    peer_penetration_pct: number;
+    estimated_opportunity: number;
+  }>;
+}
 
 interface AIRecommendation {
   priority: 'high' | 'medium' | 'low';
@@ -14,11 +36,12 @@ interface AIRecommendation {
   distributor_name?: string;
   customer_id?: string;
   customer_name?: string;
+  product_context?: ProductContext;
 }
 
 interface DistributorInsightsPanelProps {
   onGenerate: () => Promise<{ recommendations: AIRecommendation[]; executive_summary: string }>;
-  onAddToTasks?: (tasks: any[]) => Promise<void>;
+  onCreateTask?: (recommendation: AIRecommendation, actionItem?: string) => void;
   selectedYears: number[];
   selectedMonths: number[];
   selectedClass: string | null;
@@ -89,7 +112,7 @@ const CATEGORY_CONFIG = {
 
 export function DistributorInsightsPanel({
   onGenerate,
-  onAddToTasks,
+  onCreateTask,
   selectedYears,
   selectedMonths,
   selectedClass,
@@ -98,7 +121,7 @@ export function DistributorInsightsPanel({
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
   const [executiveSummary, setExecutiveSummary] = useState<string>('');
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
-  const [selectedInsights, setSelectedInsights] = useState<Set<number>>(new Set());
+  const [tasksCreated, setTasksCreated] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string>('');
 
   const handleGenerate = async () => {
@@ -126,40 +149,6 @@ export function DistributorInsightsPanel({
       newExpanded.add(index);
     }
     setExpandedCards(newExpanded);
-  };
-
-  const toggleSelection = (index: number) => {
-    const newSelected = new Set(selectedInsights);
-    if (newSelected.has(index)) {
-      newSelected.delete(index);
-    } else {
-      newSelected.add(index);
-    }
-    setSelectedInsights(newSelected);
-  };
-
-  const handleAddToTasks = async () => {
-    if (!onAddToTasks) return;
-
-    const selectedRecs = Array.from(selectedInsights).map(idx => recommendations[idx]);
-
-    // Convert recommendations to tasks
-    const tasks = selectedRecs.map(rec => ({
-      title: rec.title,
-      description: rec.problem + '\n\n' + rec.recommendation,
-      priority: rec.priority === 'high' ? 'urgent' : rec.priority,
-      distributor_name: rec.distributor_name,
-      customer_id: rec.customer_id,
-      customer_name: rec.customer_name,
-      source: 'ai_insight',
-    }));
-
-    try {
-      await onAddToTasks(tasks);
-      setSelectedInsights(new Set());
-    } catch (err) {
-      console.error('Failed to add tasks:', err);
-    }
   };
 
   // Group recommendations by category
@@ -280,11 +269,6 @@ export function DistributorInsightsPanel({
                 <span className="text-[14px] text-[#94A3B8]">
                   {recommendations.length} insight{recommendations.length !== 1 ? 's' : ''} found
                 </span>
-                {selectedInsights.size > 0 && (
-                  <span className="text-[14px] text-[#14B8A6] font-medium">
-                    {selectedInsights.size} selected
-                  </span>
-                )}
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -293,14 +277,6 @@ export function DistributorInsightsPanel({
                 >
                   Refresh Insights
                 </button>
-                {onAddToTasks && selectedInsights.size > 0 && (
-                  <button
-                    onClick={handleAddToTasks}
-                    className="px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[#14B8A6] hover:bg-[#0D9488] transition-colors"
-                  >
-                    Add {selectedInsights.size} to Tasks
-                  </button>
-                )}
               </div>
             </div>
           )}
@@ -319,7 +295,7 @@ export function DistributorInsightsPanel({
                 <div className="space-y-3">
                   {items.map(({ rec, idx }) => {
                     const isExpanded = expandedCards.has(idx);
-                    const isSelected = selectedInsights.has(idx);
+                    const taskCreated = tasksCreated.has(idx);
                     const styles = PRIORITY_STYLES[rec.priority];
 
                     return (
@@ -328,38 +304,15 @@ export function DistributorInsightsPanel({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.05 }}
-                        className={`rounded-xl border ${styles.border} ${styles.bg} overflow-hidden ${
-                          isSelected ? styles.glow : ''
-                        }`}
+                        className={`rounded-xl border ${styles.border} ${styles.bg} overflow-hidden`}
                       >
                         {/* Card Header */}
-                        <div
-                          className="p-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
-                          onClick={() => toggleCard(idx)}
-                        >
+                        <div className="p-4">
                           <div className="flex items-start gap-3">
-                            {/* Checkbox */}
-                            {onAddToTasks && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleSelection(idx);
-                                }}
-                                className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                  isSelected
-                                    ? 'bg-[#14B8A6] border-[#14B8A6]'
-                                    : 'border-[#64748B] hover:border-[#14B8A6]'
-                                }`}
-                              >
-                                {isSelected && (
-                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                )}
-                              </button>
-                            )}
-
-                            <div className="flex-1 min-w-0">
+                            <div
+                              className="flex-1 min-w-0 cursor-pointer"
+                              onClick={() => toggleCard(idx)}
+                            >
                               <div className="flex items-start justify-between gap-3 mb-2">
                                 <h5 className="text-[14px] font-semibold text-white flex-1">
                                   {rec.title}
@@ -391,7 +344,81 @@ export function DistributorInsightsPanel({
                                 {rec.problem}
                               </p>
                             </div>
+
+                            {/* Add Task Button */}
+                            {onCreateTask && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onCreateTask(rec);
+                                  setTasksCreated(prev => new Set(prev).add(idx));
+                                }}
+                                disabled={taskCreated}
+                                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                                  taskCreated
+                                    ? 'bg-green-500/20 text-green-300 border border-green-500/30 cursor-not-allowed'
+                                    : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30'
+                                }`}
+                              >
+                                {taskCreated ? (
+                                  <span className="flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    Task Created
+                                  </span>
+                                ) : (
+                                  'Add Task'
+                                )}
+                              </button>
+                            )}
                           </div>
+
+                          {/* Product Context */}
+                          {rec.product_context && (
+                            <div className="mt-3 pt-3 border-t border-white/[0.06] space-y-2">
+                              {/* Category Badges */}
+                              {rec.product_context.top_categories.length > 0 && (
+                                <CategoryBadgeList categories={rec.product_context.top_categories} />
+                              )}
+
+                              {/* Activity Status & Stats */}
+                              <div className="flex items-center gap-3 text-[11px]">
+                                <ActivityStatusBadge
+                                  status={rec.product_context.recent_activity.status}
+                                  daysSincePurchase={rec.product_context.recent_activity.days_since_purchase}
+                                  transactionCount30d={rec.product_context.recent_activity.transaction_count_30d}
+                                />
+                                <span className="text-[#64748B]">
+                                  {rec.product_context.category_count} categories
+                                </span>
+                                <span className="text-[#64748B]">•</span>
+                                <span className="text-[#64748B]">
+                                  Last order: {new Date(rec.product_context.last_purchase_date).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              {/* Missing Categories (if applicable) */}
+                              {rec.product_context.missing_categories && rec.product_context.missing_categories.length > 0 && (
+                                <div className="mt-2 p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                                  <div className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider mb-1">
+                                    Expansion Opportunity
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {rec.product_context.missing_categories.slice(0, 3).map((cat, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="text-[10px] text-[#94A3B8]"
+                                        title={`${cat.peer_penetration_pct}% of peers buy this • Est. $${cat.estimated_opportunity.toLocaleString()} opportunity`}
+                                      >
+                                        {cat.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Expanded Content */}

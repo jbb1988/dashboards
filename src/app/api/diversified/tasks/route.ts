@@ -169,7 +169,22 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, due_date, assignee, section, priority, source, insight_id, insight_category, customer_name } = body;
+    const {
+      title,
+      description,
+      due_date,
+      assignee,
+      section,
+      priority,
+      source,
+      insight_id,
+      insight_category,
+      customer_name,
+      // Distributor-specific fields
+      distributor_name,
+      customer_id,
+      location,
+    } = body;
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -198,7 +213,7 @@ export async function POST(request: NextRequest) {
     let notes = description || '';
     if (source === 'ai_insight') {
       // Add structured metadata footer that we can parse later for analytics
-      const metadataFooter = [
+      const metadataLines = [
         '',
         '---',
         '📊 INSIGHT METADATA (do not edit below)',
@@ -207,7 +222,14 @@ export async function POST(request: NextRequest) {
         `category: ${insight_category || 'general'}`,
         `customer: ${customer_name || 'unknown'}`,
         `created: ${new Date().toISOString()}`,
-      ].join('\n');
+      ];
+
+      // Add distributor-specific metadata if available
+      if (distributor_name) metadataLines.push(`distributor: ${distributor_name}`);
+      if (customer_id) metadataLines.push(`customer_id: ${customer_id}`);
+      if (location) metadataLines.push(`location: ${location}`);
+
+      const metadataFooter = metadataLines.join('\n');
       notes = notes + metadataFooter;
     }
 

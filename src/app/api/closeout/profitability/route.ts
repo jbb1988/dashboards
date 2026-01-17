@@ -59,6 +59,8 @@ interface WOLineItem {
   quantityCompleted: number;
   unitCost: number;
   lineCost: number;
+  costEstimate: number;
+  actualCost: number | null;
   isClosed: boolean;
 }
 
@@ -88,7 +90,9 @@ interface WorkOrderDetail {
   lineItems: WOLineItem[];
   totals: {
     lineItemCount: number;
-    totalCost: number;
+    totalEstimatedCost: number;
+    totalActualCost: number | null;
+    totalCost: number; // Uses actual if available, else estimated
   };
 }
 
@@ -111,6 +115,9 @@ interface ProjectTypeDetail {
     soCount: number;
     netsuiteRevenue: number;
     netsuiteCostEstimate: number;
+    netsuiteActualCost: number | null;
+    netsuiteGrossProfit: number;
+    netsuiteGrossMarginPct: number;
   };
 }
 
@@ -129,6 +136,9 @@ interface ProjectProfitabilityResponse {
       excelVariance: number;
       netsuiteRevenue: number;
       netsuiteCostEstimate: number;
+      netsuiteActualCost: number | null;
+      netsuiteGrossProfit: number;
+      netsuiteGrossMarginPct: number;
     };
   };
   legend: Record<string, string>;
@@ -136,6 +146,7 @@ interface ProjectProfitabilityResponse {
     lastSyncedAt: string | null;
     workOrderCount: number;
     salesOrderCount: number;
+    workOrdersWithActualCosts: number;
   };
 }
 
@@ -223,6 +234,7 @@ export async function GET(request: Request) {
             status,
             created_from_so_id,
             created_from_so_number,
+            total_actual_cost,
             netsuite_work_order_lines (
               line_number,
               item_id,
@@ -233,6 +245,8 @@ export async function GET(request: Request) {
               quantity_completed,
               unit_cost,
               line_cost,
+              cost_estimate,
+              actual_cost,
               is_closed
             )
           `)
@@ -254,8 +268,15 @@ export async function GET(request: Request) {
               quantityCompleted: line.quantity_completed || 0,
               unitCost: line.unit_cost || 0,
               lineCost: line.line_cost || 0,
+              costEstimate: line.cost_estimate || 0,
+              actualCost: line.actual_cost,
               isClosed: line.is_closed || false,
             }));
+
+            // Calculate totals - prefer actual cost when available
+            const totalEstimatedCost = woLineItems.reduce((sum, li) => sum + li.costEstimate, 0);
+            const totalActualCost = (wo as any).total_actual_cost || woLineItems.reduce((sum, li) => sum + (li.actualCost || 0), 0);
+            const hasActualCost = totalActualCost > 0;
 
             workOrderDetails.push({
               woNumber: wo.wo_number,
@@ -266,7 +287,9 @@ export async function GET(request: Request) {
               lineItems: woLineItems,
               totals: {
                 lineItemCount: woLineItems.length,
-                totalCost: woLineItems.reduce((sum, li) => sum + li.lineCost, 0),
+                totalEstimatedCost,
+                totalActualCost: hasActualCost ? totalActualCost : null,
+                totalCost: hasActualCost ? totalActualCost : totalEstimatedCost,
               },
             });
           }
@@ -362,7 +385,22 @@ export async function GET(request: Request) {
       const netsuiteRevenue = workOrderDetails.reduce((sum, wo) =>
         sum + (wo.linkedSO?.totals.revenue || 0), 0);
       const netsuiteCostEstimate = workOrderDetails.reduce((sum, wo) =>
-        sum + (wo.linkedSO?.totals.costEstimate || 0), 0);
+        sum + wo.totals.totalEstimatedCost, 0);
+
+      // Sum actual costs from work orders (not SO cost estimates)
+      const woActualCosts = workOrderDetails.map(wo => wo.totals.totalActualCost);
+      const hasAnyActualCost = woActualCosts.some(c => c !== null && c > 0);
+      const netsuiteActualCost = hasAnyActualCost
+        ? woActualCosts.reduce<number>((sum, c) => sum + (c || 0), 0)
+        : null;
+
+      // Use actual cost for GP if available, otherwise fall back to estimate
+      const effectiveCost = netsuiteActualCost ?? netsuiteCostEstimate;
+      const netsuiteGrossProfit = netsuiteRevenue - effectiveCost;
+      const netsuiteGrossMarginPct = netsuiteRevenue > 0
+        ? (netsuiteGrossProfit / netsuiteRevenue) * 100
+        : 0;
+
       const soNumbers = workOrderDetails
         .filter(wo => wo.linkedSO)
         .map(wo => wo.linkedSO!.soNumber);
@@ -386,6 +424,9 @@ export async function GET(request: Request) {
           soCount: new Set(soNumbers).size,
           netsuiteRevenue,
           netsuiteCostEstimate,
+          netsuiteActualCost,
+          netsuiteGrossProfit,
+          netsuiteGrossMarginPct,
         },
       });
 
@@ -398,6 +439,17 @@ export async function GET(request: Request) {
     const excelVariance = projectTypes.reduce((sum, pt) => sum + pt.excelData.variance, 0);
     const netsuiteRevenue = projectTypes.reduce((sum, pt) => sum + pt.totals.netsuiteRevenue, 0);
     const netsuiteCostEstimate = projectTypes.reduce((sum, pt) => sum + pt.totals.netsuiteCostEstimate, 0);
+
+    // Actual cost totals
+    const hasAnyActualCost = projectTypes.some(pt => pt.totals.netsuiteActualCost !== null);
+    const netsuiteActualCost = hasAnyActualCost
+      ? projectTypes.reduce((sum, pt) => sum + (pt.totals.netsuiteActualCost || 0), 0)
+      : null;
+    const effectiveCost = netsuiteActualCost ?? netsuiteCostEstimate;
+    const netsuiteGrossProfit = netsuiteRevenue - effectiveCost;
+    const netsuiteGrossMarginPct = netsuiteRevenue > 0
+      ? (netsuiteGrossProfit / netsuiteRevenue) * 100
+      : 0;
 
     // Get customer name from first SO
     const firstSOWithCustomer = projectTypes
@@ -419,6 +471,12 @@ export async function GET(request: Request) {
       .from('netsuite_sales_orders')
       .select('id', { count: 'exact', head: true });
 
+    const { count: woWithActualCost } = await supabase
+      .from('netsuite_work_orders')
+      .select('id', { count: 'exact', head: true })
+      .not('total_actual_cost', 'is', null)
+      .gt('total_actual_cost', 0);
+
     const response: ProjectProfitabilityResponse = {
       project: {
         name: projectName,
@@ -434,6 +492,9 @@ export async function GET(request: Request) {
           excelVariance,
           netsuiteRevenue,
           netsuiteCostEstimate,
+          netsuiteActualCost,
+          netsuiteGrossProfit,
+          netsuiteGrossMarginPct,
         },
       },
       legend: PROJECT_TYPE_NAMES,
@@ -441,6 +502,7 @@ export async function GET(request: Request) {
         lastSyncedAt: syncData?.[0]?.synced_at || null,
         workOrderCount: woCount || 0,
         salesOrderCount: soCount || 0,
+        workOrdersWithActualCosts: woWithActualCost || 0,
       },
     };
 

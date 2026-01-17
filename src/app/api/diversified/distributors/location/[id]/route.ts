@@ -14,6 +14,263 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+interface LocationHealthScore {
+  overall: number; // 0-100
+  tier: 'excellent' | 'good' | 'fair' | 'poor';
+  components: {
+    revenue_health: number;
+    engagement_health: number;
+    margin_health: number;
+    category_health: number;
+  };
+  risk_flags: string[];
+}
+
+interface PriorityAction {
+  id: string;
+  category: 'revenue' | 'engagement' | 'expansion' | 'retention' | 'margin';
+  priority: 'critical' | 'high' | 'medium';
+  title: string;
+  description: string;
+  impact: string;
+  effort: 'low' | 'medium' | 'high';
+  metrics: {
+    current: number;
+    target: number;
+    opportunity: number;
+  };
+}
+
+interface PeerBenchmark {
+  location_id: string;
+  location_name: string;
+  similarity_score: number;
+  revenue_r12: number;
+  transaction_count: number;
+  category_count: number;
+  avg_margin: number;
+}
+
+// Helper function to calculate percentile
+function calculatePercentile(value: number, dataset: number[]): number {
+  const sorted = dataset.filter(v => v != null).sort((a, b) => a - b);
+  const index = sorted.findIndex(v => v >= value);
+  if (index === -1) return 100;
+  return Math.round((index / sorted.length) * 100);
+}
+
+// Helper function to calculate health score
+function calculateLocationHealthScore(
+  locationMetrics: any,
+  distributorMetrics: any,
+  peerLocations: any[]
+): LocationHealthScore {
+  const components = {
+    revenue_health: 0,
+    engagement_health: 0,
+    margin_health: 0,
+    category_health: 0,
+  };
+
+  // Revenue Health (percentile among peers)
+  const revenuePercentile = calculatePercentile(
+    locationMetrics.revenue,
+    peerLocations.map(p => p.revenue)
+  );
+  components.revenue_health = revenuePercentile;
+
+  // Engagement Health (based on transaction frequency)
+  const transactionCount = locationMetrics.transaction_count || peerLocations.length;
+  const avgDaysBetweenOrders = 365 / transactionCount;
+  if (avgDaysBetweenOrders <= 7) components.engagement_health = 100;
+  else if (avgDaysBetweenOrders <= 14) components.engagement_health = 80;
+  else if (avgDaysBetweenOrders <= 30) components.engagement_health = 60;
+  else if (avgDaysBetweenOrders <= 60) components.engagement_health = 40;
+  else components.engagement_health = 20;
+
+  // Margin Health (compare to distributor average)
+  const marginVsAvg = locationMetrics.margin_pct - distributorMetrics.avg_margin_pct;
+  if (marginVsAvg >= 5) components.margin_health = 100;
+  else if (marginVsAvg >= 0) components.margin_health = 80;
+  else if (marginVsAvg >= -5) components.margin_health = 60;
+  else if (marginVsAvg >= -10) components.margin_health = 40;
+  else components.margin_health = 20;
+
+  // Category Health (category diversity)
+  const categoryPercentile = calculatePercentile(
+    locationMetrics.category_count,
+    peerLocations.map(p => p.categories.length)
+  );
+  components.category_health = categoryPercentile;
+
+  // Overall Score (weighted average)
+  const overall = Math.round(
+    components.revenue_health * 0.35 +
+    components.engagement_health * 0.25 +
+    components.margin_health * 0.20 +
+    components.category_health * 0.20
+  );
+
+  // Determine tier
+  let tier: 'excellent' | 'good' | 'fair' | 'poor';
+  if (overall >= 80) tier = 'excellent';
+  else if (overall >= 60) tier = 'good';
+  else if (overall >= 40) tier = 'fair';
+  else tier = 'poor';
+
+  // Identify risk flags
+  const risk_flags: string[] = [];
+  if (locationMetrics.yoy_change_pct < -15) {
+    risk_flags.push(`Declining revenue (${locationMetrics.yoy_change_pct.toFixed(1)}% YoY)`);
+  }
+  if (avgDaysBetweenOrders > 60) {
+    risk_flags.push('Low purchase frequency');
+  }
+  if (marginVsAvg < -10) {
+    risk_flags.push('Margin pressure');
+  }
+  if (locationMetrics.last_purchase_date) {
+    const daysSince = Math.floor((Date.now() - new Date(locationMetrics.last_purchase_date).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSince > 90) {
+      risk_flags.push(`Inactive (${daysSince} days)`);
+    }
+  }
+
+  return { overall, tier, components, risk_flags };
+}
+
+// Helper function to generate priority actions
+function generatePriorityActions(
+  locationMetrics: any,
+  healthScore: LocationHealthScore,
+  distributorMetrics: any,
+  peerLocations: any[]
+): PriorityAction[] {
+  const actions: PriorityAction[] = [];
+
+  // Critical: Inactive location
+  if (healthScore.risk_flags.some(f => f.includes('Inactive'))) {
+    const daysSince = healthScore.risk_flags.find(f => f.includes('Inactive'))?.match(/\d+/)?.[0] || '90';
+    actions.push({
+      id: 'reactivate',
+      category: 'retention',
+      priority: 'critical',
+      title: 'Reactivate Inactive Location',
+      description: `No purchases in ${daysSince}+ days. Immediate outreach required to understand status and re-engage.`,
+      impact: 'Prevent complete churn',
+      effort: 'medium',
+      metrics: {
+        current: 0,
+        target: locationMetrics.revenue / 12,
+        opportunity: locationMetrics.revenue,
+      },
+    });
+  }
+
+  // High: Category expansion opportunity
+  const peerAvgCategories = peerLocations.reduce((sum, p) => sum + p.categories.length, 0) / peerLocations.length;
+  if (locationMetrics.category_count < peerAvgCategories * 0.7) {
+    const missingCategories = Math.floor(peerAvgCategories - locationMetrics.category_count);
+    actions.push({
+      id: 'expand_categories',
+      category: 'expansion',
+      priority: 'high',
+      title: `Expand to ${missingCategories} More Categories`,
+      description: `Location purchases ${locationMetrics.category_count} categories vs peer average of ${peerAvgCategories.toFixed(1)}. Cross-sell opportunity.`,
+      impact: 'Increase wallet share',
+      effort: 'medium',
+      metrics: {
+        current: locationMetrics.category_count,
+        target: Math.ceil(peerAvgCategories),
+        opportunity: (locationMetrics.revenue / locationMetrics.category_count) * missingCategories,
+      },
+    });
+  }
+
+  // High: Improve purchase frequency
+  const transactionCount = locationMetrics.transaction_count || 12;
+  const avgDaysBetween = 365 / transactionCount;
+  const peerAvgTransactions = peerLocations.reduce((sum, p) => sum + (p.transaction_count || 12), 0) / peerLocations.length;
+  const peerAvgDaysBetween = 365 / peerAvgTransactions;
+
+  if (avgDaysBetween > peerAvgDaysBetween * 1.5) {
+    const avgOrderValue = locationMetrics.revenue / transactionCount;
+    actions.push({
+      id: 'increase_frequency',
+      category: 'engagement',
+      priority: 'high',
+      title: 'Increase Order Frequency',
+      description: `Currently orders every ${avgDaysBetween.toFixed(0)} days vs peer average of ${peerAvgDaysBetween.toFixed(0)} days.`,
+      impact: 'Boost annual revenue',
+      effort: 'low',
+      metrics: {
+        current: transactionCount,
+        target: Math.ceil(peerAvgTransactions),
+        opportunity: avgOrderValue * (peerAvgTransactions - transactionCount),
+      },
+    });
+  }
+
+  // Medium: Margin improvement
+  if (healthScore.components.margin_health < 60) {
+    actions.push({
+      id: 'improve_margins',
+      category: 'margin',
+      priority: 'medium',
+      title: 'Optimize Product Mix for Margin',
+      description: `Current margin ${locationMetrics.margin_pct.toFixed(1)}% vs distributor average ${distributorMetrics.avg_margin_pct.toFixed(1)}%.`,
+      impact: 'Increase profitability',
+      effort: 'medium',
+      metrics: {
+        current: locationMetrics.margin_pct,
+        target: distributorMetrics.avg_margin_pct,
+        opportunity: locationMetrics.revenue * ((distributorMetrics.avg_margin_pct - locationMetrics.margin_pct) / 100),
+      },
+    });
+  }
+
+  // Sort by priority and return top 5
+  const priorityOrder = { critical: 0, high: 1, medium: 2 };
+  return actions
+    .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+    .slice(0, 5);
+}
+
+// Helper function to find similar locations
+function findSimilarLocations(
+  currentLocation: any,
+  allLocations: any[],
+  limit: number = 5
+): PeerBenchmark[] {
+  const peers = allLocations
+    .filter(loc => loc.customer_id !== currentLocation.customer_id)
+    .map(loc => {
+      // Revenue similarity (within 50% = 50 points)
+      const revenueDiff = Math.abs(loc.revenue - currentLocation.revenue);
+      const revenueScore = Math.max(0, 50 - (revenueDiff / currentLocation.revenue) * 100);
+
+      // Category similarity (overlap = 50 points)
+      const categoryScore = (Math.min(loc.categories.length, currentLocation.category_count) /
+        Math.max(loc.categories.length, currentLocation.category_count)) * 50;
+
+      const similarity_score = Math.round(revenueScore + categoryScore);
+
+      return {
+        location_id: loc.customer_id,
+        location_name: loc.customer_name,
+        similarity_score,
+        revenue_r12: loc.revenue,
+        transaction_count: loc.transaction_count || 12,
+        category_count: loc.categories.length,
+        avg_margin: loc.gross_profit / loc.revenue * 100,
+      };
+    })
+    .sort((a, b) => b.similarity_score - a.similarity_score)
+    .slice(0, limit);
+
+  return peers;
+}
+
 export async function GET(
   request: NextRequest,
   context: RouteContext
@@ -314,6 +571,72 @@ export async function GET(
       });
     }
 
+    // Calculate distributor metrics for health scoring
+    const distributorTotalRevenue = peerLocations.reduce((sum, p) => sum + p.revenue, 0);
+    const distributorTotalGrossProfit = peerLocations.reduce((sum, p) => sum + p.gross_profit, 0);
+    const distributorMetrics = {
+      avg_margin_pct: distributorTotalRevenue > 0 ? (distributorTotalGrossProfit / distributorTotalRevenue) * 100 : 0,
+      total_locations: peerLocations.length,
+      avg_revenue: distributorAvgRevenue,
+    };
+
+    // Prepare location metrics for health calculation
+    const locationMetrics = {
+      revenue: totalRevenue,
+      margin_pct: marginPct,
+      category_count: categories.size,
+      yoy_change_pct: yoyChangePct,
+      last_purchase_date: lastPurchaseDate,
+      transaction_count: recentTransactions.length || 12, // Use actual transaction count or estimate
+    };
+
+    // Calculate health score
+    const healthScore = calculateLocationHealthScore(
+      locationMetrics,
+      distributorMetrics,
+      peerLocations
+    );
+
+    // Generate priority actions
+    const priorityActions = generatePriorityActions(
+      locationMetrics,
+      healthScore,
+      distributorMetrics,
+      peerLocations
+    );
+
+    // Calculate competitive position (percentile rankings)
+    const competitivePosition = {
+      revenue_percentile: calculatePercentile(
+        totalRevenue,
+        peerLocations.map(p => p.revenue)
+      ),
+      frequency_percentile: calculatePercentile(
+        locationMetrics.transaction_count,
+        peerLocations.map(p => p.transaction_count || 12)
+      ),
+      margin_percentile: calculatePercentile(
+        marginPct,
+        peerLocations.map(p => (p.gross_profit / p.revenue) * 100)
+      ),
+      category_percentile: calculatePercentile(
+        categories.size,
+        peerLocations.map(p => p.categories.length)
+      ),
+    };
+
+    // Find similar locations for peer benchmarking
+    const currentLocationForComparison = {
+      customer_id: customerId,
+      revenue: totalRevenue,
+      category_count: categories.size,
+    };
+    const similarLocations = findSimilarLocations(
+      currentLocationForComparison,
+      peerLocations,
+      5
+    );
+
     return NextResponse.json({
       customer_id: customerId,
       customer_name: customerName,
@@ -349,7 +672,13 @@ export async function GET(
           start: formatDate(priorPeriodStart),
           end: formatDate(priorPeriodEnd)
         }
-      }
+      },
+      // Strategic intelligence data (Phase 3)
+      health_score: healthScore,
+      priority_actions: priorityActions,
+      competitive_position: competitivePosition,
+      similar_locations: similarLocations,
+      distributor_metrics: distributorMetrics,
     });
 
   } catch (error) {

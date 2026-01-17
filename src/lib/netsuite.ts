@@ -1238,7 +1238,11 @@ export interface WorkOrderLineRecord {
   quantity: number | null;
   quantity_completed: number | null;
   unit_cost: number | null;
-  line_cost: number | null;
+  line_cost: number | null;        // Will now use actual cost from WOCompl/WOIssue
+  cost_estimate: number | null;    // Estimated cost from WO line
+  actual_cost: number | null;      // Actual cost from WOCompl/WOIssue transactions
+  est_gross_profit: number | null;
+  est_gross_profit_pct: number | null;
   class_id: string | null;
   class_name: string | null;
   location_id: string | null;
@@ -1345,16 +1349,17 @@ export async function getAllWorkOrders(options?: {
 /**
  * Fetch line items for a specific work order
  * Used to populate netsuite_work_order_lines table
+ *
+ * NOTE: This function does NOT fetch actual costs (too slow for per-WO queries).
+ * Use the batch sync endpoint /api/netsuite/sync-actual-costs to populate actual costs.
  */
 export async function getWorkOrderLines(woId: string): Promise<WorkOrderLineRecord[]> {
   if (!woId || woId.trim() === '') {
     return [];
   }
 
-  // Query with item details and costs
-  // Work order lines store costs in rate/netamount fields
-  // Join to Item table for item name and description
-  const query = `
+  // Get basic line items from the Work Order
+  const lineQuery = `
     SELECT
       tl.id AS line_id,
       tl.linesequencenumber AS line_number,
@@ -1365,8 +1370,11 @@ export async function getWorkOrderLines(woId: string): Promise<WorkOrderLineReco
       tl.itemtype AS item_type,
       tl.quantity,
       tl.quantityshiprecv AS quantity_completed,
-      tl.rate AS unit_cost,
-      tl.netamount AS line_cost,
+      tl.rate,
+      tl.costestimate,
+      tl.estgrossprofit,
+      tl.estgrossprofitpercent,
+      COALESCE(i.averagecost, i.lastpurchaseprice, 0) AS item_avg_cost,
       tl.location AS location_id,
       tl.class AS class_id,
       tl.isclosed
@@ -1381,33 +1389,54 @@ export async function getWorkOrderLines(woId: string): Promise<WorkOrderLineReco
   try {
     console.log(`Fetching line items for WO ${woId}...`);
 
-    const response = await netsuiteRequest<{ items: any[] }>(
+    const lineResponse = await netsuiteRequest<{ items: any[] }>(
       '/services/rest/query/v1/suiteql',
-      {
-        method: 'POST',
-        body: { q: query },
-        params: { limit: '1000' },
-      }
+      { method: 'POST', body: { q: lineQuery }, params: { limit: '1000' } }
     );
 
-    const lines: WorkOrderLineRecord[] = (response.items || []).map(row => ({
-      netsuite_line_id: row.line_id || '',
-      line_number: parseInt(row.line_number) || 0,
-      item_id: row.item_id || null,
-      item_name: row.item_name || row.item_display_name || null,
-      item_description: row.item_description || null,
-      item_type: row.item_type || null,
-      quantity: parseFloat(row.quantity) || null,
-      quantity_completed: parseFloat(row.quantity_completed) || null,
-      unit_cost: parseFloat(row.unit_cost) || null,
-      line_cost: parseFloat(row.line_cost) || null,
-      class_id: row.class_id || null,
-      class_name: null,
-      location_id: row.location_id || null,
-      location_name: null,
-      expected_completion_date: null,
-      is_closed: row.isclosed === 'T',
-    }));
+    const lines: WorkOrderLineRecord[] = (lineResponse.items || []).map(row => {
+      const qty = row.quantity !== null && row.quantity !== undefined ? parseFloat(row.quantity) : 0;
+      const qtyCompleted = row.quantity_completed !== null && row.quantity_completed !== undefined ? parseFloat(row.quantity_completed) : null;
+
+      // Use rate from transactionLine if available, otherwise fall back to item average cost
+      const rate = row.rate !== null && row.rate !== undefined ? parseFloat(row.rate) : null;
+      const itemAvgCost = row.item_avg_cost !== null && row.item_avg_cost !== undefined ? parseFloat(row.item_avg_cost) : 0;
+      const unitCost = rate !== null ? rate : itemAvgCost;
+
+      // Cost estimate from WO line
+      const costEstimate = row.costestimate !== null && row.costestimate !== undefined ? parseFloat(row.costestimate) : null;
+
+      // line_cost: use estimate if available, fall back to calculated
+      // Actual cost will be populated by the batch sync endpoint
+      const lineCost = costEstimate !== null && costEstimate > 0 ? costEstimate : unitCost * Math.abs(qty);
+
+      // Gross profit fields
+      const estGrossProfit = row.estgrossprofit !== null && row.estgrossprofit !== undefined ? parseFloat(row.estgrossprofit) : null;
+      const estGrossProfitPct = row.estgrossprofitpercent !== null && row.estgrossprofitpercent !== undefined ? parseFloat(row.estgrossprofitpercent) : null;
+
+      return {
+        netsuite_line_id: row.line_id || '',
+        line_number: parseInt(row.line_number) || 0,
+        item_id: row.item_id || null,
+        item_name: row.item_name || row.item_display_name || null,
+        item_description: row.item_description || null,
+        item_type: row.item_type || null,
+        quantity: qty,
+        quantity_completed: qtyCompleted,
+        unit_cost: unitCost,
+        line_cost: lineCost,          // Estimated cost (actual cost comes from batch sync)
+        cost_estimate: costEstimate,  // Original estimate from WO
+        actual_cost: null,            // Will be populated by /api/netsuite/sync-actual-costs
+        est_gross_profit: estGrossProfit,
+        est_gross_profit_pct: estGrossProfitPct,
+        class_id: row.class_id || null,
+        class_name: null,
+        location_id: row.location_id || null,
+        location_name: null,
+        expected_completion_date: null,
+        is_closed: row.isclosed === 'T',
+      };
+    });
 
     console.log(`Fetched ${lines.length} line items for WO ${woId}`);
     return lines;
@@ -1476,6 +1505,103 @@ export interface SalesOrderLineRecord {
  * Fetch ALL sales orders from NetSuite within date range
  * Used to populate standalone netsuite_sales_orders table
  */
+/**
+ * Batch fetch actual costs from Work Order Completion/Issue transactions
+ * This is more efficient than fetching per-WO because it runs ONE query for all WOs
+ *
+ * @param options - startDate, endDate in YYYY-MM-DD format, limit
+ * @returns Map of WO NetSuite ID -> { total: number, byItem: Map<itemId, cost> }
+ */
+export async function getActualCosts(options?: {
+  startDate?: string;
+  endDate?: string;
+  woIds?: string[];
+  limit?: number;
+}): Promise<Map<string, { woNumber: string; total: number; byItem: Map<string, number> }>> {
+  const { limit = 10000 } = options || {};
+
+  // Build date filter (on completion transaction date)
+  let dateFilter = '';
+  if (options?.startDate) {
+    const [y, m, d] = options.startDate.split('-');
+    dateFilter += ` AND t.trandate >= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+  }
+  if (options?.endDate) {
+    const [y, m, d] = options.endDate.split('-');
+    dateFilter += ` AND t.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+  }
+
+  // Build WO filter if specific IDs provided
+  let woFilter = '';
+  if (options?.woIds && options.woIds.length > 0) {
+    const woIdList = options.woIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
+    woFilter = ` AND completionLine.createdfrom IN (${woIdList})`;
+  }
+
+  // Efficient query for actual costs from WOCompl/WOIssue transactions
+  const query = `
+    SELECT
+      completionLine.createdfrom AS wo_id,
+      completionLine.item AS item_id,
+      SUM(ABS(COALESCE(tal.amount, 0))) AS actual_cost
+    FROM TransactionLine completionLine
+    INNER JOIN Transaction t ON t.id = completionLine.transaction
+    INNER JOIN TransactionAccountingLine tal ON tal.transaction = t.id
+      AND tal.transactionline = completionLine.id
+    WHERE t.type IN ('WOCompl', 'WOIssue')
+      AND tal.posting = 'T'
+      AND tal.amount < 0
+      AND completionLine.createdfrom IS NOT NULL
+      ${dateFilter}
+      ${woFilter}
+    GROUP BY completionLine.createdfrom, completionLine.item
+  `;
+
+  try {
+    console.log(`Fetching actual costs (limit: ${limit})...`);
+
+    const response = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: query },
+        params: { limit: limit.toString() },
+      }
+    );
+
+    const rows = response.items || [];
+    console.log(`Fetched ${rows.length} actual cost records from NetSuite`);
+
+    // Build result map (wo_id -> cost data)
+    // Note: woNumber is not available from query - caller can look it up if needed
+    const result = new Map<string, { woNumber: string; total: number; byItem: Map<string, number> }>();
+
+    for (const row of rows) {
+      const woId = row.wo_id?.toString() || '';
+      const itemId = row.item_id?.toString() || '';
+      const actualCost = parseFloat(row.actual_cost) || 0;
+
+      if (!result.has(woId)) {
+        result.set(woId, {
+          woNumber: '', // Not available from query - use woId as fallback
+          total: 0,
+          byItem: new Map(),
+        });
+      }
+
+      const woData = result.get(woId)!;
+      woData.byItem.set(itemId, (woData.byItem.get(itemId) || 0) + actualCost);
+      woData.total += actualCost;
+    }
+
+    console.log(`Actual costs found for ${result.size} work orders`);
+    return result;
+  } catch (error) {
+    console.error('Error fetching actual costs:', error);
+    throw error;
+  }
+}
+
 export async function getAllSalesOrders(options?: {
   startDate?: string; // YYYY-MM-DD
   endDate?: string;   // YYYY-MM-DD

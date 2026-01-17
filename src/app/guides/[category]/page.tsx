@@ -1540,6 +1540,414 @@ const guideContent: Record<string, GuideData> = {
       },
     ],
   },
+  distributors: {
+    title: 'Distributor Intelligence Guide',
+    description: 'Strategic location insights, health scoring, and actionable recommendations for distributor management.',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
+    color: '#14B8A6',
+    topics: [
+      {
+        id: 'overview',
+        title: 'System Overview',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Distributor Intelligence system transforms basic location data into actionable business insights. Instead of just showing revenue numbers, it answers the critical question: <span className="text-white font-medium">"What should I do about this location?"</span>
+            </p>
+            <div className="bg-gradient-to-r from-[#14B8A6]/10 to-transparent rounded-lg p-4 border border-[#14B8A6]/20">
+              <h4 className="text-white font-medium mb-2">Three Core Components</h4>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">1.</span>
+                  <span className="text-[#8FA3BF]"><span className="text-white">AI-Powered Insights:</span> Distributor-level recommendations with inline product context and activity status</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">2.</span>
+                  <span className="text-[#8FA3BF]"><span className="text-white">Location Health Scoring:</span> 0-100 scores across revenue, engagement, margin, and category metrics</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">3.</span>
+                  <span className="text-[#8FA3BF]"><span className="text-white">Strategic Actions:</span> Priority-ranked recommendations with opportunity sizing and Asana integration</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'health-scores',
+        title: 'Location Health Scores',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Every location receives a comprehensive health score (0-100) that combines four critical dimensions:
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { name: 'Revenue Health (35%)', desc: 'Percentile rank among peer locations', icon: '💰', color: '#14B8A6' },
+                { name: 'Engagement Health (25%)', desc: 'Purchase frequency vs. peer average', icon: '📊', color: '#38BDF8' },
+                { name: 'Margin Health (20%)', desc: 'Margin % vs. distributor average', icon: '📈', color: '#F59E0B' },
+                { name: 'Category Health (20%)', desc: 'Category diversity vs. peers', icon: '🏷️', color: '#A855F7' },
+              ].map((metric) => (
+                <div key={metric.name} className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">{metric.icon}</span>
+                    <span className="text-white font-medium text-sm">{metric.name}</span>
+                  </div>
+                  <p className="text-[#64748B] text-sm">{metric.desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Health Tiers</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 bg-green-500/10 rounded border border-green-500/20">
+                  <span className="text-white text-sm">Excellent</span>
+                  <span className="text-green-300 text-sm font-medium">80-100</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-blue-500/10 rounded border border-blue-500/20">
+                  <span className="text-white text-sm">Good</span>
+                  <span className="text-blue-300 text-sm font-medium">60-79</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-amber-500/10 rounded border border-amber-500/20">
+                  <span className="text-white text-sm">Fair</span>
+                  <span className="text-amber-300 text-sm font-medium">40-59</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-red-500/10 rounded border border-red-500/20">
+                  <span className="text-white text-sm">Poor</span>
+                  <span className="text-red-300 text-sm font-medium">0-39</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'priority-actions',
+        title: 'Priority Action Cards',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Priority Actions provide specific, ranked recommendations for each location based on health analysis. Each action includes impact assessment, effort estimation, and revenue opportunity sizing.
+            </p>
+            <div className="space-y-3">
+              <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🚨</span>
+                  <span className="text-red-300 text-xs font-semibold uppercase tracking-wider">Critical Priority</span>
+                </div>
+                <h4 className="text-white font-medium mb-1">Reactivate Inactive Location</h4>
+                <p className="text-[#8FA3BF] text-sm">Triggered when no purchases in 90+ days. Immediate outreach required to prevent complete churn.</p>
+              </div>
+              <div className="p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">⚡</span>
+                  <span className="text-amber-300 text-xs font-semibold uppercase tracking-wider">High Priority</span>
+                </div>
+                <h4 className="text-white font-medium mb-1">Expand to Missing Categories</h4>
+                <p className="text-[#8FA3BF] text-sm">Identifies categories purchased by 75%+ of peers but missing from this location. Cross-sell opportunity.</p>
+              </div>
+              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">💡</span>
+                  <span className="text-blue-300 text-xs font-semibold uppercase tracking-wider">Medium Priority</span>
+                </div>
+                <h4 className="text-white font-medium mb-1">Increase Order Frequency</h4>
+                <p className="text-[#8FA3BF] text-sm">When location orders less frequently than peer average. Low-effort way to boost annual revenue.</p>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#14B8A6]/10 to-transparent rounded-lg p-4 border border-[#14B8A6]/20">
+              <h4 className="text-white font-medium mb-2">Direct Task Creation</h4>
+              <p className="text-[#8FA3BF] text-sm">
+                Click "Create Task" on any action to open the Asana integration modal. Tasks are pre-filled with action details, opportunity sizing, and distributor metadata for proper attribution.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'product-context',
+        title: 'Product Context & Categories',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Distributor insights now include inline product context, eliminating the need to switch tabs to understand purchase behavior:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Category Badges</h4>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-[10px] text-[#64748B] uppercase tracking-wider">Categories:</span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">Plumbing</span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">HVAC</span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">Electrical</span>
+                <span className="text-[10px] text-[#64748B]">+2 more</span>
+              </div>
+              <p className="text-[#64748B] text-sm">Top 3 categories by revenue, with total count. Hover for revenue and percentage breakdown.</p>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Activity Status Indicators</h4>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="px-2 py-1 rounded-lg text-[10px] font-medium bg-green-500/20 text-green-300 border border-green-500/30 flex items-center gap-1">
+                    <span>●</span>
+                    <span>Active</span>
+                  </div>
+                  <span className="text-[#64748B] text-sm">Purchased within last 30 days</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="px-2 py-1 rounded-lg text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                    <span>◐</span>
+                    <span>At Risk</span>
+                  </div>
+                  <span className="text-[#64748B] text-sm">Last purchase 30-90 days ago</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="px-2 py-1 rounded-lg text-[10px] font-medium bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1">
+                    <span>○</span>
+                    <span>Inactive</span>
+                  </div>
+                  <span className="text-[#64748B] text-sm">No purchases in 90+ days</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Expansion Opportunities</h4>
+              <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <div className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider mb-1">
+                  Expansion Opportunity
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <span className="text-[10px] text-[#94A3B8]">Industrial Controls</span>
+                  <span className="text-[10px] text-[#94A3B8]">Safety Equipment</span>
+                  <span className="text-[10px] text-[#94A3B8]">Fasteners</span>
+                </div>
+              </div>
+              <p className="text-[#64748B] text-sm mt-2">Categories purchased by 75%+ of peer locations but missing from this distributor.</p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'peer-benchmarking',
+        title: 'Peer Benchmarking',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Compare each location against similar peers within the same distributor to identify performance gaps and opportunities:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Similarity Scoring</h4>
+              <p className="text-[#8FA3BF] text-sm mb-3">
+                Locations are matched based on two factors (0-100 scale):
+              </p>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">•</span>
+                  <span className="text-[#8FA3BF]"><span className="text-white">Revenue Similarity (50 pts):</span> How close is the revenue to the current location</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">•</span>
+                  <span className="text-[#8FA3BF]"><span className="text-white">Category Overlap (50 pts):</span> How many categories do they purchase in common</span>
+                </li>
+              </ul>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Competitive Position Metrics</h4>
+              <p className="text-[#8FA3BF] text-sm mb-3">
+                Percentile rankings show where this location stands vs. all locations in the distributor:
+              </p>
+              <div className="space-y-3">
+                {[
+                  { label: 'Revenue', percentile: 75, icon: '💰' },
+                  { label: 'Order Frequency', percentile: 62, icon: '📊' },
+                  { label: 'Margin', percentile: 85, icon: '📈' },
+                  { label: 'Category Diversity', percentile: 50, icon: '🏷️' },
+                ].map((metric) => (
+                  <div key={metric.label}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span>{metric.icon}</span>
+                        <span className="text-xs text-[#94A3B8]">{metric.label}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-white">{metric.percentile}th</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#14B8A6] transition-all duration-500"
+                        style={{ width: `${metric.percentile}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'task-integration',
+        title: 'Asana Task Integration',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              All distributor insights and actions integrate directly with your Asana workflow. No more isolated task systems.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Individual Task Creation</h4>
+              <p className="text-[#8FA3BF] text-sm mb-3">
+                Every insight and action card has an "Add Task" button that opens the Asana modal:
+              </p>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">1.</span>
+                  <span className="text-[#8FA3BF]">Click "Add Task" or "Create Task" on any insight/action</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">2.</span>
+                  <span className="text-[#8FA3BF]">Modal pre-fills with recommendation details and metadata</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">3.</span>
+                  <span className="text-[#8FA3BF]">Customize title, assignee, due date, and section</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">4.</span>
+                  <span className="text-[#8FA3BF]">Task created in Asana with distributor metadata embedded</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#14B8A6]">5.</span>
+                  <span className="text-[#8FA3BF]">Button updates to "Task Created ✓" to prevent duplicates</span>
+                </li>
+              </ul>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Task Metadata</h4>
+              <p className="text-[#8FA3BF] text-sm mb-3">
+                Tasks include hidden metadata in the notes field for proper attribution:
+              </p>
+              <div className="bg-[#1E293B] rounded p-3 font-mono text-xs">
+                <div className="text-[#64748B]">---</div>
+                <div className="text-[#8FA3BF]">📊 INSIGHT METADATA (do not edit below)</div>
+                <div className="text-[#8FA3BF]">distributor: Ferguson Enterprises</div>
+                <div className="text-[#8FA3BF]">customer_id: FERG-LOC-12345</div>
+                <div className="text-[#8FA3BF]">location: Houston, TX</div>
+                <div className="text-[#8FA3BF]">category: expansion</div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#14B8A6]/10 to-transparent rounded-lg p-4 border border-[#14B8A6]/20">
+              <h4 className="text-white font-medium mb-2">Task Sources</h4>
+              <ul className="space-y-1 text-sm">
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#14B8A6]" />
+                  <span className="text-[#8FA3BF]">Distributor AI Insights (dashboard)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#14B8A6]" />
+                  <span className="text-[#8FA3BF]">Priority Action Cards (location detail)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#14B8A6]" />
+                  <span className="text-[#8FA3BF]">Growth Opportunities (location detail)</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'best-practices',
+        title: 'Best Practices',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Get the most value from Distributor Intelligence by following these proven workflows:
+            </p>
+            <div className="space-y-3">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-white font-medium mb-2">Weekly Review Workflow</h4>
+                <ol className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#14B8A6]">1.</span>
+                    <span className="text-[#8FA3BF]">Start with distributor dashboard insights - focus on "Critical" and "High" priority items</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#14B8A6]">2.</span>
+                    <span className="text-[#8FA3BF]">Check activity status badges - reach out to "At Risk" and "Inactive" locations</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#14B8A6]">3.</span>
+                    <span className="text-[#8FA3BF]">Review location health scores - drill into "Poor" and "Fair" locations</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#14B8A6]">4.</span>
+                    <span className="text-[#8FA3BF]">Create tasks for top 3-5 actions, assign to appropriate team members</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#14B8A6]">5.</span>
+                    <span className="text-[#8FA3BF]">Track task completion in Asana to measure ROI</span>
+                  </li>
+                </ol>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-white font-medium mb-2">Using Peer Benchmarks</h4>
+                <p className="text-[#8FA3BF] text-sm mb-2">
+                  The peer benchmarking table shows the most similar locations. Use this to:
+                </p>
+                <ul className="space-y-1 text-sm">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#14B8A6]" />
+                    <span className="text-[#8FA3BF]">Identify what high-performing peers are doing differently</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#14B8A6]" />
+                    <span className="text-[#8FA3BF]">Set realistic targets based on peer performance</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#14B8A6]" />
+                    <span className="text-[#8FA3BF]">Find category expansion opportunities from peer purchases</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-white font-medium mb-2">Interpreting Health Scores</h4>
+                <div className="space-y-2 text-sm">
+                  <p className="text-[#8FA3BF]">Health scores below 60 indicate actionable opportunities:</p>
+                  <ul className="space-y-1">
+                    <li className="flex items-start gap-2">
+                      <span className="text-red-300">•</span>
+                      <span className="text-[#8FA3BF]"><span className="text-white">Low Revenue Health:</span> Location isn't buying enough - check competitive threats</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-red-300">•</span>
+                      <span className="text-[#8FA3BF]"><span className="text-white">Low Engagement:</span> Infrequent orders - set up recurring delivery or check satisfaction</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-red-300">•</span>
+                      <span className="text-[#8FA3BF]"><span className="text-white">Low Margin:</span> Wrong product mix - recommend higher-margin alternatives</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-red-300">•</span>
+                      <span className="text-[#8FA3BF]"><span className="text-white">Low Category:</span> Limited purchases - cross-sell opportunities available</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#22C55E]/10 to-transparent rounded-lg p-4 border border-[#22C55E]/20">
+              <h4 className="text-white font-medium mb-2">Success Metric</h4>
+              <p className="text-[#8FA3BF] text-sm">
+                Track the completion rate of created tasks in Asana. High-performing teams consistently act on "Critical" and "High" priority items within 48 hours, resulting in 15-25% average revenue increases per location within 90 days.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+    ],
+  },
 };
 
 export default function GuideCategoryPage() {

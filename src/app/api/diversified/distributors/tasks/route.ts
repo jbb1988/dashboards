@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+// DEPRECATED: This endpoint is replaced by /api/diversified/tasks
+// All new task creation should use the Asana integration
+// This endpoint remains for backward compatibility only
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  console.warn('DEPRECATED: /api/diversified/distributors/tasks GET endpoint used. Migrate to /api/diversified/tasks');
+
   try {
     const admin = getSupabaseAdmin();
 
@@ -56,6 +62,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.warn('DEPRECATED: /api/diversified/distributors/tasks POST endpoint used. Migrate to /api/diversified/tasks');
+
   try {
     const admin = getSupabaseAdmin();
     const body = await request.json();
@@ -133,6 +141,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  console.warn('DEPRECATED: /api/diversified/distributors/tasks PATCH endpoint used. Migrate to /api/diversified/tasks');
+
   try {
     const admin = getSupabaseAdmin();
     const body = await request.json();
@@ -181,6 +191,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  console.warn('DEPRECATED: /api/diversified/distributors/tasks DELETE endpoint used. Migrate to /api/diversified/tasks');
+
   try {
     const admin = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);

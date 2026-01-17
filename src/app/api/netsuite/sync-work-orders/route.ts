@@ -72,7 +72,7 @@ export async function POST(request: Request) {
           .eq('netsuite_id', wo.netsuite_id)
           .single();
 
-        // Prepare record (only fields available from WorkOrderRecord)
+        // Prepare record with all WO detail fields
         const record = {
           netsuite_id: wo.netsuite_id,
           wo_number: wo.wo_number,
@@ -142,6 +142,10 @@ export async function POST(request: Request) {
                   quantity_completed: line.quantity_completed,
                   unit_cost: line.unit_cost,
                   line_cost: line.line_cost,
+                  cost_estimate: line.cost_estimate,
+                  actual_cost: line.actual_cost,
+                  est_gross_profit: line.est_gross_profit,
+                  est_gross_profit_pct: line.est_gross_profit_pct,
                   class_id: line.class_id,
                   class_name: line.class_name,
                   location_id: line.location_id,

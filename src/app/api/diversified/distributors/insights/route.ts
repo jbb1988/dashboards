@@ -9,6 +9,26 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+interface ProductContext {
+  top_categories: Array<{
+    name: string;
+    revenue: number;
+    percentage: number;
+  }>;
+  category_count: number;
+  last_purchase_date: string;
+  recent_activity: {
+    days_since_purchase: number;
+    transaction_count_30d: number;
+    status: 'active' | 'warning' | 'inactive';
+  };
+  missing_categories?: Array<{
+    name: string;
+    peer_penetration_pct: number;
+    estimated_opportunity: number;
+  }>;
+}
+
 interface AIRecommendation {
   priority: 'high' | 'medium' | 'low';
   title: string;
@@ -20,6 +40,7 @@ interface AIRecommendation {
   distributor_name?: string;
   customer_id?: string;
   customer_name?: string;
+  product_context?: ProductContext;
 }
 
 export async function GET(request: NextRequest) {
@@ -119,6 +140,8 @@ export async function GET(request: NextRequest) {
 
     // Aggregate by customer and group by distributor
     const locationMap = new Map<string, any>();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     for (const row of currentData) {
       const key = row.customer_id;
@@ -129,13 +152,31 @@ export async function GET(request: NextRequest) {
         existing.current_cost += row.cost || 0;
         existing.current_gross_profit += row.gross_profit || 0;
         existing.current_units += row.quantity || 0;
-        if (row.class_category && !existing.categories.includes(row.class_category)) {
-          existing.categories.push(row.class_category);
+
+        // Track category-level revenue
+        if (row.class_category) {
+          if (!existing.categories.includes(row.class_category)) {
+            existing.categories.push(row.class_category);
+          }
+          existing.category_revenue.set(
+            row.class_category,
+            (existing.category_revenue.get(row.class_category) || 0) + (row.revenue || 0)
+          );
         }
-        if (row.transaction_date && (!existing.last_purchase_date || row.transaction_date > existing.last_purchase_date)) {
-          existing.last_purchase_date = row.transaction_date;
+
+        // Track transaction dates for recent activity
+        if (row.transaction_date) {
+          existing.transaction_dates.push(row.transaction_date);
+          if (!existing.last_purchase_date || row.transaction_date > existing.last_purchase_date) {
+            existing.last_purchase_date = row.transaction_date;
+          }
         }
       } else {
+        const categoryRevenue = new Map<string, number>();
+        if (row.class_category) {
+          categoryRevenue.set(row.class_category, row.revenue || 0);
+        }
+
         locationMap.set(key, {
           customer_id: row.customer_id,
           customer_name: row.customer_name,
@@ -147,6 +188,8 @@ export async function GET(request: NextRequest) {
           prior_cost: 0,
           prior_gross_profit: 0,
           categories: row.class_category ? [row.class_category] : [],
+          category_revenue: categoryRevenue,
+          transaction_dates: row.transaction_date ? [row.transaction_date] : [],
           last_purchase_date: row.transaction_date || null
         });
       }
@@ -194,6 +237,71 @@ export async function GET(request: NextRequest) {
       distributorMap.get(distributorName)!.push({ distributorName, location });
     }
 
+    // Helper function to build product context
+    const buildProductContext = (
+      metrics: any,
+      distributorLocations: any[],
+      distributorName: string
+    ): ProductContext => {
+      // Build top categories sorted by revenue
+      const topCategories = Array.from(metrics.category_revenue.entries())
+        .map(([name, revenue]) => ({
+          name,
+          revenue: revenue as number,
+          percentage: metrics.current_revenue > 0 ? ((revenue as number) / metrics.current_revenue) * 100 : 0,
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+
+      // Calculate days since purchase
+      const daysSincePurchase = metrics.last_purchase_date
+        ? Math.floor((new Date().getTime() - new Date(metrics.last_purchase_date).getTime()) / (1000 * 60 * 60 * 24))
+        : 999;
+
+      // Count recent transactions (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const transactionCount30d = metrics.transaction_dates.filter(
+        (date: string) => new Date(date) >= thirtyDaysAgo
+      ).length;
+
+      // Determine activity status
+      let activityStatus: 'active' | 'warning' | 'inactive';
+      if (daysSincePurchase <= 30) activityStatus = 'active';
+      else if (daysSincePurchase <= 90) activityStatus = 'warning';
+      else activityStatus = 'inactive';
+
+      // Find missing categories
+      const allCategories = new Map<string, number>();
+      for (const loc of distributorLocations) {
+        for (const cat of loc.location.categories) {
+          allCategories.set(cat, (allCategories.get(cat) || 0) + 1);
+        }
+      }
+
+      const popularThreshold = distributorLocations.length * 0.75;
+      const missingCategories = Array.from(allCategories.entries())
+        .filter(([cat, count]) => count >= popularThreshold && !metrics.categories.includes(cat))
+        .map(([name, count]) => ({
+          name,
+          peer_penetration_pct: Math.round((count / distributorLocations.length) * 100),
+          estimated_opportunity: metrics.current_revenue * 0.15, // Rough estimate
+        }))
+        .slice(0, 3);
+
+      return {
+        top_categories: topCategories,
+        category_count: metrics.categories.length,
+        last_purchase_date: metrics.last_purchase_date || '',
+        recent_activity: {
+          days_since_purchase: daysSincePurchase,
+          transaction_count_30d: transactionCount30d,
+          status: activityStatus,
+        },
+        missing_categories: missingCategories.length > 0 ? missingCategories : undefined,
+      };
+    };
+
     // Generate insights
     const recommendations: AIRecommendation[] = [];
 
@@ -223,6 +331,10 @@ export async function GET(request: NextRequest) {
             ? `Revenue declined ${Math.abs(location.yoy_change_pct).toFixed(1)}% YoY`
             : `No purchases in ${daysSincePurchase} days`;
 
+          // Get original metrics for product context
+          const metrics = locationMap.get(location.customer_id);
+          const productContext = metrics ? buildProductContext(metrics, locations, distributorName) : undefined;
+
           recommendations.push({
             priority,
             title: `At-Risk: ${location.customer_name}`,
@@ -239,6 +351,7 @@ export async function GET(request: NextRequest) {
             distributor_name: distributorName,
             customer_id: location.customer_id,
             customer_name: location.customer_name,
+            product_context: productContext,
           });
         }
       }
@@ -257,6 +370,10 @@ export async function GET(request: NextRequest) {
           const gap = avgRevenue - location.revenue;
           const gapPct = ((gap / avgRevenue) * 100);
 
+          // Get original metrics for product context
+          const metrics = locationMap.get(location.customer_id);
+          const productContext = metrics ? buildProductContext(metrics, locations, distributorName) : undefined;
+
           recommendations.push({
             priority: gapPct > 50 ? 'high' : 'medium',
             title: `Growth: ${location.customer_name}`,
@@ -273,6 +390,7 @@ export async function GET(request: NextRequest) {
             distributor_name: distributorName,
             customer_id: location.customer_id,
             customer_name: location.customer_name,
+            product_context: productContext,
           });
         }
       }
@@ -306,6 +424,10 @@ export async function GET(request: NextRequest) {
           const categoryList = missingCategories.join(', ');
           const pct = Math.round((categoryFrequency.get(missingCategories[0]) || 0) / locations.length * 100);
 
+          // Get original metrics for product context
+          const metrics = locationMap.get(location.customer_id);
+          const productContext = metrics ? buildProductContext(metrics, locations, distributorName) : undefined;
+
           recommendations.push({
             priority: missingCategories.length >= 3 ? 'high' : 'medium',
             title: `Category Gap: ${location.customer_name}`,
@@ -322,6 +444,7 @@ export async function GET(request: NextRequest) {
             distributor_name: distributorName,
             customer_id: location.customer_id,
             customer_name: location.customer_name,
+            product_context: productContext,
           });
         }
       }
