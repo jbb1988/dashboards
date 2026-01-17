@@ -715,6 +715,10 @@ export default function DiversifiedDashboard() {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
+  // VEROflow-specific filter state
+  const [veroflowEquipmentFilter, setVeroflowEquipmentFilter] = useState<'all' | 'vf1' | 'vf4'>('all');
+  const [veroflowCalibrationFilter, setVeroflowCalibrationFilter] = useState<'all' | 'active' | 'opportunity'>('all');
+
   // Child data for expanded rows
   const [childData, setChildData] = useState<Array<ClassSummary | CustomerSummary>>([]);
   const [loadingChild, setLoadingChild] = useState(false);
@@ -1320,6 +1324,19 @@ export default function DiversifiedDashboard() {
                         onRemove={() => setSelectedClass(null)}
                       />
                     )}
+                    {/* VEROflow-specific filters (only show when VEROflow tab is active) */}
+                    {activeTab === 'veroflow' && veroflowEquipmentFilter !== 'all' && (
+                      <FilterBadge
+                        label={`Equipment: ${veroflowEquipmentFilter === 'vf1' ? 'VF-1' : 'VF-4'}`}
+                        onRemove={() => setVeroflowEquipmentFilter('all')}
+                      />
+                    )}
+                    {activeTab === 'veroflow' && veroflowCalibrationFilter !== 'all' && (
+                      <FilterBadge
+                        label={`Status: ${veroflowCalibrationFilter === 'active' ? 'Active' : 'Opportunity'}`}
+                        onRemove={() => setVeroflowCalibrationFilter('all')}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -1824,6 +1841,10 @@ export default function DiversifiedDashboard() {
                       years: selectedYears,
                       months: selectedMonths,
                     }}
+                    equipmentFilter={veroflowEquipmentFilter}
+                    calibrationFilter={veroflowCalibrationFilter}
+                    onEquipmentFilterChange={setVeroflowEquipmentFilter}
+                    onCalibrationFilterChange={setVeroflowCalibrationFilter}
                   />
                 </motion.div>
               )}

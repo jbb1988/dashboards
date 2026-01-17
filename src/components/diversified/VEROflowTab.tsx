@@ -100,6 +100,10 @@ interface VEROflowTabProps {
     years?: number[];
     months?: number[];
   };
+  equipmentFilter?: 'all' | 'vf1' | 'vf4';
+  calibrationFilter?: 'all' | 'active' | 'opportunity';
+  onEquipmentFilterChange?: (filter: 'all' | 'vf1' | 'vf4') => void;
+  onCalibrationFilterChange?: (filter: 'all' | 'active' | 'opportunity') => void;
 }
 
 function formatCurrency(value: number): string {
@@ -117,7 +121,13 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function VEROflowTab({ filters }: VEROflowTabProps) {
+export function VEROflowTab({
+  filters,
+  equipmentFilter = 'all',
+  calibrationFilter = 'all',
+  onEquipmentFilterChange,
+  onCalibrationFilterChange
+}: VEROflowTabProps) {
   const [data, setData] = useState<VEROflowResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,9 +135,12 @@ export function VEROflowTab({ filters }: VEROflowTabProps) {
   const [sortBy, setSortBy] = useState<'name' | 'equipment_revenue' | 'calibration_revenue' | 'first_purchase'>('equipment_revenue');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCalibration, setFilterCalibration] = useState<'all' | 'active' | 'opportunity'>('all');
-  const [equipmentFilter, setEquipmentFilter] = useState<'all' | 'vf1' | 'vf4'>('all');
   const [creatingTask, setCreatingTask] = useState<string | null>(null);
+
+  // Use props for filter states, with local setters as fallback
+  const filterCalibration = calibrationFilter;
+  const setFilterCalibration = onCalibrationFilterChange || (() => {});
+  const setEquipmentFilter = onEquipmentFilterChange || (() => {});
 
   useEffect(() => {
     const fetchData = async () => {
