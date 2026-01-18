@@ -13,6 +13,7 @@ import TasksTabSupabase from './components/TasksTabSupabase';
 import BundleModal from './components/BundleModal';
 import { DashboardBackground, backgroundPresets, KPICard, AnimatedCounter } from '@/components/mars-ui';
 import ContractDetailDrawer from '@/components/contracts/ContractDetailDrawer';
+import ConflictResolutionModal from '@/components/contracts/ConflictResolutionModal';
 import { usePersistedFilters, FILTER_STORAGE_KEYS } from '@/hooks';
 
 // Persisted filter state for Contracts Pipeline
@@ -800,6 +801,12 @@ export default function ContractsDashboard() {
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
   const [lastAutoSync, setLastAutoSync] = useState<Date | null>(null);
 
+  // Conflict resolution state
+  const [conflicts, setConflicts] = useState<any[]>([]);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Fetch contracts with pending Salesforce sync
   const fetchSfSyncPending = useCallback(async () => {
     try {
@@ -1121,6 +1128,105 @@ export default function ContractsDashboard() {
     fetchData();
   };
 
+  // Sync from Salesforce and handle conflicts
+  const handleRefresh = useCallback(async () => {
+    console.log('handleRefresh: Starting Salesforce sync...');
+    setIsSyncing(true);
+    setError(null);
+    try {
+      // Step 1: Sync from Salesforce
+      console.log('handleRefresh: Calling /api/contracts/sync...');
+      const syncResponse = await fetch('/api/contracts/sync', { method: 'POST' });
+
+      console.log('handleRefresh: Sync response status:', syncResponse.status);
+
+      if (!syncResponse.ok) {
+        let errorMessage = 'Salesforce sync failed';
+        try {
+          const errorData = await syncResponse.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (jsonError) {
+          errorMessage = `HTTP ${syncResponse.status}: ${syncResponse.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const syncResult = await syncResponse.json();
+      console.log('handleRefresh: Sync result:', syncResult);
+
+      // Step 2: Check for conflicts
+      if (!syncResult.success && syncResult.conflicts && syncResult.conflicts.length > 0) {
+        console.log('handleRefresh: Conflicts detected:', syncResult.conflicts.length);
+        // Show conflict resolution modal
+        setConflicts(syncResult.conflicts);
+        setShowConflictModal(true);
+        setIsSyncing(false);
+        return; // Don't refresh yet, let user resolve conflicts first
+      }
+
+      // Step 3: Update last sync time
+      if (syncResult.lastUpdated) {
+        console.log('handleRefresh: Setting last sync time:', syncResult.lastUpdated);
+        setLastSyncTime(syncResult.lastUpdated);
+      }
+
+      // Step 4: Refresh local data display
+      console.log('handleRefresh: Refreshing local data...');
+      await fetchData();
+
+      // Show success message
+      const updatedMsg = syncResult.updatedCount > 0 ? `${syncResult.updatedCount} updated` : '';
+      const newMsg = syncResult.newCount > 0 ? `${syncResult.newCount} new` : '';
+      const parts = [updatedMsg, newMsg].filter(Boolean);
+      const summary = parts.length > 0 ? `: ${parts.join(', ')}` : '';
+
+      console.log(`✅ Synced from Salesforce${summary}`);
+      alert(`✅ Synced from Salesforce${summary}`); // Temporary visual feedback
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      console.error('❌ Sync failed:', errorMessage, err);
+      alert(`❌ Sync failed: ${errorMessage}`); // Temporary visual feedback
+    } finally {
+      setIsSyncing(false);
+      console.log('handleRefresh: Complete (isSyncing = false)');
+    }
+  }, [fetchData]);
+
+  // Handle conflict resolution
+  const handleConflictResolution = async (resolutions: Array<{ contractId: string; action: 'use_salesforce' | 'keep_local' }>) => {
+    setShowConflictModal(false);
+    setIsSyncing(true);
+
+    try {
+      // Process each resolution
+      for (const resolution of resolutions) {
+        if (resolution.action === 'use_salesforce') {
+          // Clear pending status - accept Salesforce values
+          // The next sync will overwrite with SF values
+          await fetch('/api/contracts/sync-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contractId: resolution.contractId,
+              status: 'synced',
+            })
+          });
+        }
+        // If 'keep_local', do nothing - keep pending status for later push
+      }
+
+      // After clearing statuses, retry the sync
+      await handleRefresh();
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      console.error('Conflict resolution failed:', errorMessage);
+      setIsSyncing(false);
+    }
+  };
+
   // Handle KPI card clicks
   const handleFilterChange = (filter: ActiveFilter) => {
     setActiveFilter(filter === activeFilter ? 'all' : filter);
@@ -1152,7 +1258,7 @@ export default function ContractsDashboard() {
     goToPipeline: () => setActiveTab('pipeline'),
     goToTasks: () => setActiveTab('tasks'),
     goToDocuments: () => setActiveTab('documents'),
-    refresh: () => fetchData(),
+    refresh: () => handleRefresh(),
     exportData: () => {
       // Simple CSV export
       if (!data) return;
@@ -1169,7 +1275,7 @@ export default function ContractsDashboard() {
       a.download = 'contracts-export.csv';
       a.click();
     },
-  }), [data, fetchData]);
+  }), [data, handleRefresh]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts(
@@ -1548,6 +1654,14 @@ export default function ContractsDashboard() {
         onClose={() => setHelpOverlayOpen(false)}
       />
 
+      {/* Conflict Resolution Modal */}
+      <ConflictResolutionModal
+        isOpen={showConflictModal}
+        conflicts={conflicts}
+        onResolve={handleConflictResolution}
+        onCancel={() => setShowConflictModal(false)}
+      />
+
       {/* Sidebar */}
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
@@ -1604,6 +1718,21 @@ export default function ContractsDashboard() {
                       return `${Math.floor(hours / 24)}d ago`;
                     })()}
                   </div>
+                  {lastSyncTime && (
+                    <div className={`text-xs mt-1 ${(() => {
+                      const hours = Math.floor((Date.now() - new Date(lastSyncTime).getTime()) / 3600000);
+                      return hours > 24 ? 'text-yellow-500' : 'text-gray-500';
+                    })()}`}>
+                      Last sync: {(() => {
+                        const mins = Math.floor((Date.now() - new Date(lastSyncTime).getTime()) / 60000);
+                        if (mins < 1) return 'just now';
+                        if (mins < 60) return `${mins} min ago`;
+                        const hours = Math.floor(mins / 60);
+                        if (hours < 24) return `${hours}h ago`;
+                        return `${Math.floor(hours / 24)}d ago`;
+                      })()}
+                    </div>
+                  )}
                 </div>
                 {/* Focus Mode Toggle */}
                 <div className="relative group">
@@ -1645,11 +1774,19 @@ export default function ContractsDashboard() {
                   </div>
                 </div>
                 <button
-                  onClick={() => window.location.reload()}
-                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                  title="Refresh data"
+                  onClick={handleRefresh}
+                  disabled={isSyncing}
+                  className={`p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors ${
+                    isSyncing ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  title="Sync from Salesforce and refresh data"
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg
+                    className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </button>

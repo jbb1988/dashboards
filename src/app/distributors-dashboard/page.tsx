@@ -16,9 +16,6 @@ import { CategoryHeatmap } from '@/components/charts/CategoryHeatmap';
 import { LocationPerformanceChart } from '@/components/charts/LocationPerformanceChart';
 import { CreateTaskModal } from '@/components/diversified/CreateTaskModal';
 import type { AIRecommendation } from '@/components/diversified/UnifiedInsightsPanel';
-import StrategicPortfolioMatrix, { type PortfolioEntity } from '@/components/distributors/StrategicPortfolioMatrix';
-import RevenueBridge, { type RiskItem, type OpportunityItem } from '@/components/distributors/RevenueBridge';
-import PriorityActionQueue, { type PriorityAction } from '@/components/distributors/PriorityActionQueue';
 
 // =============================================================================
 // TYPE DEFINITIONS

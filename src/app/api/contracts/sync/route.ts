@@ -6,6 +6,30 @@ interface SyncResult {
   synced: number;
   total: number;
   errors: string[];
+  updatedCount?: number;
+  newCount?: number;
+  conflicts?: ConflictInfo[];
+}
+
+interface ConflictInfo {
+  contractId: string;
+  contractName: string;
+  salesforceId: string;
+  localValues: {
+    awardDate: string | null;
+    contractDate: string | null;
+    deliverDate: string | null;
+    installDate: string | null;
+    cashDate: string | null;
+  };
+  salesforceValues: {
+    awardDate: string | null;
+    contractDate: string | null;
+    deliverDate: string | null;
+    installDate: string | null;
+    cashDate: string | null;
+  };
+  pendingFields: Record<string, any>;
 }
 
 /**
@@ -63,21 +87,97 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 2: Get existing contracts to check for manual status overrides
+    // Step 2: Get existing contracts to check for manual status overrides and conflicts
     const existingContracts = await getContracts();
     const manualOverrideMap = new Map<string, { status: string }>();
+    const existingContractsMap = new Map<string, any>();
 
     existingContracts.forEach(contract => {
-      if (contract.manual_status_override && contract.salesforce_id) {
-        manualOverrideMap.set(contract.salesforce_id, {
-          status: contract.status,
-        });
+      if (contract.salesforce_id) {
+        existingContractsMap.set(contract.salesforce_id, contract);
+
+        if (contract.manual_status_override) {
+          manualOverrideMap.set(contract.salesforce_id, {
+            status: contract.status,
+          });
+        }
       }
     });
 
-    // Step 3: Transform to Supabase contract format
+    // Step 3: Detect conflicts - check for contracts with pending changes that also have different SF values
+    const conflicts: ConflictInfo[] = [];
+
+    for (const opp of opportunities) {
+      const localContract = existingContractsMap.get(opp.id);
+
+      if (localContract && localContract.sf_sync_status === 'pending') {
+        // Check if Salesforce has different date values
+        const hasDateConflict =
+          localContract.award_date !== (opp.awardDate || null) ||
+          localContract.contract_date !== (opp.contractDate || null) ||
+          localContract.deliver_date !== (opp.deliverDate || null) ||
+          localContract.install_date !== (opp.installDate || null) ||
+          localContract.cash_date !== (opp.cashDate || null);
+
+        if (hasDateConflict) {
+          conflicts.push({
+            contractId: localContract.id,
+            contractName: localContract.name,
+            salesforceId: opp.id,
+            localValues: {
+              awardDate: localContract.award_date,
+              contractDate: localContract.contract_date,
+              deliverDate: localContract.deliver_date,
+              installDate: localContract.install_date,
+              cashDate: localContract.cash_date,
+            },
+            salesforceValues: {
+              awardDate: opp.awardDate || null,
+              contractDate: opp.contractDate || null,
+              deliverDate: opp.deliverDate || null,
+              installDate: opp.installDate || null,
+              cashDate: opp.cashDate || null,
+            },
+            pendingFields: localContract.sf_sync_pending_fields || {},
+          });
+        }
+      }
+    }
+
+    // If conflicts detected, return them without syncing
+    if (conflicts.length > 0) {
+      return NextResponse.json({
+        success: false,
+        conflicts: conflicts,
+        message: `Found ${conflicts.length} conflict${conflicts.length > 1 ? 's' : ''}. Please resolve before syncing.`,
+      });
+    }
+
+    // Step 4: Transform to Supabase contract format
+    let updatedCount = 0;
+    let newCount = 0;
+
     const contracts = opportunities.map(opp => {
       const transformed = transformToContract(opp);
+      const existing = existingContractsMap.get(transformed.salesforce_id);
+
+      if (existing) {
+        // Check if any date fields changed
+        const hasChanges =
+          existing.award_date !== transformed.award_date ||
+          existing.contract_date !== transformed.contract_date ||
+          existing.deliver_date !== transformed.deliver_date ||
+          existing.install_date !== transformed.install_date ||
+          existing.cash_date !== transformed.cash_date ||
+          existing.value !== transformed.value ||
+          existing.status !== transformed.status;
+
+        if (hasChanges) {
+          updatedCount++;
+        }
+      } else {
+        newCount++;
+      }
 
       // Preserve manual status override if exists
       const manualOverride = manualOverrideMap.get(transformed.salesforce_id);
@@ -89,7 +189,7 @@ export async function POST(request: NextRequest) {
       return transformed;
     });
 
-    // Step 4: Upsert to Supabase
+    // Step 5: Upsert to Supabase
     const upsertResult = await upsertContracts(contracts);
 
     if (!upsertResult.success) {
@@ -102,6 +202,8 @@ export async function POST(request: NextRequest) {
     }
 
     result.synced = upsertResult.count;
+    result.updatedCount = updatedCount;
+    result.newCount = newCount;
 
     const preservedCount = manualOverrideMap.size;
 
@@ -110,6 +212,8 @@ export async function POST(request: NextRequest) {
       message: `Successfully synced ${result.synced} contracts from Salesforce to Supabase`,
       result,
       preservedManualStatuses: preservedCount,
+      updatedCount,
+      newCount,
       lastUpdated: new Date().toISOString(),
     });
 

@@ -574,7 +574,7 @@ export function getDefaultCommands(handlers: {
     {
       id: 'refresh',
       label: 'Refresh Data',
-      description: 'Sync latest data from Salesforce',
+      description: 'Sync from Salesforce and refresh',
       shortcut: 'R',
       icon: icons.refresh,
       category: 'Actions',
