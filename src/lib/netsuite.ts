@@ -652,6 +652,7 @@ export interface ProjectProfitabilityRecord {
  * - M3SW: M3 Software (4051, 4080-4099, 5051, 5080-5099)
  * - MCC: MCC Services (4100-4111, 5100-5111)
  * - TBSV: TB Service/Maintenance (4071-4079, 5071-5079)
+ * - SCH: Shipping & Handling (4050, 5050)
  */
 export function parseProjectType(
   accountNumber: string,
@@ -718,7 +719,7 @@ export function parseProjectType(
   if (acct.startsWith('404') || acct.startsWith('504')) return 'M3IN';
 
   // Shipping and Handling (exclude from M3 Software)
-  if (acct === '4050' || acct === '5050') return 'Other';
+  if (acct === '4050' || acct === '5050') return 'SCH';
 
   // M3 Software (4051-4059, 4080-4099, 5051-5059, 5080-5099)
   if (acct.startsWith('405') && acct !== '4050' || acct.startsWith('505') && acct !== '5050') return 'M3 Software';
