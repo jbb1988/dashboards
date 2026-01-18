@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 
     // Add helper fields
     const currentYear = parseInt(year);
-    const enrichedLines = (lines || []).map(line => {
+    const enrichedLines = (lines || []).map((line: any) => {
       let futureYearRevenue = 'No';
       let revenueYears = '';
 
@@ -74,10 +74,14 @@ export async function GET(request: Request) {
         }
       }
 
+      const salesOrder = Array.isArray(line.netsuite_sales_orders)
+        ? line.netsuite_sales_orders[0]
+        : line.netsuite_sales_orders;
+
       return {
-        customer_name: line.netsuite_sales_orders.customer_name,
-        so_number: line.netsuite_sales_orders.so_number,
-        so_date: line.netsuite_sales_orders.so_date,
+        customer_name: salesOrder?.customer_name,
+        so_number: salesOrder?.so_number,
+        so_date: salesOrder?.so_date,
         item_name: line.item_name,
         item_description: line.item_description,
         item_type: line.item_type,
