@@ -3,7 +3,7 @@
  * Transforms vague AI recommendations into specific, actionable items
  */
 
-import { CustomerAttritionScore, CustomerBehavior, QuickWinOpportunity } from './insights';
+import { CustomerAttritionScore, CustomerBehavior, QuickWinOpportunity, CustomerContext } from './insights';
 
 // ============================================
 // TYPES
@@ -65,7 +65,8 @@ export interface ActionItem {
  */
 export function classifyAttritionAction(
   customer: CustomerAttritionScore,
-  behavior?: CustomerBehavior
+  behavior?: CustomerBehavior,
+  context?: CustomerContext
 ): ActionItem | null {
   // Skip if not eligible for attrition actions
   if (behavior && !behavior.attrition_eligible) {
@@ -75,6 +76,7 @@ export function classifyAttritionAction(
   const segment = behavior?.segment || 'unknown';
   const daysInactive = customer.recency_days;
   const revenueAtRisk = customer.revenue_at_risk;
+  const topProducts = context?.top_products || [];
 
   // Determine action type based on severity
   let actionType: ActionType;
@@ -112,6 +114,7 @@ export function classifyAttritionAction(
   const actionTitle = buildActionTitle(actionType, customer.customer_name, {
     daysInactive,
     segment,
+    topProducts,
   });
 
   // Build call script
@@ -120,6 +123,7 @@ export function classifyAttritionAction(
     daysInactive,
     segment,
     revenueAtRisk,
+    topProducts,
   });
 
   return {
@@ -131,6 +135,7 @@ export function classifyAttritionAction(
     action_title: actionTitle,
     action_description: `${customer.customer_name} has not ordered in ${daysInactive} days (attrition score: ${customer.attrition_score})`,
     call_script: callScript,
+    product_stopped: topProducts.length > 0 ? topProducts[0] : undefined,
     days_stopped: daysInactive,
     revenue_at_risk: revenueAtRisk,
     expected_recovery: revenueAtRisk * getRecoveryProbability(segment),
@@ -148,7 +153,8 @@ export function classifyAttritionAction(
  */
 export function classifyQuickWinAction(
   quickWin: QuickWinOpportunity,
-  behavior?: CustomerBehavior
+  behavior?: CustomerBehavior,
+  context?: CustomerContext
 ): ActionItem | null {
   const segment = behavior?.segment || quickWin.customer_type;
 
@@ -167,8 +173,12 @@ export function classifyQuickWinAction(
     riskLevel = quickWin.priority === 'high' ? 'medium' : 'low';
   }
 
+  // Use typical_products from quickWin if available, otherwise fall back to context
+  const products = quickWin.typical_products || context?.top_products || [];
+  const productName = products.length > 0 ? products[0] : undefined;
+
   const actionTitle = quickWin.type === 'repeat_order'
-    ? `Call ${quickWin.customer_name} re: repeat order (${quickWin.days_overdue}d overdue)`
+    ? `Call ${quickWin.customer_name} re: ${productName || 'repeat order'} (${quickWin.days_overdue}d overdue)`
     : `Pitch ${quickWin.recommended_products?.[0] || 'new products'} to ${quickWin.customer_name}`;
 
   return {
@@ -180,6 +190,7 @@ export function classifyQuickWinAction(
     action_title: actionTitle,
     action_description: quickWin.action_summary,
     call_script: quickWin.call_script,
+    product_stopped: productName,
     days_stopped: quickWin.days_overdue,
     recommended_product: quickWin.recommended_products?.[0],
     expected_recovery: quickWin.type === 'repeat_order' ? quickWin.estimated_value : undefined,
@@ -203,19 +214,23 @@ export function classifyQuickWinAction(
 function buildActionTitle(
   actionType: ActionType,
   customerName: string,
-  context: { daysInactive?: number; segment?: string }
+  context: { daysInactive?: number; segment?: string; topProducts?: string[] }
 ): string {
+  const productInfo = context.topProducts && context.topProducts.length > 0
+    ? context.topProducts[0]
+    : 'usual products';
+
   switch (actionType) {
     case 'call_to_recover_po':
-      return `Call ${customerName} re: missing PO (inactive ${context.daysInactive}d)`;
+      return `Call ${customerName} re: ${productInfo} (inactive ${context.daysInactive}d)`;
     case 'price_margin_reset':
-      return `Discuss pricing with ${customerName} (revenue declining)`;
+      return `Discuss pricing with ${customerName} re: ${productInfo}`;
     case 'category_expansion':
-      return `Pitch new categories to ${customerName} (product mix narrowing)`;
+      return `Pitch new categories to ${customerName} (currently buying ${productInfo})`;
     case 'exec_escalation':
-      return `URGENT: Executive call with ${customerName} (churn risk)`;
+      return `URGENT: Executive call with ${customerName} re: ${productInfo} (churn risk)`;
     case 'repeat_order_reminder':
-      return `Remind ${customerName} about repeat order`;
+      return `Remind ${customerName} about ${productInfo}`;
     case 'cross_sell_pitch':
       return `Cross-sell pitch to ${customerName}`;
     default:
@@ -233,25 +248,29 @@ function buildCallScript(
     daysInactive?: number;
     segment?: string;
     revenueAtRisk?: number;
+    topProducts?: string[];
   }
 ): string {
   const weeksInactive = context.daysInactive ? Math.round(context.daysInactive / 7) : 0;
+  const productNames = context.topProducts && context.topProducts.length > 0
+    ? context.topProducts.slice(0, 2).join(' and ')
+    : 'your usual items';
 
   switch (actionType) {
     case 'call_to_recover_po':
-      return `Hi, it's been about ${weeksInactive} weeks since your last order. I wanted to check in - is there anything we can help with? Any projects coming up that need quotes?`;
+      return `Hi, it's been about ${weeksInactive} weeks since your last order of ${productNames}. I wanted to check in - is there anything we can help with? Any projects coming up that need quotes?`;
 
     case 'price_margin_reset':
-      return `Hi, I noticed your orders have dropped off. Are we still competitive on pricing? I'd like to review your account and see if we can do better.`;
+      return `Hi, I noticed your orders for ${productNames} have dropped off. Are we still competitive on pricing? I'd like to review your account and see if we can do better.`;
 
     case 'category_expansion':
-      return `Hi, I noticed you've been ordering from us but only in a couple categories. Most customers like you also buy [other products]. Would you like me to send over pricing on those?`;
+      return `Hi, I noticed you've been ordering ${productNames} from us but only in a couple categories. Most customers like you also buy [other products]. Would you like me to send over pricing on those?`;
 
     case 'exec_escalation':
-      return `[EXEC] Major account at risk. ${context.customerName} - $${((context.revenueAtRisk || 0) / 1000).toFixed(0)}K revenue, no orders in ${weeksInactive} weeks. Immediate action needed.`;
+      return `[EXEC] Major account at risk. ${context.customerName} - $${((context.revenueAtRisk || 0) / 1000).toFixed(0)}K revenue, no orders for ${productNames} in ${weeksInactive} weeks. Immediate action needed.`;
 
     case 'repeat_order_reminder':
-      return `Hi, just wanted to check in on your usual order. Need me to send over a quote for your standard items?`;
+      return `Hi, just wanted to check in on your usual order of ${productNames}. Need me to send over a quote for your standard items?`;
 
     case 'cross_sell_pitch':
       return `Hi, I wanted to let you know we also carry [product]. Most customers like you use both. Would you like me to send pricing?`;

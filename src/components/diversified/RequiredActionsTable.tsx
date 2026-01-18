@@ -21,6 +21,8 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
   const [filterType, setFilterType] = useState<ActionType | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [selectedAction, setSelectedAction] = useState<ActionItem | null>(null);
+  const [taskModalAction, setTaskModalAction] = useState<ActionItem | null>(null);
+  const [creatingTaskFor, setCreatingTaskFor] = useState<string | null>(null);
 
   // Filter and sort actions
   let filteredActions = [...actions];
@@ -53,11 +55,63 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
   // Get unique action types
   const actionTypes = Array.from(new Set(actions.map(a => a.action_type)));
 
-  // Handle owner assignment
-  const handleOwnerChange = async (actionId: string, owner: string) => {
-    // TODO: Implement API call to update owner
-    console.log('Update owner for action', actionId, 'to', owner);
-    onRefresh();
+  // Handle task creation
+  const handleCreateTask = async (action: ActionItem) => {
+    setCreatingTaskFor(action.id);
+
+    try {
+      const value = action.expected_recovery || action.cross_sell_potential || 0;
+      const priority = action.risk_level === 'critical' ? 'urgent' :
+                      action.risk_level === 'high' ? 'high' : 'medium';
+
+      // Calculate default due date based on speed to impact
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + action.speed_to_impact_days);
+
+      const taskData = {
+        title: action.action_title,
+        description: `${action.action_description}
+
+${action.call_script ? `Call Script:\n${action.call_script}\n\n` : ''}Customer: ${action.customer_name}
+Segment: ${action.customer_segment}
+$ Impact: ${formatCurrency(value)}
+Risk Level: ${action.risk_level}
+Days Inactive: ${action.days_stopped || 'N/A'}
+Speed to Impact: ${action.speed_to_impact_days} days
+
+---
+📊 ACTION COMMAND METADATA
+source: action_command
+action_type: ${action.action_type}
+action_id: ${action.id}
+customer_id: ${action.customer_id}
+created: ${new Date().toISOString()}`,
+        priority,
+        due_date: dueDate.toISOString().split('T')[0],
+        customer_name: action.customer_name,
+        source: 'action_command',
+        insight_id: action.id,
+        insight_category: action.source_type,
+      };
+
+      const response = await fetch('/api/diversified/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create task');
+      }
+
+      // Success - refresh data
+      onRefresh();
+    } catch (error) {
+      console.error('Error creating task:', error);
+      alert('Failed to create task in Asana');
+    } finally {
+      setCreatingTaskFor(null);
+    }
   };
 
   return (
@@ -131,17 +185,14 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
                   Speed
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">
-                  Owner
-                </th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">
-                  Status
+                  Task
                 </th>
               </tr>
             </thead>
             <tbody>
               {filteredActions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-[#64748B] text-[14px]">
+                  <td colSpan={7} className="px-4 py-8 text-center text-[#64748B] text-[14px]">
                     No actions found
                   </td>
                 </tr>
@@ -186,20 +237,29 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
                         {action.speed_to_impact_days}d
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <select
-                          value={action.owner || ''}
-                          onChange={(e) => handleOwnerChange(action.id, e.target.value)}
-                          className="px-2 py-1 bg-[#0F172A] border border-white/[0.04] text-[#94A3B8] rounded text-[12px] hover:bg-[#1E293B] transition-colors min-w-[120px]"
+                        <button
+                          onClick={() => handleCreateTask(action)}
+                          disabled={creatingTaskFor === action.id}
+                          className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white text-[12px] font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                         >
-                          <option value="">Unassigned</option>
-                          <option value="Sales Rep 1">Sales Rep 1</option>
-                          <option value="Sales Rep 2">Sales Rep 2</option>
-                          <option value="Sales Manager">Sales Manager</option>
-                          <option value="VP Sales">VP Sales</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={action.status} />
+                          {creatingTaskFor === action.id ? (
+                            <>
+                              <motion.div
+                                className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full"
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                              />
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                              Add Task
+                            </>
+                          )}
+                        </button>
                       </td>
                     </motion.tr>
                   );
@@ -216,25 +276,14 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
           <ActionDetailModal
             action={selectedAction}
             onClose={() => setSelectedAction(null)}
+            onCreateTask={(action) => {
+              setSelectedAction(null);
+              handleCreateTask(action);
+            }}
           />
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-// Helper component for status badge
-function StatusBadge({ status }: { status: string }) {
-  const colors = {
-    pending: 'bg-[#64748B]/10 text-[#64748B]',
-    in_progress: 'bg-[#F59E0B]/10 text-[#F59E0B]',
-    completed: 'bg-[#22C55E]/10 text-[#22C55E]',
-  };
-
-  return (
-    <span className={`px-2 py-1 rounded text-[11px] font-medium ${colors[status as keyof typeof colors] || colors.pending}`}>
-      {status.replace('_', ' ')}
-    </span>
   );
 }
 
@@ -255,7 +304,15 @@ function getRiskColor(risk: string): string {
 }
 
 // Action Detail Modal
-function ActionDetailModal({ action, onClose }: { action: ActionItem; onClose: () => void }) {
+function ActionDetailModal({
+  action,
+  onClose,
+  onCreateTask,
+}: {
+  action: ActionItem;
+  onClose: () => void;
+  onCreateTask: (action: ActionItem) => void;
+}) {
   const value = action.expected_recovery || action.cross_sell_potential || 0;
 
   return (
@@ -335,13 +392,24 @@ function ActionDetailModal({ action, onClose }: { action: ActionItem; onClose: (
             </div>
           </div>
 
-          {/* Action */}
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2.5 bg-[#38BDF8] text-white rounded-lg hover:bg-[#38BDF8]/80 transition-colors text-[14px] font-medium"
-          >
-            Close
-          </button>
+          {/* Actions */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onCreateTask(action)}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 text-white rounded-lg transition-colors text-[14px] font-medium flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create Task in Asana
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 bg-[#1E293B] border border-white/[0.04] text-[#94A3B8] hover:bg-[#334155] rounded-lg transition-colors text-[14px] font-medium"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>

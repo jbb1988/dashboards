@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { RevenueAtRiskSection } from './RevenueAtRiskSection';
 import { RequiredActionsTable } from './RequiredActionsTable';
-import { OwnershipDashboard } from './OwnershipDashboard';
 import { StrategicBucketsGrid } from './StrategicBucketsGrid';
 import type { ActionItem } from '@/lib/action-classification';
 import type { StrategicBucketSummary } from '@/lib/strategic-buckets';
@@ -189,12 +188,7 @@ export function ActionCommandCenter({ filters }: ActionCommandCenterProps) {
         onRefresh={fetchData}
       />
 
-      {/* 3. Ownership Dashboard */}
-      <OwnershipDashboard
-        actions={data.required_actions}
-      />
-
-      {/* 4. Strategic Buckets Grid */}
+      {/* 3. Strategic Buckets Grid */}
       <StrategicBucketsGrid
         buckets={data.strategic_buckets}
       />

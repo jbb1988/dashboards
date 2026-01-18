@@ -5,10 +5,12 @@ import {
   generateCrossSellOpportunities,
   classifyCustomerBehavior,
   calculateRolling12Performance,
+  calculateCustomerContext,
   CustomerAttritionScore,
   CustomerBehavior,
   QuickWinOpportunity,
   CrossSellOpportunity,
+  CustomerContext,
 } from '@/lib/insights';
 import {
   ActionItem,
@@ -163,13 +165,14 @@ export async function GET(request: NextRequest) {
     // Step 1: Fetch all customer data in parallel
     // Note: Not all functions support filters - only pass where supported
     console.log('[ACTION COMMAND] Fetching customer data...');
-    const [attritionData, behaviorData, quickWins, crossSellData, rolling12Data] =
+    const [attritionData, behaviorData, quickWins, crossSellData, rolling12Data, contextData] =
       await Promise.all([
         calculateCustomerAttrition(filters),
         classifyCustomerBehavior(),
         generateQuickWins(),
         generateCrossSellOpportunities(filters),
         calculateRolling12Performance('customer'),
+        calculateCustomerContext(),
       ]);
 
     console.log(`[ACTION COMMAND] Fetched:`);
@@ -178,6 +181,7 @@ export async function GET(request: NextRequest) {
     console.log(`  - ${quickWins.length} quick win opportunities`);
     console.log(`  - ${crossSellData.length} cross-sell opportunities`);
     console.log(`  - ${rolling12Data.length} customers with rolling 12-mo performance`);
+    console.log(`  - ${contextData.length} customers with context (top products)`);
 
     // Step 2: Create lookup maps
     const behaviorMap = new Map<string, CustomerBehavior>();
@@ -204,6 +208,11 @@ export async function GET(request: NextRequest) {
       rolling12Map.set(r12.entity_id || r12.entity_name, r12.current_revenue);
     }
 
+    const contextMap = new Map<string, CustomerContext>();
+    for (const context of contextData) {
+      contextMap.set(context.customer_id || context.customer_name, context);
+    }
+
     // Step 3: Generate action items from attrition and quick wins
     console.log('[ACTION COMMAND] Generating action items...');
     const allActions: ActionItem[] = [];
@@ -213,7 +222,8 @@ export async function GET(request: NextRequest) {
       if (attrition.status === 'active') continue; // Skip healthy customers
 
       const behavior = behaviorMap.get(attrition.customer_id || attrition.customer_name);
-      const action = classifyAttritionAction(attrition, behavior);
+      const context = contextMap.get(attrition.customer_id || attrition.customer_name);
+      const action = classifyAttritionAction(attrition, behavior, context);
       if (action) {
         allActions.push(action);
       }
@@ -222,7 +232,8 @@ export async function GET(request: NextRequest) {
     // From quick wins
     for (const quickWin of quickWins) {
       const behavior = behaviorMap.get(quickWin.customer_id || quickWin.customer_name);
-      const action = classifyQuickWinAction(quickWin, behavior);
+      const context = contextMap.get(quickWin.customer_id || quickWin.customer_name);
+      const action = classifyQuickWinAction(quickWin, behavior, context);
       if (action) {
         allActions.push(action);
       }
