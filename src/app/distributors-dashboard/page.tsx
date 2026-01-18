@@ -13,10 +13,12 @@ import { SalesTasksTab } from '@/components/diversified/SalesTasksTab';
 import { DistributorRevenueChart } from '@/components/charts/DistributorRevenueChart';
 import { LocationConcentrationChart } from '@/components/charts/LocationConcentrationChart';
 import { CategoryHeatmap } from '@/components/charts/CategoryHeatmap';
-import { AtRiskScatterChart } from '@/components/charts/AtRiskScatterChart';
 import { LocationPerformanceChart } from '@/components/charts/LocationPerformanceChart';
 import { CreateTaskModal } from '@/components/diversified/CreateTaskModal';
 import type { AIRecommendation } from '@/components/diversified/UnifiedInsightsPanel';
+import StrategicPortfolioMatrix, { type PortfolioEntity } from '@/components/distributors/StrategicPortfolioMatrix';
+import RevenueBridge, { type RiskItem, type OpportunityItem } from '@/components/distributors/RevenueBridge';
+import PriorityActionQueue, { type PriorityAction } from '@/components/distributors/PriorityActionQueue';
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -91,6 +93,17 @@ interface DistributorsResponse {
     prior: { start: string; end: string };
   };
   categories: string[];
+  strategicAccountData?: {
+    portfolioEntities: PortfolioEntity[];
+    revenueBridge: {
+      currentRevenue: number;
+      targetRevenue: number;
+      atRisk: RiskItem[];
+      quickWins: OpportunityItem[];
+      strategicGrowth: OpportunityItem[];
+    };
+    priorityActions: PriorityAction[];
+  };
 }
 
 // =============================================================================
@@ -803,18 +816,32 @@ export default function DistributorsDashboard() {
                     index={2}
                   />
 
-                  {/* Row 3: At-Risk Scatter + Location Performance */}
-                  <div className="grid grid-cols-2 gap-6">
-                    <AtRiskScatterChart
-                      data={scatterData}
-                      index={3}
-                    />
-                    <LocationPerformanceChart
-                      data={performanceData}
-                      showTop={20}
-                      index={4}
-                    />
-                  </div>
+                  {/* Row 3: Strategic Account Command Center */}
+                  {data.strategicAccountData && (
+                    <>
+                      {/* Portfolio Matrix */}
+                      <StrategicPortfolioMatrix
+                        entities={data.strategicAccountData.portfolioEntities}
+                        entityType="distributor"
+                      />
+
+                      {/* Revenue Bridge */}
+                      <RevenueBridge
+                        currentRevenue={data.strategicAccountData.revenueBridge.currentRevenue}
+                        targetRevenue={data.strategicAccountData.revenueBridge.targetRevenue}
+                        atRisk={data.strategicAccountData.revenueBridge.atRisk}
+                        quickWins={data.strategicAccountData.revenueBridge.quickWins}
+                        strategicGrowth={data.strategicAccountData.revenueBridge.strategicGrowth}
+                        entityType="distributor"
+                      />
+
+                      {/* Priority Action Queue */}
+                      <PriorityActionQueue
+                        actions={data.strategicAccountData.priorityActions}
+                        showPlaybook={true}
+                      />
+                    </>
+                  )}
                 </motion.div>
               )}
 
