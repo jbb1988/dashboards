@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ActionItem, ActionType } from '@/lib/action-classification';
-import { getActionTypeLabel, getRiskLevelColor } from '@/lib/roi-calculation';
+import { getActionTypeLabel } from '@/lib/roi-calculation';
 
 interface RequiredActionsTableProps {
   actions: ActionItem[];
@@ -17,7 +17,7 @@ function formatCurrency(value: number): string {
 }
 
 export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTableProps) {
-  const [sortBy, setSortBy] = useState<'roi' | 'value' | 'due_date'>('roi');
+  const [sortBy, setSortBy] = useState<'value' | 'risk' | 'speed'>('value');
   const [filterType, setFilterType] = useState<ActionType | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [selectedAction, setSelectedAction] = useState<ActionItem | null>(null);
@@ -37,23 +37,28 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
 
   // Sort
   filteredActions.sort((a, b) => {
-    if (sortBy === 'roi') {
-      return (b.roi_score || 0) - (a.roi_score || 0);
-    } else if (sortBy === 'value') {
+    if (sortBy === 'value') {
       const aValue = a.expected_recovery || a.cross_sell_potential || 0;
       const bValue = b.expected_recovery || b.cross_sell_potential || 0;
       return bValue - aValue;
+    } else if (sortBy === 'risk') {
+      const riskOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+      return riskOrder[a.risk_level] - riskOrder[b.risk_level];
     } else {
-      // due_date
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      // speed
+      return a.speed_to_impact_days - b.speed_to_impact_days;
     }
   });
 
   // Get unique action types
   const actionTypes = Array.from(new Set(actions.map(a => a.action_type)));
+
+  // Handle owner assignment
+  const handleOwnerChange = async (actionId: string, owner: string) => {
+    // TODO: Implement API call to update owner
+    console.log('Update owner for action', actionId, 'to', owner);
+    onRefresh();
+  };
 
   return (
     <div className="space-y-4">
@@ -70,9 +75,9 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
             onChange={(e) => setSortBy(e.target.value as any)}
             className="px-3 py-1.5 bg-[#1E293B] border border-white/[0.04] text-[#94A3B8] rounded-lg text-[13px] hover:bg-[#334155] transition-colors"
           >
-            <option value="roi">Sort by ROI</option>
             <option value="value">Sort by $ Impact</option>
-            <option value="due_date">Sort by Due Date</option>
+            <option value="risk">Sort by Risk</option>
+            <option value="speed">Sort by Speed</option>
           </select>
 
           {/* Type filter */}
@@ -120,13 +125,13 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
                   $ Impact
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">
-                  ROI
-                </th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">
                   Risk
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">
                   Speed
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">
+                  Owner
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">
                   Status
@@ -173,15 +178,25 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
                         <div className="text-[14px] font-semibold text-white">{formatCurrency(value)}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-[14px] font-bold text-[#22C55E]">{action.roi_score?.toFixed(0) || 'N/A'}</div>
-                      </td>
-                      <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded text-[11px] font-medium ${riskColor}`}>
                           {action.risk_level}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-[13px] text-[#94A3B8]">
                         {action.speed_to_impact_days}d
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={action.owner || ''}
+                          onChange={(e) => handleOwnerChange(action.id, e.target.value)}
+                          className="px-2 py-1 bg-[#0F172A] border border-white/[0.04] text-[#94A3B8] rounded text-[12px] hover:bg-[#1E293B] transition-colors min-w-[120px]"
+                        >
+                          <option value="">Unassigned</option>
+                          <option value="Sales Rep 1">Sales Rep 1</option>
+                          <option value="Sales Rep 2">Sales Rep 2</option>
+                          <option value="Sales Manager">Sales Manager</option>
+                          <option value="VP Sales">VP Sales</option>
+                        </select>
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={action.status} />
@@ -276,14 +291,10 @@ function ActionDetailModal({ action, onClose }: { action: ActionItem; onClose: (
           </div>
 
           {/* Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="bg-[#0F172A] p-3 rounded-lg">
               <div className="text-[11px] text-[#64748B] uppercase font-semibold mb-1">$ Impact</div>
               <div className="text-[16px] font-bold text-white">{formatCurrency(value)}</div>
-            </div>
-            <div className="bg-[#0F172A] p-3 rounded-lg">
-              <div className="text-[11px] text-[#64748B] uppercase font-semibold mb-1">ROI Score</div>
-              <div className="text-[16px] font-bold text-[#22C55E]">{action.roi_score?.toFixed(0) || 'N/A'}</div>
             </div>
             <div className="bg-[#0F172A] p-3 rounded-lg">
               <div className="text-[11px] text-[#64748B] uppercase font-semibold mb-1">Risk Level</div>

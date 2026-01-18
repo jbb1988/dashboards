@@ -145,15 +145,30 @@ export async function GET(request: NextRequest) {
     console.log('[ACTION COMMAND] Starting data consolidation');
     console.log('='.repeat(60));
 
-    // Step 1: Fetch all customer data in parallel
+    // Parse query parameters for filters
+    const searchParams = request.nextUrl.searchParams;
+    const yearsParam = searchParams.get('years');
+    const monthsParam = searchParams.get('months');
+
+    const filters: { years?: number[]; months?: number[] } = {};
+    if (yearsParam) {
+      filters.years = yearsParam.split(',').map(Number);
+    }
+    if (monthsParam) {
+      filters.months = monthsParam.split(',').map(Number);
+    }
+
+    console.log('[ACTION COMMAND] Filters:', filters);
+
+    // Step 1: Fetch all customer data in parallel with filters
     console.log('[ACTION COMMAND] Fetching customer data...');
     const [attritionData, behaviorData, quickWins, crossSellData, rolling12Data] =
       await Promise.all([
-        calculateCustomerAttrition(),
-        classifyCustomerBehavior(),
-        generateQuickWins(),
-        generateCrossSellOpportunities(),
-        calculateRolling12Performance('customer'),
+        calculateCustomerAttrition(filters),
+        classifyCustomerBehavior(filters),
+        generateQuickWins(filters),
+        generateCrossSellOpportunities(filters),
+        calculateRolling12Performance('customer', filters),
       ]);
 
     console.log(`[ACTION COMMAND] Fetched:`);

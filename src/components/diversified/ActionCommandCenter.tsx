@@ -4,12 +4,9 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { RevenueAtRiskSection } from './RevenueAtRiskSection';
 import { RequiredActionsTable } from './RequiredActionsTable';
-import { ROIPriorityChart } from './ROIPriorityChart';
 import { OwnershipDashboard } from './OwnershipDashboard';
 import { StrategicBucketsGrid } from './StrategicBucketsGrid';
-import { TargetGapSection } from './TargetGapSection';
 import type { ActionItem } from '@/lib/action-classification';
-import type { ROIQuadrant } from '@/lib/roi-calculation';
 import type { StrategicBucketSummary } from '@/lib/strategic-buckets';
 
 // ============================================
@@ -68,30 +65,23 @@ interface ActionCommandData {
   };
 
   required_actions: ActionItem[];
-  roi_quadrants: ROIQuadrant[];
   strategic_buckets: StrategicBucketSummary[];
 
-  target_gap_analysis: {
-    current_run_rate: number;
-    target_annual_revenue: number;
-    net_gap: number;
-    gap_coverage: {
-      from_saves: number;
-      from_quick_wins: number;
-      from_growth: number;
-      total_potential: number;
-      coverage_pct: number;
-    };
-  };
-
   generated_at: string;
+}
+
+interface ActionCommandCenterProps {
+  filters?: {
+    years: number[];
+    months: number[];
+  };
 }
 
 // ============================================
 // MAIN COMPONENT
 // ============================================
 
-export function ActionCommandCenter() {
+export function ActionCommandCenter({ filters }: ActionCommandCenterProps) {
   const [data, setData] = useState<ActionCommandData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,14 +89,24 @@ export function ActionCommandCenter() {
   // Fetch action command data
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [filters]);
 
   const fetchData = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/diversified/action-command');
+      // Build query params from filters
+      const params = new URLSearchParams();
+      if (filters?.years && filters.years.length > 0) {
+        params.set('years', filters.years.join(','));
+      }
+      if (filters?.months && filters.months.length > 0) {
+        params.set('months', filters.months.join(','));
+      }
+
+      const url = `/api/diversified/action-command${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error('Failed to fetch action command data');
@@ -189,24 +189,14 @@ export function ActionCommandCenter() {
         onRefresh={fetchData}
       />
 
-      {/* 3. ROI Priority Chart */}
-      <ROIPriorityChart
-        quadrants={data.roi_quadrants}
-      />
-
-      {/* 4. Ownership Dashboard */}
+      {/* 3. Ownership Dashboard */}
       <OwnershipDashboard
         actions={data.required_actions}
       />
 
-      {/* 5. Strategic Buckets Grid */}
+      {/* 4. Strategic Buckets Grid */}
       <StrategicBucketsGrid
         buckets={data.strategic_buckets}
-      />
-
-      {/* 6. Target Gap Section */}
-      <TargetGapSection
-        gapAnalysis={data.target_gap_analysis}
       />
 
       {/* Footer */}

@@ -1870,7 +1870,12 @@ export default function DiversifiedDashboard() {
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <ActionCommandCenter />
+                  <ActionCommandCenter
+                    filters={{
+                      years: selectedYears,
+                      months: selectedMonths,
+                    }}
+                  />
                 </motion.div>
               )}
             </>
