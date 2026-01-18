@@ -179,7 +179,6 @@ export function ActionCommandCenter({ filters }: ActionCommandCenterProps) {
       {/* 1. Revenue at Risk Section (30/60/90 day buckets) */}
       <RevenueAtRiskSection
         revenueAtRisk={data.revenue_at_risk}
-        top3Accounts={data.summary.top_3_accounts_at_risk}
       />
 
       {/* 2. Required Actions Table */}

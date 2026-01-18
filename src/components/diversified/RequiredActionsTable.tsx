@@ -60,7 +60,8 @@ export function RequiredActionsTable({ actions, onRefresh }: RequiredActionsTabl
     setCreatingTaskFor(action.id);
 
     try {
-      const value = action.expected_recovery || action.cross_sell_potential || 0;
+      // Use product revenue - the revenue from the specific product in this action
+      const value = action.product_revenue || action.expected_recovery || action.cross_sell_potential || 0;
       const priority = action.risk_level === 'critical' ? 'urgent' :
                       action.risk_level === 'high' ? 'high' : 'medium';
 
@@ -198,7 +199,8 @@ created: ${new Date().toISOString()}`,
                 </tr>
               ) : (
                 filteredActions.map((action, idx) => {
-                  const value = action.expected_recovery || action.cross_sell_potential || 0;
+                  // Use product revenue - the revenue from the specific product in this action
+      const value = action.product_revenue || action.expected_recovery || action.cross_sell_potential || 0;
                   const riskColor = getRiskColor(action.risk_level);
 
                   return (

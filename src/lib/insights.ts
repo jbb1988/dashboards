@@ -1347,7 +1347,11 @@ export interface CustomerContext {
   // What They Buy
   product_classes: string[];           // Classes they've purchased
   top_products: string[];              // Most frequent items (deprecated - use top_products_with_descriptions)
-  top_products_with_descriptions: Array<{ item_name: string; item_description: string }>;
+  top_products_with_descriptions: Array<{
+    item_name: string;
+    item_description: string;
+    revenue_12mo: number;  // Revenue from this specific product
+  }>;
   avg_order_value: number;
 
   // Lifetime Value
@@ -1495,7 +1499,7 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
     transactions: typeof allData;
     orderDates: Date[];
     classes: Set<string>;
-    productDetails: Map<string, { count: number; description: string }>;
+    productDetails: Map<string, { count: number; description: string; revenue: number }>;
     totalRevenue: number;
   }>();
 
@@ -1528,10 +1532,12 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
       const existing = customer.productDetails.get(row.item_name);
       if (existing) {
         existing.count += (row.quantity || 1);
+        existing.revenue += (row.revenue || 0);
       } else {
         customer.productDetails.set(row.item_name, {
           count: row.quantity || 1,
           description: row.item_description || row.item_name,
+          revenue: row.revenue || 0,
         });
       }
     }
@@ -1581,15 +1587,16 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
     // Overdue if gap > avg frequency * 1.5 (and they have a pattern)
     const isOverdue = avgFrequencyDays > 0 && daysSinceLastOrder > (avgFrequencyDays * 1.5);
 
-    // Top products (with descriptions)
+    // Top products (with descriptions and revenue)
     const sortedProductsWithDetails = Array.from(customer.productDetails.entries())
-      .sort((a, b) => b[1].count - a[1].count)
+      .sort((a, b) => b[1].revenue - a[1].revenue)  // Sort by revenue, not count
       .slice(0, 5);
 
     const sortedProducts = sortedProductsWithDetails.map(([name]) => name);
     const topProductsWithDescriptions = sortedProductsWithDetails.map(([name, details]) => ({
       item_name: name,
       item_description: details.description,
+      revenue_12mo: Math.round(details.revenue),
     }));
 
     // Average order value

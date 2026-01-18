@@ -35,7 +35,8 @@ export interface ActionItem {
   recommended_product?: string;
 
   // $ Impact
-  revenue_at_risk?: number;
+  revenue_at_risk?: number;  // Total customer revenue (for context)
+  product_revenue?: number;  // Revenue from THIS specific product
   expected_recovery?: number;
   cross_sell_potential?: number;
 
@@ -75,19 +76,20 @@ export function classifyAttritionAction(
 
   const segment = behavior?.segment || 'unknown';
   const daysInactive = customer.recency_days;
-  const revenueAtRisk = customer.revenue_at_risk;
 
-  // Use ONLY item description (item number is irrelevant)
-  const topProductsFormatted = context?.top_products_with_descriptions?.map(p =>
-    p.item_description
-  ) || context?.top_products || [];
+  // Get product details with revenue
+  const topProductsWithRevenue = context?.top_products_with_descriptions || [];
+  const topProductsFormatted = topProductsWithRevenue.map(p => p.item_description);
+
+  // Use the revenue from the TOP product they buy (highest revenue product)
+  const productRevenue = topProductsWithRevenue.length > 0 ? topProductsWithRevenue[0].revenue_12mo : 0;
 
   // Determine action type based on severity
   let actionType: ActionType;
   let speedToImpact: number;
   let riskLevel: 'critical' | 'high' | 'medium' | 'low';
 
-  if (customer.status === 'churned' || (customer.attrition_score > 80 && revenueAtRisk > 100000)) {
+  if (customer.status === 'churned' || (customer.attrition_score > 80 && productRevenue > 100000)) {
     // Critical case - needs executive escalation
     actionType = 'exec_escalation';
     speedToImpact = 3; // Exec can move fast
@@ -126,7 +128,7 @@ export function classifyAttritionAction(
     customerName: customer.customer_name,
     daysInactive,
     segment,
-    revenueAtRisk,
+    revenueAtRisk: productRevenue,  // Use product revenue in script
     topProducts: topProductsFormatted,
   });
 
@@ -141,8 +143,9 @@ export function classifyAttritionAction(
     call_script: callScript,
     product_stopped: topProductsFormatted.length > 0 ? topProductsFormatted[0] : undefined,
     days_stopped: daysInactive,
-    revenue_at_risk: revenueAtRisk,
-    expected_recovery: revenueAtRisk * getRecoveryProbability(segment),
+    revenue_at_risk: customer.revenue_at_risk,  // Total customer revenue
+    product_revenue: productRevenue,  // Revenue from THIS specific product
+    expected_recovery: productRevenue * getRecoveryProbability(segment),
     speed_to_impact_days: speedToImpact,
     risk_level: riskLevel,
     status: 'pending',
@@ -179,11 +182,16 @@ export function classifyQuickWinAction(
 
   // Use ONLY item description (item number is irrelevant)
   let products: string[];
+  let productRevenue = 0;
+
   if (quickWin.typical_products && quickWin.typical_products.length > 0) {
     products = quickWin.typical_products;
+    // For quick wins, use the estimated value as product revenue
+    productRevenue = quickWin.estimated_value;
   } else if (context?.top_products_with_descriptions && context.top_products_with_descriptions.length > 0) {
     // Use ONLY the description, not the item number
     products = context.top_products_with_descriptions.map(p => p.item_description);
+    productRevenue = context.top_products_with_descriptions[0].revenue_12mo;
   } else {
     products = context?.top_products || [];
   }
@@ -206,6 +214,7 @@ export function classifyQuickWinAction(
     product_stopped: productName,
     days_stopped: quickWin.days_overdue,
     recommended_product: quickWin.recommended_products?.[0],
+    product_revenue: productRevenue,  // Revenue from THIS specific product
     expected_recovery: quickWin.type === 'repeat_order' ? quickWin.estimated_value : undefined,
     cross_sell_potential: quickWin.type === 'cross_sell' ? quickWin.estimated_value : undefined,
     speed_to_impact_days: speedToImpact,
