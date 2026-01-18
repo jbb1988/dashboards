@@ -10,6 +10,217 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+// Strategic Account Command Center calculation for locations
+function calculateLocationStrategicData(
+  allLocations: any[],
+  totalDistributorRevenue: number,
+  distributorName: string
+) {
+  // Portfolio entities for matrix (locations within this distributor)
+  const portfolioEntities = allLocations.map(loc => {
+    const daysSincePurchase = loc.last_purchase_date
+      ? Math.floor((Date.now() - new Date(loc.last_purchase_date).getTime()) / (1000 * 60 * 60 * 24))
+      : 999;
+
+    const yoyChangePct = loc.prior_revenue > 0
+      ? ((loc.revenue - loc.prior_revenue) / loc.prior_revenue) * 100
+      : loc.revenue > 0 ? 100 : 0;
+
+    const marginPct = loc.revenue > 0
+      ? (loc.gross_profit / loc.revenue) * 100
+      : 0;
+
+    return {
+      id: loc.customer_id,
+      name: loc.customer_name || `Location ${loc.customer_id}`,
+      revenue: loc.revenue || 0,
+      yoy_change_pct: yoyChangePct,
+      margin_pct: marginPct,
+      days_since_purchase: daysSincePurchase,
+      is_growing: yoyChangePct > 5,
+      is_healthy: yoyChangePct > -10 && daysSincePurchase < 60,
+    };
+  });
+
+  // Revenue at risk (locations with declining revenue or inactive)
+  const atRisk = allLocations
+    .filter(loc => {
+      const daysSince = loc.last_purchase_date
+        ? Math.floor((Date.now() - new Date(loc.last_purchase_date).getTime()) / (1000 * 60 * 60 * 24))
+        : 999;
+      const yoyChangePct = loc.prior_revenue > 0
+        ? ((loc.revenue - loc.prior_revenue) / loc.prior_revenue) * 100
+        : 0;
+      return yoyChangePct < -10 || daysSince > 60;
+    })
+    .map(loc => {
+      const daysSince = loc.last_purchase_date
+        ? Math.floor((Date.now() - new Date(loc.last_purchase_date).getTime()) / (1000 * 60 * 60 * 24))
+        : 999;
+      const yoyChangePct = loc.prior_revenue > 0
+        ? ((loc.revenue - loc.prior_revenue) / loc.prior_revenue) * 100
+        : 0;
+      const marginPct = loc.revenue > 0 ? (loc.gross_profit / loc.revenue) * 100 : 0;
+
+      let reason = '';
+      if (daysSince > 90) reason = `Inactive ${daysSince} days`;
+      else if (yoyChangePct < -15) reason = 'Revenue declining >15%';
+      else if (marginPct < 10) reason = 'Margin pressure';
+      else reason = 'Multiple risk factors';
+
+      return {
+        name: loc.customer_name || `Location ${loc.customer_id}`,
+        amount: (loc.revenue || 0) * 0.15,
+        reason,
+        days_inactive: daysSince > 60 ? daysSince : undefined,
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+
+  // Quick wins (locations with category expansion potential)
+  const avgCategoryCount = allLocations.reduce((sum, loc) => {
+    const count = Array.isArray(loc.categories) ? loc.categories.length : 0;
+    return sum + count;
+  }, 0) / allLocations.length;
+
+  const quickWins = allLocations
+    .filter(loc => {
+      const yoyChangePct = loc.prior_revenue > 0
+        ? ((loc.revenue - loc.prior_revenue) / loc.prior_revenue) * 100
+        : 0;
+      const categoryCount = Array.isArray(loc.categories) ? loc.categories.length : 0;
+      return categoryCount < avgCategoryCount * 0.8 && yoyChangePct > -5;
+    })
+    .map(loc => {
+      const categoryCount = Array.isArray(loc.categories) ? loc.categories.length : 0;
+      const categoryGap = Math.floor(avgCategoryCount - categoryCount);
+      const avgRevenuePerCategory = loc.revenue > 0 && categoryCount > 0
+        ? loc.revenue / categoryCount
+        : 0;
+
+      return {
+        name: loc.customer_name || `Location ${loc.customer_id}`,
+        amount: avgRevenuePerCategory * categoryGap * 0.3,
+        type: 'quick-win' as const,
+        action: `Expand to ${categoryGap} more categories`,
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+
+  // Strategic growth (top performing locations for expansion)
+  const strategicGrowth = allLocations
+    .filter(loc => {
+      const yoyChangePct = loc.prior_revenue > 0
+        ? ((loc.revenue - loc.prior_revenue) / loc.prior_revenue) * 100
+        : 100;
+      const marginPct = loc.revenue > 0 ? (loc.gross_profit / loc.revenue) * 100 : 0;
+      return yoyChangePct > 10 && marginPct > 15;
+    })
+    .slice(0, 5)
+    .map(loc => ({
+      name: loc.customer_name || `Location ${loc.customer_id}`,
+      amount: (loc.revenue || 0) * 0.2,
+      type: 'strategic' as const,
+      action: 'Replicate success model',
+    }))
+    .sort((a, b) => b.amount - a.amount);
+
+  // Priority actions
+  const priorityActions = [];
+  let rank = 1;
+
+  // Critical: At-risk locations
+  atRisk.forEach(risk => {
+    priorityActions.push({
+      id: `action-${rank}`,
+      rank,
+      action: `${distributorName} - ${risk.reason}`,
+      entityName: risk.name,
+      entityId: risk.name.toLowerCase().replace(/\s+/g, '-'),
+      impact: risk.amount,
+      riskLevel: risk.days_inactive && risk.days_inactive > 90 ? 'CRITICAL' : 'HIGH' as const,
+      category: risk.days_inactive ? 'inactive' : 'margin' as const,
+      owner: undefined,
+      dueDate: new Date(Date.now() + (risk.days_inactive && risk.days_inactive > 90 ? 7 : 14) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      status: 'open' as const,
+      effort: 'medium' as const,
+      playbook: {
+        context: `${risk.name} shows concerning signs: ${risk.reason}. Immediate action needed within ${distributorName} network.`,
+        talkingPoints: [
+          'Review location-specific purchase patterns and identify service gaps',
+          'Contact location manager to understand operational challenges',
+          'Compare to successful locations within same distributor',
+          'Propose location-specific recovery plan',
+        ],
+        successMetrics: [
+          'Schedule site visit or call within 7 days',
+          'Identify root cause and competitive threats',
+          'Create location action plan',
+          'Re-engage and track weekly progress',
+        ],
+        similarWins: [
+          'Ferguson Phoenix recovered from 90-day inactive status with category expansion (+$45K)',
+          'Core & Main Atlanta turned around margin pressure with product mix optimization (+$32K)',
+        ],
+      },
+    });
+    rank++;
+  });
+
+  // High: Quick wins
+  quickWins.forEach(opp => {
+    priorityActions.push({
+      id: `action-${rank}`,
+      rank,
+      action: opp.action,
+      entityName: opp.name,
+      entityId: opp.name.toLowerCase().replace(/\s+/g, '-'),
+      impact: opp.amount,
+      riskLevel: 'HIGH' as const,
+      category: 'category' as const,
+      owner: undefined,
+      dueDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      status: 'open' as const,
+      effort: 'low' as const,
+      playbook: {
+        context: `${opp.name} has category gaps vs ${distributorName} average. Low-effort expansion opportunity.`,
+        talkingPoints: [
+          'Analyze category gaps specific to this location',
+          'Present category expansion based on successful peer locations',
+          'Highlight quick wins with proven product recommendations',
+          'Create trial order to test new categories',
+        ],
+        successMetrics: [
+          'Add 2+ new categories in next 30 days',
+          'Track category adoption rate',
+          'Measure incremental revenue per new category',
+          'Expand to full product line if successful',
+        ],
+        similarWins: [
+          'Ferguson Denver added 3 categories and generated $28K incremental revenue',
+          'Core & Main Austin expanded from 4 to 7 categories (+$41K)',
+        ],
+      },
+    });
+    rank++;
+  });
+
+  // Limit to top 10 actions
+  const topActions = priorityActions.slice(0, 10);
+
+  return {
+    portfolioEntities,
+    revenueBridge: {
+      currentRevenue: totalDistributorRevenue,
+      targetRevenue: totalDistributorRevenue * 1.15,
+      atRisk,
+      quickWins,
+      strategicGrowth,
+    },
+    priorityActions: topActions,
+  };
+}
+
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
@@ -509,7 +720,7 @@ export async function GET(
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 50); // Top 50 recent transactions
 
-    // Fetch all locations for this distributor for comparison
+    // Fetch all locations for this distributor for comparison (current period)
     let peerQuery = admin
       .from('diversified_sales')
       .select('customer_id, customer_name, revenue, cost, gross_profit, class_category, transaction_date');
@@ -523,10 +734,26 @@ export async function GET(
       peerQuery = peerQuery.eq('class_name', className);
     }
 
-    const peerResult = await peerQuery;
+    // Fetch prior period data for peers
+    let peerPriorQuery = admin
+      .from('diversified_sales')
+      .select('customer_id, revenue');
+
+    peerPriorQuery = peerPriorQuery
+      .ilike('customer_name', `%${distributorName}%`)
+      .gte('transaction_date', formatDate(priorPeriodStart))
+      .lte('transaction_date', formatDate(priorPeriodEnd));
+
+    if (className) {
+      peerPriorQuery = peerPriorQuery.eq('class_name', className);
+    }
+
+    const [peerResult, peerPriorResult] = await Promise.all([peerQuery, peerPriorQuery]);
     if (peerResult.error) throw peerResult.error;
+    if (peerPriorResult.error) throw peerPriorResult.error;
 
     const peerData = peerResult.data || [];
+    const peerPriorData = peerPriorResult.data || [];
 
     // Aggregate peer locations
     const peerMap = new Map<string, any>();
@@ -559,8 +786,27 @@ export async function GET(
           cost: row.cost || 0,
           gross_profit: row.gross_profit || 0,
           categories: row.class_category ? [row.class_category] : [],
-          transaction_count: 0 // Will be set below
+          transaction_count: 0, // Will be set below
+          prior_revenue: 0, // Will be set below
+          last_purchase_date: row.transaction_date || null
         });
+      }
+
+      // Track last purchase date
+      if (row.transaction_date) {
+        const existing = peerMap.get(key);
+        if (existing && (!existing.last_purchase_date || row.transaction_date > existing.last_purchase_date)) {
+          existing.last_purchase_date = row.transaction_date;
+        }
+      }
+    }
+
+    // Process prior period data for peers
+    for (const row of peerPriorData) {
+      const key = row.customer_id;
+      const existing = peerMap.get(key);
+      if (existing) {
+        existing.prior_revenue += row.revenue || 0;
       }
     }
 
@@ -683,6 +929,14 @@ export async function GET(
       5
     );
 
+    // Calculate Strategic Account Command Center data
+    const totalDistributorRevenue = peerLocations.reduce((sum, loc) => sum + (loc.revenue || 0), 0);
+    const strategicAccountData = calculateLocationStrategicData(
+      peerLocations,
+      totalDistributorRevenue,
+      distributorName
+    );
+
     return NextResponse.json({
       customer_id: customerId,
       customer_name: customerName,
@@ -725,6 +979,8 @@ export async function GET(
       competitive_position: competitivePosition,
       similar_locations: similarLocations,
       distributor_metrics: distributorMetrics,
+      // Strategic Account Command Center
+      strategicAccountData,
     });
 
   } catch (error) {

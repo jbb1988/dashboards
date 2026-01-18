@@ -22,6 +22,9 @@ import CompetitivePositionCard from '@/components/distributors/CompetitivePositi
 import PeerBenchmarkingTable from '@/components/distributors/PeerBenchmarkingTable';
 import { CreateTaskModal } from '@/components/diversified/CreateTaskModal';
 import type { AIRecommendation } from '@/components/diversified/UnifiedInsightsPanel';
+import StrategicPortfolioMatrix, { type PortfolioEntity } from '@/components/distributors/StrategicPortfolioMatrix';
+import RevenueBridge, { type RiskItem, type OpportunityItem } from '@/components/distributors/RevenueBridge';
+import PriorityActionQueue, { type PriorityAction } from '@/components/distributors/PriorityActionQueue';
 
 // Icon Components
 const ArrowUpIcon = ({ className }: { className?: string }) => (
@@ -1094,6 +1097,48 @@ export default function DistributorDetailPage() {
               </table>
             </div>
           </motion.div>
+        )}
+
+        {/* Strategic Account Command Center */}
+        {data.strategicAccountData && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.6 }}
+            >
+              <StrategicPortfolioMatrix
+                entities={data.strategicAccountData.portfolioEntities}
+                entityType="location"
+              />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.7 }}
+            >
+              <RevenueBridge
+                currentRevenue={data.strategicAccountData.revenueBridge.currentRevenue}
+                targetRevenue={data.strategicAccountData.revenueBridge.targetRevenue}
+                atRisk={data.strategicAccountData.revenueBridge.atRisk}
+                quickWins={data.strategicAccountData.revenueBridge.quickWins}
+                strategicGrowth={data.strategicAccountData.revenueBridge.strategicGrowth}
+                entityType="location"
+              />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.8 }}
+            >
+              <PriorityActionQueue
+                actions={data.strategicAccountData.priorityActions}
+                showPlaybook={true}
+              />
+            </motion.div>
+          </>
         )}
       </div>
 
