@@ -3,29 +3,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Clock, Database, Search, AlertCircle, ChevronDown, X } from 'lucide-react';
 import ProfitabilityKPIs from './ProfitabilityKPIs';
-import ProjectHierarchy from './ProjectHierarchy';
 
 interface ProjectOption {
   name: string;
   years: number[];
 }
 
-interface ProjectKPIs {
-  budgetRevenue: number;
-  actualRevenue: number;
-  budgetCost: number;
-  actualCost: number;
-  budgetGP: number;
-  actualGP: number;
-  budgetGPM: number;
-  actualGPM: number;
-  variance: number;
-  variancePct: number;
-  cpi: number;
-}
-
+// Matches the actual API response from /api/closeout/profitability
 interface SOLineItem {
-  lineId: string;
+  lineNumber: number;
   itemId: string;
   itemName: string | null;
   itemDescription: string | null;
@@ -40,7 +26,7 @@ interface SOLineItem {
 }
 
 interface WOLineItem {
-  lineId: string;
+  lineNumber: number;
   itemId: string;
   itemName: string | null;
   itemDescription: string | null;
@@ -49,24 +35,12 @@ interface WOLineItem {
   quantityCompleted: number;
   unitCost: number;
   lineCost: number;
+  costEstimate: number;
+  actualCost: number | null;
   isClosed: boolean;
 }
 
-interface WorkOrder {
-  woNumber: string;
-  netsuiteId: string;
-  woDate: string | null;
-  status: string | null;
-  customerName: string | null;
-  lineItems: WOLineItem[];
-  totals: {
-    itemCount: number;
-    totalQuantity: number;
-    totalCost: number;
-  };
-}
-
-interface SalesOrder {
+interface LinkedSalesOrder {
   soNumber: string;
   netsuiteId: string;
   soDate: string | null;
@@ -74,15 +48,52 @@ interface SalesOrder {
   customerName: string | null;
   totalAmount: number;
   lineItems: SOLineItem[];
-  workOrders: WorkOrder[];
   totals: {
     lineItemCount: number;
-    workOrderCount: number;
     revenue: number;
     costEstimate: number;
     grossProfit: number;
     grossMarginPct: number;
-    woManufacturingCost: number;
+  };
+}
+
+interface WorkOrderDetail {
+  woNumber: string;
+  netsuiteId: string;
+  woDate: string | null;
+  status: string | null;
+  linkedSO: LinkedSalesOrder | null;
+  lineItems: WOLineItem[];
+  totals: {
+    lineItemCount: number;
+    totalEstimatedCost: number;
+    totalActualCost: number | null;
+    totalCost: number;
+  };
+}
+
+interface ProjectTypeDetail {
+  typeCode: string;
+  typeName: string;
+  excelData: {
+    budgetRevenue: number;
+    budgetCost: number;
+    budgetGP: number;
+    actualRevenue: number;
+    actualCost: number;
+    actualGP: number;
+    variance: number;
+  };
+  workOrders: WorkOrderDetail[];
+  linkedSalesOrders: string[];
+  totals: {
+    woCount: number;
+    soCount: number;
+    netsuiteRevenue: number;
+    netsuiteCostEstimate: number;
+    netsuiteActualCost: number | null;
+    netsuiteGrossProfit: number;
+    netsuiteGrossMarginPct: number;
   };
 }
 
@@ -91,22 +102,27 @@ interface ProfitabilityData {
     name: string;
     year: number | null;
     customerName: string | null;
-    kpis: ProjectKPIs;
-    salesOrders: SalesOrder[];
+    projectTypes: ProjectTypeDetail[];
     totals: {
-      salesOrderCount: number;
+      projectTypeCount: number;
       workOrderCount: number;
-      soLineItemCount: number;
-      woLineItemCount: number;
-      totalRevenue: number;
-      totalCostEstimate: number;
-      totalWOCost: number;
+      salesOrderCount: number;
+      excelBudgetRevenue: number;
+      excelActualRevenue: number;
+      excelVariance: number;
+      netsuiteRevenue: number;
+      netsuiteCostEstimate: number;
+      netsuiteActualCost: number | null;
+      netsuiteGrossProfit: number;
+      netsuiteGrossMarginPct: number;
     };
   };
+  legend: Record<string, string>;
   syncStatus: {
     lastSyncedAt: string | null;
     workOrderCount: number;
     salesOrderCount: number;
+    workOrdersWithActualCosts: number;
   };
 }
 
@@ -410,14 +426,52 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
       {/* Data Display */}
       {data && (
         <>
-          {/* KPIs */}
-          <ProfitabilityKPIs
-            kpis={data.project.kpis}
-            projectName={data.project.customerName || data.project.name}
-          />
+          {/* KPIs - Computed from project types */}
+          {(() => {
+            // Compute KPIs from projectTypes
+            const totals = data.project.totals;
+            const projectTypes = data.project.projectTypes;
+
+            const budgetRevenue = totals.excelBudgetRevenue;
+            const actualRevenue = totals.excelActualRevenue;
+            const budgetCost = projectTypes.reduce((sum, pt) => sum + pt.excelData.budgetCost, 0);
+            const actualCost = projectTypes.reduce((sum, pt) => sum + pt.excelData.actualCost, 0);
+            const budgetGP = projectTypes.reduce((sum, pt) => sum + pt.excelData.budgetGP, 0);
+            const actualGP = projectTypes.reduce((sum, pt) => sum + pt.excelData.actualGP, 0);
+            const budgetGPM = budgetRevenue > 0 ? (budgetGP / budgetRevenue) * 100 : 0;
+            const actualGPM = actualRevenue > 0 ? (actualGP / actualRevenue) * 100 : 0;
+            const variance = totals.excelVariance;
+            const variancePct = budgetCost > 0 ? (variance / budgetCost) * 100 : 0;
+            const cpi = actualCost > 0 ? budgetCost / actualCost : 1;
+
+            const kpis = {
+              budgetRevenue,
+              actualRevenue,
+              budgetCost,
+              actualCost,
+              budgetGP,
+              actualGP,
+              budgetGPM,
+              actualGPM,
+              variance,
+              variancePct,
+              cpi,
+            };
+
+            return (
+              <ProfitabilityKPIs
+                kpis={kpis}
+                projectName={data.project.customerName || data.project.name}
+              />
+            );
+          })()}
 
           {/* Summary Stats */}
           <div className="grid grid-cols-4 gap-4">
+            <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-4">
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Project Types</div>
+              <div className="text-2xl font-bold text-white">{data.project.totals.projectTypeCount}</div>
+            </div>
             <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-4">
               <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Sales Orders</div>
               <div className="text-2xl font-bold text-white">{data.project.totals.salesOrderCount}</div>
@@ -427,17 +481,93 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
               <div className="text-2xl font-bold text-white">{data.project.totals.workOrderCount}</div>
             </div>
             <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-4">
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">SO Line Items</div>
-              <div className="text-2xl font-bold text-white">{data.project.totals.soLineItemCount}</div>
-            </div>
-            <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-4">
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">WO Line Items</div>
-              <div className="text-2xl font-bold text-white">{data.project.totals.woLineItemCount}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">NetSuite GPM</div>
+              <div className={`text-2xl font-bold ${data.project.totals.netsuiteGrossMarginPct >= 50 ? 'text-[#22C55E]' : data.project.totals.netsuiteGrossMarginPct >= 30 ? 'text-[#F59E0B]' : 'text-[#EF4444]'}`}>
+                {data.project.totals.netsuiteGrossMarginPct.toFixed(1)}%
+              </div>
             </div>
           </div>
 
-          {/* Project Hierarchy */}
-          <ProjectHierarchy salesOrders={data.project.salesOrders} />
+          {/* Project Types Breakdown */}
+          <div className="bg-[#111827] rounded-xl border border-white/[0.04] overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/[0.04] bg-white/[0.02]">
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider">
+                Project Types & Work Orders
+              </h3>
+            </div>
+            <div className="divide-y divide-white/[0.04]">
+              {data.project.projectTypes.map((pt) => (
+                <div key={pt.typeCode} className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <span className="text-sm font-medium text-white">{pt.typeName}</span>
+                      <span className="ml-2 text-xs text-gray-500">({pt.typeCode})</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-gray-400">{pt.totals.woCount} WOs</span>
+                      <span className="text-gray-400">{pt.totals.soCount} SOs</span>
+                      <span className={`font-medium ${pt.totals.netsuiteGrossMarginPct >= 50 ? 'text-[#22C55E]' : pt.totals.netsuiteGrossMarginPct >= 30 ? 'text-[#F59E0B]' : 'text-[#EF4444]'}`}>
+                        {pt.totals.netsuiteGrossMarginPct.toFixed(1)}% GPM
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Excel Budget vs Actual */}
+                  <div className="grid grid-cols-4 gap-3 mb-3 text-xs">
+                    <div className="bg-[#0D1117] rounded-lg p-2">
+                      <div className="text-gray-400">Budget Revenue</div>
+                      <div className="text-white font-medium">${(pt.excelData.budgetRevenue / 1000).toFixed(0)}K</div>
+                    </div>
+                    <div className="bg-[#0D1117] rounded-lg p-2">
+                      <div className="text-gray-400">Actual Revenue</div>
+                      <div className="text-white font-medium">${(pt.excelData.actualRevenue / 1000).toFixed(0)}K</div>
+                    </div>
+                    <div className="bg-[#0D1117] rounded-lg p-2">
+                      <div className="text-gray-400">Actual Cost</div>
+                      <div className="text-white font-medium">${(pt.excelData.actualCost / 1000).toFixed(0)}K</div>
+                    </div>
+                    <div className="bg-[#0D1117] rounded-lg p-2">
+                      <div className="text-gray-400">Variance</div>
+                      <div className={`font-medium ${pt.excelData.variance >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+                        ${(pt.excelData.variance / 1000).toFixed(0)}K
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Work Orders */}
+                  {pt.workOrders.length > 0 && (
+                    <div className="space-y-2">
+                      {pt.workOrders.slice(0, 5).map((wo) => (
+                        <div key={wo.woNumber} className="bg-[#0D1117] rounded-lg p-2 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-medium">{wo.woNumber}</span>
+                            {wo.linkedSO && (
+                              <span className="text-gray-500">→ {wo.linkedSO.soNumber}</span>
+                            )}
+                            <span className="text-gray-400">{wo.status}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-400">{wo.totals.lineItemCount} items</span>
+                            <span className="text-white">${(wo.totals.totalCost / 1000).toFixed(1)}K cost</span>
+                            {wo.linkedSO && (
+                              <span className={`${wo.linkedSO.totals.grossMarginPct >= 50 ? 'text-[#22C55E]' : wo.linkedSO.totals.grossMarginPct >= 30 ? 'text-[#F59E0B]' : 'text-[#EF4444]'}`}>
+                                {wo.linkedSO.totals.grossMarginPct.toFixed(1)}% GPM
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {pt.workOrders.length > 5 && (
+                        <div className="text-xs text-gray-500 text-center py-1">
+                          + {pt.workOrders.length - 5} more work orders
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </>
       )}
     </div>
