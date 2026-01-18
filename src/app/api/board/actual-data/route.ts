@@ -10,25 +10,30 @@ export async function GET(request: Request) {
   const supabase = getSupabaseAdmin();
 
   try {
-    // Get ALL sales orders for the year (no class filter since most are NULL)
-    const { data: salesOrders } = await supabase
+    // Get ALL sales orders for the year
+    const { data: salesOrders, error: soError } = await supabase
       .from('netsuite_sales_orders')
       .select(`
         id,
         customer_name,
         so_number,
         so_date,
-        class_name,
-        netsuite_sales_order_lines (
+        netsuite_sales_order_lines!sales_order_id (
           item_name,
           amount,
           quantity,
-          rate
+          rate,
+          class_name
         )
       `)
       .gte('so_date', `${year}-01-01`)
       .lte('so_date', `${year}-12-31`)
       .order('customer_name');
+
+    if (soError) {
+      console.error('SO query error:', soError);
+      throw new Error(`Failed to fetch sales orders: ${soError.message}`);
+    }
 
     // Get work orders for the year
     const { data: workOrders } = await supabase
