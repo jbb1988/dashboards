@@ -8,11 +8,8 @@ export async function GET(request: NextRequest) {
     const admin = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
 
-    // Parse year/month filters
-    const yearsParam = searchParams.get('years');
-    const monthsParam = searchParams.get('months');
-    const years = yearsParam ? yearsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
-    const months = monthsParam ? monthsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
+    // NOTE: Stopped buying analysis requires 18 months of historical data
+    // We intentionally IGNORE year/month filters to ensure we have the full comparison window
 
     // Calculate date ranges
     // Current period: last 6 months (for "stopped buying" detection)
@@ -46,21 +43,11 @@ export async function GET(request: NextRequest) {
     let hasMore = true;
 
     while (hasMore) {
-      let query = admin
+      // Always use 18-month window - DO NOT apply year/month filters
+      const query = admin
         .from('diversified_sales')
-        .select('customer_id, customer_name, item_id, item_name, item_description, class_name, transaction_date, year, month, revenue, quantity');
-
-      // Apply year filter if provided, otherwise use 18-month window
-      if (years.length > 0) {
-        query = query.in('year', years);
-      } else {
-        query = query.gte('transaction_date', formatDate(eighteenMonthsAgo));
-      }
-
-      // Apply month filter if provided
-      if (months.length > 0) {
-        query = query.in('month', months);
-      }
+        .select('customer_id, customer_name, item_id, item_name, item_description, class_name, transaction_date, year, month, revenue, quantity')
+        .gte('transaction_date', formatDate(eighteenMonthsAgo))
 
       const { data, error } = await query
         .order('transaction_date', { ascending: false })

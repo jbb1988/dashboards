@@ -80,6 +80,33 @@ export function StoppedBuyingReport({ onCustomerClick, selectedYears, selectedMo
   const [viewMode, setViewMode] = useState<'by_product' | 'by_customer'>('by_product');
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
+  // Sorting state for "By Product" view
+  const [productSortColumn, setProductSortColumn] = useState<'product' | 'revenue' | 'customers'>('revenue');
+  const [productSortDirection, setProductSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Sorting state for "By Customer" view
+  const [customerSortColumn, setCustomerSortColumn] = useState<'customer' | 'revenue' | 'products'>('revenue');
+  const [customerSortDirection, setCustomerSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Sorting handlers
+  const handleProductSort = (column: 'product' | 'revenue' | 'customers') => {
+    if (productSortColumn === column) {
+      setProductSortDirection(productSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setProductSortColumn(column);
+      setProductSortDirection('desc');
+    }
+  };
+
+  const handleCustomerSort = (column: 'customer' | 'revenue' | 'products') => {
+    if (customerSortColumn === column) {
+      setCustomerSortDirection(customerSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setCustomerSortColumn(column);
+      setCustomerSortDirection('desc');
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -127,6 +154,65 @@ export function StoppedBuyingReport({ onCustomerClick, selectedYears, selectedMo
 
   if (!data) return null;
 
+  // Sort product data
+  const sortedProducts = [...data.by_product].sort((a, b) => {
+    let compareValue = 0;
+
+    switch (productSortColumn) {
+      case 'product':
+        compareValue = (a.item_description || a.item_name).localeCompare(b.item_description || b.item_name);
+        break;
+      case 'revenue':
+        compareValue = a.total_prior_revenue - b.total_prior_revenue;
+        break;
+      case 'customers':
+        compareValue = a.customers_lost - b.customers_lost;
+        break;
+    }
+
+    return productSortDirection === 'asc' ? compareValue : -compareValue;
+  });
+
+  // Sort customer data
+  const sortedCustomers = [...data.by_customer].sort((a, b) => {
+    let compareValue = 0;
+
+    switch (customerSortColumn) {
+      case 'customer':
+        compareValue = a.customer_name.localeCompare(b.customer_name);
+        break;
+      case 'revenue':
+        compareValue = a.total_prior_revenue - b.total_prior_revenue;
+        break;
+      case 'products':
+        compareValue = a.products_stopped - b.products_stopped;
+        break;
+    }
+
+    return customerSortDirection === 'asc' ? compareValue : -compareValue;
+  });
+
+  // Sort indicator component
+  const SortIndicator = ({ column, activeColumn, direction }: { column: string; activeColumn: string; direction: 'asc' | 'desc' }) => {
+    if (column !== activeColumn) {
+      return (
+        <svg className="w-3 h-3 text-[#64748B]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      );
+    }
+
+    return direction === 'asc' ? (
+      <svg className="w-3 h-3 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-3 h-3 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -138,9 +224,17 @@ export function StoppedBuyingReport({ onCustomerClick, selectedYears, selectedMo
             </svg>
             Stopped Buying Analysis
           </h3>
-          <p className="text-[12px] text-[#64748B] mt-1">
-            Products that customers purchased {data.periods.comparison_window.description} but have NOT purchased {data.periods.detection_window.description}
-          </p>
+          <div className="mt-1 space-y-1">
+            <p className="text-[12px] text-[#64748B]">
+              Products that customers purchased {data.periods.comparison_window.description} but have NOT purchased {data.periods.detection_window.description}
+            </p>
+            <div className="flex items-center gap-2 text-[11px] text-amber-400/80">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              This analysis always uses the last 18 months of data, independent of any dashboard filters
+            </div>
+          </div>
         </div>
       </div>
 
@@ -207,15 +301,33 @@ export function StoppedBuyingReport({ onCustomerClick, selectedYears, selectedMo
       {/* By Product View */}
       {viewMode === 'by_product' && (
         <div className="rounded-xl bg-[#151F2E] border border-white/[0.04] overflow-hidden">
-          <div className="grid grid-cols-[1fr,120px,100px,80px] gap-4 px-4 py-3 bg-[#0F1722] border-b border-white/[0.04] text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">
-            <div>Product</div>
-            <div className="text-right">Lost Revenue</div>
-            <div className="text-right">Customers Lost</div>
+          <div className="grid grid-cols-[1fr,120px,100px,80px] gap-4 px-4 py-3 bg-[#0F1722] border-b border-white/[0.04] text-[10px] font-semibold uppercase tracking-wider">
+            <button
+              onClick={() => handleProductSort('product')}
+              className="flex items-center gap-1.5 text-left hover:text-cyan-400 transition-colors text-[#64748B]"
+            >
+              Product
+              <SortIndicator column="product" activeColumn={productSortColumn} direction={productSortDirection} />
+            </button>
+            <button
+              onClick={() => handleProductSort('revenue')}
+              className="flex items-center justify-end gap-1.5 text-right hover:text-cyan-400 transition-colors text-[#64748B]"
+            >
+              Lost Revenue
+              <SortIndicator column="revenue" activeColumn={productSortColumn} direction={productSortDirection} />
+            </button>
+            <button
+              onClick={() => handleProductSort('customers')}
+              className="flex items-center justify-end gap-1.5 text-right hover:text-cyan-400 transition-colors text-[#64748B]"
+            >
+              Customers Lost
+              <SortIndicator column="customers" activeColumn={productSortColumn} direction={productSortDirection} />
+            </button>
             <div></div>
           </div>
 
           <div className="max-h-[400px] overflow-y-auto">
-            {data.by_product.map((product) => {
+            {sortedProducts.map((product) => {
               const isExpanded = expandedItem === product.item_id;
 
               return (
@@ -297,15 +409,33 @@ export function StoppedBuyingReport({ onCustomerClick, selectedYears, selectedMo
       {/* By Customer View */}
       {viewMode === 'by_customer' && (
         <div className="rounded-xl bg-[#151F2E] border border-white/[0.04] overflow-hidden">
-          <div className="grid grid-cols-[1fr,120px,100px,80px] gap-4 px-4 py-3 bg-[#0F1722] border-b border-white/[0.04] text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">
-            <div>Customer</div>
-            <div className="text-right">Revenue at Risk</div>
-            <div className="text-right">Products Dropped</div>
+          <div className="grid grid-cols-[1fr,120px,100px,80px] gap-4 px-4 py-3 bg-[#0F1722] border-b border-white/[0.04] text-[10px] font-semibold uppercase tracking-wider">
+            <button
+              onClick={() => handleCustomerSort('customer')}
+              className="flex items-center gap-1.5 text-left hover:text-cyan-400 transition-colors text-[#64748B]"
+            >
+              Customer
+              <SortIndicator column="customer" activeColumn={customerSortColumn} direction={customerSortDirection} />
+            </button>
+            <button
+              onClick={() => handleCustomerSort('revenue')}
+              className="flex items-center justify-end gap-1.5 text-right hover:text-cyan-400 transition-colors text-[#64748B]"
+            >
+              Revenue at Risk
+              <SortIndicator column="revenue" activeColumn={customerSortColumn} direction={customerSortDirection} />
+            </button>
+            <button
+              onClick={() => handleCustomerSort('products')}
+              className="flex items-center justify-end gap-1.5 text-right hover:text-cyan-400 transition-colors text-[#64748B]"
+            >
+              Products Dropped
+              <SortIndicator column="products" activeColumn={customerSortColumn} direction={customerSortDirection} />
+            </button>
             <div></div>
           </div>
 
           <div className="max-h-[400px] overflow-y-auto">
-            {data.by_customer.map((customer) => {
+            {sortedCustomers.map((customer) => {
               const isExpanded = expandedItem === (customer.customer_id || customer.customer_name);
 
               return (

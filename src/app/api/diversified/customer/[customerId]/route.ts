@@ -292,6 +292,89 @@ export async function GET(request: NextRequest, { params }: CustomerDetailParams
     const stoppedProducts = products.filter(p => p.stopped_buying === 'stopped');
     const warningProducts = products.filter(p => p.stopped_buying === 'warning');
 
+    // Cross-sell opportunities: find classes they don't buy
+    const currentClasses = [...new Set(products.filter(p => p.current_revenue > 0).map(p => p.class_name))];
+
+    // Get all classes available in the system with their average metrics
+    const { data: allClassesData, error: classesError } = await admin
+      .from('diversified_sales')
+      .select('class_name, revenue, cost')
+      .gte('transaction_date', formatDate(currentPeriodStart))
+      .not('class_name', 'is', null);
+
+    const classMetrics = new Map<string, { totalRevenue: number; totalCost: number; count: number }>();
+    if (allClassesData) {
+      for (const row of allClassesData) {
+        const className = row.class_name;
+        if (!classMetrics.has(className)) {
+          classMetrics.set(className, { totalRevenue: 0, totalCost: 0, count: 0 });
+        }
+        const metrics = classMetrics.get(className)!;
+        metrics.totalRevenue += row.revenue || 0;
+        metrics.totalCost += row.cost || 0;
+        metrics.count++;
+      }
+    }
+
+    // Find opportunities: classes they don't currently buy
+    const crossSellOpportunities = Array.from(classMetrics.entries())
+      .filter(([className]) => !currentClasses.includes(className))
+      .map(([className, metrics]) => {
+        const avgRevenue = metrics.totalRevenue / metrics.count;
+        const avgMargin = metrics.totalRevenue > 0 ? ((metrics.totalRevenue - metrics.totalCost) / metrics.totalRevenue) * 100 : 0;
+
+        // Generate talking points based on what they already buy
+        let talkingPoints: string[] = [];
+        const complementaryClasses: Record<string, string[]> = {
+          'Spools': ['Strainers', 'Valve Keys', 'Fillers Flanges'],
+          'Strainers': ['Spools', 'Valve Keys'],
+          'Valve Keys': ['Spools', 'Strainers'],
+          'Fillers Flanges': ['Spools', 'Strainers'],
+          'VeroFlow': ['Spools', 'Strainers', 'Valve Keys'],
+        };
+
+        const relatedClasses = currentClasses.filter(current =>
+          complementaryClasses[current]?.includes(className)
+        );
+
+        if (relatedClasses.length > 0) {
+          talkingPoints.push(`Complements their existing ${relatedClasses.join(', ')} purchases`);
+        }
+
+        // Add more context based on the class
+        if (className === 'VeroFlow') {
+          talkingPoints.push('High-efficiency alternative to traditional backflow preventers');
+          talkingPoints.push('Customers report 30-40% labor savings on installation');
+        } else if (className === 'Spools') {
+          talkingPoints.push('Custom configurations available for specific applications');
+          talkingPoints.push('Often paired with strainers for complete system solutions');
+        } else if (className === 'Strainers') {
+          talkingPoints.push('Essential for protecting equipment downstream');
+          talkingPoints.push('Variety of mesh sizes for different applications');
+        }
+
+        return {
+          class_name: className,
+          estimated_annual_revenue: Math.round(avgRevenue * 12), // Estimate annual spend
+          avg_margin_pct: Math.round(avgMargin * 10) / 10,
+          priority: relatedClasses.length > 0 ? 'high' : 'medium',
+          talking_points: talkingPoints.length > 0 ? talkingPoints : [
+            `Currently buying ${currentClasses.join(', ')}`,
+            `${className} offers additional solutions for their applications`,
+          ],
+          related_products: currentClasses.filter(c => c !== className).slice(0, 3),
+        };
+      })
+      .filter(opp => opp.estimated_annual_revenue > 1000) // Only meaningful opportunities
+      .sort((a, b) => {
+        // Sort by priority first, then revenue
+        if (a.priority !== b.priority) {
+          return a.priority === 'high' ? -1 : 1;
+        }
+        return b.estimated_annual_revenue - a.estimated_annual_revenue;
+      })
+      .slice(0, 5); // Top 5 opportunities
+
     return NextResponse.json({
       customer: {
         id: customerId,
@@ -327,6 +410,7 @@ export async function GET(request: NextRequest, { params }: CustomerDetailParams
         warning_prior_revenue: warningProducts.reduce((sum, p) => sum + p.prior_revenue, 0),
       },
       transactions,
+      cross_sell_opportunities: crossSellOpportunities,
     });
   } catch (error) {
     console.error('Error fetching customer detail:', error);

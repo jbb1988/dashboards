@@ -68,6 +68,14 @@ interface CustomerDetail {
     total_revenue: number;
     total_units: number;
   }>;
+  cross_sell_opportunities: Array<{
+    class_name: string;
+    estimated_annual_revenue: number;
+    avg_margin_pct: number;
+    priority: 'high' | 'medium';
+    talking_points: string[];
+    related_products: string[];
+  }>;
 }
 
 interface CustomerDetailDrawerProps {
@@ -108,7 +116,7 @@ export function CustomerDetailDrawer({ customerId, customerName, onClose }: Cust
   const [data, setData] = useState<CustomerDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'products' | 'transactions'>('products');
+  const [activeSubTab, setActiveSubTab] = useState<'products' | 'transactions' | 'cross_sell'>('products');
   const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null);
 
   useEffect(() => {
@@ -317,7 +325,7 @@ export function CustomerDetailDrawer({ customerId, customerName, onClose }: Cust
                     </div>
                   </div>
 
-                  {/* Sub-tabs for Products/Transactions */}
+                  {/* Sub-tabs for Products/Transactions/Cross-Sell */}
                   <div className="flex items-center gap-1 border-b border-white/[0.06]">
                     <button
                       onClick={() => setActiveSubTab('products')}
@@ -328,6 +336,21 @@ export function CustomerDetailDrawer({ customerId, customerName, onClose }: Cust
                       }`}
                     >
                       Products ({data.products.length})
+                    </button>
+                    <button
+                      onClick={() => setActiveSubTab('cross_sell')}
+                      className={`px-4 py-2.5 text-[12px] font-medium border-b-2 transition-all ${
+                        activeSubTab === 'cross_sell'
+                          ? 'text-[#38BDF8] border-[#38BDF8]'
+                          : 'text-[#64748B] border-transparent hover:text-white'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Cross-Sell ({data.cross_sell_opportunities.length})
+                      </span>
                     </button>
                     <button
                       onClick={() => setActiveSubTab('transactions')}
@@ -383,6 +406,113 @@ export function CustomerDetailDrawer({ customerId, customerName, onClose }: Cust
                           <ProductRow key={product.item_id} product={product} />
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Cross-Sell Tab */}
+                  {activeSubTab === 'cross_sell' && (
+                    <div className="space-y-4">
+                      {data.cross_sell_opportunities.length === 0 ? (
+                        <div className="p-8 rounded-lg bg-[#151F2E] border border-white/[0.04] text-center">
+                          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-500/10 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <p className="text-white font-medium mb-1">Already Buying All Product Lines!</p>
+                          <p className="text-[12px] text-[#64748B]">This customer is purchasing from all available product classes</p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Summary Banner */}
+                          <div className="p-4 rounded-lg bg-gradient-to-r from-cyan-500/10 to-transparent border border-cyan-500/20">
+                            <div className="flex items-start gap-3">
+                              <div className="p-2 rounded-lg bg-cyan-500/20">
+                                <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-semibold text-cyan-400 mb-1">
+                                  {data.cross_sell_opportunities.filter(o => o.priority === 'high').length} High-Priority Opportunities
+                                </h4>
+                                <p className="text-[12px] text-[#94A3B8]">
+                                  Potential annual revenue: {formatCurrency(data.cross_sell_opportunities.reduce((sum, o) => sum + o.estimated_annual_revenue, 0))}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Opportunities List */}
+                          {data.cross_sell_opportunities.map((opp, idx) => (
+                            <div
+                              key={opp.class_name}
+                              className={`p-4 rounded-lg border ${
+                                opp.priority === 'high'
+                                  ? 'bg-cyan-500/5 border-cyan-500/30'
+                                  : 'bg-[#151F2E] border-white/[0.04]'
+                              }`}
+                            >
+                              {/* Header */}
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h5 className="text-[14px] font-semibold text-white">{opp.class_name}</h5>
+                                    {opp.priority === 'high' && (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-cyan-500/20 text-cyan-400">
+                                        HIGH PRIORITY
+                                      </span>
+                                    )}
+                                  </div>
+                                  {opp.related_products.length > 0 && (
+                                    <p className="text-[11px] text-[#64748B]">
+                                      Complements: {opp.related_products.join(', ')}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[14px] font-bold text-cyan-400">
+                                    {formatCurrency(opp.estimated_annual_revenue)}/yr
+                                  </div>
+                                  <div className="text-[11px] text-[#64748B]">
+                                    {opp.avg_margin_pct.toFixed(1)}% margin
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Talking Points */}
+                              <div className="space-y-2 mb-3">
+                                <div className="text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wide">
+                                  Why Recommend This:
+                                </div>
+                                {opp.talking_points.map((point, pointIdx) => (
+                                  <div key={pointIdx} className="flex items-start gap-2">
+                                    <svg className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span className="text-[12px] text-[#E2E8F0]">{point}</span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Action Button */}
+                              <button
+                                onClick={() => {
+                                  // Copy a pre-formatted call script to clipboard
+                                  const script = `Hi ${data.customer.name},\n\nBased on your current purchases of ${opp.related_products.length > 0 ? opp.related_products.join(', ') : 'our products'}, I wanted to introduce you to our ${opp.class_name} line.\n\nKey benefits:\n${opp.talking_points.map(p => `• ${p}`).join('\n')}\n\nI estimate this could add around ${formatCurrency(opp.estimated_annual_revenue)} annually to your operations.\n\nWould you be interested in learning more?`;
+                                  navigator.clipboard.writeText(script);
+                                }}
+                                className="w-full px-3 py-2 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-[12px] font-medium transition-all flex items-center justify-center gap-2"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                </svg>
+                                Copy Call Script
+                              </button>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   )}
 
