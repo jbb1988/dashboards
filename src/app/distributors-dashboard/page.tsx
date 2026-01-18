@@ -90,17 +90,6 @@ interface DistributorsResponse {
     prior: { start: string; end: string };
   };
   categories: string[];
-  strategicAccountData?: {
-    portfolioEntities: PortfolioEntity[];
-    revenueBridge: {
-      currentRevenue: number;
-      targetRevenue: number;
-      atRisk: RiskItem[];
-      quickWins: OpportunityItem[];
-      strategicGrowth: OpportunityItem[];
-    };
-    priorityActions: PriorityAction[];
-  };
 }
 
 // =============================================================================
@@ -813,32 +802,6 @@ export default function DistributorsDashboard() {
                     index={2}
                   />
 
-                  {/* Row 3: Strategic Account Command Center */}
-                  {data.strategicAccountData && (
-                    <>
-                      {/* Portfolio Matrix */}
-                      <StrategicPortfolioMatrix
-                        entities={data.strategicAccountData.portfolioEntities}
-                        entityType="distributor"
-                      />
-
-                      {/* Revenue Bridge */}
-                      <RevenueBridge
-                        currentRevenue={data.strategicAccountData.revenueBridge.currentRevenue}
-                        targetRevenue={data.strategicAccountData.revenueBridge.targetRevenue}
-                        atRisk={data.strategicAccountData.revenueBridge.atRisk}
-                        quickWins={data.strategicAccountData.revenueBridge.quickWins}
-                        strategicGrowth={data.strategicAccountData.revenueBridge.strategicGrowth}
-                        entityType="distributor"
-                      />
-
-                      {/* Priority Action Queue */}
-                      <PriorityActionQueue
-                        actions={data.strategicAccountData.priorityActions}
-                        showPlaybook={true}
-                      />
-                    </>
-                  )}
                 </motion.div>
               )}
 

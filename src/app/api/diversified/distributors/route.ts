@@ -13,168 +13,53 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-// Strategic Account Command Center calculation function
-function calculateStrategicAccountData(distributors: DistributorData[], totalRevenue: number) {
-  // Portfolio entities for matrix
-  const portfolioEntities = distributors.map(dist => {
-    const daysSincePurchase = dist.locations.reduce((max, loc) => {
-      if (!loc.last_purchase_date) return 999;
-      const days = Math.floor((Date.now() - new Date(loc.last_purchase_date).getTime()) / (1000 * 60 * 60 * 24));
-      return Math.max(max, days);
-    }, 0);
+// Calculate simple health indicators for a distributor
+function addHealthIndicators(dist: DistributorData) {
+  // Calculate most recent purchase date across all locations
+  let mostRecentDate: Date | null = null;
+  for (const loc of dist.locations) {
+    if (loc.last_purchase_date) {
+      const locDate = new Date(loc.last_purchase_date);
+      if (!mostRecentDate || locDate > mostRecentDate) {
+        mostRecentDate = locDate;
+      }
+    }
+  }
 
-    return {
-      id: dist.distributor_name.toLowerCase().replace(/\s+/g, '-'),
-      name: dist.distributor_name,
-      revenue: dist.total_revenue,
-      yoy_change_pct: dist.yoy_change_pct,
-      margin_pct: dist.total_margin_pct,
-      days_since_purchase: daysSincePurchase,
-      is_growing: dist.yoy_change_pct > 5,
-      is_healthy: dist.yoy_change_pct > -10 && daysSincePurchase < 60,
-    };
-  });
+  // Calculate days since last order
+  const days_since_order = mostRecentDate
+    ? Math.floor((Date.now() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
 
-  // Revenue at risk (distributors with declining revenue or inactive)
-  const atRisk = distributors
-    .filter(dist => {
-      const avgDaysSince = dist.locations.reduce((sum, loc) => {
-        if (!loc.last_purchase_date) return sum + 90;
-        const days = Math.floor((Date.now() - new Date(loc.last_purchase_date).getTime()) / (1000 * 60 * 60 * 24));
-        return sum + days;
-      }, 0) / dist.locations.length;
-      return dist.yoy_change_pct < -10 || avgDaysSince > 60;
-    })
-    .map(dist => {
-      const avgDaysSince = Math.floor(dist.locations.reduce((sum, loc) => {
-        if (!loc.last_purchase_date) return sum + 90;
-        const days = Math.floor((Date.now() - new Date(loc.last_purchase_date).getTime()) / (1000 * 60 * 60 * 24));
-        return sum + days;
-      }, 0) / dist.locations.length);
+  // Determine health status
+  let health_status: 'green' | 'yellow' | 'red';
+  if (days_since_order === null || days_since_order > 60 || dist.yoy_change_pct < -20) {
+    health_status = 'red';
+  } else if (days_since_order > 30 || dist.yoy_change_pct < 0) {
+    health_status = 'yellow';
+  } else {
+    health_status = 'green';
+  }
 
-      let reason = '';
-      if (avgDaysSince > 90) reason = `Inactive ${avgDaysSince} days`;
-      else if (dist.yoy_change_pct < -15) reason = 'Revenue declining >15%';
-      else if (dist.total_margin_pct < 10) reason = 'Margin pressure';
-      else reason = 'Multiple risk factors';
-
-      return {
-        name: dist.distributor_name,
-        amount: dist.total_revenue * 0.15, // Estimate 15% at risk
-        reason,
-        days_inactive: avgDaysSince > 60 ? avgDaysSince : undefined,
-      };
-    })
-    .sort((a, b) => b.amount - a.amount);
-
-  // Quick wins (distributors with growth potential)
-  const quickWins = distributors
-    .filter(dist => dist.growth_opportunities > 0 && dist.yoy_change_pct > -5)
-    .map(dist => ({
-      name: dist.distributor_name,
-      amount: dist.avg_revenue_per_location * dist.growth_opportunities * 0.2, // 20% uplift estimate
-      type: 'quick-win' as const,
-      action: `${dist.growth_opportunities} location expansion opportunities`,
-    }))
-    .sort((a, b) => b.amount - a.amount);
-
-  // Strategic growth (top performing distributors for expansion)
-  const strategicGrowth = distributors
-    .filter(dist => dist.yoy_change_pct > 10 && dist.total_margin_pct > 15)
-    .slice(0, 5)
-    .map(dist => ({
-      name: dist.distributor_name,
-      amount: dist.total_revenue * 0.15, // 15% growth potential
-      type: 'strategic' as const,
-      action: 'Strategic partnership expansion',
-    }))
-    .sort((a, b) => b.amount - a.amount);
-
-  // Priority actions
-  const priorityActions: any[] = [];
-  let rank = 1;
-
-  // Critical: At-risk distributors
-  atRisk.forEach(risk => {
-    priorityActions.push({
-      id: `action-${rank}`,
-      rank,
-      action: `Intervention Required - ${risk.reason}`,
-      entityName: risk.name,
-      entityId: risk.name.toLowerCase().replace(/\s+/g, '-'),
-      impact: risk.amount,
-      riskLevel: risk.days_inactive && risk.days_inactive > 90 ? 'CRITICAL' : 'HIGH' as const,
-      category: risk.days_inactive ? 'inactive' : 'margin' as const,
-      owner: undefined,
-      dueDate: new Date(Date.now() + (risk.days_inactive && risk.days_inactive > 90 ? 7 : 14) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'open' as const,
-      effort: 'medium' as const,
-      playbook: {
-        context: `${risk.name} shows concerning signs: ${risk.reason}. Immediate action needed to prevent revenue loss.`,
-        talkingPoints: [
-          'Review recent activity and identify any service issues',
-          'Schedule call with key stakeholder to understand concerns',
-          'Identify competitive threats or internal challenges',
-          'Propose recovery plan with specific value propositions',
-        ],
-        successMetrics: [
-          'Schedule follow-up meeting within 7 days',
-          'Identify root cause of decline',
-          'Create action plan with quarterly targets',
-          'Re-engage within 30 days',
-        ],
-      },
-    });
-    rank++;
-  });
-
-  // High: Quick wins
-  quickWins.forEach(opp => {
-    priorityActions.push({
-      id: `action-${rank}`,
-      rank,
-      action: opp.action,
-      entityName: opp.name,
-      entityId: opp.name.toLowerCase().replace(/\s+/g, '-'),
-      impact: opp.amount,
-      riskLevel: 'HIGH' as const,
-      category: 'expansion' as const,
-      owner: undefined,
-      dueDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'open' as const,
-      effort: 'low' as const,
-      playbook: {
-        context: `${opp.name} has ${opp.action.split(' ')[0]} locations ready for expansion. Low-hanging fruit opportunity.`,
-        talkingPoints: [
-          'Identify top-performing locations as expansion models',
-          'Analyze category gaps across all locations',
-          'Present cross-sell opportunities with data',
-          'Create location-specific expansion roadmap',
-        ],
-        successMetrics: [
-          'Expand to 2+ new categories per location',
-          'Increase average order frequency by 20%',
-          'Track category adoption rate',
-          'Measure incremental revenue per location',
-        ],
-      },
-    });
-    rank++;
-  });
-
-  // Limit to top 10 actions
-  const topActions = priorityActions.slice(0, 10);
+  // Generate next action
+  let next_action: string;
+  if (days_since_order === null || days_since_order > 60) {
+    next_action = `Call - ${days_since_order || 'No recent'} days inactive`;
+  } else if (dist.category_penetration < 30) {
+    next_action = 'Upsell - Low category penetration';
+  } else if (dist.yoy_change_pct < -10) {
+    next_action = 'Intervene - Revenue declining';
+  } else if (dist.growth_opportunities > 0) {
+    next_action = `Expand - ${dist.growth_opportunities} location opps`;
+  } else {
+    next_action = 'Maintain';
+  }
 
   return {
-    portfolioEntities,
-    revenueBridge: {
-      currentRevenue: totalRevenue,
-      targetRevenue: totalRevenue * 1.15, // 15% growth target
-      atRisk,
-      quickWins,
-      strategicGrowth,
-    },
-    priorityActions: topActions,
+    ...dist,
+    health_status,
+    days_since_order,
+    next_action,
   };
 }
 
@@ -205,6 +90,9 @@ interface DistributorData {
   category_penetration: number;
   growth_opportunities: number;
   locations: DistributorLocation[];
+  health_status?: 'green' | 'yellow' | 'red';
+  days_since_order?: number | null;
+  next_action?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -496,6 +384,9 @@ export async function GET(request: NextRequest) {
     // Sort distributors by total revenue desc
     distributors.sort((a, b) => b.total_revenue - a.total_revenue);
 
+    // Add health indicators to each distributor
+    const distributorsWithHealth = distributors.map(dist => addHealthIndicators(dist));
+
     // Calculate summary
     const totalDistributors = distributors.length;
     const totalLocations = distributors.reduce((sum, d) => sum + d.location_count, 0);
@@ -529,9 +420,6 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-
-    // Calculate Strategic Account Command Center data
-    const strategicAccountData = calculateStrategicAccountData(distributors, totalRevenue);
 
     // Return different response based on view mode
     if (viewMode === 'location') {
@@ -571,14 +459,13 @@ export async function GET(request: NextRequest) {
             end: formatDate(priorPeriodEnd)
           }
         },
-        categories: Array.from(allCategories).sort(),
-        strategicAccountData
+        categories: Array.from(allCategories).sort()
       });
     }
 
     // Default: Return distributor view
     return NextResponse.json({
-      distributors,
+      distributors: distributorsWithHealth,
       summary: {
         total_distributors: totalDistributors,
         total_locations: totalLocations,
@@ -602,8 +489,7 @@ export async function GET(request: NextRequest) {
           end: formatDate(priorPeriodEnd)
         }
       },
-      categories: Array.from(allCategories).sort(),
-      strategicAccountData
+      categories: Array.from(allCategories).sort()
     });
 
   } catch (error) {

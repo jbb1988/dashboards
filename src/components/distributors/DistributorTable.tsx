@@ -14,6 +14,9 @@ interface DistributorData {
   total_margin_pct: number;
   category_penetration: number;
   growth_opportunities: number;
+  health_status?: 'green' | 'yellow' | 'red';
+  days_since_order?: number | null;
+  next_action?: string;
 }
 
 interface DistributorTableProps {
@@ -132,7 +135,7 @@ export default function DistributorTable({
       className="rounded-xl bg-[#151F2E] border border-white/[0.04] overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
     >
       {/* Table Header */}
-      <div className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-6 py-4 bg-[#0F1824] border-b border-white/[0.04]">
+      <div className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1fr_1fr_0.8fr_0.8fr_1fr_1.5fr] gap-4 px-6 py-4 bg-[#0F1824] border-b border-white/[0.04]">
         <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
           Distributor
         </div>
@@ -181,6 +184,15 @@ export default function DistributorTable({
           Growth Opps
           <SortIcon field="opps" />
         </button>
+        <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider text-center">
+          Health
+        </div>
+        <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider text-center">
+          Days
+        </div>
+        <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
+          Next Action
+        </div>
       </div>
 
       {/* Table Body */}
@@ -195,7 +207,7 @@ export default function DistributorTable({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: idx * 0.02 }}
               onClick={() => handleRowClick(row.distributor_name)}
-              className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-6 py-4 border-b border-white/[0.02] hover:bg-[#1E293B] cursor-pointer transition-colors group"
+              className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1fr_1fr_0.8fr_0.8fr_1fr_1.5fr] gap-4 px-6 py-4 border-b border-white/[0.02] hover:bg-[#1E293B] cursor-pointer transition-colors group"
             >
               {/* Distributor Name with Revenue Bar */}
               <div className="flex items-center gap-3">
@@ -289,6 +301,48 @@ export default function DistributorTable({
                     <span className="text-[12px] font-semibold text-[#14B8A6]">
                       {row.growth_opportunities}
                     </span>
+                  </div>
+                ) : (
+                  <div className="text-[12px] text-[#475569]">—</div>
+                )}
+              </div>
+
+              {/* Health Status */}
+              <div className="flex items-center justify-center">
+                {row.health_status === 'green' && (
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                )}
+                {row.health_status === 'yellow' && (
+                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                )}
+                {row.health_status === 'red' && (
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                )}
+                {!row.health_status && (
+                  <div className="text-[12px] text-[#475569]">—</div>
+                )}
+              </div>
+
+              {/* Days Since Order */}
+              <div className="text-center">
+                {row.days_since_order !== null && row.days_since_order !== undefined ? (
+                  <div className={`text-[13px] font-medium ${
+                    row.days_since_order > 60 ? 'text-red-400' :
+                    row.days_since_order > 30 ? 'text-amber-400' :
+                    'text-white'
+                  }`}>
+                    {row.days_since_order}
+                  </div>
+                ) : (
+                  <div className="text-[12px] text-[#475569]">—</div>
+                )}
+              </div>
+
+              {/* Next Action */}
+              <div>
+                {row.next_action ? (
+                  <div className="text-[11px] text-[#94A3B8] truncate">
+                    {row.next_action}
                   </div>
                 ) : (
                   <div className="text-[12px] text-[#475569]">—</div>
