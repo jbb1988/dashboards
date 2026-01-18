@@ -9,7 +9,7 @@ import DiversifiedFilterDrawer, { DiversifiedFilterState } from '@/components/di
 import DistributorTable from '@/components/distributors/DistributorTable';
 import LocationTable from '@/components/distributors/LocationTable';
 import { DistributorInsightsPanel } from '@/components/distributors/DistributorInsightsPanel';
-import { DistributorTasksTab } from '@/components/distributors/DistributorTasksTab';
+import { SalesTasksTab } from '@/components/diversified/SalesTasksTab';
 import { DistributorRevenueChart } from '@/components/charts/DistributorRevenueChart';
 import { LocationConcentrationChart } from '@/components/charts/LocationConcentrationChart';
 import { CategoryHeatmap } from '@/components/charts/CategoryHeatmap';
@@ -852,11 +852,7 @@ export default function DistributorsDashboard() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35 }}
                 >
-                  <DistributorTasksTab
-                    selectedYears={selectedYears}
-                    selectedMonths={selectedMonths}
-                    selectedClass={selectedClass}
-                  />
+                  <SalesTasksTab />
                 </motion.div>
               )}
             </>
