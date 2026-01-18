@@ -25,6 +25,7 @@ import type { AIRecommendation } from '@/components/diversified/UnifiedInsightsP
 import InsightsDrawer from '@/components/diversified/InsightsDrawer';
 import DiversifiedFilterDrawer from '@/components/diversified/DiversifiedFilterDrawer';
 import { SalesTasksTab } from '@/components/diversified/SalesTasksTab';
+import { ActionCommandCenter } from '@/components/diversified/ActionCommandCenter';
 import { MetricExplainer, HHIExplainer, YoYChangeExplainer } from '@/components/ui/MetricExplainer';
 
 interface ClassSummary {
@@ -669,7 +670,7 @@ export default function DiversifiedDashboard() {
   const [syncing, setSyncing] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights' | 'tasks' | 'veroflow'>('table');
+  const [activeTab, setActiveTab] = useState<'table' | 'charts' | 'products' | 'insights' | 'tasks' | 'veroflow' | 'action-command'>('table');
   const [budgetData, setBudgetData] = useState<BudgetData[]>([]);
 
   // Customer detail drawer state
@@ -1247,6 +1248,19 @@ export default function DiversifiedDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   VEROflow
+                </button>
+                <button
+                  onClick={() => setActiveTab('action-command')}
+                  className={`px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-2 ${
+                    activeTab === 'action-command'
+                      ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
+                      : 'bg-[#1E293B] text-[#94A3B8] border border-white/[0.04] hover:bg-[#334155] hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  30-Day Command
                 </button>
               </motion.div>
 
@@ -1846,6 +1860,17 @@ export default function DiversifiedDashboard() {
                     onEquipmentFilterChange={setVeroflowEquipmentFilter}
                     onCalibrationFilterChange={setVeroflowCalibrationFilter}
                   />
+                </motion.div>
+              )}
+
+              {/* Action Command Center Tab */}
+              {activeTab === 'action-command' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ActionCommandCenter />
                 </motion.div>
               )}
             </>
