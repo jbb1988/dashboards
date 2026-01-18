@@ -321,8 +321,19 @@ export async function GET(request: Request) {
 
       if (nsSOs) {
         for (const so of nsSOs) {
+          // Filter out NetSuite metadata lines (subtotals, tax groups, comments)
+          const validLines = (so.netsuite_sales_order_lines || []).filter((line: any) => {
+            const itemName = line.item_name || '';
+            // Exclude: Subtotal, -Not Taxable-, tax groups, and comment lines
+            if (itemName === 'Subtotal') return false;
+            if (itemName.startsWith('-Not Taxable-')) return false;
+            if (line.item_type === 'TaxGroup') return false;
+            if (line.item_type === 'Subtotal') return false;
+            return true;
+          });
+
           // Enhance line items with product type
-          const enhancedLines: EnhancedSOLineItem[] = (so.netsuite_sales_order_lines || []).map((line: any) => {
+          const enhancedLines: EnhancedSOLineItem[] = validLines.map((line: any) => {
             const accountNumber = line.account_number || null;
             const itemClassName = line.item_class_name || null;
             const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
