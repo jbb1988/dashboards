@@ -76,7 +76,11 @@ export function classifyAttritionAction(
   const segment = behavior?.segment || 'unknown';
   const daysInactive = customer.recency_days;
   const revenueAtRisk = customer.revenue_at_risk;
-  const topProducts = context?.top_products || [];
+
+  // Format product info as "Item Name - Item Description"
+  const topProductsFormatted = context?.top_products_with_descriptions?.map(p =>
+    `${p.item_name} - ${p.item_description}`
+  ) || context?.top_products || [];
 
   // Determine action type based on severity
   let actionType: ActionType;
@@ -114,7 +118,7 @@ export function classifyAttritionAction(
   const actionTitle = buildActionTitle(actionType, customer.customer_name, {
     daysInactive,
     segment,
-    topProducts,
+    topProducts: topProductsFormatted,
   });
 
   // Build call script
@@ -123,7 +127,7 @@ export function classifyAttritionAction(
     daysInactive,
     segment,
     revenueAtRisk,
-    topProducts,
+    topProducts: topProductsFormatted,
   });
 
   return {
@@ -135,7 +139,7 @@ export function classifyAttritionAction(
     action_title: actionTitle,
     action_description: `${customer.customer_name} has not ordered in ${daysInactive} days (attrition score: ${customer.attrition_score})`,
     call_script: callScript,
-    product_stopped: topProducts.length > 0 ? topProducts[0] : undefined,
+    product_stopped: topProductsFormatted.length > 0 ? topProductsFormatted[0] : undefined,
     days_stopped: daysInactive,
     revenue_at_risk: revenueAtRisk,
     expected_recovery: revenueAtRisk * getRecoveryProbability(segment),
@@ -173,8 +177,16 @@ export function classifyQuickWinAction(
     riskLevel = quickWin.priority === 'high' ? 'medium' : 'low';
   }
 
-  // Use typical_products from quickWin if available, otherwise fall back to context
-  const products = quickWin.typical_products || context?.top_products || [];
+  // Use typical_products from quickWin if available, otherwise format from context
+  let products: string[];
+  if (quickWin.typical_products && quickWin.typical_products.length > 0) {
+    products = quickWin.typical_products;
+  } else if (context?.top_products_with_descriptions && context.top_products_with_descriptions.length > 0) {
+    products = context.top_products_with_descriptions.map(p => `${p.item_name} - ${p.item_description}`);
+  } else {
+    products = context?.top_products || [];
+  }
+
   const productName = products.length > 0 ? products[0] : undefined;
 
   const actionTitle = quickWin.type === 'repeat_order'

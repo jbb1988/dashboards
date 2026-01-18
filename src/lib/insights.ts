@@ -1346,7 +1346,8 @@ export interface CustomerContext {
 
   // What They Buy
   product_classes: string[];           // Classes they've purchased
-  top_products: string[];              // Most frequent items
+  top_products: string[];              // Most frequent items (deprecated - use top_products_with_descriptions)
+  top_products_with_descriptions: Array<{ item_name: string; item_description: string }>;
   avg_order_value: number;
 
   // Lifetime Value
@@ -1451,6 +1452,7 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
     customer_name: string;
     class_name: string;
     item_name: string;
+    item_description: string;
     transaction_date: string;
     revenue: number;
     quantity: number;
@@ -1463,7 +1465,7 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
   while (hasMore) {
     const { data, error } = await admin
       .from('diversified_sales')
-      .select('customer_id, customer_name, class_name, item_name, transaction_date, revenue, quantity')
+      .select('customer_id, customer_name, class_name, item_name, item_description, transaction_date, revenue, quantity')
       .gte('transaction_date', formatDate(periodStart))
       .lte('transaction_date', formatDate(periodEnd))
       .range(offset, offset + batchSize - 1);
@@ -1493,7 +1495,7 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
     transactions: typeof allData;
     orderDates: Date[];
     classes: Set<string>;
-    productCounts: Map<string, number>;
+    productDetails: Map<string, { count: number; description: string }>;
     totalRevenue: number;
   }>();
 
@@ -1508,7 +1510,7 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
         transactions: [],
         orderDates: [],
         classes: new Set(),
-        productCounts: new Map(),
+        productDetails: new Map(),
         totalRevenue: 0,
       });
     }
@@ -1523,8 +1525,15 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
     }
 
     if (row.item_name) {
-      const count = customer.productCounts.get(row.item_name) || 0;
-      customer.productCounts.set(row.item_name, count + (row.quantity || 1));
+      const existing = customer.productDetails.get(row.item_name);
+      if (existing) {
+        existing.count += (row.quantity || 1);
+      } else {
+        customer.productDetails.set(row.item_name, {
+          count: row.quantity || 1,
+          description: row.item_description || row.item_name,
+        });
+      }
     }
   }
 
@@ -1572,11 +1581,16 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
     // Overdue if gap > avg frequency * 1.5 (and they have a pattern)
     const isOverdue = avgFrequencyDays > 0 && daysSinceLastOrder > (avgFrequencyDays * 1.5);
 
-    // Top products
-    const sortedProducts = Array.from(customer.productCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name]) => name);
+    // Top products (with descriptions)
+    const sortedProductsWithDetails = Array.from(customer.productDetails.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 5);
+
+    const sortedProducts = sortedProductsWithDetails.map(([name]) => name);
+    const topProductsWithDescriptions = sortedProductsWithDetails.map(([name, details]) => ({
+      item_name: name,
+      item_description: details.description,
+    }));
 
     // Average order value
     const avgOrderValue = uniqueDates.length > 0
@@ -1617,6 +1631,7 @@ export async function calculateCustomerContext(): Promise<CustomerContext[]> {
       last_order_date: lastOrderDate?.toISOString() || null,
       product_classes: Array.from(customer.classes),
       top_products: sortedProducts,
+      top_products_with_descriptions: topProductsWithDescriptions,
       avg_order_value: avgOrderValue,
       total_revenue_12mo: customer.totalRevenue,
       order_count_12mo: uniqueDates.length,
