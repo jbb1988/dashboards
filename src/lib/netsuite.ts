@@ -495,6 +495,7 @@ export async function getDiversifiedSales(options: {
       AND tl.item IS NOT NULL
       AND tl.netamount IS NOT NULL
       AND tl.netamount != 0
+      AND t.type = 'CustInvc'
       AND (tl.class = 18 OR c.parent = 18 OR tl.class = 17)
       ${dateFilter}
     ORDER BY t.trandate DESC, t.id, tl.id
