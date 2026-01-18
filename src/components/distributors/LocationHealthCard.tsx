@@ -95,12 +95,31 @@ function HealthComponent({ label, score, icon }: { label: string; score: number;
   if (score < 60) colorClass = 'text-amber-400';
   if (score < 40) colorClass = 'text-red-400';
 
+  const tooltips: Record<string, string> = {
+    'Revenue': 'Percentile rank vs peer locations. Based on revenue relative to other locations in this distributor.',
+    'Engagement': 'Purchase frequency score. Based on average days between orders (≤7 days = 100, ≤14 = 80, ≤30 = 60, ≤60 = 40, >60 = 20).',
+    'Margin': 'Margin performance vs distributor average. +5% above avg = 100, at avg = 80, -5% = 60, -10% = 40, <-10% = 20.',
+    'Categories': 'Category diversity percentile. Measures variety of product categories purchased vs peer locations.',
+  };
+
   return (
-    <div className="text-center">
+    <div className="text-center group relative">
       <div className="text-2xl mb-1">{icon}</div>
       <div className={`text-2xl font-bold ${colorClass}`}>{score}</div>
       <div className="text-xs text-[#64748B] uppercase tracking-wider mt-1">
         {label}
+      </div>
+
+      {/* Tooltip */}
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10 w-64">
+        <div className="bg-[#1E293B] border border-white/10 rounded-lg p-3 shadow-xl">
+          <div className="text-xs text-white text-left leading-relaxed">
+            {tooltips[label]}
+          </div>
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+            <div className="border-4 border-transparent border-t-[#1E293B]"></div>
+          </div>
+        </div>
       </div>
     </div>
   );

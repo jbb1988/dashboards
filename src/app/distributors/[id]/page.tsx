@@ -881,7 +881,7 @@ export default function DistributorDetailPage() {
                   data={data.category_breakdown}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
+                  labelLine={true}
                   label={(entry: any) => `${entry.percentage.toFixed(1)}%`}
                   outerRadius={80}
                   fill="#8884d8"
@@ -889,7 +889,7 @@ export default function DistributorDetailPage() {
                   animationDuration={1500}
                 >
                   {data.category_breakdown.map((_: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index]} />
                   ))}
                 </Pie>
                 <Tooltip
@@ -897,18 +897,24 @@ export default function DistributorDetailPage() {
                     backgroundColor: '#1E293B',
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '8px',
-                    color: '#fff'
+                    color: '#ffffff'
+                  }}
+                  itemStyle={{
+                    color: '#ffffff'
+                  }}
+                  labelStyle={{
+                    color: '#ffffff'
                   }}
                   formatter={(value: any) => [formatCurrency(value), 'Revenue']}
                 />
               </PieChart>
             </ResponsiveContainer>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              {data.category_breakdown.slice(0, 6).map((cat: any, index: number) => (
+              {data.category_breakdown.map((cat: any, index: number) => (
                 <div key={cat.category} className="flex items-center gap-2 text-sm">
                   <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: CHART_COLORS[index] }}
                   ></div>
                   <span className="text-[#64748B] truncate">{cat.category}</span>
                 </div>
@@ -989,7 +995,7 @@ export default function DistributorDetailPage() {
                     <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">Revenue</th>
                     <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">YoY %</th>
                     <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">Margin %</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">Categories</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-[#64748B]">Categories</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1016,8 +1022,22 @@ export default function DistributorDetailPage() {
                       <td className="text-right py-3 px-4 text-white">
                         {formatPercent(loc.margin_pct)}
                       </td>
-                      <td className="text-right py-3 px-4 text-[#64748B]">
-                        {loc.category_count}
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1">
+                          {loc.categories && loc.categories.slice(0, 5).map((cat: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#14B8A6]/10 text-[#14B8A6] border border-[#14B8A6]/20"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                          {loc.categories && loc.categories.length > 5 && (
+                            <span className="px-2 py-0.5 text-[10px] text-[#64748B]">
+                              +{loc.categories.length - 5} more
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1054,7 +1074,12 @@ export default function DistributorDetailPage() {
                       <td className="py-3 px-4 text-[#64748B] text-sm">
                         {new Date(txn.date).toLocaleDateString()}
                       </td>
-                      <td className="py-3 px-4 text-white text-sm">{txn.item_name}</td>
+                      <td className="py-3 px-4 text-sm">
+                        <div className="text-white font-medium">{txn.item_name}</div>
+                        {txn.item_description && (
+                          <div className="text-xs text-[#64748B] mt-0.5">{txn.item_description}</div>
+                        )}
+                      </td>
                       <td className="py-3 px-4 text-[#64748B] text-sm">{txn.category}</td>
                       <td className="text-right py-3 px-4 text-white text-sm">{txn.quantity}</td>
                       <td className="text-right py-3 px-4 text-white font-medium">
