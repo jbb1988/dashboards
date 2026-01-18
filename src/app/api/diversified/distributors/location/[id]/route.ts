@@ -863,80 +863,6 @@ export async function GET(
       });
     }
 
-    // Calculate distributor metrics for health scoring
-    const distributorTotalRevenue = peerLocations.reduce((sum, p) => sum + p.revenue, 0);
-    const distributorTotalGrossProfit = peerLocations.reduce((sum, p) => sum + p.gross_profit, 0);
-    const distributorMetrics = {
-      avg_margin_pct: distributorTotalRevenue > 0 ? (distributorTotalGrossProfit / distributorTotalRevenue) * 100 : 0,
-      total_locations: peerLocations.length,
-      avg_revenue: distributorAvgRevenue,
-    };
-
-    // Prepare location metrics for health calculation
-    const locationMetrics = {
-      revenue: totalRevenue,
-      margin_pct: marginPct,
-      category_count: categories.size,
-      yoy_change_pct: yoyChangePct,
-      last_purchase_date: lastPurchaseDate,
-      transaction_count: actualTransactionCount,
-    };
-
-    // Calculate health score
-    const healthScore = calculateLocationHealthScore(
-      locationMetrics,
-      distributorMetrics,
-      peerLocations
-    );
-
-    // Generate priority actions
-    const priorityActions = generatePriorityActions(
-      locationMetrics,
-      healthScore,
-      distributorMetrics,
-      peerLocations
-    );
-
-    // Calculate competitive position (percentile rankings)
-    const competitivePosition = {
-      revenue_percentile: calculatePercentile(
-        totalRevenue,
-        peerLocations.map(p => p.revenue || 0)
-      ),
-      frequency_percentile: calculatePercentile(
-        locationMetrics.transaction_count,
-        peerLocations.map(p => p.transaction_count || 1)
-      ),
-      margin_percentile: calculatePercentile(
-        marginPct,
-        peerLocations.map(p => (p.revenue || 0) > 0 ? ((p.gross_profit || 0) / p.revenue) * 100 : 0)
-      ),
-      category_percentile: calculatePercentile(
-        categories.size,
-        peerLocations.map(p => (Array.isArray(p.categories) ? p.categories.length : 0))
-      ),
-    };
-
-    // Find similar locations for peer benchmarking
-    const currentLocationForComparison = {
-      customer_id: customerId,
-      revenue: totalRevenue,
-      category_count: categories.size,
-    };
-    const similarLocations = findSimilarLocations(
-      currentLocationForComparison,
-      peerLocations,
-      5
-    );
-
-    // Calculate Strategic Account Command Center data
-    const totalDistributorRevenue = peerLocations.reduce((sum, loc) => sum + (loc.revenue || 0), 0);
-    const strategicAccountData = calculateLocationStrategicData(
-      peerLocations,
-      totalDistributorRevenue,
-      distributorName
-    );
-
     return NextResponse.json({
       customer_id: customerId,
       customer_name: customerName,
@@ -972,15 +898,7 @@ export async function GET(
           start: formatDate(priorPeriodStart),
           end: formatDate(priorPeriodEnd)
         }
-      },
-      // Strategic intelligence data (Phase 3)
-      health_score: healthScore,
-      priority_actions: priorityActions,
-      competitive_position: competitivePosition,
-      similar_locations: similarLocations,
-      distributor_metrics: distributorMetrics,
-      // Strategic Account Command Center
-      strategicAccountData,
+      }
     });
 
   } catch (error) {
