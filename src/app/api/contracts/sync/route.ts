@@ -69,6 +69,13 @@ function transformToContract(opp: any): Contract {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Helper to normalize dates for comparison (ignoring time/timezone)
+    const normalizeDate = (date: string | null | undefined): string | null => {
+      if (!date) return null;
+      // Extract just YYYY-MM-DD portion to ignore time/timezone differences
+      return date.substring(0, 10);
+    };
+
     const result: SyncResult = {
       synced: 0,
       total: 0,
@@ -111,13 +118,13 @@ export async function POST(request: NextRequest) {
       const localContract = existingContractsMap.get(opp.id);
 
       if (localContract && localContract.sf_sync_status === 'pending') {
-        // Check if Salesforce has different date values
+        // Check if Salesforce has different date values (normalize for comparison)
         const hasDateConflict =
-          localContract.award_date !== (opp.awardDate || null) ||
-          localContract.contract_date !== (opp.contractDate || null) ||
-          localContract.deliver_date !== (opp.deliverDate || null) ||
-          localContract.install_date !== (opp.installDate || null) ||
-          localContract.cash_date !== (opp.cashDate || null);
+          normalizeDate(localContract.award_date) !== normalizeDate(opp.awardDate || null) ||
+          normalizeDate(localContract.contract_date) !== normalizeDate(opp.contractDate || null) ||
+          normalizeDate(localContract.deliver_date) !== normalizeDate(opp.deliverDate || null) ||
+          normalizeDate(localContract.install_date) !== normalizeDate(opp.installDate || null) ||
+          normalizeDate(localContract.cash_date) !== normalizeDate(opp.cashDate || null);
 
         if (hasDateConflict) {
           conflicts.push({
@@ -162,18 +169,34 @@ export async function POST(request: NextRequest) {
       const existing = existingContractsMap.get(transformed.salesforce_id);
 
       if (existing) {
-        // Check if any date fields changed
+        // Check if any fields actually changed (normalize dates for comparison)
+        const awardDateChanged = normalizeDate(existing.award_date) !== normalizeDate(transformed.award_date);
+        const contractDateChanged = normalizeDate(existing.contract_date) !== normalizeDate(transformed.contract_date);
+        const deliverDateChanged = normalizeDate(existing.deliver_date) !== normalizeDate(transformed.deliver_date);
+        const installDateChanged = normalizeDate(existing.install_date) !== normalizeDate(transformed.install_date);
+        const cashDateChanged = normalizeDate(existing.cash_date) !== normalizeDate(transformed.cash_date);
+        const valueChanged = existing.value !== transformed.value;
+        const statusChanged = existing.status !== transformed.status;
+
         const hasChanges =
-          existing.award_date !== transformed.award_date ||
-          existing.contract_date !== transformed.contract_date ||
-          existing.deliver_date !== transformed.deliver_date ||
-          existing.install_date !== transformed.install_date ||
-          existing.cash_date !== transformed.cash_date ||
-          existing.value !== transformed.value ||
-          existing.status !== transformed.status;
+          awardDateChanged ||
+          contractDateChanged ||
+          deliverDateChanged ||
+          installDateChanged ||
+          cashDateChanged ||
+          valueChanged ||
+          statusChanged;
 
         if (hasChanges) {
           updatedCount++;
+          console.log(`[SYNC] Detected change in ${transformed.salesforce_id} (${transformed.name}):`);
+          if (awardDateChanged) console.log(`  award_date: ${normalizeDate(existing.award_date)} -> ${normalizeDate(transformed.award_date)}`);
+          if (contractDateChanged) console.log(`  contract_date: ${normalizeDate(existing.contract_date)} -> ${normalizeDate(transformed.contract_date)}`);
+          if (deliverDateChanged) console.log(`  deliver_date: ${normalizeDate(existing.deliver_date)} -> ${normalizeDate(transformed.deliver_date)}`);
+          if (installDateChanged) console.log(`  install_date: ${normalizeDate(existing.install_date)} -> ${normalizeDate(transformed.install_date)}`);
+          if (cashDateChanged) console.log(`  cash_date: ${normalizeDate(existing.cash_date)} -> ${normalizeDate(transformed.cash_date)}`);
+          if (valueChanged) console.log(`  value: ${existing.value} -> ${transformed.value}`);
+          if (statusChanged) console.log(`  status: ${existing.status} -> ${transformed.status}`);
         }
       } else {
         newCount++;
