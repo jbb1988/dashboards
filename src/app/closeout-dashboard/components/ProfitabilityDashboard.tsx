@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, Clock, Database, Search, AlertCircle, ChevronDown, X } from 'lucide-react';
+import { RefreshCw, Clock, Database, Search, AlertCircle, ChevronDown, ChevronRight, X, Package, Wrench, FileText } from 'lucide-react';
 import ProfitabilityKPIs from './ProfitabilityKPIs';
 
 interface ProjectOption {
@@ -144,6 +144,34 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Expanded state for line items
+  const [expandedWOs, setExpandedWOs] = useState<Set<string>>(new Set());
+  const [expandedSOs, setExpandedSOs] = useState<Set<string>>(new Set());
+
+  const toggleWO = (woNumber: string) => {
+    setExpandedWOs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(woNumber)) {
+        newSet.delete(woNumber);
+      } else {
+        newSet.add(woNumber);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSO = (soNumber: string) => {
+    setExpandedSOs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(soNumber)) {
+        newSet.delete(soNumber);
+      } else {
+        newSet.add(soNumber);
+      }
+      return newSet;
+    });
+  };
 
   // Fetch available projects on mount
   useEffect(() => {
@@ -537,31 +565,171 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
                   {/* Work Orders */}
                   {pt.workOrders.length > 0 && (
                     <div className="space-y-2">
-                      {pt.workOrders.slice(0, 5).map((wo) => (
-                        <div key={wo.woNumber} className="bg-[#0D1117] rounded-lg p-2 flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">{wo.woNumber}</span>
-                            {wo.linkedSO && (
-                              <span className="text-gray-500">→ {wo.linkedSO.soNumber}</span>
-                            )}
-                            <span className="text-gray-400">{wo.status}</span>
+                      {pt.workOrders.map((wo) => (
+                        <div key={wo.woNumber} className="bg-[#0D1117] rounded-lg overflow-hidden">
+                          {/* WO Header - Clickable */}
+                          <div
+                            className="p-3 flex items-center justify-between text-xs cursor-pointer hover:bg-white/[0.02] transition-colors"
+                            onClick={() => toggleWO(wo.woNumber)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {expandedWOs.has(wo.woNumber) ? (
+                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                              )}
+                              <Wrench className="w-4 h-4 text-[#F59E0B]" />
+                              <span className="text-white font-medium">{wo.woNumber}</span>
+                              {wo.linkedSO && (
+                                <>
+                                  <span className="text-gray-500">→</span>
+                                  <Package className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                  <span className="text-[#3B82F6]">{wo.linkedSO.soNumber}</span>
+                                </>
+                              )}
+                              <span className="text-gray-400 px-2 py-0.5 bg-white/[0.04] rounded">{wo.status || 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="text-gray-400">{wo.totals.lineItemCount} WO items</span>
+                              {wo.linkedSO && (
+                                <span className="text-gray-400">{wo.linkedSO.totals.lineItemCount} SO items</span>
+                              )}
+                              <span className="text-white font-medium">${(wo.totals.totalCost / 1000).toFixed(1)}K cost</span>
+                              {wo.linkedSO && (
+                                <span className={`font-medium ${wo.linkedSO.totals.grossMarginPct >= 50 ? 'text-[#22C55E]' : wo.linkedSO.totals.grossMarginPct >= 30 ? 'text-[#F59E0B]' : 'text-[#EF4444]'}`}>
+                                  {wo.linkedSO.totals.grossMarginPct.toFixed(1)}% GPM
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-gray-400">{wo.totals.lineItemCount} items</span>
-                            <span className="text-white">${(wo.totals.totalCost / 1000).toFixed(1)}K cost</span>
-                            {wo.linkedSO && (
-                              <span className={`${wo.linkedSO.totals.grossMarginPct >= 50 ? 'text-[#22C55E]' : wo.linkedSO.totals.grossMarginPct >= 30 ? 'text-[#F59E0B]' : 'text-[#EF4444]'}`}>
-                                {wo.linkedSO.totals.grossMarginPct.toFixed(1)}% GPM
-                              </span>
-                            )}
-                          </div>
+
+                          {/* Expanded Content - Line Items */}
+                          {expandedWOs.has(wo.woNumber) && (
+                            <div className="border-t border-white/[0.04] p-3 space-y-4">
+                              {/* Sales Order Line Items */}
+                              {wo.linkedSO && wo.linkedSO.lineItems.length > 0 && (
+                                <div>
+                                  <div
+                                    className="flex items-center gap-2 mb-2 cursor-pointer"
+                                    onClick={(e) => { e.stopPropagation(); toggleSO(wo.linkedSO!.soNumber); }}
+                                  >
+                                    {expandedSOs.has(wo.linkedSO.soNumber) ? (
+                                      <ChevronDown className="w-3 h-3 text-[#3B82F6]" />
+                                    ) : (
+                                      <ChevronRight className="w-3 h-3 text-[#3B82F6]" />
+                                    )}
+                                    <FileText className="w-3.5 h-3.5 text-[#3B82F6]" />
+                                    <span className="text-xs text-[#3B82F6] font-medium">
+                                      Sales Order Line Items ({wo.linkedSO.lineItems.length})
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      Revenue: ${(wo.linkedSO.totals.revenue / 1000).toFixed(1)}K
+                                    </span>
+                                  </div>
+                                  {expandedSOs.has(wo.linkedSO.soNumber) && (
+                                    <div className="ml-5 bg-[#111827] rounded-lg border border-white/[0.04] overflow-hidden">
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="border-b border-white/[0.04] text-gray-400 bg-white/[0.02]">
+                                            <th className="text-left px-3 py-2">Item</th>
+                                            <th className="text-right px-3 py-2">Qty</th>
+                                            <th className="text-right px-3 py-2">Rate</th>
+                                            <th className="text-right px-3 py-2">Amount</th>
+                                            <th className="text-right px-3 py-2">Cost Est.</th>
+                                            <th className="text-right px-3 py-2">GP%</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/[0.04]">
+                                          {wo.linkedSO.lineItems.map((line, idx) => (
+                                            <tr key={idx} className="text-gray-300 hover:bg-white/[0.02]">
+                                              <td className="px-3 py-2">
+                                                <div className="text-white">{line.itemName || line.itemId}</div>
+                                                {line.itemType && (
+                                                  <span className="text-[10px] text-gray-500">{line.itemType}</span>
+                                                )}
+                                              </td>
+                                              <td className="text-right px-3 py-2">{line.quantity}</td>
+                                              <td className="text-right px-3 py-2">${line.rate.toLocaleString()}</td>
+                                              <td className="text-right px-3 py-2 text-white font-medium">${line.amount.toLocaleString()}</td>
+                                              <td className="text-right px-3 py-2">${line.costEstimate.toLocaleString()}</td>
+                                              <td className={`text-right px-3 py-2 font-medium ${line.grossMarginPct >= 50 ? 'text-[#22C55E]' : line.grossMarginPct >= 30 ? 'text-[#F59E0B]' : 'text-[#EF4444]'}`}>
+                                                {line.grossMarginPct.toFixed(1)}%
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Work Order Line Items */}
+                              {wo.lineItems.length > 0 && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Wrench className="w-3.5 h-3.5 text-[#F59E0B]" />
+                                    <span className="text-xs text-[#F59E0B] font-medium">
+                                      Work Order Line Items ({wo.lineItems.length})
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      Total Cost: ${(wo.totals.totalCost / 1000).toFixed(1)}K
+                                    </span>
+                                  </div>
+                                  <div className="ml-5 bg-[#111827] rounded-lg border border-white/[0.04] overflow-hidden">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="border-b border-white/[0.04] text-gray-400 bg-white/[0.02]">
+                                          <th className="text-left px-3 py-2">Component</th>
+                                          <th className="text-right px-3 py-2">Qty</th>
+                                          <th className="text-right px-3 py-2">Completed</th>
+                                          <th className="text-right px-3 py-2">Unit Cost</th>
+                                          <th className="text-right px-3 py-2">Line Cost</th>
+                                          <th className="text-right px-3 py-2">Actual Cost</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-white/[0.04]">
+                                        {wo.lineItems.map((line, idx) => (
+                                          <tr key={idx} className="text-gray-300 hover:bg-white/[0.02]">
+                                            <td className="px-3 py-2">
+                                              <div className="text-white">{line.itemName || line.itemId}</div>
+                                              {line.itemType && (
+                                                <span className="text-[10px] text-gray-500">{line.itemType}</span>
+                                              )}
+                                            </td>
+                                            <td className="text-right px-3 py-2">{line.quantity}</td>
+                                            <td className="text-right px-3 py-2">
+                                              <span className={line.quantityCompleted >= line.quantity ? 'text-[#22C55E]' : 'text-[#F59E0B]'}>
+                                                {line.quantityCompleted}
+                                              </span>
+                                            </td>
+                                            <td className="text-right px-3 py-2">${line.unitCost.toLocaleString()}</td>
+                                            <td className="text-right px-3 py-2 text-white">${line.lineCost.toLocaleString()}</td>
+                                            <td className="text-right px-3 py-2">
+                                              {line.actualCost !== null ? (
+                                                <span className="text-[#22C55E]">${line.actualCost.toLocaleString()}</span>
+                                              ) : (
+                                                <span className="text-gray-500">-</span>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* No line items message */}
+                              {wo.lineItems.length === 0 && (!wo.linkedSO || wo.linkedSO.lineItems.length === 0) && (
+                                <div className="text-xs text-gray-500 text-center py-2">
+                                  No line items available for this work order
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
-                      {pt.workOrders.length > 5 && (
-                        <div className="text-xs text-gray-500 text-center py-1">
-                          + {pt.workOrders.length - 5} more work orders
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
