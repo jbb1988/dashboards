@@ -329,7 +329,8 @@ export default function DistributorDetailPage() {
       }
     }
 
-    router.replace(`?${params.toString()}`);
+    const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+    router.replace(newUrl);
   };
 
   const availableYears = [2022, 2023, 2024, 2025, 2026];
@@ -510,6 +511,7 @@ export default function DistributorDetailPage() {
                   <button
                     onClick={() => {
                       router.replace(window.location.pathname);
+                      setIsFilterPanelOpen(false);
                     }}
                     className="text-xs text-[#EF4444] hover:text-[#EF4444]/80 font-medium transition-colors"
                   >
@@ -555,7 +557,8 @@ export default function DistributorDetailPage() {
                       onClick={() => {
                         const params = new URLSearchParams(searchParams.toString());
                         params.delete('years');
-                        router.replace(`?${params.toString()}`);
+                        const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+                        router.replace(newUrl);
                       }}
                       className="hover:bg-[#38BDF8]/20 rounded p-0.5 transition-colors"
                     >
@@ -572,7 +575,8 @@ export default function DistributorDetailPage() {
                       onClick={() => {
                         const params = new URLSearchParams(searchParams.toString());
                         params.delete('months');
-                        router.replace(`?${params.toString()}`);
+                        const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+                        router.replace(newUrl);
                       }}
                       className="hover:bg-[#38BDF8]/20 rounded p-0.5 transition-colors"
                     >
@@ -589,7 +593,8 @@ export default function DistributorDetailPage() {
                       onClick={() => {
                         const params = new URLSearchParams(searchParams.toString());
                         params.delete('className');
-                        router.replace(`?${params.toString()}`);
+                        const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+                        router.replace(newUrl);
                       }}
                       className="hover:bg-[#38BDF8]/20 rounded p-0.5 transition-colors"
                     >
