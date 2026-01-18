@@ -61,10 +61,9 @@ export function RevenueAtRiskSection({ revenueAtRisk, top3Accounts }: RevenueAtR
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* 30-Day Bucket - Critical */}
         <KPICard
-          label="30-Day Bucket"
+          title="30-Day Bucket"
           value={formatCurrency(revenueAtRisk.bucket_30d.total_revenue)}
           subtitle={`${revenueAtRisk.bucket_30d.customer_count} customers - ACT NOW`}
-          trend={null}
           icon="⚠️"
           color="red"
           onClick={() => {}}
@@ -72,10 +71,9 @@ export function RevenueAtRiskSection({ revenueAtRisk, top3Accounts }: RevenueAtR
 
         {/* 60-Day Bucket - Plan */}
         <KPICard
-          label="60-Day Bucket"
+          title="60-Day Bucket"
           value={formatCurrency(revenueAtRisk.bucket_60d.total_revenue)}
           subtitle={`${revenueAtRisk.bucket_60d.customer_count} customers - PLAN`}
-          trend={null}
           icon="📋"
           color="amber"
           onClick={() => {}}
@@ -83,10 +81,9 @@ export function RevenueAtRiskSection({ revenueAtRisk, top3Accounts }: RevenueAtR
 
         {/* 90-Day Bucket - Monitor */}
         <KPICard
-          label="90-Day Bucket"
+          title="90-Day Bucket"
           value={formatCurrency(revenueAtRisk.bucket_90d.total_revenue)}
           subtitle={`${revenueAtRisk.bucket_90d.customer_count} customers - MONITOR`}
-          trend={null}
           icon="👀"
           color="blue"
           onClick={() => {}}
