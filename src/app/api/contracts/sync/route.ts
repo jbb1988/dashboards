@@ -163,6 +163,7 @@ export async function POST(request: NextRequest) {
     // Step 4: Transform to Supabase contract format
     let updatedCount = 0;
     let newCount = 0;
+    const updateDetails: any[] = [];
 
     const contracts = opportunities.map(opp => {
       const transformed = transformToContract(opp);
@@ -176,7 +177,8 @@ export async function POST(request: NextRequest) {
         const installDateChanged = normalizeDate(existing.install_date) !== normalizeDate(transformed.install_date);
         const cashDateChanged = normalizeDate(existing.cash_date) !== normalizeDate(transformed.cash_date);
         const valueChanged = existing.value !== transformed.value;
-        const statusChanged = existing.status !== transformed.status;
+        // Only count status as changed if manual_status_override is NOT set
+        const statusChanged = !existing.manual_status_override && existing.status !== transformed.status;
 
         const hasChanges =
           awardDateChanged ||
@@ -189,14 +191,21 @@ export async function POST(request: NextRequest) {
 
         if (hasChanges) {
           updatedCount++;
-          console.log(`[SYNC] Detected change in ${transformed.salesforce_id} (${transformed.name}):`);
-          if (awardDateChanged) console.log(`  award_date: ${normalizeDate(existing.award_date)} -> ${normalizeDate(transformed.award_date)}`);
-          if (contractDateChanged) console.log(`  contract_date: ${normalizeDate(existing.contract_date)} -> ${normalizeDate(transformed.contract_date)}`);
-          if (deliverDateChanged) console.log(`  deliver_date: ${normalizeDate(existing.deliver_date)} -> ${normalizeDate(transformed.deliver_date)}`);
-          if (installDateChanged) console.log(`  install_date: ${normalizeDate(existing.install_date)} -> ${normalizeDate(transformed.install_date)}`);
-          if (cashDateChanged) console.log(`  cash_date: ${normalizeDate(existing.cash_date)} -> ${normalizeDate(transformed.cash_date)}`);
-          if (valueChanged) console.log(`  value: ${existing.value} -> ${transformed.value}`);
-          if (statusChanged) console.log(`  status: ${existing.status} -> ${transformed.status}`);
+          const changes: any = {
+            salesforceId: transformed.salesforce_id,
+            name: transformed.name,
+            fields: {}
+          };
+
+          if (awardDateChanged) changes.fields.award_date = { from: normalizeDate(existing.award_date), to: normalizeDate(transformed.award_date) };
+          if (contractDateChanged) changes.fields.contract_date = { from: normalizeDate(existing.contract_date), to: normalizeDate(transformed.contract_date) };
+          if (deliverDateChanged) changes.fields.deliver_date = { from: normalizeDate(existing.deliver_date), to: normalizeDate(transformed.deliver_date) };
+          if (installDateChanged) changes.fields.install_date = { from: normalizeDate(existing.install_date), to: normalizeDate(transformed.install_date) };
+          if (cashDateChanged) changes.fields.cash_date = { from: normalizeDate(existing.cash_date), to: normalizeDate(transformed.cash_date) };
+          if (valueChanged) changes.fields.value = { from: existing.value, to: transformed.value };
+          if (statusChanged) changes.fields.status = { from: existing.status, to: transformed.status };
+
+          updateDetails.push(changes);
         }
       } else {
         newCount++;
@@ -237,6 +246,7 @@ export async function POST(request: NextRequest) {
       preservedManualStatuses: preservedCount,
       updatedCount,
       newCount,
+      updateDetails: updateDetails.length > 0 ? updateDetails : undefined,
       lastUpdated: new Date().toISOString(),
     });
 
