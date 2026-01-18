@@ -665,9 +665,13 @@ export function parseProjectType(
 
     // Direct mappings from Item class
     if (className.includes('test bench') || className.includes('testbench')) {
-      // Use account number to determine if it's Equipment, Install, or Service
+      // Use account number to determine if it's Equipment, Install, Service, or MCC
       if (accountNumber) {
         const acct = accountNumber.trim();
+        // Check if account is MCC Services (4101-4111, excluding 4140-4149)
+        if ((acct.startsWith('410') || acct.startsWith('411')) && !acct.startsWith('414')) return 'MCC';
+        if ((acct.startsWith('510') || acct.startsWith('511')) && !acct.startsWith('514')) return 'MCC';
+        // Test Bench specific accounts
         if (acct.startsWith('401') || acct.startsWith('501')) return 'TBEN';
         if (acct.startsWith('403') || acct.startsWith('503')) return 'TBIN';
         if (acct.startsWith('407') || acct.startsWith('507')) return 'TB Service';
