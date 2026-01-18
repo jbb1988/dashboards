@@ -1,5 +1,7 @@
 'use client';
 
+import { useRouter, useSearchParams } from 'next/navigation';
+
 interface PeerBenchmark {
   location_id: string;
   location_name: string;
@@ -27,6 +29,17 @@ export default function PeerBenchmarkingTable({
   peers,
   transactionCount = 12,
 }: PeerBenchmarkingTableProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const handlePeerClick = (locationId: string) => {
+    // Preserve current filters when navigating to peer location
+    const params = new URLSearchParams(searchParams.toString());
+    const url = params.toString()
+      ? `/distributors/${locationId}?${params.toString()}`
+      : `/distributors/${locationId}`;
+    router.push(url);
+  };
   return (
     <div className="p-6 rounded-xl bg-[#151F2E] border border-white/[0.06]">
       <h2 className="text-lg font-semibold text-white mb-4">Peer Benchmarking</h2>
@@ -81,8 +94,12 @@ export default function PeerBenchmarkingTable({
 
             {/* Peer Locations */}
             {peers.map((peer) => (
-              <tr key={peer.location_id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                <td className="py-3 px-4 text-sm text-[#94A3B8]">
+              <tr
+                key={peer.location_id}
+                onClick={() => handlePeerClick(peer.location_id)}
+                className="border-b border-white/5 hover:bg-white/[0.02] cursor-pointer transition-colors"
+              >
+                <td className="py-3 px-4 text-sm text-[#94A3B8] group-hover:text-[#14B8A6]">
                   {peer.location_name}
                 </td>
                 <td className="py-3 px-4 text-sm text-right text-[#94A3B8]">
