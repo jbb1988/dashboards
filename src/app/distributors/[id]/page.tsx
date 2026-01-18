@@ -907,7 +907,7 @@ export default function DistributorDetailPage() {
                   }}
                   formatter={(value: any, name: any, props: any) => [
                     `${formatCurrency(value)} (${props.payload.percentage.toFixed(1)}%)`,
-                    'Revenue'
+                    props.payload.category
                   ]}
                 />
               </PieChart>
