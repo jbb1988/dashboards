@@ -353,8 +353,9 @@ export async function GET(request: Request) {
 
           // Create product type groups with totals
           const productTypeGroups: ProductTypeGroup[] = Array.from(productTypeMap.entries()).map(([productType, lineItems]) => {
-            const revenue = lineItems.reduce((sum, li) => sum + li.amount, 0);
-            const costEstimate = lineItems.reduce((sum, li) => sum + li.costEstimate, 0);
+            // Use absolute values since NetSuite may store negative amounts
+            const revenue = Math.abs(lineItems.reduce((sum, li) => sum + li.amount, 0));
+            const costEstimate = Math.abs(lineItems.reduce((sum, li) => sum + li.costEstimate, 0));
             const grossProfit = revenue - costEstimate;
 
             return {
@@ -375,18 +376,19 @@ export async function GET(request: Request) {
           productTypeGroups.sort((a, b) => b.totals.revenue - a.totals.revenue);
 
           // Calculate SO totals
-          const soRevenue = enhancedLines.reduce((sum, li) => sum + li.amount, 0);
+          // Use SO's total_amount (positive) instead of summing line amounts (which can be negative)
+          const soRevenue = so.total_amount || Math.abs(enhancedLines.reduce((sum, li) => sum + li.amount, 0));
           const soCostEstimate = enhancedLines.reduce((sum, li) => sum + li.costEstimate, 0);
           const soGrossProfit = soRevenue - soCostEstimate;
 
           // Create rollup validation
           const productTypeBreakdown = productTypeGroups.map(g => ({
             type: g.productType,
-            total: g.totals.revenue,
+            total: Math.abs(g.totals.revenue), // Use absolute value for product type totals too
           }));
 
-          const lineItemsTotal = soRevenue;
-          const expectedTotal = so.total_amount || soRevenue;
+          const lineItemsTotal = Math.abs(enhancedLines.reduce((sum, li) => sum + li.amount, 0));
+          const expectedTotal = so.total_amount || lineItemsTotal;
           const variance = lineItemsTotal - expectedTotal;
           const variancePct = expectedTotal > 0 ? Math.abs(variance / expectedTotal) * 100 : 0;
 
