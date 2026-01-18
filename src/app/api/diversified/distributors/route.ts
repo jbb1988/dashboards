@@ -93,6 +93,8 @@ interface DistributorData {
   health_status?: 'green' | 'yellow' | 'red';
   days_since_order?: number | null;
   next_action?: string;
+  total_locations_market?: number | null;
+  penetration_pct?: number | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -384,8 +386,28 @@ export async function GET(request: NextRequest) {
     // Sort distributors by total revenue desc
     distributors.sort((a, b) => b.total_revenue - a.total_revenue);
 
-    // Add health indicators to each distributor
-    const distributorsWithHealth = distributors.map(dist => addHealthIndicators(dist));
+    // Fetch distributor metadata for penetration rates
+    const { data: metadata } = await admin
+      .from('distributor_metadata')
+      .select('distributor_name, total_locations');
+
+    const metadataMap = new Map(
+      (metadata || []).map(m => [m.distributor_name, m.total_locations])
+    );
+
+    // Add health indicators and penetration rates to each distributor
+    const distributorsWithHealth = distributors.map(dist => {
+      const distWithHealth = addHealthIndicators(dist);
+      const totalMarketLocations = metadataMap.get(dist.distributor_name);
+
+      return {
+        ...distWithHealth,
+        total_locations_market: totalMarketLocations || null,
+        penetration_pct: totalMarketLocations
+          ? ((dist.location_count / totalMarketLocations) * 100)
+          : null,
+      };
+    });
 
     // Calculate summary
     const totalDistributors = distributors.length;

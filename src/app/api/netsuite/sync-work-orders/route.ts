@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     const endDate = url.searchParams.get('endDate') || undefined;
     const statuses = url.searchParams.getAll('status').filter(s => s);
     const limit = parseInt(url.searchParams.get('limit') || '5000');
+    const skipLineItems = url.searchParams.get('skipLineItems') === 'true';
 
     console.log('Starting NetSuite Work Orders sync...');
     console.log('Parameters:', { startDate, endDate, statuses, limit });
@@ -115,7 +116,10 @@ export async function POST(request: Request) {
           console.log(`✓ Created WO ${wo.wo_number}`);
         }
 
-        // Fetch and insert line items
+        // Fetch and insert line items (skip if skipLineItems=true for faster sync)
+        if (skipLineItems) {
+          continue; // Skip to next work order
+        }
         try {
           const lines = await getWorkOrderLines(wo.netsuite_id);
 

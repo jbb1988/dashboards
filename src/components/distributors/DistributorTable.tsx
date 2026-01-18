@@ -17,6 +17,8 @@ interface DistributorData {
   health_status?: 'green' | 'yellow' | 'red';
   days_since_order?: number | null;
   next_action?: string;
+  total_locations_market?: number | null;
+  penetration_pct?: number | null;
 }
 
 interface DistributorTableProps {
@@ -281,6 +283,11 @@ export default function DistributorTable({
               <div className="text-right">
                 <div className="text-[13px] font-medium text-white">
                   {row.location_count}
+                  {row.total_locations_market && (
+                    <span className="text-[11px] text-[#64748B] block">
+                      of {row.total_locations_market} ({row.penetration_pct?.toFixed(1)}%)
+                    </span>
+                  )}
                 </div>
               </div>
 
