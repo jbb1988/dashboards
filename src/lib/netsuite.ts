@@ -1264,6 +1264,7 @@ export async function getAllWorkOrders(options?: {
   limit?: number;
 }): Promise<WorkOrderRecord[]> {
   const { limit = 5000 } = options || {};
+  const PAGE_SIZE = 1000; // NetSuite max per request
 
   // Build date filter - NetSuite uses MM/DD/YYYY format
   let dateFilter = '';
@@ -1313,16 +1314,33 @@ export async function getAllWorkOrders(options?: {
     console.log(`Fetching all work orders (limit: ${limit})...`);
     console.log(`Date range: ${options?.startDate || 'all'} to ${options?.endDate || 'all'}`);
 
-    const response = await netsuiteRequest<{ items: any[] }>(
-      '/services/rest/query/v1/suiteql',
-      {
-        method: 'POST',
-        body: { q: query },
-        params: { limit: limit.toString() },
-      }
-    );
+    // Paginate through all results
+    let allItems: any[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    const workOrders: WorkOrderRecord[] = (response.items || []).map(row => ({
+    while (hasMore && allItems.length < limit) {
+      const pageLimit = Math.min(PAGE_SIZE, limit - allItems.length);
+      console.log(`  Fetching work orders at offset ${offset} (limit: ${pageLimit})...`);
+
+      const response = await netsuiteRequest<{ items: any[]; hasMore: boolean }>(
+        '/services/rest/query/v1/suiteql',
+        {
+          method: 'POST',
+          body: { q: query },
+          params: { limit: pageLimit.toString(), offset: offset.toString() },
+        }
+      );
+
+      const items = response.items || [];
+      allItems = allItems.concat(items);
+      hasMore = response.hasMore && items.length === pageLimit;
+      offset += items.length;
+
+      console.log(`  Fetched ${items.length} work orders (total: ${allItems.length})`);
+    }
+
+    const workOrders: WorkOrderRecord[] = allItems.map(row => ({
       netsuite_id: row.id || '',
       wo_number: row.tranid || '',
       wo_date: row.trandate || null,

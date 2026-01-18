@@ -720,6 +720,22 @@ export async function GET(
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 50); // Top 50 recent transactions
 
+    // Get all transactions for filtered period (respects year/month/class filters)
+    const filteredPeriodTransactions = currentData
+      .map(row => ({
+        date: row.transaction_date,
+        item_name: row.item_name || 'Unknown Item',
+        item_description: row.item_description || '',
+        category: row.class_category || 'Uncategorized',
+        quantity: row.quantity || 0,
+        revenue: row.revenue || 0,
+        cost: row.cost || 0,
+        gross_profit: row.gross_profit || 0,
+        margin_pct: row.revenue > 0 ? ((row.gross_profit || 0) / row.revenue) * 100 : 0
+      }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 200); // Top 200 transactions from filtered period
+
     // Fetch all locations for this distributor for comparison (current period)
     let peerQuery = admin
       .from('diversified_sales')
@@ -889,6 +905,7 @@ export async function GET(
       growth_opportunities: growthOpportunities,
       revenue_trend: monthlyTrend,
       recent_transactions: recentTransactions,
+      filtered_period_transactions: filteredPeriodTransactions,
       periods: {
         current: {
           start: formatDate(currentPeriodStart),

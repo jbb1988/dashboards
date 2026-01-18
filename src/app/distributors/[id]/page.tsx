@@ -1047,6 +1047,67 @@ export default function DistributorDetailPage() {
           </motion.div>
         )}
 
+        {/* Location View: Filtered Period Transactions */}
+        {isLocationView && data.filtered_period_transactions && data.filtered_period_transactions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.4 }}
+            className="bg-gradient-to-br from-[#1E293B] to-[#0F172A] rounded-xl p-6 border border-white/[0.04]"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">
+                Filtered Period Transactions
+                {data.periods && (
+                  <span className="text-sm text-[#64748B] font-normal ml-2">
+                    ({new Date(data.periods.current.start).toLocaleDateString()} - {new Date(data.periods.current.end).toLocaleDateString()})
+                  </span>
+                )}
+              </h3>
+              <div className="text-sm text-[#64748B]">
+                Showing {Math.min(data.filtered_period_transactions.length, 200)} of {data.filtered_period_transactions.length} transactions
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/[0.04]">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-[#64748B]">Date</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-[#64748B]">Item</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-[#64748B]">Category</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">Quantity</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">Revenue</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-[#64748B]">Margin %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.filtered_period_transactions.map((txn: any, index: number) => (
+                    <tr key={index} className="border-b border-white/[0.02] hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-4 text-[#64748B] text-sm">
+                        {new Date(txn.date).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <div className="text-white font-medium">{txn.item_name}</div>
+                        {txn.item_description && (
+                          <div className="text-xs text-[#64748B] mt-0.5 truncate max-w-xs">{txn.item_description}</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-[#64748B] text-sm">{txn.category}</td>
+                      <td className="text-right py-3 px-4 text-white text-sm">{txn.quantity}</td>
+                      <td className="text-right py-3 px-4 text-white font-medium">
+                        {formatCurrency(txn.revenue)}
+                      </td>
+                      <td className="text-right py-3 px-4 text-white">
+                        {formatPercent(txn.margin_pct)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
         {/* Location View: Recent Transactions */}
         {isLocationView && data.recent_transactions && data.recent_transactions.length > 0 && (
           <motion.div
