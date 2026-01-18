@@ -670,17 +670,23 @@ export function parseProjectType(accountNumber: string, accountName?: string): s
   if (acct === '4042' || acct === '5042') return 'M3IU';
   if (acct.startsWith('404') || acct.startsWith('504')) return 'M3IN';
 
-  // M3 Software
-  if (acct.startsWith('405') || acct.startsWith('505')) return 'M3 Software';
+  // Shipping and Handling (exclude from M3 Software)
+  if (acct === '4050' || acct === '5050') return 'Other';
+
+  // M3 Software (4051-4059, 4080-4099, 5051-5059, 5080-5099)
+  if (acct.startsWith('405') && acct !== '4050' || acct.startsWith('505') && acct !== '5050') return 'M3 Software';
   if (acct.startsWith('408') || acct.startsWith('409') ||
       acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
 
   // TB Service/Maintenance
   if (acct.startsWith('407') || acct.startsWith('507')) return 'TB Service';
 
-  // MCC Services
-  if (acct.startsWith('410') || acct.startsWith('411') ||
-      acct.startsWith('510') || acct.startsWith('511')) return 'MCC';
+  // MCC Services (4100-4111, 5100-5111, but exclude 414x for Diversified Products)
+  if ((acct.startsWith('410') || acct.startsWith('411')) && !acct.startsWith('414')) return 'MCC';
+  if ((acct.startsWith('510') || acct.startsWith('511')) && !acct.startsWith('514')) return 'MCC';
+
+  // Diversified Products
+  if (acct.startsWith('414') || acct.startsWith('514')) return 'Other';
 
   return 'Other';
 }
