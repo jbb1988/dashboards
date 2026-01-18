@@ -881,8 +881,8 @@ export default function DistributorDetailPage() {
                   data={data.category_breakdown}
                   cx="50%"
                   cy="50%"
-                  labelLine={(entry: any) => entry.percentage >= 5}
-                  label={(entry: any) => entry.percentage >= 5 ? `${entry.percentage.toFixed(1)}%` : ''}
+                  labelLine={false}
+                  label={false}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="revenue"
@@ -905,18 +905,26 @@ export default function DistributorDetailPage() {
                   labelStyle={{
                     color: '#ffffff'
                   }}
-                  formatter={(value: any) => [formatCurrency(value), 'Revenue']}
+                  formatter={(value: any, name: any, props: any) => [
+                    `${formatCurrency(value)} (${props.payload.percentage.toFixed(1)}%)`,
+                    'Revenue'
+                  ]}
                 />
               </PieChart>
             </ResponsiveContainer>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {data.category_breakdown.map((cat: any, index: number) => (
-                <div key={cat.category} className="flex items-center gap-2 text-sm">
-                  <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: CHART_COLORS[index] }}
-                  ></div>
-                  <span className="text-[#64748B] truncate">{cat.category}</span>
+                <div key={cat.category} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: CHART_COLORS[index] }}
+                    ></div>
+                    <span className="text-[#64748B] truncate">{cat.category}</span>
+                  </div>
+                  <span className="text-[#94A3B8] text-xs font-medium ml-2 flex-shrink-0">
+                    {cat.percentage.toFixed(1)}%
+                  </span>
                 </div>
               ))}
             </div>
