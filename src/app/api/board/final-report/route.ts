@@ -118,7 +118,7 @@ export async function GET(request: Request) {
 
     // Enrich with future revenue indicators
     const currentYear = parseInt(year);
-    const lineItemPreview = (topProjectLines || []).map(l => {
+    const lineItemPreview = (topProjectLines || []).map((l: any) => {
       let hasFutureRevenue = 'No';
       let revenueYears = 'N/A';
 
@@ -136,9 +136,13 @@ export async function GET(request: Request) {
         }
       }
 
+      const salesOrder = Array.isArray(l.netsuite_sales_orders)
+        ? l.netsuite_sales_orders[0]
+        : l.netsuite_sales_orders;
+
       return {
-        customer: l.netsuite_sales_orders.customer_name,
-        so_number: l.netsuite_sales_orders.so_number,
+        customer: salesOrder?.customer_name,
+        so_number: salesOrder?.so_number,
         item: l.item_name,
         item_description: l.item_description,
         amount: l.amount,
