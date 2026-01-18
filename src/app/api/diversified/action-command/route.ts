@@ -160,15 +160,16 @@ export async function GET(request: NextRequest) {
 
     console.log('[ACTION COMMAND] Filters:', filters);
 
-    // Step 1: Fetch all customer data in parallel with filters
+    // Step 1: Fetch all customer data in parallel
+    // Note: Not all functions support filters - only pass where supported
     console.log('[ACTION COMMAND] Fetching customer data...');
     const [attritionData, behaviorData, quickWins, crossSellData, rolling12Data] =
       await Promise.all([
         calculateCustomerAttrition(filters),
-        classifyCustomerBehavior(filters),
-        generateQuickWins(filters),
+        classifyCustomerBehavior(),
+        generateQuickWins(),
         generateCrossSellOpportunities(filters),
-        calculateRolling12Performance('customer', filters),
+        calculateRolling12Performance('customer'),
       ]);
 
     console.log(`[ACTION COMMAND] Fetched:`);
