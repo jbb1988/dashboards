@@ -1,12 +1,8 @@
--- Fix: Ensure sync operation flag and upsert happen in same transaction
--- Problem: Calling set_sync_operation_flag() via RPC then upsert separately
---          can result in different database sessions/connections due to pooling
--- Solution: Create atomic upsert function that sets flag within same transaction
+-- Fix contract_type type mismatch in upsert_contracts_from_sync function
+-- The column is TEXT[], not JSONB
 
--- Drop existing helper function (we'll replace it with a better approach)
-DROP FUNCTION IF EXISTS set_sync_operation_flag();
+DROP FUNCTION IF EXISTS upsert_contracts_from_sync(jsonb);
 
--- Create function to upsert contracts with sync flag set atomically
 CREATE OR REPLACE FUNCTION upsert_contracts_from_sync(contracts_data jsonb)
 RETURNS TABLE(salesforce_id text) AS $$
 BEGIN
@@ -51,7 +47,13 @@ BEGIN
     (c->>'status')::text,
     (c->>'status_group')::text,
     COALESCE((c->>'sales_stage')::text, ''),
-    COALESCE((c->'contract_type')::jsonb::text[], ARRAY[]::text[]),
+    -- Convert JSONB array to TEXT[] array
+    CASE
+      WHEN c->'contract_type' IS NOT NULL THEN
+        ARRAY(SELECT jsonb_array_elements_text(c->'contract_type'))
+      ELSE
+        ARRAY[]::text[]
+    END,
     (c->>'close_date')::timestamp,
     (c->>'award_date')::timestamp,
     (c->>'contract_date')::timestamp,
