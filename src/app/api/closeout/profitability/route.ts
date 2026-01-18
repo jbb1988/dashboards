@@ -324,11 +324,14 @@ export async function GET(request: Request) {
           // Filter out NetSuite metadata lines (subtotals, tax groups, comments)
           const validLines = (so.netsuite_sales_order_lines || []).filter((line: any) => {
             const itemName = line.item_name || '';
+            const itemType = line.item_type || '';
             // Exclude: Subtotal, -Not Taxable-, tax groups, and comment lines
             if (itemName === 'Subtotal') return false;
+            if (itemName === 'Comment') return false;
             if (itemName.startsWith('-Not Taxable-')) return false;
-            if (line.item_type === 'TaxGroup') return false;
-            if (line.item_type === 'Subtotal') return false;
+            if (itemType === 'TaxGroup') return false;
+            if (itemType === 'Subtotal') return false;
+            if (itemType === 'Description') return false; // Comment lines
             return true;
           });
 
