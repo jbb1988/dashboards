@@ -732,10 +732,12 @@ export async function getProjectProfitability(options: {
       tl.costestimate,
       tl.quantity,
       tl.item AS item_id,
-      BUILTIN.DF(tl.item) AS item_name
+      i.itemid AS item_name,
+      i.displayname AS item_description
     FROM Transaction t
     INNER JOIN TransactionLine tl ON tl.transaction = t.id
     LEFT JOIN Account a ON a.id = tl.account
+    LEFT JOIN Item i ON i.id = tl.item
     WHERE t.posting = 'T'
       AND ((tl.mainline = 'F' AND t.type != 'Journal') OR (tl.mainline = 'T' AND t.type = 'Journal'))
       AND tl.class = 1
@@ -1610,6 +1612,7 @@ export async function getAllSalesOrders(options?: {
   limit?: number;
 }): Promise<{ headers: SalesOrderRecord[]; linesBySOId: Record<string, SalesOrderLineRecord[]> }> {
   const { limit = 5000, includeLineItems = true } = options || {};
+  const PAGE_SIZE = 1000; // NetSuite max per request
 
   // Build date filter
   let dateFilter = '';
@@ -1660,16 +1663,33 @@ export async function getAllSalesOrders(options?: {
     console.log(`Date range: ${options?.startDate || 'all'} to ${options?.endDate || 'all'}`);
     console.log(`Include line items: ${includeLineItems}`);
 
-    const response = await netsuiteRequest<{ items: any[] }>(
-      '/services/rest/query/v1/suiteql',
-      {
-        method: 'POST',
-        body: { q: headerQuery },
-        params: { limit: limit.toString() },
-      }
-    );
+    // Paginate through all results
+    let allItems: any[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    const headers: SalesOrderRecord[] = (response.items || []).map(row => ({
+    while (hasMore && allItems.length < limit) {
+      const pageLimit = Math.min(PAGE_SIZE, limit - allItems.length);
+      console.log(`  Fetching page at offset ${offset} (limit: ${pageLimit})...`);
+
+      const response = await netsuiteRequest<{ items: any[]; hasMore: boolean }>(
+        '/services/rest/query/v1/suiteql',
+        {
+          method: 'POST',
+          body: { q: headerQuery },
+          params: { limit: pageLimit.toString(), offset: offset.toString() },
+        }
+      );
+
+      const items = response.items || [];
+      allItems = allItems.concat(items);
+      hasMore = response.hasMore && items.length === pageLimit;
+      offset += items.length;
+
+      console.log(`  Fetched ${items.length} records (total: ${allItems.length})`);
+    }
+
+    const headers: SalesOrderRecord[] = allItems.map(row => ({
       netsuite_id: row.id || '',
       so_number: row.tranid || '',
       so_date: row.trandate || null,
@@ -1715,6 +1735,8 @@ export async function getAllSalesOrders(options?: {
           tl.id AS line_id,
           tl.linesequencenumber AS line_number,
           tl.item AS item_id,
+          i.itemid AS item_name,
+          i.displayname AS item_description,
           tl.itemtype AS item_type,
           tl.quantity,
           tl.rate,
@@ -1723,23 +1745,40 @@ export async function getAllSalesOrders(options?: {
           tl.location AS location_id,
           tl.isclosed
         FROM transactionline tl
+        LEFT JOIN Item i ON i.id = tl.item
         WHERE tl.transaction IN (${soIds})
           AND tl.mainline = 'F'
           AND tl.item IS NOT NULL
         ORDER BY tl.transaction, tl.linesequencenumber
       `;
 
-      const lineResponse = await netsuiteRequest<{ items: any[] }>(
-        '/services/rest/query/v1/suiteql',
-        {
-          method: 'POST',
-          body: { q: lineQuery },
-          params: { limit: '1000' }, // Max allowed by NetSuite
-        }
-      );
+      // Paginate through all line items
+      let allLineItems: any[] = [];
+      let lineOffset = 0;
+      let hasMoreLines = true;
+
+      while (hasMoreLines) {
+        console.log(`  Fetching line items at offset ${lineOffset}...`);
+
+        const lineResponse = await netsuiteRequest<{ items: any[]; hasMore: boolean }>(
+          '/services/rest/query/v1/suiteql',
+          {
+            method: 'POST',
+            body: { q: lineQuery },
+            params: { limit: PAGE_SIZE.toString(), offset: lineOffset.toString() },
+          }
+        );
+
+        const items = lineResponse.items || [];
+        allLineItems = allLineItems.concat(items);
+        hasMoreLines = lineResponse.hasMore && items.length === PAGE_SIZE;
+        lineOffset += items.length;
+
+        console.log(`  Fetched ${items.length} line items (total: ${allLineItems.length})`);
+      }
 
       // Group lines by SO ID
-      for (const row of lineResponse.items || []) {
+      for (const row of allLineItems) {
         const soId = row.so_id || '';
         if (!linesBySOId[soId]) {
           linesBySOId[soId] = [];
@@ -1749,8 +1788,8 @@ export async function getAllSalesOrders(options?: {
           netsuite_line_id: row.line_id || '',
           line_number: parseInt(row.line_number) || 0,
           item_id: row.item_id || null,
-          item_name: null, // Not queried to avoid JOIN overhead
-          item_description: null, // Not queried to avoid JOIN overhead
+          item_name: row.item_name || null,
+          item_description: row.item_description || null,
           item_type: row.item_type || null,
           quantity: parseFloat(row.quantity) || null,
           quantity_committed: null, // Field not available in SuiteQL

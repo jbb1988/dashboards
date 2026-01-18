@@ -180,9 +180,9 @@ export default function DistributorDetailPage() {
 
   // Determine if this is a location or distributor view
   const isLocationView = useMemo(() => {
-    // Location IDs contain the customer_id format
-    // Distributor IDs are simple slugs like "ferguson"
-    return id && id.length > 20; // Customer IDs are longer
+    // Location IDs are numeric (customer_id like "2875")
+    // Distributor IDs are text slugs (like "ferguson" or "ferguson-enterprises")
+    return id && /^\d+$/.test(id); // Check if ID is purely numeric
   }, [id]);
 
   useEffect(() => {
@@ -202,6 +202,10 @@ export default function DistributorDetailPage() {
           : `/api/diversified/distributors/${id}`;
 
         const endpoint = params.toString() ? `${baseEndpoint}?${params.toString()}` : baseEndpoint;
+
+        console.log('[Detail Page] Fetching:', endpoint);
+        console.log('[Detail Page] Is Location View:', isLocationView);
+        console.log('[Detail Page] Filters:', { selectedYears, selectedMonths, selectedClass });
 
         const response = await fetch(endpoint);
 

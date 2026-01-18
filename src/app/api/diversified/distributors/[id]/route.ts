@@ -25,6 +25,9 @@ export async function GET(
     const admin = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
 
+    console.log('[Distributor API] Distributor ID:', distributorId);
+    console.log('[Distributor API] Search Params:', Object.fromEntries(searchParams));
+
     // Parse filters
     const yearsParam = searchParams.get('years');
     const monthsParam = searchParams.get('months');
@@ -32,6 +35,8 @@ export async function GET(
 
     const years = yearsParam ? yearsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
     const months = monthsParam ? monthsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
+
+    console.log('[Distributor API] Parsed filters:', { years, months, className });
 
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
@@ -84,6 +89,9 @@ export async function GET(
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
 
+    console.log('[Distributor API] Distributor Name:', distributorName);
+    console.log('[Distributor API] Date Range:', formatDate(currentPeriodStart), 'to', formatDate(currentPeriodEnd));
+
     // Fetch current period data
     let currentQuery = admin
       .from('diversified_sales')
@@ -122,6 +130,9 @@ export async function GET(
 
     const currentData = currentResult.data || [];
     const priorData = priorResult.data || [];
+
+    console.log('[Distributor API] Current data rows found:', currentData.length);
+    console.log('[Distributor API] Prior data rows found:', priorData.length);
 
     // Aggregate by location
     const locationMap = new Map<string, any>();
