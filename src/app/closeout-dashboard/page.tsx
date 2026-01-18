@@ -522,6 +522,37 @@ export default function CloseoutDashboard() {
         </header>
 
         <main className="max-w-[1600px] mx-auto px-8 py-6">
+          {/* Tab Navigation - Always visible at top */}
+          <div className="flex gap-1 mb-6 p-1 bg-[#111827] rounded-lg w-fit border border-white/[0.04]">
+            <TabButton
+              active={activeTab === 'profitability'}
+              onClick={() => setActiveTab('profitability')}
+            >
+              <span className="flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Profitability (NetSuite)
+              </span>
+            </TabButton>
+            <TabButton
+              active={activeTab === 'projects'}
+              onClick={() => setActiveTab('projects')}
+            >
+              Projects (Excel)
+            </TabButton>
+            <TabButton
+              active={activeTab === 'mcc'}
+              onClick={() => setActiveTab('mcc')}
+            >
+              MCC
+            </TabButton>
+            <TabButton
+              active={activeTab === 'analytics'}
+              onClick={() => setActiveTab('analytics')}
+            >
+              Analytics
+            </TabButton>
+          </div>
+
           {/* Empty State - No Data Loaded Yet (only for non-profitability tabs) */}
           {activeTab !== 'profitability' && !data && !loadingAndEnriching && !error && (
             <div className="flex items-center justify-center py-20">
@@ -629,37 +660,6 @@ export default function CloseoutDashboard() {
               <p className="text-[#EF4444] text-sm">{error}</p>
             </div>
           )}
-
-          {/* Tab Navigation - Always visible */}
-          <div className="flex gap-1 mb-6 p-1 bg-[#111827] rounded-lg w-fit border border-white/[0.04]">
-            <TabButton
-              active={activeTab === 'profitability'}
-              onClick={() => setActiveTab('profitability')}
-            >
-              <span className="flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5" />
-                Profitability (NetSuite)
-              </span>
-            </TabButton>
-            <TabButton
-              active={activeTab === 'projects'}
-              onClick={() => setActiveTab('projects')}
-            >
-              Projects (Excel)
-            </TabButton>
-            <TabButton
-              active={activeTab === 'mcc'}
-              onClick={() => setActiveTab('mcc')}
-            >
-              MCC
-            </TabButton>
-            <TabButton
-              active={activeTab === 'analytics'}
-              onClick={() => setActiveTab('analytics')}
-            >
-              Analytics
-            </TabButton>
-          </div>
 
           {/* Profitability Tab - Works independently with pre-synced NetSuite data */}
           {activeTab === 'profitability' && (
