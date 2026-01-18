@@ -52,6 +52,48 @@ export async function GET() {
       .order('wo_date', { ascending: false })
       .limit(10);
 
+    // Get date range of sales orders
+    const { data: dateRange } = await supabase
+      .from('netsuite_sales_orders')
+      .select('so_date')
+      .order('so_date', { ascending: true })
+      .limit(1);
+
+    const { data: dateRangeMax } = await supabase
+      .from('netsuite_sales_orders')
+      .select('so_date')
+      .order('so_date', { ascending: false })
+      .limit(1);
+
+    // Get distinct item_ids that have NULL item_name (excluding system items with negative IDs)
+    const { data: nullItemIds } = await supabase
+      .from('netsuite_sales_order_lines')
+      .select('item_id, item_type')
+      .is('item_name', null)
+      .gt('item_id', '0')
+      .limit(50);
+
+    // Get distinct item_ids that are system items (negative IDs) with NULL names
+    const { data: systemItemIds } = await supabase
+      .from('netsuite_sales_order_lines')
+      .select('item_id, item_type')
+      .is('item_name', null)
+      .lt('item_id', '0')
+      .limit(20);
+
+    // Count by item_type for NULL items
+    const { data: nullByType } = await supabase
+      .from('netsuite_sales_order_lines')
+      .select('item_type')
+      .is('item_name', null);
+
+    // Group null items by type
+    const nullTypeGroups: Record<string, number> = {};
+    for (const row of nullByType || []) {
+      const t = row.item_type || 'unknown';
+      nullTypeGroups[t] = (nullTypeGroups[t] || 0) + 1;
+    }
+
     return NextResponse.json({
       success: true,
       counts: {
@@ -60,6 +102,15 @@ export async function GET() {
         salesOrders: soCount || 0,
         salesOrderLines: solCount || 0,
         salesOrderLinesNullItemName: nullItemNameCount || 0,
+      },
+      dateRange: {
+        earliest: dateRange?.[0]?.so_date || null,
+        latest: dateRangeMax?.[0]?.so_date || null,
+      },
+      nullAnalysis: {
+        byItemType: nullTypeGroups,
+        sampleRealItemsWithNull: nullItemIds || [],
+        sampleSystemItemsWithNull: systemItemIds || [],
       },
       recentWorkOrders: recentWOs || [],
       recentSalesOrderLines: recentSOLines || [],

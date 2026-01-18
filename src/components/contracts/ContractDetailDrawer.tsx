@@ -347,11 +347,11 @@ export default function ContractDetailDrawer({
 
   function formatDateCompact(dateStr: string | null): string {
     if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const year = date.getFullYear().toString().slice(-2);
-    return `${month}/${day}/${year}`;
+    // Parse date string directly to avoid timezone issues
+    // Database stores dates as YYYY-MM-DD, so split and use directly
+    const [year, month, day] = dateStr.split('T')[0].split('-');
+    const yearShort = year.slice(-2);
+    return `${month}/${day}/${yearShort}`;
   }
 
   function formatDateForInput(dateStr: string | null): string {
