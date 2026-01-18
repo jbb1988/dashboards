@@ -281,6 +281,9 @@ export async function GET(
     const admin = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
 
+    console.log('[Location API] Customer ID:', customerId);
+    console.log('[Location API] Search Params:', Object.fromEntries(searchParams));
+
     // Parse filters
     const yearsParam = searchParams.get('years');
     const monthsParam = searchParams.get('months');
@@ -374,9 +377,13 @@ export async function GET(
     const currentData = currentResult.data || [];
     const priorData = priorResult.data || [];
 
+    console.log('[Location API] Current data rows found:', currentData.length);
+    console.log('[Location API] Date range:', formatDate(currentPeriodStart), 'to', formatDate(currentPeriodEnd));
+
     if (currentData.length === 0) {
+      console.log('[Location API] No data found for customer_id:', customerId);
       return NextResponse.json(
-        { error: 'Location not found', message: 'No data found for this location' },
+        { error: 'Location not found', message: `No data found for this location (${customerId}) in the selected date range` },
         { status: 404 }
       );
     }
