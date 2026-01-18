@@ -65,8 +65,7 @@ export function RevenueAtRiskSection({ revenueAtRisk, top3Accounts }: RevenueAtR
           value={formatCurrency(revenueAtRisk.bucket_30d.total_revenue)}
           subtitle={`${revenueAtRisk.bucket_30d.customer_count} customers - ACT NOW`}
           icon="⚠️"
-          color="red"
-          onClick={() => {}}
+          color="#EF4444"
         />
 
         {/* 60-Day Bucket - Plan */}
@@ -75,8 +74,7 @@ export function RevenueAtRiskSection({ revenueAtRisk, top3Accounts }: RevenueAtR
           value={formatCurrency(revenueAtRisk.bucket_60d.total_revenue)}
           subtitle={`${revenueAtRisk.bucket_60d.customer_count} customers - PLAN`}
           icon="📋"
-          color="amber"
-          onClick={() => {}}
+          color="#F59E0B"
         />
 
         {/* 90-Day Bucket - Monitor */}
@@ -85,8 +83,7 @@ export function RevenueAtRiskSection({ revenueAtRisk, top3Accounts }: RevenueAtR
           value={formatCurrency(revenueAtRisk.bucket_90d.total_revenue)}
           subtitle={`${revenueAtRisk.bucket_90d.customer_count} customers - MONITOR`}
           icon="👀"
-          color="blue"
-          onClick={() => {}}
+          color="#38BDF8"
         />
       </div>
 
