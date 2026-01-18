@@ -649,7 +649,7 @@ export interface ProjectProfitabilityRecord {
  * - MCC: MCC Services (4100-4111, 5100-5111)
  * - TBSV: TB Service/Maintenance (4071-4079, 5071-5079)
  */
-function parseProjectType(accountNumber: string, accountName?: string): string {
+export function parseProjectType(accountNumber: string, accountName?: string): string {
   if (!accountNumber) return 'Unknown';
 
   const acct = accountNumber.trim();

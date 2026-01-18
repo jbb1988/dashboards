@@ -1,40 +1,39 @@
 /**
  * API Route: /api/closeout/profitability
- * Enhanced Project Profitability Dashboard API
+ * Project Profitability Dashboard API - REDESIGNED
  *
- * CORRECT FLOW: Excel Project Type → Work Orders → Sales Orders → Line Items
- *
- * Shows data organized by project type (TBEN, MCC, etc.) so you can see
- * which WOs and SOs belong to each type of work.
- *
- * Project Type Legend:
- * - TBEN: Test Bench Equipment New
- * - TBIN: Test Bench Install
- * - PM: Project Management
- * - M3IN: M3 Install
- * - MCC: Maintenance Service and Calibration
- * - DRM3: DRM3
- * - SCH: Scheduling
+ * NEW STRUCTURE:
+ * 1. High-level KPIs (Revenue, Cost, GP, GPM%, CPI)
+ * 2. Sales Orders with line items grouped by PRODUCT TYPE (not item number)
+ * 3. Work Orders with detailed cost breakdown
+ * 4. Rollup validation (line items → product type → SO total → project total)
  */
 
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { parseProjectType } from '@/lib/netsuite';
 
 export const dynamic = 'force-dynamic';
 
-// Project type descriptions
-const PROJECT_TYPE_NAMES: Record<string, string> = {
+// Product type full names
+const PRODUCT_TYPE_NAMES: Record<string, string> = {
   'TBEN': 'Test Bench Equipment New',
-  'TBIN': 'Test Bench Install',
+  'TBEU': 'Test Bench Equipment Upgrade',
+  'TBIN': 'Test Bench Install & Training New',
+  'TBIU': 'Test Bench Install & Training Upgrade',
+  'M3IN': 'M3 Install New',
+  'M3IU': 'M3 Install Upgrade',
+  'M3 Software': 'M3 Software',
+  'TB Service': 'Test Bench Service/Maintenance',
+  'MCC': 'Maintenance & Calibration Services',
+  'TB Components': 'Test Bench Components',
   'PM': 'Project Management',
-  'M3IN': 'M3 Install',
-  'MCC': 'Maintenance Service & Calibration',
-  'DRM3': 'DRM3',
-  'SCH': 'Scheduling',
+  'Other': 'Other',
+  'Unknown': 'Unknown Product Type',
 };
 
-// Types for the API response
-interface SOLineItem {
+// Enhanced SO Line Item with account and product type info
+interface EnhancedSOLineItem {
   lineNumber: number;
   itemId: string;
   itemName: string | null;
@@ -47,8 +46,55 @@ interface SOLineItem {
   grossProfit: number;
   grossMarginPct: number;
   isClosed: boolean;
+  accountNumber: string | null;
+  accountName: string | null;
+  productType: string; // Derived from account_number
 }
 
+// Product type group (lines grouped by product type)
+interface ProductTypeGroup {
+  productType: string;
+  productTypeName: string;
+  lineItems: EnhancedSOLineItem[];
+  totals: {
+    lineItemCount: number;
+    revenue: number;
+    costEstimate: number;
+    grossProfit: number;
+    grossMarginPct: number;
+  };
+}
+
+// Rollup validation structure
+interface RollupValidation {
+  productTypeBreakdown: Array<{ type: string; total: number }>;
+  lineItemsTotal: number;
+  expectedTotal: number;
+  variance: number;
+  variancePct: number;
+  valid: boolean;
+}
+
+// Sales Order with product type grouping
+interface LinkedSalesOrder {
+  soNumber: string;
+  netsuiteId: string;
+  soDate: string | null;
+  status: string | null;
+  customerName: string | null;
+  totalAmount: number;
+  productTypeGroups: ProductTypeGroup[];
+  rollupValidation: RollupValidation;
+  totals: {
+    lineItemCount: number;
+    revenue: number;
+    costEstimate: number;
+    grossProfit: number;
+    grossMarginPct: number;
+  };
+}
+
+// Work Order Line Item
 interface WOLineItem {
   lineNumber: number;
   itemId: string;
@@ -62,91 +108,52 @@ interface WOLineItem {
   costEstimate: number;
   actualCost: number | null;
   isClosed: boolean;
+  completionPct: number;
 }
 
-interface LinkedSalesOrder {
-  soNumber: string;
-  netsuiteId: string;
-  soDate: string | null;
-  status: string | null;
-  customerName: string | null;
-  totalAmount: number;
-  lineItems: SOLineItem[];
-  totals: {
-    lineItemCount: number;
-    revenue: number;
-    costEstimate: number;
-    grossProfit: number;
-    grossMarginPct: number;
-  };
-}
-
+// Work Order with cost breakdown
 interface WorkOrderDetail {
   woNumber: string;
   netsuiteId: string;
   woDate: string | null;
   status: string | null;
-  linkedSO: LinkedSalesOrder | null;
+  linkedSONumber: string | null;
   lineItems: WOLineItem[];
   totals: {
     lineItemCount: number;
     totalEstimatedCost: number;
     totalActualCost: number | null;
-    totalCost: number; // Uses actual if available, else estimated
+    totalCost: number;
   };
 }
 
-interface ProjectTypeDetail {
-  typeCode: string;
-  typeName: string;
-  excelData: {
-    budgetRevenue: number;
-    budgetCost: number;
-    budgetGP: number;
-    actualRevenue: number;
-    actualCost: number;
-    actualGP: number;
-    variance: number;
-  };
-  workOrders: WorkOrderDetail[];
-  linkedSalesOrders: string[]; // List of SO numbers linked to this project type
-  totals: {
-    woCount: number;
-    soCount: number;
-    netsuiteRevenue: number;
-    netsuiteCostEstimate: number;
-    netsuiteActualCost: number | null;
-    netsuiteGrossProfit: number;
-    netsuiteGrossMarginPct: number;
-  };
+// Project-level totals and KPIs
+interface ProjectKPIs {
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  grossMarginPct: number;
+  cpi: number; // Cost Performance Index (budget / actual)
+  budgetRevenue: number;
+  budgetCost: number;
+  actualRevenue: number;
+  actualCost: number;
 }
 
+// Main API response
 interface ProjectProfitabilityResponse {
   project: {
     name: string;
     year: number | null;
     customerName: string | null;
-    projectTypes: ProjectTypeDetail[];
-    totals: {
-      projectTypeCount: number;
-      workOrderCount: number;
-      salesOrderCount: number;
-      excelBudgetRevenue: number;
-      excelActualRevenue: number;
-      excelVariance: number;
-      netsuiteRevenue: number;
-      netsuiteCostEstimate: number;
-      netsuiteActualCost: number | null;
-      netsuiteGrossProfit: number;
-      netsuiteGrossMarginPct: number;
-    };
   };
-  legend: Record<string, string>;
+  kpis: ProjectKPIs;
+  salesOrders: LinkedSalesOrder[];
+  workOrders: WorkOrderDetail[];
   syncStatus: {
     lastSyncedAt: string | null;
     workOrderCount: number;
     salesOrderCount: number;
-    workOrdersWithActualCosts: number;
   };
 }
 
@@ -156,307 +163,277 @@ export async function GET(request: Request) {
     const projectName = url.searchParams.get('project');
     const yearParam = url.searchParams.get('year');
     const year = yearParam ? parseInt(yearParam) : null;
-    const typeParam = url.searchParams.get('type'); // Optional: filter by specific project type
 
     if (!projectName) {
       return NextResponse.json({
         error: 'Missing required parameter',
         message: 'project parameter is required (e.g., ?project=Sarasota&year=2025)',
-        example: '/api/closeout/profitability?project=Sarasota&year=2025',
       }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
 
-    // STEP 1: Get Excel projects matching name (and optionally year/type)
+    // STEP 1: Get Excel projects for KPI data
     let projectQuery = supabase
       .from('closeout_projects')
       .select('*')
-      .ilike('project_name', `%${projectName}%`);
+      .ilike('project_name', `%${projectName}%`)
+      .gt('project_year', 0);
 
     if (year) {
       projectQuery = projectQuery.eq('project_year', year);
     }
 
-    if (typeParam) {
-      projectQuery = projectQuery.eq('project_type', typeParam);
-    }
-
-    // Exclude year=0 summary rows
-    projectQuery = projectQuery.gt('project_year', 0);
-
     const { data: excelProjects, error: projError } = await projectQuery;
 
-    if (projError) {
-      console.error('Error fetching Excel projects:', projError);
-      return NextResponse.json({
-        error: 'Database error',
-        message: projError.message,
-      }, { status: 500 });
-    }
-
-    if (!excelProjects || excelProjects.length === 0) {
+    if (projError || !excelProjects || excelProjects.length === 0) {
       return NextResponse.json({
         error: 'No project found',
-        message: `No Excel project found for "${projectName}"${year ? ` in ${year}` : ''}`,
-        suggestion: 'Check the project name matches the Excel data exactly',
+        message: `No project found for "${projectName}"${year ? ` in ${year}` : ''}`,
       }, { status: 404 });
     }
 
-    // STEP 2: For each project type, get WOs and their linked SOs
-    const projectTypes: ProjectTypeDetail[] = [];
-    const allSONumbers: Set<string> = new Set();
-    let totalWOCount = 0;
+    // Calculate KPIs from Excel data
+    const budgetRevenue = excelProjects.reduce((sum, p) => sum + (p.budget_revenue || 0), 0);
+    const budgetCost = excelProjects.reduce((sum, p) => sum + (p.budget_cost || 0), 0);
+    const actualRevenue = excelProjects.reduce((sum, p) => sum + (p.actual_revenue || 0), 0);
+    const actualCost = excelProjects.reduce((sum, p) => sum + (p.actual_cost || 0), 0);
 
-    for (const excelProject of excelProjects) {
-      // Get WOs for this project type
-      const { data: excelWOs } = await supabase
-        .from('closeout_work_orders')
-        .select('wo_number, actual_revenue, actual_cost')
-        .eq('closeout_project_id', excelProject.id)
-        .not('wo_number', 'is', null)
-        .neq('wo_number', '');
+    // STEP 2: Get all work orders for this project
+    const { data: excelWOs } = await supabase
+      .from('closeout_work_orders')
+      .select('wo_number, closeout_project_id')
+      .in('closeout_project_id', excelProjects.map(p => p.id))
+      .not('wo_number', 'is', null)
+      .neq('wo_number', '');
 
-      const uniqueWONumbers = [...new Set((excelWOs || []).map(wo => wo.wo_number))];
-      const netsuiteWONumbers = uniqueWONumbers.map(n => `WO${n}`);
+    const uniqueWONumbers = [...new Set((excelWOs || []).map(wo => `WO${wo.wo_number}`))];
 
-      // Look up WOs in NetSuite
-      let workOrderDetails: WorkOrderDetail[] = [];
-      const linkedSOIds: Set<string> = new Set();
+    // STEP 3: Fetch Work Orders with line items from NetSuite
+    const workOrders: WorkOrderDetail[] = [];
+    const linkedSOIds: Set<string> = new Set();
 
-      if (netsuiteWONumbers.length > 0) {
-        const { data: nsWOs } = await supabase
-          .from('netsuite_work_orders')
-          .select(`
-            netsuite_id,
-            wo_number,
-            wo_date,
-            status,
-            created_from_so_id,
-            created_from_so_number,
-            total_actual_cost,
-            netsuite_work_order_lines (
-              line_number,
-              item_id,
-              item_name,
-              item_description,
-              item_type,
-              quantity,
-              quantity_completed,
-              unit_cost,
-              line_cost,
-              cost_estimate,
-              actual_cost,
-              is_closed
-            )
-          `)
-          .in('wo_number', netsuiteWONumbers);
+    if (uniqueWONumbers.length > 0) {
+      const { data: nsWOs } = await supabase
+        .from('netsuite_work_orders')
+        .select(`
+          netsuite_id,
+          wo_number,
+          wo_date,
+          status,
+          created_from_so_id,
+          created_from_so_number,
+          total_actual_cost,
+          netsuite_work_order_lines (
+            line_number,
+            item_id,
+            item_name,
+            item_description,
+            item_type,
+            quantity,
+            quantity_completed,
+            unit_cost,
+            line_cost,
+            cost_estimate,
+            actual_cost,
+            is_closed
+          )
+        `)
+        .in('wo_number', uniqueWONumbers);
 
-        if (nsWOs) {
-          for (const wo of nsWOs) {
-            if (wo.created_from_so_id) {
-              linkedSOIds.add(wo.created_from_so_id);
-            }
+      if (nsWOs) {
+        for (const wo of nsWOs) {
+          if (wo.created_from_so_id) {
+            linkedSOIds.add(wo.created_from_so_id);
+          }
 
-            const woLineItems: WOLineItem[] = (wo.netsuite_work_order_lines || []).map((line: any) => ({
+          const woLineItems: WOLineItem[] = (wo.netsuite_work_order_lines || []).map((line: any) => ({
+            lineNumber: line.line_number || 0,
+            itemId: line.item_id || '',
+            itemName: line.item_name,
+            itemDescription: line.item_description,
+            itemType: line.item_type,
+            quantity: line.quantity || 0,
+            quantityCompleted: line.quantity_completed || 0,
+            unitCost: line.unit_cost || 0,
+            lineCost: line.line_cost || 0,
+            costEstimate: line.cost_estimate || 0,
+            actualCost: line.actual_cost,
+            isClosed: line.is_closed || false,
+            completionPct: line.quantity > 0 ? (line.quantity_completed / line.quantity) * 100 : 0,
+          }));
+
+          const totalEstimatedCost = woLineItems.reduce((sum, li) => sum + li.costEstimate, 0);
+          const totalActualCost = (wo as any).total_actual_cost || woLineItems.reduce((sum, li) => sum + (li.actualCost || 0), 0);
+          const hasActualCost = totalActualCost > 0;
+
+          workOrders.push({
+            woNumber: wo.wo_number,
+            netsuiteId: wo.netsuite_id,
+            woDate: wo.wo_date,
+            status: wo.status,
+            linkedSONumber: wo.created_from_so_number,
+            lineItems: woLineItems,
+            totals: {
+              lineItemCount: woLineItems.length,
+              totalEstimatedCost,
+              totalActualCost: hasActualCost ? totalActualCost : null,
+              totalCost: hasActualCost ? totalActualCost : totalEstimatedCost,
+            },
+          });
+        }
+      }
+    }
+
+    // STEP 4: Fetch Sales Orders with enhanced line items (including account info)
+    const salesOrders: LinkedSalesOrder[] = [];
+
+    if (linkedSOIds.size > 0) {
+      const { data: nsSOs } = await supabase
+        .from('netsuite_sales_orders')
+        .select(`
+          netsuite_id,
+          so_number,
+          so_date,
+          status,
+          customer_name,
+          total_amount,
+          netsuite_sales_order_lines (
+            line_number,
+            item_id,
+            item_name,
+            item_description,
+            item_type,
+            quantity,
+            rate,
+            amount,
+            cost_estimate,
+            gross_profit,
+            gross_margin_pct,
+            is_closed,
+            account_number,
+            account_name
+          )
+        `)
+        .in('netsuite_id', Array.from(linkedSOIds));
+
+      if (nsSOs) {
+        for (const so of nsSOs) {
+          // Enhance line items with product type
+          const enhancedLines: EnhancedSOLineItem[] = (so.netsuite_sales_order_lines || []).map((line: any) => {
+            const accountNumber = line.account_number || null;
+            const productType = accountNumber ? parseProjectType(accountNumber, line.account_name) : 'Unknown';
+
+            return {
               lineNumber: line.line_number || 0,
               itemId: line.item_id || '',
               itemName: line.item_name,
               itemDescription: line.item_description,
               itemType: line.item_type,
               quantity: line.quantity || 0,
-              quantityCompleted: line.quantity_completed || 0,
-              unitCost: line.unit_cost || 0,
-              lineCost: line.line_cost || 0,
+              rate: line.rate || 0,
+              amount: line.amount || 0,
               costEstimate: line.cost_estimate || 0,
-              actualCost: line.actual_cost,
+              grossProfit: line.gross_profit || 0,
+              grossMarginPct: line.gross_margin_pct || 0,
               isClosed: line.is_closed || false,
-            }));
+              accountNumber,
+              accountName: line.account_name,
+              productType,
+            };
+          });
 
-            // Calculate totals - prefer actual cost when available
-            const totalEstimatedCost = woLineItems.reduce((sum, li) => sum + li.costEstimate, 0);
-            const totalActualCost = (wo as any).total_actual_cost || woLineItems.reduce((sum, li) => sum + (li.actualCost || 0), 0);
-            const hasActualCost = totalActualCost > 0;
+          // Group lines by product type
+          const productTypeMap = new Map<string, EnhancedSOLineItem[]>();
+          for (const line of enhancedLines) {
+            const existing = productTypeMap.get(line.productType) || [];
+            existing.push(line);
+            productTypeMap.set(line.productType, existing);
+          }
 
-            workOrderDetails.push({
-              woNumber: wo.wo_number,
-              netsuiteId: wo.netsuite_id,
-              woDate: wo.wo_date,
-              status: wo.status,
-              linkedSO: null, // Will be filled in below
-              lineItems: woLineItems,
+          // Create product type groups with totals
+          const productTypeGroups: ProductTypeGroup[] = Array.from(productTypeMap.entries()).map(([productType, lineItems]) => {
+            const revenue = lineItems.reduce((sum, li) => sum + li.amount, 0);
+            const costEstimate = lineItems.reduce((sum, li) => sum + li.costEstimate, 0);
+            const grossProfit = revenue - costEstimate;
+
+            return {
+              productType,
+              productTypeName: PRODUCT_TYPE_NAMES[productType] || productType,
+              lineItems,
               totals: {
-                lineItemCount: woLineItems.length,
-                totalEstimatedCost,
-                totalActualCost: hasActualCost ? totalActualCost : null,
-                totalCost: hasActualCost ? totalActualCost : totalEstimatedCost,
+                lineItemCount: lineItems.length,
+                revenue,
+                costEstimate,
+                grossProfit,
+                grossMarginPct: revenue > 0 ? (grossProfit / revenue) * 100 : 0,
               },
-            });
-          }
+            };
+          });
+
+          // Sort groups by revenue descending
+          productTypeGroups.sort((a, b) => b.totals.revenue - a.totals.revenue);
+
+          // Calculate SO totals
+          const soRevenue = enhancedLines.reduce((sum, li) => sum + li.amount, 0);
+          const soCostEstimate = enhancedLines.reduce((sum, li) => sum + li.costEstimate, 0);
+          const soGrossProfit = soRevenue - soCostEstimate;
+
+          // Create rollup validation
+          const productTypeBreakdown = productTypeGroups.map(g => ({
+            type: g.productType,
+            total: g.totals.revenue,
+          }));
+
+          const lineItemsTotal = soRevenue;
+          const expectedTotal = so.total_amount || soRevenue;
+          const variance = lineItemsTotal - expectedTotal;
+          const variancePct = expectedTotal > 0 ? Math.abs(variance / expectedTotal) * 100 : 0;
+
+          salesOrders.push({
+            soNumber: so.so_number,
+            netsuiteId: so.netsuite_id,
+            soDate: so.so_date,
+            status: so.status,
+            customerName: so.customer_name,
+            totalAmount: so.total_amount || soRevenue,
+            productTypeGroups,
+            rollupValidation: {
+              productTypeBreakdown,
+              lineItemsTotal,
+              expectedTotal,
+              variance,
+              variancePct,
+              valid: variancePct < 1, // <1% variance is valid
+            },
+            totals: {
+              lineItemCount: enhancedLines.length,
+              revenue: soRevenue,
+              costEstimate: soCostEstimate,
+              grossProfit: soGrossProfit,
+              grossMarginPct: soRevenue > 0 ? (soGrossProfit / soRevenue) * 100 : 0,
+            },
+          });
         }
       }
-
-      // Fetch linked Sales Orders with line items
-      if (linkedSOIds.size > 0) {
-        const { data: salesOrders } = await supabase
-          .from('netsuite_sales_orders')
-          .select(`
-            netsuite_id,
-            so_number,
-            so_date,
-            status,
-            customer_name,
-            total_amount,
-            netsuite_sales_order_lines (
-              line_number,
-              item_id,
-              item_name,
-              item_description,
-              item_type,
-              quantity,
-              rate,
-              amount,
-              cost_estimate,
-              gross_profit,
-              gross_margin_pct,
-              is_closed
-            )
-          `)
-          .in('netsuite_id', Array.from(linkedSOIds));
-
-        // Map SOs to WOs
-        if (salesOrders) {
-          const soMap = new Map<string, any>();
-          for (const so of salesOrders) {
-            soMap.set(so.netsuite_id, so);
-            allSONumbers.add(so.so_number);
-          }
-
-          // Attach SOs to WOs
-          for (const woDetail of workOrderDetails) {
-            const nsWO = (await supabase
-              .from('netsuite_work_orders')
-              .select('created_from_so_id')
-              .eq('wo_number', woDetail.woNumber)
-              .single()).data;
-
-            if (nsWO?.created_from_so_id && soMap.has(nsWO.created_from_so_id)) {
-              const so = soMap.get(nsWO.created_from_so_id);
-              const soLineItems: SOLineItem[] = (so.netsuite_sales_order_lines || []).map((line: any) => ({
-                lineNumber: line.line_number || 0,
-                itemId: line.item_id || '',
-                itemName: line.item_name,
-                itemDescription: line.item_description,
-                itemType: line.item_type,
-                quantity: line.quantity || 0,
-                rate: line.rate || 0,
-                amount: line.amount || 0,
-                costEstimate: line.cost_estimate || 0,
-                grossProfit: line.gross_profit || 0,
-                grossMarginPct: line.gross_margin_pct || 0,
-                isClosed: line.is_closed || false,
-              }));
-
-              const soRevenue = soLineItems.reduce((sum, li) => sum + li.amount, 0);
-              const soCostEstimate = soLineItems.reduce((sum, li) => sum + li.costEstimate, 0);
-
-              woDetail.linkedSO = {
-                soNumber: so.so_number,
-                netsuiteId: so.netsuite_id,
-                soDate: so.so_date,
-                status: so.status,
-                customerName: so.customer_name,
-                totalAmount: so.total_amount || soRevenue,
-                lineItems: soLineItems,
-                totals: {
-                  lineItemCount: soLineItems.length,
-                  revenue: soRevenue,
-                  costEstimate: soCostEstimate,
-                  grossProfit: soRevenue - soCostEstimate,
-                  grossMarginPct: soRevenue > 0 ? ((soRevenue - soCostEstimate) / soRevenue) * 100 : 0,
-                },
-              };
-            }
-          }
-        }
-      }
-
-      // Calculate totals for this project type
-      const netsuiteRevenue = workOrderDetails.reduce((sum, wo) =>
-        sum + (wo.linkedSO?.totals.revenue || 0), 0);
-      const netsuiteCostEstimate = workOrderDetails.reduce((sum, wo) =>
-        sum + wo.totals.totalEstimatedCost, 0);
-
-      // Sum actual costs from work orders (not SO cost estimates)
-      const woActualCosts = workOrderDetails.map(wo => wo.totals.totalActualCost);
-      const hasAnyActualCost = woActualCosts.some(c => c !== null && c > 0);
-      const netsuiteActualCost = hasAnyActualCost
-        ? woActualCosts.reduce<number>((sum, c) => sum + (c || 0), 0)
-        : null;
-
-      // Use actual cost for GP if available, otherwise fall back to estimate
-      const effectiveCost = netsuiteActualCost ?? netsuiteCostEstimate;
-      const netsuiteGrossProfit = netsuiteRevenue - effectiveCost;
-      const netsuiteGrossMarginPct = netsuiteRevenue > 0
-        ? (netsuiteGrossProfit / netsuiteRevenue) * 100
-        : 0;
-
-      const soNumbers = workOrderDetails
-        .filter(wo => wo.linkedSO)
-        .map(wo => wo.linkedSO!.soNumber);
-
-      projectTypes.push({
-        typeCode: excelProject.project_type,
-        typeName: PROJECT_TYPE_NAMES[excelProject.project_type] || excelProject.project_type,
-        excelData: {
-          budgetRevenue: excelProject.budget_revenue || 0,
-          budgetCost: excelProject.budget_cost || 0,
-          budgetGP: excelProject.budget_gp || 0,
-          actualRevenue: excelProject.actual_revenue || 0,
-          actualCost: excelProject.actual_cost || 0,
-          actualGP: excelProject.actual_gp || 0,
-          variance: excelProject.variance || 0,
-        },
-        workOrders: workOrderDetails,
-        linkedSalesOrders: [...new Set(soNumbers)],
-        totals: {
-          woCount: workOrderDetails.length,
-          soCount: new Set(soNumbers).size,
-          netsuiteRevenue,
-          netsuiteCostEstimate,
-          netsuiteActualCost,
-          netsuiteGrossProfit,
-          netsuiteGrossMarginPct,
-        },
-      });
-
-      totalWOCount += workOrderDetails.length;
     }
 
-    // Calculate overall totals
-    const excelBudgetRevenue = projectTypes.reduce((sum, pt) => sum + pt.excelData.budgetRevenue, 0);
-    const excelActualRevenue = projectTypes.reduce((sum, pt) => sum + pt.excelData.actualRevenue, 0);
-    const excelVariance = projectTypes.reduce((sum, pt) => sum + pt.excelData.variance, 0);
-    const netsuiteRevenue = projectTypes.reduce((sum, pt) => sum + pt.totals.netsuiteRevenue, 0);
-    const netsuiteCostEstimate = projectTypes.reduce((sum, pt) => sum + pt.totals.netsuiteCostEstimate, 0);
+    // STEP 5: Calculate project-level KPIs
+    const netsuiteRevenue = salesOrders.reduce((sum, so) => sum + so.totals.revenue, 0);
+    const netsuiteCostEstimate = salesOrders.reduce((sum, so) => sum + so.totals.costEstimate, 0);
 
-    // Actual cost totals
-    const hasAnyActualCost = projectTypes.some(pt => pt.totals.netsuiteActualCost !== null);
-    const netsuiteActualCost = hasAnyActualCost
-      ? projectTypes.reduce((sum, pt) => sum + (pt.totals.netsuiteActualCost || 0), 0)
-      : null;
-    const effectiveCost = netsuiteActualCost ?? netsuiteCostEstimate;
-    const netsuiteGrossProfit = netsuiteRevenue - effectiveCost;
-    const netsuiteGrossMarginPct = netsuiteRevenue > 0
-      ? (netsuiteGrossProfit / netsuiteRevenue) * 100
-      : 0;
+    // Use actual WO costs if available
+    const woActualCosts = workOrders.filter(wo => wo.totals.totalActualCost !== null);
+    const netsuiteActualCost = woActualCosts.length > 0
+      ? workOrders.reduce((sum, wo) => sum + (wo.totals.totalActualCost || 0), 0)
+      : netsuiteCostEstimate;
 
-    // Get customer name from first SO
-    const firstSOWithCustomer = projectTypes
-      .flatMap(pt => pt.workOrders)
-      .find(wo => wo.linkedSO?.customerName);
+    const effectiveCost = woActualCosts.length > 0 ? netsuiteActualCost : netsuiteCostEstimate;
+    const grossProfit = netsuiteRevenue - effectiveCost;
+    const grossMarginPct = netsuiteRevenue > 0 ? (grossProfit / netsuiteRevenue) * 100 : 0;
+    const cpi = actualCost > 0 ? budgetCost / actualCost : 1;
 
-    // Get sync status
+    // STEP 6: Get sync status
     const { data: syncData } = await supabase
       .from('netsuite_work_orders')
       .select('synced_at')
@@ -471,38 +448,29 @@ export async function GET(request: Request) {
       .from('netsuite_sales_orders')
       .select('id', { count: 'exact', head: true });
 
-    const { count: woWithActualCost } = await supabase
-      .from('netsuite_work_orders')
-      .select('id', { count: 'exact', head: true })
-      .not('total_actual_cost', 'is', null)
-      .gt('total_actual_cost', 0);
-
     const response: ProjectProfitabilityResponse = {
       project: {
         name: projectName,
-        year: year,
-        customerName: firstSOWithCustomer?.linkedSO?.customerName || null,
-        projectTypes: projectTypes.sort((a, b) => b.excelData.actualRevenue - a.excelData.actualRevenue),
-        totals: {
-          projectTypeCount: projectTypes.length,
-          workOrderCount: totalWOCount,
-          salesOrderCount: allSONumbers.size,
-          excelBudgetRevenue,
-          excelActualRevenue,
-          excelVariance,
-          netsuiteRevenue,
-          netsuiteCostEstimate,
-          netsuiteActualCost,
-          netsuiteGrossProfit,
-          netsuiteGrossMarginPct,
-        },
+        year,
+        customerName: salesOrders[0]?.customerName || null,
       },
-      legend: PROJECT_TYPE_NAMES,
+      kpis: {
+        revenue: netsuiteRevenue,
+        cost: effectiveCost,
+        grossProfit,
+        grossMarginPct,
+        cpi,
+        budgetRevenue,
+        budgetCost,
+        actualRevenue,
+        actualCost,
+      },
+      salesOrders: salesOrders.sort((a, b) => b.totals.revenue - a.totals.revenue),
+      workOrders: workOrders.sort((a, b) => b.totals.totalCost - a.totals.totalCost),
       syncStatus: {
         lastSyncedAt: syncData?.[0]?.synced_at || null,
         workOrderCount: woCount || 0,
         salesOrderCount: soCount || 0,
-        workOrdersWithActualCosts: woWithActualCost || 0,
       },
     };
 

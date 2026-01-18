@@ -200,10 +200,14 @@ export async function POST(request: Request) {
         tl.class AS class_id,
         BUILTIN.DF(tl.class) AS class_name,
         tl.location AS location_id,
-        BUILTIN.DF(tl.location) AS location_name
+        BUILTIN.DF(tl.location) AS location_name,
+        tl.account AS account_id,
+        a.acctnumber AS account_number,
+        a.fullname AS account_name
       FROM Transaction t
       INNER JOIN TransactionLine tl ON tl.transaction = t.id
       LEFT JOIN Item i ON i.id = tl.item
+      LEFT JOIN Account a ON a.id = tl.account
       WHERE t.type = 'SalesOrd'
         AND t.trandate >= TO_DATE('${year}-01-01', 'YYYY-MM-DD')
         AND t.trandate <= TO_DATE('${year}-12-31', 'YYYY-MM-DD')
@@ -281,6 +285,9 @@ export async function POST(request: Request) {
         class_name: line.class_name,
         location_id: line.location_id?.toString(),
         location_name: line.location_name,
+        account_id: line.account_id?.toString(),
+        account_number: line.account_number,
+        account_name: line.account_name,
         updated_at: new Date().toISOString(),
       }));
 
