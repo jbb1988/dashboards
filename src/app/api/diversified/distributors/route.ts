@@ -91,7 +91,7 @@ function calculateStrategicAccountData(distributors: DistributorData[], totalRev
     .sort((a, b) => b.amount - a.amount);
 
   // Priority actions
-  const priorityActions = [];
+  const priorityActions: any[] = [];
   let rank = 1;
 
   // Critical: At-risk distributors
