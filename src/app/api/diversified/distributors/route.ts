@@ -139,6 +139,27 @@ export async function GET(request: NextRequest) {
     const currentData = currentResult.data || [];
     const priorData = priorResult.data || [];
 
+    // Query total diversified revenue (not filtered by distributor) for percentage calculation
+    let totalDiversifiedQuery = admin
+      .from('diversified_sales')
+      .select('revenue');
+
+    totalDiversifiedQuery = totalDiversifiedQuery
+      .gte('transaction_date', formatDate(currentPeriodStart))
+      .lte('transaction_date', formatDate(currentPeriodEnd));
+
+    if (className) {
+      totalDiversifiedQuery = totalDiversifiedQuery.eq('class_name', className);
+    }
+
+    const totalDiversifiedResult = await totalDiversifiedQuery;
+    if (totalDiversifiedResult.error) throw totalDiversifiedResult.error;
+
+    const totalDiversifiedRevenue = (totalDiversifiedResult.data || []).reduce(
+      (sum, row) => sum + (row.revenue || 0),
+      0
+    );
+
     // Aggregate by customer (location)
     const locationMap = new Map<string, LocationMetrics>();
 
@@ -363,6 +384,7 @@ export async function GET(request: NextRequest) {
           total_distributors: totalDistributors,
           total_locations: totalLocations,
           total_revenue: totalRevenue,
+          total_diversified_revenue: totalDiversifiedRevenue,
           avg_revenue_per_location: avgRevenuePerLocation,
           total_growth_opportunities: totalOpportunities,
           opportunities_by_tier: {
@@ -392,6 +414,7 @@ export async function GET(request: NextRequest) {
         total_distributors: totalDistributors,
         total_locations: totalLocations,
         total_revenue: totalRevenue,
+        total_diversified_revenue: totalDiversifiedRevenue,
         avg_revenue_per_location: avgRevenuePerLocation,
         total_growth_opportunities: totalOpportunities,
         opportunities_by_tier: {

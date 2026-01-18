@@ -77,6 +77,7 @@ interface DistributorsResponse {
     total_distributors: number;
     total_locations: number;
     total_revenue: number;
+    total_diversified_revenue: number;
     avg_revenue_per_location: number;
     total_growth_opportunities: number;
     opportunities_by_tier: {
@@ -755,6 +756,7 @@ export default function DistributorsDashboard() {
                     <DistributorTable
                       data={data.distributors || []}
                       maxRevenue={maxRevenue}
+                      totalDiversifiedRevenue={data.summary.total_diversified_revenue}
                       selectedYears={selectedYears}
                       selectedMonths={selectedMonths}
                       selectedClass={selectedClass}

@@ -19,17 +19,19 @@ interface DistributorData {
 interface DistributorTableProps {
   data: DistributorData[];
   maxRevenue: number;
+  totalDiversifiedRevenue: number;
   selectedYears?: number[];
   selectedMonths?: number[];
   selectedClass?: string | null;
 }
 
-type SortField = 'revenue' | 'margin' | 'yoy' | 'locations' | 'opps';
+type SortField = 'revenue' | 'margin' | 'yoy' | 'locations' | 'opps' | 'pct_total';
 type SortDirection = 'asc' | 'desc';
 
 export default function DistributorTable({
   data,
   maxRevenue,
+  totalDiversifiedRevenue,
   selectedYears = [],
   selectedMonths = [],
   selectedClass = null
@@ -70,6 +72,10 @@ export default function DistributorTable({
       case 'opps':
         aVal = a.growth_opportunities;
         bVal = b.growth_opportunities;
+        break;
+      case 'pct_total':
+        aVal = totalDiversifiedRevenue > 0 ? (a.total_revenue / totalDiversifiedRevenue) * 100 : 0;
+        bVal = totalDiversifiedRevenue > 0 ? (b.total_revenue / totalDiversifiedRevenue) * 100 : 0;
         break;
       default:
         return 0;
@@ -126,7 +132,7 @@ export default function DistributorTable({
       className="rounded-xl bg-[#151F2E] border border-white/[0.04] overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
     >
       {/* Table Header */}
-      <div className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-6 py-4 bg-[#0F1824] border-b border-white/[0.04]">
+      <div className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-6 py-4 bg-[#0F1824] border-b border-white/[0.04]">
         <div className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
           Distributor
         </div>
@@ -136,6 +142,13 @@ export default function DistributorTable({
         >
           Revenue
           <SortIcon field="revenue" />
+        </button>
+        <button
+          onClick={() => handleSort('pct_total')}
+          className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider text-right flex items-center justify-end hover:text-[#14B8A6] transition-colors"
+        >
+          % of Total
+          <SortIcon field="pct_total" />
         </button>
         <button
           onClick={() => handleSort('margin')}
@@ -182,7 +195,7 @@ export default function DistributorTable({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: idx * 0.02 }}
               onClick={() => handleRowClick(row.distributor_name)}
-              className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-6 py-4 border-b border-white/[0.02] hover:bg-[#1E293B] cursor-pointer transition-colors group"
+              className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-4 px-6 py-4 border-b border-white/[0.02] hover:bg-[#1E293B] cursor-pointer transition-colors group"
             >
               {/* Distributor Name with Revenue Bar */}
               <div className="flex items-center gap-3">
@@ -206,6 +219,15 @@ export default function DistributorTable({
                 </div>
                 <div className="text-[11px] text-[#64748B] mt-0.5">
                   vs {formatCurrency(row.prior_revenue)}
+                </div>
+              </div>
+
+              {/* % of Total Revenue */}
+              <div className="text-right">
+                <div className="text-[13px] font-medium text-white">
+                  {totalDiversifiedRevenue > 0
+                    ? ((row.total_revenue / totalDiversifiedRevenue) * 100).toFixed(1)
+                    : '0.0'}%
                 </div>
               </div>
 
