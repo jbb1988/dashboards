@@ -355,7 +355,7 @@ export async function GET(
     // Fetch current period data for this location
     let currentQuery = admin
       .from('diversified_sales')
-      .select('customer_id, customer_name, revenue, cost, gross_profit, gross_profit_pct, quantity, class_category, transaction_date, item_name, product_type');
+      .select('customer_id, customer_name, revenue, cost, gross_profit, gross_profit_pct, quantity, class_category, transaction_date, item_name');
 
     currentQuery = currentQuery
       .eq('customer_id', customerId)
@@ -499,7 +499,6 @@ export async function GET(
         date: row.transaction_date,
         item_name: row.item_name || 'Unknown Item',
         category: row.class_category || 'Uncategorized',
-        product_type: row.product_type,
         quantity: row.quantity || 0,
         revenue: row.revenue || 0,
         cost: row.cost || 0,
