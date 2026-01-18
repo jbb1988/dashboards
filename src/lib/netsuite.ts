@@ -637,8 +637,12 @@ export interface ProjectProfitabilityRecord {
 }
 
 /**
- * Parse project type from account number
- * Maps NetSuite account numbers to project types matching the Excel spreadsheet:
+ * Parse project type from item class and account number
+ *
+ * Primary: Uses item class name from NetSuite Item table
+ * Fallback: Uses account number if item class is unavailable
+ *
+ * Maps NetSuite data to project types matching the Excel spreadsheet:
  * - TBEN: Test Bench Equipment New (4011, 5011)
  * - TBEU: Test Bench Equipment Upgrade (4012, 5012)
  * - TBIN: TB Install & Training New (4031, 5031)
@@ -649,7 +653,50 @@ export interface ProjectProfitabilityRecord {
  * - MCC: MCC Services (4100-4111, 5100-5111)
  * - TBSV: TB Service/Maintenance (4071-4079, 5071-5079)
  */
-export function parseProjectType(accountNumber: string, accountName?: string): string {
+export function parseProjectType(
+  accountNumber: string,
+  accountName?: string,
+  itemClassName?: string
+): string {
+  // Primary: Use item class name if available
+  if (itemClassName) {
+    const className = itemClassName.toLowerCase();
+
+    // Direct mappings from Item class
+    if (className.includes('test bench') || className.includes('testbench')) {
+      // Use account number to determine if it's Equipment, Install, or Service
+      if (accountNumber) {
+        const acct = accountNumber.trim();
+        if (acct.startsWith('401') || acct.startsWith('501')) return 'TBEN';
+        if (acct.startsWith('403') || acct.startsWith('503')) return 'TBIN';
+        if (acct.startsWith('407') || acct.startsWith('507')) return 'TB Service';
+      }
+      // Default to TBEN if account doesn't specify
+      return 'TBEN';
+    }
+
+    if (className.includes('mcc') || className.includes('maintenance') || className.includes('calibration')) {
+      return 'MCC';
+    }
+
+    if (className.includes('m3') || className.includes('laser')) {
+      // Use account to determine Install vs Software
+      if (accountNumber) {
+        const acct = accountNumber.trim();
+        if (acct.startsWith('404') || acct.startsWith('504')) return 'M3IN';
+        if (acct.startsWith('405') || acct.startsWith('408') || acct.startsWith('409') ||
+            acct.startsWith('505') || acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
+      }
+      return 'M3 Software';
+    }
+
+    // Other, Diversified, etc. → Other
+    if (className.includes('other') || className.includes('diversified') || className.includes('veroflow')) {
+      return 'Other';
+    }
+  }
+
+  // Fallback: Use account number classification
   if (!accountNumber) return 'Unknown';
 
   const acct = accountNumber.trim();

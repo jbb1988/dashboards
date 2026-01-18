@@ -304,6 +304,8 @@ export async function GET(request: Request) {
             item_name,
             item_description,
             item_type,
+            item_class_id,
+            item_class_name,
             quantity,
             rate,
             amount,
@@ -322,7 +324,8 @@ export async function GET(request: Request) {
           // Enhance line items with product type
           const enhancedLines: EnhancedSOLineItem[] = (so.netsuite_sales_order_lines || []).map((line: any) => {
             const accountNumber = line.account_number || null;
-            const productType = accountNumber ? parseProjectType(accountNumber, line.account_name) : 'Unknown';
+            const itemClassName = line.item_class_name || null;
+            const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
 
             return {
               lineNumber: line.line_number || 0,
