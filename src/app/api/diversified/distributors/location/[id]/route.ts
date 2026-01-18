@@ -190,7 +190,9 @@ function generatePriorityActions(
   // High: Improve purchase frequency
   const transactionCount = locationMetrics.transaction_count || 12;
   const avgDaysBetween = 365 / transactionCount;
-  const peerAvgTransactions = peerLocations.reduce((sum, p) => sum + (p.transaction_count || 12), 0) / peerLocations.length;
+  const peerAvgTransactions = peerLocations.length > 0
+    ? peerLocations.reduce((sum, p) => sum + (p.transaction_count || 12), 0) / peerLocations.length
+    : 12;
   const peerAvgDaysBetween = 365 / peerAvgTransactions;
 
   if (avgDaysBetween > peerAvgDaysBetween * 1.5) {
@@ -247,11 +249,15 @@ function findSimilarLocations(
     .map(loc => {
       // Revenue similarity (within 50% = 50 points)
       const revenueDiff = Math.abs(loc.revenue - currentLocation.revenue);
-      const revenueScore = Math.max(0, 50 - (revenueDiff / currentLocation.revenue) * 100);
+      const revenueScore = currentLocation.revenue > 0
+        ? Math.max(0, 50 - (revenueDiff / currentLocation.revenue) * 100)
+        : 0;
 
       // Category similarity (overlap = 50 points)
-      const categoryScore = (Math.min(loc.categories.length, currentLocation.category_count) /
-        Math.max(loc.categories.length, currentLocation.category_count)) * 50;
+      const maxCategoryCount = Math.max(loc.categories.length, currentLocation.category_count);
+      const categoryScore = maxCategoryCount > 0
+        ? (Math.min(loc.categories.length, currentLocation.category_count) / maxCategoryCount) * 50
+        : 0;
 
       const similarity_score = Math.round(revenueScore + categoryScore);
 
@@ -262,7 +268,7 @@ function findSimilarLocations(
         revenue_r12: loc.revenue,
         transaction_count: loc.transaction_count || 12,
         category_count: loc.categories.length,
-        avg_margin: loc.gross_profit / loc.revenue * 100,
+        avg_margin: loc.revenue > 0 ? (loc.gross_profit / loc.revenue * 100) : 0,
       };
     })
     .sort((a, b) => b.similarity_score - a.similarity_score)
@@ -624,7 +630,7 @@ export async function GET(
       ),
       margin_percentile: calculatePercentile(
         marginPct,
-        peerLocations.map(p => (p.gross_profit / p.revenue) * 100)
+        peerLocations.map(p => p.revenue > 0 ? (p.gross_profit / p.revenue) * 100 : 0)
       ),
       category_percentile: calculatePercentile(
         categories.size,

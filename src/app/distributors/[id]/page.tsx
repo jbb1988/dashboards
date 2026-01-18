@@ -188,6 +188,8 @@ export default function DistributorDetailPage() {
   }, [id]);
 
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -209,7 +211,7 @@ export default function DistributorDetailPage() {
         console.log('[Detail Page] Is Location View:', isLocationView);
         console.log('[Detail Page] Filters:', { selectedYears, selectedMonths, selectedClass });
 
-        const response = await fetch(endpoint);
+        const response = await fetch(endpoint, { signal: abortController.signal });
 
         if (!response.ok) {
           const errorData = await response.json();
@@ -219,6 +221,11 @@ export default function DistributorDetailPage() {
         const result = await response.json();
         setData(result);
       } catch (err) {
+        // Ignore abort errors
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.log('[Detail Page] Fetch aborted');
+          return;
+        }
         console.error('Error fetching detail data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load data');
       } finally {
@@ -227,6 +234,11 @@ export default function DistributorDetailPage() {
     };
 
     fetchData();
+
+    // Cleanup: abort fetch if component unmounts or dependencies change
+    return () => {
+      abortController.abort();
+    };
   }, [id, isLocationView, selectedYears, selectedMonths, selectedClass]);
 
   // Handle task creation from priority actions
