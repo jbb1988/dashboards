@@ -589,9 +589,6 @@ export default function DistributorDetailPage() {
                 )}
                 <button
                   onClick={() => {
-                    setSelectedYears([]);
-                    setSelectedMonths([]);
-                    setSelectedClass(null);
                     router.replace(window.location.pathname);
                   }}
                   className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[#EF4444] bg-[#EF4444]/10 hover:bg-[#EF4444]/20 transition-colors"
