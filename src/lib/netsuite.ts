@@ -667,12 +667,17 @@ export function parseProjectType(
 
     // Direct mappings from Item class
     if (className.includes('test bench') || className.includes('testbench')) {
-      // Use account number to determine if it's Equipment, Install, Service, PM, SCH, or MCC
+      // Use account number to determine if it's Equipment, Install, Service, PM, SCH, MCC, or M3
       if (accountNumber) {
         const acct = accountNumber.trim();
         // Check if account is MCC Services (4101-4111, excluding 4140-4149)
         if ((acct.startsWith('410') || acct.startsWith('411')) && !acct.startsWith('414')) return 'MCC';
         if ((acct.startsWith('510') || acct.startsWith('511')) && !acct.startsWith('514')) return 'MCC';
+        // Check if account is M3 (some M3 items have Test Bench item class)
+        if (acct.startsWith('404') || acct.startsWith('504')) return 'M3IN';
+        if (acct === '4051' || acct === '5051') return 'M3NEW';
+        if ((acct.startsWith('405') && acct !== '4050' && acct !== '4051') ||
+            (acct.startsWith('505') && acct !== '5050' && acct !== '5051')) return 'M3 Software';
         // Project Management and Shipping
         if (acct === '4013' || acct === '5013') return 'PM';
         if (acct === '4018' || acct === '5018') return 'SCH';
