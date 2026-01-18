@@ -33,13 +33,14 @@ export async function GET(request: NextRequest) {
       tasks: [],
     };
 
-    // Search contracts
+    // Search contracts (only 2025+ to match NetSuite data availability)
     if (scope === 'all' || scope === 'contracts') {
       const { data: contracts, error } = await admin
         .from('contracts')
         .select('*')
         .or(`name.ilike.${searchTerm},account_name.ilike.${searchTerm},opportunity_name.ilike.${searchTerm},sales_rep.ilike.${searchTerm}`)
         .eq('is_closed', false)
+        .gte('close_date', '2025-01-01')
         .limit(limit);
 
       if (!error && contracts) {
