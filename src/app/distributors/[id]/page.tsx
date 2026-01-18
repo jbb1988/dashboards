@@ -380,8 +380,19 @@ export default function DistributorDetailPage() {
     );
   }
 
-  // Chart colors
-  const TEAL_COLORS = ['#14B8A6', '#0D9488', '#0F766E', '#115E59', '#134E4A'];
+  // Chart colors - diverse palette for better differentiation
+  const CHART_COLORS = [
+    '#14B8A6', // Teal
+    '#F59E0B', // Amber
+    '#8B5CF6', // Purple
+    '#EC4899', // Pink
+    '#10B981', // Green
+    '#3B82F6', // Blue
+    '#EF4444', // Red
+    '#F97316', // Orange
+    '#06B6D4', // Cyan
+    '#6366F1', // Indigo
+  ];
 
   return (
     <div className="min-h-screen bg-[#0B1220] p-6">
@@ -878,7 +889,7 @@ export default function DistributorDetailPage() {
                   animationDuration={1500}
                 >
                   {data.category_breakdown.map((_: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={TEAL_COLORS[index % TEAL_COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip
@@ -897,7 +908,7 @@ export default function DistributorDetailPage() {
                 <div key={cat.category} className="flex items-center gap-2 text-sm">
                   <div
                     className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: TEAL_COLORS[index % TEAL_COLORS.length] }}
+                    style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
                   ></div>
                   <span className="text-[#64748B] truncate">{cat.category}</span>
                 </div>
