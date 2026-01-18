@@ -77,9 +77,9 @@ export function classifyAttritionAction(
   const daysInactive = customer.recency_days;
   const revenueAtRisk = customer.revenue_at_risk;
 
-  // Format product info as "Item Name - Item Description"
+  // Use ONLY item description (item number is irrelevant)
   const topProductsFormatted = context?.top_products_with_descriptions?.map(p =>
-    `${p.item_name} - ${p.item_description}`
+    p.item_description
   ) || context?.top_products || [];
 
   // Determine action type based on severity
@@ -177,12 +177,13 @@ export function classifyQuickWinAction(
     riskLevel = quickWin.priority === 'high' ? 'medium' : 'low';
   }
 
-  // Use typical_products from quickWin if available, otherwise format from context
+  // Use ONLY item description (item number is irrelevant)
   let products: string[];
   if (quickWin.typical_products && quickWin.typical_products.length > 0) {
     products = quickWin.typical_products;
   } else if (context?.top_products_with_descriptions && context.top_products_with_descriptions.length > 0) {
-    products = context.top_products_with_descriptions.map(p => `${p.item_name} - ${p.item_description}`);
+    // Use ONLY the description, not the item number
+    products = context.top_products_with_descriptions.map(p => p.item_description);
   } else {
     products = context?.top_products || [];
   }

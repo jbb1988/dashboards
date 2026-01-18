@@ -2136,6 +2136,10 @@ export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
         ? ` (${behavior.segment.replace('_', ' ')} - orders ${behavior.order_consistency}% of months)`
         : '';
 
+      // Use item descriptions only (item numbers are irrelevant)
+      const productDescriptions = ctx.top_products_with_descriptions.slice(0, 3).map(p => p.item_description);
+      const productDescriptionsForScript = ctx.top_products_with_descriptions.slice(0, 2).map(p => p.item_description).join(' and ') || 'your usual items';
+
       quickWins.push({
         type: 'repeat_order',
         priority,
@@ -2145,10 +2149,10 @@ export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
         usual_frequency_days: ctx.avg_order_frequency_days,
         days_overdue: daysOverdue,
         typical_order_value: Math.round(ctx.avg_order_value),
-        typical_products: ctx.top_products.slice(0, 3),
+        typical_products: productDescriptions,
         action_summary: `Usually orders every ${ctx.avg_order_frequency_days} days, ${daysOverdue} days overdue${segmentNote}`,
         estimated_value: Math.round(ctx.avg_order_value),
-        call_script: `Hi, I noticed it's been about ${Math.round(ctx.days_since_last_order / 7)} weeks since your last order. You usually order ${ctx.top_products.slice(0, 2).join(' and ') || 'your usual items'} around this time. Want me to put together a quote for your standard order?`,
+        call_script: `Hi, I noticed it's been about ${Math.round(ctx.days_since_last_order / 7)} weeks since your last order. You usually order ${productDescriptionsForScript} around this time. Want me to put together a quote for your standard order?`,
       });
     }
 
