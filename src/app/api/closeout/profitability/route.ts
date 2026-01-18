@@ -370,6 +370,9 @@ export async function GET(request: Request) {
 
           // Create product type groups with totals
           const productTypeGroups: ProductTypeGroup[] = Array.from(productTypeMap.entries()).map(([productType, lineItems]) => {
+            // Sort line items by rate descending (highest rate first)
+            const sortedLineItems = [...lineItems].sort((a, b) => Math.abs(b.rate) - Math.abs(a.rate));
+
             // Use absolute values since NetSuite may store negative amounts
             const revenue = Math.abs(lineItems.reduce((sum, li) => sum + li.amount, 0));
             const costEstimate = Math.abs(lineItems.reduce((sum, li) => sum + li.costEstimate, 0));
@@ -378,7 +381,7 @@ export async function GET(request: Request) {
             return {
               productType,
               productTypeName: PRODUCT_TYPE_NAMES[productType] || productType,
-              lineItems,
+              lineItems: sortedLineItems,
               totals: {
                 lineItemCount: lineItems.length,
                 revenue,
