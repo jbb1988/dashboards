@@ -448,28 +448,32 @@ export default function CloseoutDashboard() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {/* Year Filter - Multi-select */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 font-medium">Years:</span>
-                  {availableYears.map(year => (
-                    <button
-                      key={year}
-                      onClick={() => toggleYear(year)}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                        selectedYears.includes(year)
-                          ? 'bg-[#22C55E] text-white'
-                          : 'bg-[#111827] text-gray-400 hover:bg-[#1F2937] hover:text-white border border-white/[0.08]'
-                      }`}
-                    >
-                      {year}
-                    </button>
-                  ))}
-                </div>
+                {/* Year Filter & Load Button - Only for Excel-based tabs */}
+                {activeTab !== 'profitability' && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 font-medium">Years:</span>
+                      {availableYears.map(year => (
+                        <button
+                          key={year}
+                          onClick={() => toggleYear(year)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                            selectedYears.includes(year)
+                              ? 'bg-[#22C55E] text-white'
+                              : 'bg-[#111827] text-gray-400 hover:bg-[#1F2937] hover:text-white border border-white/[0.08]'
+                          }`}
+                        >
+                          {year}
+                        </button>
+                      ))}
+                    </div>
 
-                <div className="h-6 w-px bg-white/[0.08]"></div>
+                    <div className="h-6 w-px bg-white/[0.08]"></div>
+                  </>
+                )}
 
                 {/* Primary Action: Load & Enrich Data */}
-                {!data && (
+                {activeTab !== 'profitability' && !data && (
                   <button
                     onClick={loadAndEnrichData}
                     disabled={loadingAndEnriching}
@@ -493,8 +497,8 @@ export default function CloseoutDashboard() {
                   </button>
                 )}
 
-                {/* Secondary Actions: After data is loaded */}
-                {data && (
+                {/* Secondary Actions: After data is loaded (only for Excel tabs) */}
+                {activeTab !== 'profitability' && data && (
                   <>
                     <button
                       onClick={() => fetchData(true)}

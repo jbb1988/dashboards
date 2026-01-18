@@ -1,9 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { RefreshCw, Clock, Database, Search, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { RefreshCw, Clock, Database, Search, AlertCircle, ChevronDown, X } from 'lucide-react';
 import ProfitabilityKPIs from './ProfitabilityKPIs';
 import ProjectHierarchy from './ProjectHierarchy';
+
+interface ProjectOption {
+  name: string;
+  years: number[];
+}
 
 interface ProjectKPIs {
   budgetRevenue: number;
@@ -114,10 +119,49 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
   const [projectName, setProjectName] = useState(initialProject || '');
   const [year, setYear] = useState<number | ''>(initialYear || '');
   const [searchInput, setSearchInput] = useState(initialProject || '');
-  const [yearInput, setYearInput] = useState(initialYear?.toString() || '');
   const [data, setData] = useState<ProfitabilityData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Dropdown state
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch available projects on mount
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await fetch('/api/closeout/projects');
+        const result = await response.json();
+        if (result.projects) {
+          setProjects(result.projects);
+        }
+      } catch (err) {
+        console.error('Failed to fetch projects:', err);
+      } finally {
+        setLoadingProjects(false);
+      }
+    };
+    fetchProjects();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter projects based on search input
+  const filteredProjects = projects.filter(p =>
+    p.name.toLowerCase().includes(searchInput.toLowerCase())
+  );
 
   const fetchData = async (project: string, yr?: number | '') => {
     if (!project) {
@@ -161,19 +205,35 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
 
   const handleSearch = () => {
     const trimmedProject = searchInput.trim();
-    const parsedYear = yearInput ? parseInt(yearInput) : '';
 
     if (trimmedProject) {
       setProjectName(trimmedProject);
-      setYear(parsedYear);
-      fetchData(trimmedProject, parsedYear);
+      setIsDropdownOpen(false);
+      fetchData(trimmedProject, year);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch();
+    } else if (e.key === 'Escape') {
+      setIsDropdownOpen(false);
     }
+  };
+
+  const selectProject = (project: ProjectOption, selectedYear?: number) => {
+    setSearchInput(project.name);
+    setProjectName(project.name);
+    setYear(selectedYear || '');
+    setIsDropdownOpen(false);
+    fetchData(project.name, selectedYear || '');
+  };
+
+  const clearSelection = () => {
+    setSearchInput('');
+    setProjectName('');
+    setYear('');
+    setData(null);
   };
 
   const formatSyncTime = (timestamp: string | null) => {
@@ -192,29 +252,81 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
       {/* Search Bar */}
       <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-4">
         <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Enter project name (e.g., Sarasota, Empire, Ferguson)..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="w-full pl-10 pr-4 py-2.5 bg-[#0D1117] border border-white/[0.08] rounded-lg text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6]/40"
-            />
+          {/* Searchable Dropdown */}
+          <div className="flex-1 relative" ref={dropdownRef}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
+              <input
+                type="text"
+                placeholder={loadingProjects ? "Loading projects..." : "Search or select a project..."}
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  setIsDropdownOpen(true);
+                }}
+                onFocus={() => setIsDropdownOpen(true)}
+                onKeyDown={handleKeyPress}
+                disabled={loadingProjects}
+                className="w-full pl-10 pr-10 py-2.5 bg-[#0D1117] border border-white/[0.08] rounded-lg text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6]/40"
+              />
+              {searchInput ? (
+                <button
+                  onClick={clearSelection}
+                  className="absolute right-8 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              ) : null}
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              >
+                <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
+            {/* Dropdown List */}
+            {isDropdownOpen && !loadingProjects && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-80 overflow-y-auto bg-[#0D1117] border border-white/[0.08] rounded-lg shadow-xl">
+                {filteredProjects.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-400">
+                    No projects found matching "{searchInput}"
+                  </div>
+                ) : (
+                  filteredProjects.map((project) => (
+                    <div
+                      key={project.name}
+                      className="border-b border-white/[0.04] last:border-b-0"
+                    >
+                      {/* Project name - click to search all years */}
+                      <button
+                        onClick={() => selectProject(project)}
+                        className="w-full px-4 py-2.5 text-left hover:bg-white/[0.04] transition-colors flex items-center justify-between"
+                      >
+                        <span className="text-sm text-white font-medium">{project.name}</span>
+                        <span className="text-xs text-gray-500">All years</span>
+                      </button>
+                      {/* Year buttons */}
+                      {project.years.length > 0 && (
+                        <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+                          {project.years.map((yr) => (
+                            <button
+                              key={yr}
+                              onClick={() => selectProject(project, yr)}
+                              className="px-2.5 py-1 text-xs bg-[#1F2937] hover:bg-[#374151] text-gray-300 hover:text-white rounded transition-colors"
+                            >
+                              {yr}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
-          <div className="w-32">
-            <input
-              type="number"
-              placeholder="Year"
-              value={yearInput}
-              onChange={(e) => setYearInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              min="2020"
-              max="2030"
-              className="w-full px-4 py-2.5 bg-[#0D1117] border border-white/[0.08] rounded-lg text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6]/40"
-            />
-          </div>
+
           <button
             onClick={handleSearch}
             disabled={loading || !searchInput.trim()}
@@ -274,25 +386,24 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
       {!data && !loading && !error && (
         <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-12 text-center">
           <Search className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">Search for a Project</h3>
+          <h3 className="text-lg font-medium text-white mb-2">Select a Project</h3>
           <p className="text-sm text-gray-400 max-w-md mx-auto">
-            Enter a project or customer name to view the complete profitability hierarchy
-            including Sales Orders, Work Orders, and all line items.
+            Use the dropdown above to select a project and view its complete profitability
+            hierarchy including Sales Orders, Work Orders, and all line items.
           </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {['Sarasota', 'Empire', 'Ferguson'].map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => {
-                  setSearchInput(suggestion);
-                  fetchData(suggestion);
-                }}
-                className="px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-sm text-gray-300 rounded-lg transition-colors"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
+          {projects.length > 0 && (
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {projects.slice(0, 5).map((project) => (
+                <button
+                  key={project.name}
+                  onClick={() => selectProject(project)}
+                  className="px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-sm text-gray-300 rounded-lg transition-colors"
+                >
+                  {project.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
