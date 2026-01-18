@@ -168,9 +168,16 @@ function generatePriorityActions(
   }
 
   // High: Category expansion opportunity
-  const peerAvgCategories = peerLocations.reduce((sum, p) => sum + p.categories.length, 0) / peerLocations.length;
-  if (locationMetrics.category_count < peerAvgCategories * 0.7) {
+  const peerAvgCategories = peerLocations.length > 0
+    ? peerLocations.reduce((sum, p) => sum + (Array.isArray(p.categories) ? p.categories.length : 0), 0) / peerLocations.length
+    : locationMetrics.category_count;
+
+  if (peerAvgCategories > 0 && locationMetrics.category_count < peerAvgCategories * 0.7) {
     const missingCategories = Math.floor(peerAvgCategories - locationMetrics.category_count);
+    const revenuePerCategory = locationMetrics.category_count > 0
+      ? locationMetrics.revenue / locationMetrics.category_count
+      : locationMetrics.revenue * 0.15;
+
     actions.push({
       id: 'expand_categories',
       category: 'expansion',
@@ -182,7 +189,7 @@ function generatePriorityActions(
       metrics: {
         current: locationMetrics.category_count,
         target: Math.ceil(peerAvgCategories),
-        opportunity: (locationMetrics.revenue / locationMetrics.category_count) * missingCategories,
+        opportunity: revenuePerCategory * missingCategories,
       },
     });
   }
@@ -248,15 +255,17 @@ function findSimilarLocations(
     .filter(loc => loc.customer_id !== currentLocation.customer_id)
     .map(loc => {
       // Revenue similarity (within 50% = 50 points)
-      const revenueDiff = Math.abs(loc.revenue - currentLocation.revenue);
+      const revenueDiff = Math.abs((loc.revenue || 0) - (currentLocation.revenue || 0));
       const revenueScore = currentLocation.revenue > 0
         ? Math.max(0, 50 - (revenueDiff / currentLocation.revenue) * 100)
         : 0;
 
       // Category similarity (overlap = 50 points)
-      const maxCategoryCount = Math.max(loc.categories.length, currentLocation.category_count);
+      const locCategoryCount = Array.isArray(loc.categories) ? loc.categories.length : 0;
+      const currentCategoryCount = currentLocation.category_count || 0;
+      const maxCategoryCount = Math.max(locCategoryCount, currentCategoryCount);
       const categoryScore = maxCategoryCount > 0
-        ? (Math.min(loc.categories.length, currentLocation.category_count) / maxCategoryCount) * 50
+        ? (Math.min(locCategoryCount, currentCategoryCount) / maxCategoryCount) * 50
         : 0;
 
       const similarity_score = Math.round(revenueScore + categoryScore);
@@ -265,10 +274,10 @@ function findSimilarLocations(
         location_id: loc.customer_id,
         location_name: loc.customer_name,
         similarity_score,
-        revenue_r12: loc.revenue,
-        transaction_count: loc.transaction_count || 12,
-        category_count: loc.categories.length,
-        avg_margin: loc.revenue > 0 ? (loc.gross_profit / loc.revenue * 100) : 0,
+        revenue_r12: loc.revenue || 0,
+        transaction_count: loc.transaction_count || 1,
+        category_count: locCategoryCount,
+        avg_margin: (loc.revenue || 0) > 0 ? ((loc.gross_profit || 0) / loc.revenue * 100) : 0,
       };
     })
     .sort((a, b) => b.similarity_score - a.similarity_score)
@@ -413,6 +422,7 @@ export async function GET(
     let totalGrossProfit = 0;
     let totalUnits = 0;
     const categories = new Set<string>();
+    const transactionDates = new Set<string>();
     let lastPurchaseDate: string | null = null;
 
     for (const row of currentData) {
@@ -421,10 +431,16 @@ export async function GET(
       totalGrossProfit += row.gross_profit || 0;
       totalUnits += row.quantity || 0;
       if (row.class_category) categories.add(row.class_category);
-      if (row.transaction_date && (!lastPurchaseDate || row.transaction_date > lastPurchaseDate)) {
-        lastPurchaseDate = row.transaction_date;
+      if (row.transaction_date) {
+        transactionDates.add(row.transaction_date);
+        if (!lastPurchaseDate || row.transaction_date > lastPurchaseDate) {
+          lastPurchaseDate = row.transaction_date;
+        }
       }
     }
+
+    // Calculate actual transaction count for the full period
+    const actualTransactionCount = transactionDates.size > 0 ? transactionDates.size : 1; // Minimum 1 to avoid division by zero
 
     // Aggregate prior period
     let totalPriorRevenue = 0;
@@ -496,7 +512,7 @@ export async function GET(
     // Fetch all locations for this distributor for comparison
     let peerQuery = admin
       .from('diversified_sales')
-      .select('customer_id, customer_name, revenue, cost, gross_profit, class_category');
+      .select('customer_id, customer_name, revenue, cost, gross_profit, class_category, transaction_date');
 
     peerQuery = peerQuery
       .ilike('customer_name', `%${distributorName}%`)
@@ -514,9 +530,19 @@ export async function GET(
 
     // Aggregate peer locations
     const peerMap = new Map<string, any>();
+    const peerTransactionDates = new Map<string, Set<string>>();
+
     for (const row of peerData) {
       const key = row.customer_id;
       const existing = peerMap.get(key);
+
+      // Track unique transaction dates for each peer
+      if (!peerTransactionDates.has(key)) {
+        peerTransactionDates.set(key, new Set());
+      }
+      if (row.transaction_date) {
+        peerTransactionDates.get(key)!.add(row.transaction_date);
+      }
 
       if (existing) {
         existing.revenue += row.revenue || 0;
@@ -532,9 +558,16 @@ export async function GET(
           revenue: row.revenue || 0,
           cost: row.cost || 0,
           gross_profit: row.gross_profit || 0,
-          categories: row.class_category ? [row.class_category] : []
+          categories: row.class_category ? [row.class_category] : [],
+          transaction_count: 0 // Will be set below
         });
       }
+    }
+
+    // Set transaction counts for each peer
+    for (const [customerId, peer] of peerMap.entries()) {
+      const dateSet = peerTransactionDates.get(customerId);
+      peer.transaction_count = dateSet ? dateSet.size : 1; // Minimum 1 to avoid division by zero
     }
 
     // Convert to array and calculate distributor average
@@ -600,7 +633,7 @@ export async function GET(
       category_count: categories.size,
       yoy_change_pct: yoyChangePct,
       last_purchase_date: lastPurchaseDate,
-      transaction_count: recentTransactions.length || 12, // Use actual transaction count or estimate
+      transaction_count: actualTransactionCount,
     };
 
     // Calculate health score
@@ -622,19 +655,19 @@ export async function GET(
     const competitivePosition = {
       revenue_percentile: calculatePercentile(
         totalRevenue,
-        peerLocations.map(p => p.revenue)
+        peerLocations.map(p => p.revenue || 0)
       ),
       frequency_percentile: calculatePercentile(
         locationMetrics.transaction_count,
-        peerLocations.map(p => p.transaction_count || 12)
+        peerLocations.map(p => p.transaction_count || 1)
       ),
       margin_percentile: calculatePercentile(
         marginPct,
-        peerLocations.map(p => p.revenue > 0 ? (p.gross_profit / p.revenue) * 100 : 0)
+        peerLocations.map(p => (p.revenue || 0) > 0 ? ((p.gross_profit || 0) / p.revenue) * 100 : 0)
       ),
       category_percentile: calculatePercentile(
         categories.size,
-        peerLocations.map(p => p.categories.length)
+        peerLocations.map(p => (Array.isArray(p.categories) ? p.categories.length : 0))
       ),
     };
 

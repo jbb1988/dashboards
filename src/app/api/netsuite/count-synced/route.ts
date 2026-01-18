@@ -32,6 +32,19 @@ export async function GET() {
       .from('netsuite_sales_order_lines')
       .select('*', { count: 'exact', head: true });
 
+    // Count sales order lines with NULL item_name
+    const { count: nullItemNameCount, error: nullError } = await supabase
+      .from('netsuite_sales_order_lines')
+      .select('*', { count: 'exact', head: true })
+      .is('item_name', null);
+
+    // Get sample recent sales order lines with item names
+    const { data: recentSOLines } = await supabase
+      .from('netsuite_sales_order_lines')
+      .select('netsuite_line_id, item_id, item_name, item_description, updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(10);
+
     // Get sample recent work orders
     const { data: recentWOs } = await supabase
       .from('netsuite_work_orders')
@@ -46,9 +59,11 @@ export async function GET() {
         workOrderLines: wolCount || 0,
         salesOrders: soCount || 0,
         salesOrderLines: solCount || 0,
+        salesOrderLinesNullItemName: nullItemNameCount || 0,
       },
       recentWorkOrders: recentWOs || [],
-      errors: [woError, wolError, soError, solError].filter(e => e),
+      recentSalesOrderLines: recentSOLines || [],
+      errors: [woError, wolError, soError, solError, nullError].filter(e => e),
     });
   } catch (error) {
     console.error('Error counting synced records:', error);
