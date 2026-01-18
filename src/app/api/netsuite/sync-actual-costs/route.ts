@@ -2,19 +2,18 @@
  * API Route: /api/netsuite/sync-actual-costs
  * Batch sync actual costs from NetSuite Work Order Completions and Issues
  *
- * This endpoint is MORE EFFICIENT than the per-WO approach because it fetches
- * ALL actual costs in ONE SuiteQL query instead of N queries (one per WO).
+ * This endpoint fetches ALL actual costs with PAGINATION to handle large datasets.
  *
  * How it works:
- * 1. Query NetSuite for all WOCompl/WOIssue transactions that post costs
+ * 1. Query NetSuite for all WOCompl/WOIssue transactions that post costs (with pagination)
  * 2. Group costs by WO ID and Item ID
  * 3. Update netsuite_work_order_lines.actual_cost in batch
  * 4. Update netsuite_work_orders.total_actual_cost aggregated total
  *
  * Query Parameters:
- * - startDate: YYYY-MM-DD (default: 2024-01-01)
+ * - startDate: YYYY-MM-DD (default: 2020-01-01)
  * - endDate: YYYY-MM-DD (default: today)
- * - limit: Max records to fetch (default: 10000)
+ * - maxPages: Max pages to fetch (default: 50, each page = 1000 rows)
  */
 
 import { NextResponse } from 'next/server';
@@ -35,12 +34,13 @@ export async function POST(request: Request) {
     const url = new URL(request.url);
 
     // Parse query parameters
-    const startDate = url.searchParams.get('startDate') || '2024-01-01';
+    const startDate = url.searchParams.get('startDate') || '2020-01-01';
     const endDate = url.searchParams.get('endDate') || new Date().toISOString().split('T')[0];
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '1000'), 1000); // NetSuite max is 1000
+    const maxPages = parseInt(url.searchParams.get('maxPages') || '50');
+    const pageSize = 1000; // NetSuite max per request
 
-    console.log('Starting batch actual cost sync...');
-    console.log('Parameters:', { startDate, endDate, limit });
+    console.log('Starting batch actual cost sync with PAGINATION...');
+    console.log('Parameters:', { startDate, endDate, maxPages, pageSize });
 
     // Convert dates to NetSuite format (MM/DD/YYYY)
     const [startY, startM, startD] = startDate.split('-');
@@ -48,10 +48,9 @@ export async function POST(request: Request) {
     const nsStartDate = `${startM}/${startD}/${startY}`;
     const nsEndDate = `${endM}/${endD}/${endY}`;
 
-    // EFFICIENT QUERY: Get actual costs from WOCompl/WOIssue transactions
-    // Starts from completion transaction lines and groups by WO ID and item
-    // Note: We get WO numbers from our local database since we already have that mapping
-    const query = `
+    // PAGINATED QUERY: Get actual costs from WOCompl/WOIssue transactions
+    // Using ROW_NUMBER for pagination since NetSuite SuiteQL supports it
+    const baseQuery = `
       SELECT
         completionLine.createdfrom AS wo_id,
         completionLine.item AS item_id,
@@ -69,25 +68,51 @@ export async function POST(request: Request) {
       GROUP BY completionLine.createdfrom, completionLine.item
     `;
 
-    console.log('Executing batch SuiteQL query for actual costs...');
+    // Fetch all pages
+    const allRows: any[] = [];
+    let page = 0;
+    let hasMore = true;
 
-    const response = await netsuiteRequest<{ items: any[] }>(
-      '/services/rest/query/v1/suiteql',
-      {
-        method: 'POST',
-        body: { q: query },
-        params: { limit: limit.toString() },
+    console.log('Fetching actual costs with pagination...');
+
+    while (hasMore && page < maxPages) {
+      const offset = page * pageSize;
+      console.log(`  Fetching page ${page + 1} (offset ${offset})...`);
+
+      try {
+        const response = await netsuiteRequest<{ items: any[]; hasMore?: boolean }>(
+          '/services/rest/query/v1/suiteql',
+          {
+            method: 'POST',
+            body: { q: baseQuery },
+            params: { limit: pageSize.toString(), offset: offset.toString() },
+          }
+        );
+
+        const rows = response.items || [];
+        console.log(`    Page ${page + 1}: ${rows.length} records`);
+
+        if (rows.length === 0) {
+          hasMore = false;
+        } else {
+          allRows.push(...rows);
+          hasMore = rows.length === pageSize; // If we got a full page, there might be more
+          page++;
+        }
+      } catch (pageError) {
+        console.error(`Error fetching page ${page + 1}:`, pageError);
+        hasMore = false; // Stop on error
       }
-    );
+    }
 
-    const rows = response.items || [];
-    console.log(`SuiteQL returned ${rows.length} cost records`);
+    console.log(`Total records fetched: ${allRows.length} across ${page} pages`);
 
-    if (rows.length === 0) {
+    if (allRows.length === 0) {
       return NextResponse.json({
         success: true,
         stats: {
           recordsFetched: 0,
+          pagesFetched: page,
           linesUpdated: 0,
           workOrdersUpdated: 0,
           errors: [],
@@ -98,7 +123,7 @@ export async function POST(request: Request) {
     }
 
     // Parse records
-    const costRecords: ActualCostRecord[] = rows.map(row => ({
+    const costRecords: ActualCostRecord[] = allRows.map(row => ({
       wo_id: row.wo_id?.toString() || '',
       item_id: row.item_id?.toString() || '',
       actual_cost: parseFloat(row.actual_cost) || 0,
@@ -189,7 +214,8 @@ export async function POST(request: Request) {
     }
 
     const stats = {
-      recordsFetched: rows.length,
+      recordsFetched: allRows.length,
+      pagesFetched: page,
       uniqueWorkOrders: costsByWO.size,
       linesUpdated,
       workOrdersUpdated,
