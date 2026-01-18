@@ -2122,10 +2122,12 @@ export async function generateQuickWins(): Promise<QuickWinOpportunity[]> {
     // REPEAT ORDER OPPORTUNITIES
     // Customer is overdue and has a regular order pattern
     // ONLY if customer is eligible for repeat order insights (not project buyer, not seasonal off-season)
+    // IMPORTANT: Must have at least 6 orders in 12 months to establish a meaningful "usual" pattern
     if (
       ctx.is_overdue &&
       ctx.avg_order_frequency_days > 0 &&
       ctx.avg_order_frequency_days < 90 &&
+      ctx.order_count_12mo >= 6 &&  // Need at least 6 orders to say "usually orders every X days"
       (!behavior || behavior.repeat_order_eligible) // Allow if no behavior data (backward compatible)
     ) {
       const daysOverdue = ctx.days_since_last_order - ctx.avg_order_frequency_days;
