@@ -54,8 +54,6 @@ export default function CloseoutDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedYears, setSelectedYears] = useState<number[]>([2025]); // Default to current year
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [testMode, setTestMode] = useState(true);  // TEST MODE: Start with single project testing
-  const TEST_PROJECT = 'Saracotta SF, CO';  // Single test project
 
   const availableYears = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
 
@@ -192,14 +190,8 @@ export default function CloseoutDashboard() {
       });
 
       // Step 1: Import from Excel to database
-      const importParams = new URLSearchParams();
-      if (testMode) {
-        importParams.append('testProject', TEST_PROJECT);
-        console.log(`Step 1: TEST MODE - Importing only project "${TEST_PROJECT}" from Excel...`);
-      } else {
-        console.log('Step 1: Importing data from Excel...');
-      }
-      const importResponse = await fetch(`/api/closeout/import?${importParams.toString()}`, { method: 'POST' });
+      console.log('Step 1: Importing data from Excel...');
+      const importResponse = await fetch('/api/closeout/import', { method: 'POST' });
       const importResult = await importResponse.json();
 
       if (!importResult.success) {
@@ -476,19 +468,6 @@ export default function CloseoutDashboard() {
 
                 <div className="h-6 w-px bg-white/[0.08]"></div>
 
-                {/* TEST MODE Toggle */}
-                <label className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111827] border border-white/[0.08] cursor-pointer hover:bg-white/[0.04] transition-all">
-                  <input
-                    type="checkbox"
-                    checked={testMode}
-                    onChange={(e) => setTestMode(e.target.checked)}
-                    className="w-4 h-4 rounded bg-[#1F2937] border-white/[0.08] text-[#22C55E] focus:ring-[#22C55E] focus:ring-offset-0"
-                  />
-                  <span className="text-xs font-medium text-white">
-                    Test Mode ({TEST_PROJECT})
-                  </span>
-                </label>
-
                 {/* Primary Action: Load & Enrich Data */}
                 {!data && (
                   <button
@@ -503,12 +482,12 @@ export default function CloseoutDashboard() {
                     {loadingAndEnriching ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        Loading {testMode ? TEST_PROJECT : selectedYears.join(', ')}...
+                        Loading {selectedYears.join(', ')}...
                       </>
                     ) : (
                       <>
                         <Database className="w-4 h-4" />
-                        Load {testMode ? TEST_PROJECT : selectedYears.join(', ')} Data
+                        Load {selectedYears.join(', ')} Data
                       </>
                     )}
                   </button>
@@ -532,8 +511,8 @@ export default function CloseoutDashboard() {
                     >
                       <Upload className={`w-4 h-4 ${loadingAndEnriching ? 'animate-bounce' : ''}`} />
                       {loadingAndEnriching
-                        ? `Loading ${testMode ? TEST_PROJECT : selectedYears.join(', ')}...`
-                        : `Reload ${testMode ? TEST_PROJECT : selectedYears.join(', ')}`}
+                        ? `Loading ${selectedYears.join(', ')}...`
+                        : `Reload ${selectedYears.join(', ')}`}
                     </button>
                   </>
                 )}
