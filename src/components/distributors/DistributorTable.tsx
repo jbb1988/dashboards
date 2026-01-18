@@ -19,12 +19,21 @@ interface DistributorData {
 interface DistributorTableProps {
   data: DistributorData[];
   maxRevenue: number;
+  selectedYears?: number[];
+  selectedMonths?: number[];
+  selectedClass?: string | null;
 }
 
 type SortField = 'revenue' | 'margin' | 'yoy' | 'locations' | 'opps';
 type SortDirection = 'asc' | 'desc';
 
-export default function DistributorTable({ data, maxRevenue }: DistributorTableProps) {
+export default function DistributorTable({
+  data,
+  maxRevenue,
+  selectedYears = [],
+  selectedMonths = [],
+  selectedClass = null
+}: DistributorTableProps) {
   const router = useRouter();
   const [sortField, setSortField] = useState<SortField>('revenue');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -81,7 +90,15 @@ export default function DistributorTable({ data, maxRevenue }: DistributorTableP
 
   const handleRowClick = (distributorName: string) => {
     const id = distributorName.toLowerCase().replace(/\s+/g, '-').replace(/&/g, 'and');
-    router.push(`/distributors/${id}`);
+
+    // Build URL with filter params
+    const params = new URLSearchParams();
+    if (selectedYears.length > 0) params.set('years', selectedYears.join(','));
+    if (selectedMonths.length > 0) params.set('months', selectedMonths.join(','));
+    if (selectedClass) params.set('className', selectedClass);
+
+    const url = params.toString() ? `/distributors/${id}?${params.toString()}` : `/distributors/${id}`;
+    router.push(url);
   };
 
   const SortIcon = ({ field }: { field: SortField }) => (

@@ -755,11 +755,17 @@ export default function DistributorsDashboard() {
                     <DistributorTable
                       data={data.distributors || []}
                       maxRevenue={maxRevenue}
+                      selectedYears={selectedYears}
+                      selectedMonths={selectedMonths}
+                      selectedClass={selectedClass}
                     />
                   ) : (
                     <LocationTable
                       data={data.locations ? [{ distributor_name: '', locations: data.locations }] : []}
                       maxRevenue={maxRevenue}
+                      selectedYears={selectedYears}
+                      selectedMonths={selectedMonths}
+                      selectedClass={selectedClass}
                     />
                   )}
                 </motion.div>

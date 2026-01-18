@@ -40,12 +40,21 @@ interface DistributorData {
 interface LocationTableProps {
   data: DistributorData[];
   maxRevenue: number;
+  selectedYears?: number[];
+  selectedMonths?: number[];
+  selectedClass?: string | null;
 }
 
 type SortField = 'revenue' | 'margin' | 'yoy' | 'categories' | 'tier';
 type SortDirection = 'asc' | 'desc';
 
-export default function LocationTable({ data, maxRevenue }: LocationTableProps) {
+export default function LocationTable({
+  data,
+  maxRevenue,
+  selectedYears = [],
+  selectedMonths = [],
+  selectedClass = null
+}: LocationTableProps) {
   const router = useRouter();
   const [sortField, setSortField] = useState<SortField>('revenue');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -111,7 +120,14 @@ export default function LocationTable({ data, maxRevenue }: LocationTableProps) 
   };
 
   const handleRowClick = (customerId: string) => {
-    router.push(`/distributors/${customerId}`);
+    // Build URL with filter params
+    const params = new URLSearchParams();
+    if (selectedYears.length > 0) params.set('years', selectedYears.join(','));
+    if (selectedMonths.length > 0) params.set('months', selectedMonths.join(','));
+    if (selectedClass) params.set('className', selectedClass);
+
+    const url = params.toString() ? `/distributors/${customerId}?${params.toString()}` : `/distributors/${customerId}`;
+    router.push(url);
   };
 
   const getTierBadge = (tier: 'high' | 'medium' | 'low' | undefined) => {

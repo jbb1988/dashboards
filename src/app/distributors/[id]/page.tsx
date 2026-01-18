@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   AreaChart,
@@ -150,11 +150,25 @@ function StatRow({
 export default function DistributorDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Date filter state - read from URL params
+  const [selectedYears, setSelectedYears] = useState<number[]>(() => {
+    const yearsParam = searchParams.get('years');
+    return yearsParam ? yearsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
+  });
+  const [selectedMonths, setSelectedMonths] = useState<number[]>(() => {
+    const monthsParam = searchParams.get('months');
+    return monthsParam ? monthsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
+  });
+  const [selectedClass, setSelectedClass] = useState<string | null>(() => {
+    return searchParams.get('className');
+  });
 
   // Task creation modal state
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -174,9 +188,17 @@ export default function DistributorDetailPage() {
         setLoading(true);
         setError(null);
 
-        const endpoint = isLocationView
+        // Build URL with filter params
+        const params = new URLSearchParams();
+        if (selectedYears.length > 0) params.set('years', selectedYears.join(','));
+        if (selectedMonths.length > 0) params.set('months', selectedMonths.join(','));
+        if (selectedClass) params.set('className', selectedClass);
+
+        const baseEndpoint = isLocationView
           ? `/api/diversified/distributors/location/${id}`
           : `/api/diversified/distributors/${id}`;
+
+        const endpoint = params.toString() ? `${baseEndpoint}?${params.toString()}` : baseEndpoint;
 
         const response = await fetch(endpoint);
 
@@ -196,7 +218,7 @@ export default function DistributorDetailPage() {
     };
 
     fetchData();
-  }, [id, isLocationView]);
+  }, [id, isLocationView, selectedYears, selectedMonths, selectedClass]);
 
   // Handle task creation from priority actions
   const handleCreateTaskFromAction = (action: any) => {
@@ -349,12 +371,88 @@ export default function DistributorDetailPage() {
           transition={{ duration: 0.4 }}
           className="mb-8"
         >
-          <h1 className="text-3xl font-bold text-white mb-2">
-            {isLocationView ? `${data.distributor_name} - ${data.location}` : data.distributor_name}
-          </h1>
-          {isLocationView && data.state && (
-            <p className="text-[#64748B]">{data.state}</p>
-          )}
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">
+                {isLocationView ? `${data.distributor_name} - ${data.location}` : data.distributor_name}
+              </h1>
+              {isLocationView && data.state && (
+                <p className="text-[#64748B]">{data.state}</p>
+              )}
+            </div>
+
+            {/* Filter Controls */}
+            {(selectedYears.length > 0 || selectedMonths.length > 0 || selectedClass) && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#64748B] mr-1">Filters:</span>
+                {selectedYears.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#38BDF8]/10 border border-[#38BDF8]/30 text-[#38BDF8]">
+                    <span className="text-[12px] font-medium">Year: {selectedYears.join(', ')}</span>
+                    <button
+                      onClick={() => {
+                        setSelectedYears([]);
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.delete('years');
+                        router.replace(`?${params.toString()}`);
+                      }}
+                      className="hover:bg-[#38BDF8]/20 rounded p-0.5 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {selectedMonths.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#38BDF8]/10 border border-[#38BDF8]/30 text-[#38BDF8]">
+                    <span className="text-[12px] font-medium">Months: {selectedMonths.join(', ')}</span>
+                    <button
+                      onClick={() => {
+                        setSelectedMonths([]);
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.delete('months');
+                        router.replace(`?${params.toString()}`);
+                      }}
+                      className="hover:bg-[#38BDF8]/20 rounded p-0.5 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {selectedClass && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#38BDF8]/10 border border-[#38BDF8]/30 text-[#38BDF8]">
+                    <span className="text-[12px] font-medium">Class: {selectedClass}</span>
+                    <button
+                      onClick={() => {
+                        setSelectedClass(null);
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.delete('className');
+                        router.replace(`?${params.toString()}`);
+                      }}
+                      className="hover:bg-[#38BDF8]/20 rounded p-0.5 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setSelectedYears([]);
+                    setSelectedMonths([]);
+                    setSelectedClass(null);
+                    router.replace(window.location.pathname);
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[#EF4444] bg-[#EF4444]/10 hover:bg-[#EF4444]/20 transition-colors"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
+          </div>
         </motion.div>
 
         {/* KPI Cards */}
