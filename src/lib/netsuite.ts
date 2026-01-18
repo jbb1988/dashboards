@@ -645,14 +645,16 @@ export interface ProjectProfitabilityRecord {
  * Maps NetSuite data to project types matching the Excel spreadsheet:
  * - TBEN: Test Bench Equipment New (4011, 5011)
  * - TBEU: Test Bench Equipment Upgrade (4012, 5012)
+ * - PM: Project Management Fee (4013, 5013)
+ * - SCH: Shipping & Handling (4018, 4050, 5018, 5050)
  * - TBIN: TB Install & Training New (4031, 5031)
  * - TBIU: TB Install & Training Upgrade (4032, 5032)
  * - M3IN: M3 Install New (4041, 5041)
  * - M3IU: M3 Install Upgrade (4042, 5042)
- * - M3SW: M3 Software (4051, 4080-4099, 5051, 5080-5099)
+ * - M3NEW: M3 Software New (4051, 5051)
+ * - M3SW: M3 Software (4052+, 4080-4099, 5052+, 5080-5099)
  * - MCC: MCC Services (4100-4111, 5100-5111)
  * - TBSV: TB Service/Maintenance (4071-4079, 5071-5079)
- * - SCH: Shipping & Handling (4050, 5050)
  */
 export function parseProjectType(
   accountNumber: string,
@@ -665,12 +667,15 @@ export function parseProjectType(
 
     // Direct mappings from Item class
     if (className.includes('test bench') || className.includes('testbench')) {
-      // Use account number to determine if it's Equipment, Install, Service, or MCC
+      // Use account number to determine if it's Equipment, Install, Service, PM, SCH, or MCC
       if (accountNumber) {
         const acct = accountNumber.trim();
         // Check if account is MCC Services (4101-4111, excluding 4140-4149)
         if ((acct.startsWith('410') || acct.startsWith('411')) && !acct.startsWith('414')) return 'MCC';
         if ((acct.startsWith('510') || acct.startsWith('511')) && !acct.startsWith('514')) return 'MCC';
+        // Project Management and Shipping
+        if (acct === '4013' || acct === '5013') return 'PM';
+        if (acct === '4018' || acct === '5018') return 'SCH';
         // Test Bench specific accounts
         if (acct.startsWith('401') || acct.startsWith('501')) return 'TBEN';
         if (acct.startsWith('403') || acct.startsWith('503')) return 'TBIN';
@@ -685,10 +690,11 @@ export function parseProjectType(
     }
 
     if (className.includes('m3') || className.includes('laser')) {
-      // Use account to determine Install vs Software
+      // Use account to determine Install vs Software (New vs Other)
       if (accountNumber) {
         const acct = accountNumber.trim();
         if (acct.startsWith('404') || acct.startsWith('504')) return 'M3IN';
+        if (acct === '4051' || acct === '5051') return 'M3NEW'; // M3 Software New
         if (acct.startsWith('405') || acct.startsWith('408') || acct.startsWith('409') ||
             acct.startsWith('505') || acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
       }
@@ -709,7 +715,9 @@ export function parseProjectType(
   // Test Bench Equipment
   if (acct === '4011' || acct === '5011') return 'TBEN';
   if (acct === '4012' || acct === '5012') return 'TBEU';
-  if (acct.startsWith('401') || acct.startsWith('501')) return 'TBEN'; // 4010, 4013-4019, etc.
+  if (acct === '4013' || acct === '5013') return 'PM'; // Project Management Fee
+  if (acct === '4018' || acct === '5018') return 'SCH'; // TB Freight/Shipping
+  if (acct.startsWith('401') || acct.startsWith('501')) return 'TBEN'; // 4010, 4014-4017, 4019, etc.
   if (acct === '4021' || acct === '5021') return 'TB Components';
 
   // TB Install & Training
@@ -725,8 +733,10 @@ export function parseProjectType(
   // Shipping and Handling (exclude from M3 Software)
   if (acct === '4050' || acct === '5050') return 'SCH';
 
-  // M3 Software (4051-4059, 4080-4099, 5051-5059, 5080-5099)
-  if (acct.startsWith('405') && acct !== '4050' || acct.startsWith('505') && acct !== '5050') return 'M3 Software';
+  // M3 Software - separate New from other software
+  if (acct === '4051' || acct === '5051') return 'M3NEW'; // M3 Software New
+  if (acct.startsWith('405') && acct !== '4050' && acct !== '4051' ||
+      acct.startsWith('505') && acct !== '5050' && acct !== '5051') return 'M3 Software';
   if (acct.startsWith('408') || acct.startsWith('409') ||
       acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
 
