@@ -83,11 +83,14 @@ export async function GET(
       priorPeriodStart.setUTCHours(0, 0, 0, 0);
     }
 
-    // Convert distributor ID to name (e.g., "ferguson" -> "Ferguson")
-    const distributorName = distributorId
+    // Convert distributor ID to name, handling special cases like "and" -> "&"
+    let distributorName = distributorId
       .split('-')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
+
+    // Handle common patterns: "X And Y" -> "X & Y"
+    distributorName = distributorName.replace(/ And /g, ' & ');
 
     console.log('[Distributor API] Distributor Name:', distributorName);
     console.log('[Distributor API] Date Range:', formatDate(currentPeriodStart), 'to', formatDate(currentPeriodEnd));

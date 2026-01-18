@@ -294,14 +294,28 @@ export default function DistributorTable({
               {/* Growth Opportunities */}
               <div className="text-right">
                 {row.growth_opportunities > 0 ? (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#14B8A6]/20 border border-[#14B8A6]/30">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const id = row.distributor_name.toLowerCase().replace(/\s+/g, '-').replace(/&/g, 'and');
+                      const params = new URLSearchParams();
+                      if (selectedYears.length > 0) params.set('years', selectedYears.join(','));
+                      if (selectedMonths.length > 0) params.set('months', selectedMonths.join(','));
+                      if (selectedClass) params.set('className', selectedClass);
+                      const url = params.toString()
+                        ? `/distributors/${id}/opportunities?${params.toString()}`
+                        : `/distributors/${id}/opportunities`;
+                      router.push(url);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#14B8A6]/20 border border-[#14B8A6]/30 hover:bg-[#14B8A6]/30 transition-colors"
+                  >
                     <svg className="w-3.5 h-3.5 text-[#14B8A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
                     <span className="text-[12px] font-semibold text-[#14B8A6]">
                       {row.growth_opportunities}
                     </span>
-                  </div>
+                  </button>
                 ) : (
                   <div className="text-[12px] text-[#475569]">—</div>
                 )}
