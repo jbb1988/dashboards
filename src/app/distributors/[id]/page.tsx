@@ -157,18 +157,20 @@ export default function DistributorDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Date filter state - read from URL params
-  const [selectedYears, setSelectedYears] = useState<number[]>(() => {
+  // Read filters directly from URL - no local state needed
+  const selectedYears = useMemo(() => {
     const yearsParam = searchParams.get('years');
     return yearsParam ? yearsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
-  });
-  const [selectedMonths, setSelectedMonths] = useState<number[]>(() => {
+  }, [searchParams]);
+
+  const selectedMonths = useMemo(() => {
     const monthsParam = searchParams.get('months');
     return monthsParam ? monthsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
-  });
-  const [selectedClass, setSelectedClass] = useState<string | null>(() => {
+  }, [searchParams]);
+
+  const selectedClass = useMemo(() => {
     return searchParams.get('className');
-  });
+  }, [searchParams]);
 
   // Task creation modal state
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -291,7 +293,7 @@ export default function DistributorDetailPage() {
     }
   };
 
-  // Handle filter changes
+  // Handle filter changes - only update URL, useMemo will handle state
   const handleFilterChange = (type: 'year' | 'month', value: number) => {
     const params = new URLSearchParams(searchParams.toString());
 
@@ -299,7 +301,6 @@ export default function DistributorDetailPage() {
       const newYears = selectedYears.includes(value)
         ? selectedYears.filter(y => y !== value)
         : [...selectedYears, value];
-      setSelectedYears(newYears);
       if (newYears.length > 0) {
         params.set('years', newYears.join(','));
       } else {
@@ -309,7 +310,6 @@ export default function DistributorDetailPage() {
       const newMonths = selectedMonths.includes(value)
         ? selectedMonths.filter(m => m !== value)
         : [...selectedMonths, value];
-      setSelectedMonths(newMonths);
       if (newMonths.length > 0) {
         params.set('months', newMonths.join(','));
       } else {
@@ -497,9 +497,6 @@ export default function DistributorDetailPage() {
                 <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
                   <button
                     onClick={() => {
-                      setSelectedYears([]);
-                      setSelectedMonths([]);
-                      setSelectedClass(null);
                       router.replace(window.location.pathname);
                     }}
                     className="text-xs text-[#EF4444] hover:text-[#EF4444]/80 font-medium transition-colors"
@@ -544,7 +541,6 @@ export default function DistributorDetailPage() {
                     <span className="text-[12px] font-medium">Year: {selectedYears.join(', ')}</span>
                     <button
                       onClick={() => {
-                        setSelectedYears([]);
                         const params = new URLSearchParams(searchParams.toString());
                         params.delete('years');
                         router.replace(`?${params.toString()}`);
@@ -562,7 +558,6 @@ export default function DistributorDetailPage() {
                     <span className="text-[12px] font-medium">Months: {selectedMonths.join(', ')}</span>
                     <button
                       onClick={() => {
-                        setSelectedMonths([]);
                         const params = new URLSearchParams(searchParams.toString());
                         params.delete('months');
                         router.replace(`?${params.toString()}`);
@@ -580,7 +575,6 @@ export default function DistributorDetailPage() {
                     <span className="text-[12px] font-medium">Class: {selectedClass}</span>
                     <button
                       onClick={() => {
-                        setSelectedClass(null);
                         const params = new URLSearchParams(searchParams.toString());
                         params.delete('className');
                         router.replace(`?${params.toString()}`);
