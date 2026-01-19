@@ -41,8 +41,6 @@ export default function WordDocumentPreview({ fileUrl, fileName, onClose }: Word
             experimental: false,
             trimXmlDeclaration: true,
             useBase64URL: false,
-            useMathMLPolyfill: false,
-            showChanges: true, // Show tracked changes
             debug: false,
           });
         }
