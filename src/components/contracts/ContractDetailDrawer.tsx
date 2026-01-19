@@ -704,7 +704,7 @@ export default function ContractDetailDrawer({
     }
   };
 
-  const handleView = (doc: ContractDocument) => {
+  const handleView = async (doc: ContractDocument) => {
     if (!doc.file_url) return;
 
     const fileName = doc.file_name?.toLowerCase() || '';
@@ -713,14 +713,29 @@ export default function ContractDetailDrawer({
     if (isWordDoc) {
       setOpeningDocId(doc.id);
 
-      // Open in desktop Word using ms-word protocol
-      const wordUrl = `ms-word:ofe|u|${doc.file_url}`;
-      window.location.href = wordUrl;
+      try {
+        // Fetch the file and create a blob URL
+        const response = await fetch(doc.file_url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
 
-      // Reset loading state
-      setTimeout(() => {
-        setOpeningDocId(null);
-      }, 1000);
+        // Download the file
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = doc.file_name || 'document.docx';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Clean up blob URL
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      } catch (error) {
+        console.error('Failed to download document:', error);
+      } finally {
+        setTimeout(() => {
+          setOpeningDocId(null);
+        }, 1000);
+      }
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
