@@ -86,12 +86,26 @@ async function convertDocxToPdfWithTrackedChanges(buffer: Buffer): Promise<Buffe
   console.log('Aspose upload successful, converting to PDF with tracked changes...');
 
   // Convert to PDF with tracked changes visible
-  // The loadEncoding=Track parameter tells Aspose to render tracked changes
+  // Use the saveOptions to control how tracked changes are rendered
+  // RevisionOptions.ShowInBalloons = true will show tracked changes
+  const saveOptions = {
+    SaveFormat: 'pdf',
+    RevisionOptions: {
+      ShowInBalloons: true,
+      ShowOriginalRevision: false,
+      ShowRevisionBars: true
+    }
+  };
+
   const convertResponse = await fetch(
-    `https://api.aspose.cloud/v4.0/words/${encodeURIComponent(filename)}?format=pdf&loadEncoding=Track`,
+    `https://api.aspose.cloud/v4.0/words/${encodeURIComponent(filename)}/SaveAs`,
     {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` },
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(saveOptions)
     }
   );
 
@@ -104,14 +118,37 @@ async function convertDocxToPdfWithTrackedChanges(buffer: Buffer): Promise<Buffe
     throw new Error(`Failed to convert document: ${convertResponse.status}`);
   }
 
-  // Get the PDF as buffer
-  const pdfArrayBuffer = await convertResponse.arrayBuffer();
+  // SaveAs returns a JSON response with the document info
+  const saveResult = await convertResponse.json();
+  const outputFilename = saveResult.SaveResult?.DestDocument?.Href;
+
+  if (!outputFilename) {
+    throw new Error('No output file returned from conversion');
+  }
+
+  console.log('Downloading converted PDF:', outputFilename);
+
+  // Download the converted PDF
+  const downloadResponse = await fetch(
+    `https://api.aspose.cloud/v4.0/words/storage/file/${outputFilename}`,
+    {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }
+  );
+
+  if (!downloadResponse.ok) {
+    throw new Error(`Failed to download converted PDF: ${downloadResponse.status}`);
+  }
+
+  const pdfArrayBuffer = await downloadResponse.arrayBuffer();
   const pdfBuffer = Buffer.from(pdfArrayBuffer);
 
   console.log(`Conversion successful: ${pdfBuffer.length} bytes`);
 
-  // Cleanup - delete from Aspose storage
+  // Cleanup both original and converted files
   await cleanupAsposeFile(token, filename);
+  await cleanupAsposeFile(token, outputFilename);
 
   return pdfBuffer;
 }
