@@ -712,8 +712,15 @@ export default function ContractDetailDrawer({
     const isWordDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
 
     if (isWordDoc) {
-      // Show Word document in preview modal with tracked changes
-      setPreviewDocument(doc);
+      // Open in Word Online using ms-word protocol (requires Office 365 license)
+      // This will open in Word Online in the browser with full tracked changes support
+      const wordOnlineUrl = `ms-word:ofe|u|${doc.file_url}`;
+      window.location.href = wordOnlineUrl;
+
+      // Fallback: if protocol handler doesn't work, show modal viewer
+      setTimeout(() => {
+        setPreviewDocument(doc);
+      }, 1000);
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
