@@ -1520,26 +1520,86 @@ export default function ContractsDashboard() {
       );
     }
 
-    // Sort
-    filtered.sort((a, b) => {
-      let comparison = 0;
+    // BUNDLE-AWARE SORTING
+    // Contracts in the same bundle appear grouped together in the list.
+    // Within each bundle, the primary contract (★) appears first.
+    // Bundle groups sort based on their primary contract's field value.
+
+    // Step 1: Group contracts by bundleId
+    interface BundleGroup {
+      bundleId: string | null;
+      contracts: Contract[];
+      primary: Contract | null;
+      sortKey: any;
+    }
+
+    const groups = new Map<string | null, BundleGroup>();
+
+    filtered.forEach(contract => {
+      const bundleId = contract.bundleInfo?.bundleId ?? null;
+
+      if (!groups.has(bundleId)) {
+        groups.set(bundleId, {
+          bundleId,
+          contracts: [],
+          primary: null,
+          sortKey: null
+        });
+      }
+
+      const group = groups.get(bundleId)!;
+      group.contracts.push(contract);
+
+      if (contract.bundleInfo?.isPrimary) {
+        group.primary = contract;
+      }
+    });
+
+    // Step 2: Calculate sort keys for each group (use primary contract's value)
+    groups.forEach(group => {
+      const representativeContract = group.primary || group.contracts[0];
+
       switch (sortField) {
         case 'name':
-          comparison = a.name.localeCompare(b.name);
+          group.sortKey = representativeContract.name.toLowerCase();
           break;
         case 'value':
-          comparison = a.value - b.value;
+          group.sortKey = representativeContract.value;
           break;
         case 'contractDate':
-          const dateA = a.contractDate ? new Date(a.contractDate).getTime() : Infinity;
-          const dateB = b.contractDate ? new Date(b.contractDate).getTime() : Infinity;
-          comparison = dateA - dateB;
+          group.sortKey = representativeContract.contractDate
+            ? new Date(representativeContract.contractDate).getTime()
+            : Infinity;
           break;
         case 'daysInStage':
-          comparison = a.daysInStage - b.daysInStage;
+          group.sortKey = representativeContract.daysInStage;
           break;
       }
+    });
+
+    // Step 3: Sort groups by their sort keys
+    const sortedGroups = Array.from(groups.values()).sort((a, b) => {
+      let comparison = 0;
+
+      if (sortField === 'name') {
+        comparison = (a.sortKey as string).localeCompare(b.sortKey as string);
+      } else {
+        comparison = (a.sortKey as number) - (b.sortKey as number);
+      }
+
       return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    // Step 4: Flatten groups back to array (primary first within bundles)
+    filtered = sortedGroups.flatMap(group => {
+      if (!group.bundleId) {
+        return group.contracts;
+      }
+
+      const primary = group.contracts.filter(c => c.bundleInfo?.isPrimary);
+      const others = group.contracts.filter(c => !c.bundleInfo?.isPrimary);
+
+      return [...primary, ...others];
     });
 
     return filtered;
