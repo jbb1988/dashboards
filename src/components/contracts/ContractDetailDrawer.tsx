@@ -18,6 +18,8 @@ interface NotionTask {
   dueDate: string | null;
   priority: string | null;
   assignee: string | null;
+  description?: string | null;
+  assignee_email?: string | null;
 }
 
 interface ContractDocument {
@@ -102,6 +104,7 @@ interface ContractDetailDrawerProps {
   onClose: () => void;
   onUpdate?: () => void;
   openBundleModal?: (contract: Contract, mode: 'create' | 'add') => void;
+  onNavigateToTask?: (taskId: string) => void;
 }
 
 // Stage colors
@@ -157,11 +160,47 @@ function formatCurrency(value: number): string {
   return `$${value.toLocaleString()}`;
 }
 
+// TaskTooltip Component
+interface TaskTooltipProps {
+  task: NotionTask;
+  children: React.ReactNode;
+}
+
+const TaskTooltip: React.FC<TaskTooltipProps> = ({ task, children }) => {
+  return (
+    <div className="relative group">
+      {children}
+      <div className="absolute z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-300 bg-[#1F2937] text-white text-sm rounded-lg p-3 shadow-xl max-w-xs -left-2 top-full mt-2 pointer-events-none">
+        {task.description && (
+          <div className="mb-2">
+            <div className="font-semibold mb-1 text-[11px] text-[#9CA3AF]">Description:</div>
+            <div className="text-[#E5E7EB] text-[11px] leading-relaxed">
+              {task.description.length > 200
+                ? task.description.substring(0, 200) + '...'
+                : task.description}
+            </div>
+          </div>
+        )}
+        {(task.assignee_email || task.assignee) && (
+          <div className="text-[#E5E7EB] text-[11px]">
+            <span className="font-semibold text-[#9CA3AF]">Assigned to:</span> {task.assignee_email || task.assignee}
+          </div>
+        )}
+        {!task.description && !task.assignee_email && !task.assignee && (
+          <div className="text-[#9CA3AF] italic text-[11px]">No additional details</div>
+        )}
+        <div className="absolute -top-1 left-4 w-2 h-2 bg-[#1F2937] transform rotate-45"></div>
+      </div>
+    </div>
+  );
+};
+
 export default function ContractDetailDrawer({
   contract,
   onClose,
   onUpdate,
   openBundleModal,
+  onNavigateToTask,
 }: ContractDetailDrawerProps) {
   // Edit dates state
   const [isEditingDates, setIsEditingDates] = useState(false);
@@ -182,6 +221,8 @@ export default function ContractDetailDrawer({
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<NotionTask | null>(null);
 
   // Documents state
   const [documents, setDocuments] = useState<ContractDocument[]>([]);
@@ -521,6 +562,52 @@ export default function ContractDetailDrawer({
     }
   };
 
+  const handleTaskClick = (task: NotionTask) => {
+    if (expandedTaskId === task.id) {
+      setExpandedTaskId(null);
+      setEditingTask(null);
+    } else {
+      setExpandedTaskId(task.id);
+      setEditingTask({ ...task });
+    }
+  };
+
+  const handleSaveTask = async () => {
+    if (!editingTask) return;
+
+    try {
+      const response = await fetch('/api/contracts/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: editingTask.id,
+          updates: {
+            title: editingTask.title,
+            status: editingTask.status,
+            priority: editingTask.priority,
+            dueDate: editingTask.dueDate,
+            description: editingTask.description,
+            assignee_email: editingTask.assignee_email,
+          }
+        }),
+      });
+
+      if (response.ok) {
+        setTasks(prev => prev.map(t => t.id === editingTask.id ? editingTask : t));
+        setExpandedTaskId(null);
+        setEditingTask(null);
+      }
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  };
+
+  const handleNavigateToTask = (task: NotionTask) => {
+    if (onNavigateToTask) {
+      onNavigateToTask(task.id);
+    }
+  };
+
   // Review handlers
   const handleDeleteReview = async (reviewId: string) => {
     if (!confirm('Delete this analysis? This cannot be undone.')) return;
@@ -650,11 +737,17 @@ export default function ContractDetailDrawer({
       const isWordDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
 
       if (isWordDoc) {
-        // Use Microsoft Office Online viewer for Word documents
-        const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.file_url)}`;
-        window.open(viewerUrl, '_blank');
+        // For Word documents, open directly to download and view in local Word
+        // This preserves tracked changes/redlines that web viewers don't show
+        const link = document.createElement('a');
+        link.href = doc.file_url;
+        link.download = doc.file_name || 'document.docx';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } else {
-        // Open PDFs and other files directly
+        // Open PDFs and other files directly in browser
         window.open(doc.file_url, '_blank');
       }
     }
@@ -1418,86 +1511,239 @@ export default function ContractDetailDrawer({
                         {tasks.map(task => {
                           const isComplete = task.status.toLowerCase().includes('done') || task.status.toLowerCase().includes('complete');
                           const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !isComplete;
+                          const isExpanded = expandedTaskId === task.id;
 
                           return (
-                            <div
-                              key={task.id}
-                              className={`
-                                group flex items-center justify-between p-3 rounded-lg
-                                ${isComplete ? 'bg-[#22C55E]/5' : isOverdue ? 'bg-[#EF4444]/5' : 'bg-[#151F2E]'}
-                              `}
-                            >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                {/* Status Toggle */}
-                                <button
-                                  onClick={() => handleToggleTaskStatus(task)}
+                            <div key={task.id} className="border-b border-white/[0.04] last:border-b-0">
+                              {/* Compact Row (always visible) */}
+                              <TaskTooltip task={task}>
+                                <div
                                   className={`
-                                    w-5 h-5 rounded flex items-center justify-center flex-shrink-0
-                                    transition-all duration-200 hover:scale-110 cursor-pointer
-                                    ${isComplete
-                                      ? 'bg-[#22C55E]/20 text-[#22C55E] hover:bg-[#22C55E]/30'
-                                      : isOverdue
-                                        ? 'bg-[#EF4444]/20 text-[#EF4444] hover:bg-[#EF4444]/30'
-                                        : 'bg-[#38BDF8]/20 text-[#38BDF8] hover:bg-[#38BDF8]/30'
-                                    }
+                                    group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors
+                                    ${isComplete ? 'bg-[#22C55E]/5 hover:bg-[#22C55E]/10' : isOverdue ? 'bg-[#EF4444]/5 hover:bg-[#EF4444]/10' : 'bg-[#151F2E] hover:bg-[#1E293B]'}
                                   `}
-                                  title={isComplete ? 'Mark as To Do' : 'Mark as Done'}
+                                  onClick={() => handleTaskClick(task)}
                                 >
-                                  {isComplete ? (
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    {/* Status Toggle */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleTaskStatus(task);
+                                      }}
+                                      className={`
+                                        w-5 h-5 rounded flex items-center justify-center flex-shrink-0
+                                        transition-all duration-200 hover:scale-110 cursor-pointer
+                                        ${isComplete
+                                          ? 'bg-[#22C55E]/20 text-[#22C55E] hover:bg-[#22C55E]/30'
+                                          : isOverdue
+                                            ? 'bg-[#EF4444]/20 text-[#EF4444] hover:bg-[#EF4444]/30'
+                                            : 'bg-[#38BDF8]/20 text-[#38BDF8] hover:bg-[#38BDF8]/30'
+                                        }
+                                      `}
+                                      title={isComplete ? 'Mark as To Do' : 'Mark as Done'}
+                                    >
+                                      {isComplete ? (
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      ) : (
+                                        <div className="w-2 h-2 rounded-full bg-current" />
+                                      )}
+                                    </button>
+
+                                    {/* Task title */}
+                                    <span className={`text-[12px] truncate ${isComplete ? 'text-[#64748B] line-through' : 'text-[#EAF2FF]'}`}>
+                                      {task.title}
+                                    </span>
+
+                                    {/* Priority badge */}
+                                    {task.priority && !isComplete && (
+                                      <span className={`
+                                        text-[9px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0
+                                        ${task.priority.toLowerCase() === 'high'
+                                          ? 'bg-[#EF4444]/15 text-[#EF4444]'
+                                          : task.priority.toLowerCase() === 'medium'
+                                            ? 'bg-[#F59E0B]/15 text-[#F59E0B]'
+                                            : 'bg-[#64748B]/15 text-[#64748B]'
+                                        }
+                                      `}>
+                                        {task.priority}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                    {/* Due date */}
+                                    {task.dueDate && (
+                                      <span className={`text-[10px] tabular-nums ${
+                                        isComplete
+                                          ? 'text-[#64748B]'
+                                          : isOverdue
+                                            ? 'text-[#EF4444]'
+                                            : 'text-[#64748B]'
+                                      }`}>
+                                        {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                      </span>
+                                    )}
+
+                                    {/* View in Tasks icon button */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleNavigateToTask(task);
+                                      }}
+                                      className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-all opacity-0 group-hover:opacity-100"
+                                      title="View in Tasks Tab"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                      </svg>
+                                    </button>
+
+                                    {/* Delete button */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteTask(task.id);
+                                      }}
+                                      className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-all opacity-0 group-hover:opacity-100"
+                                      title="Delete task"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+
+                                    {/* Expand/Collapse Indicator */}
+                                    <svg
+                                      className={`w-4 h-4 text-[#64748B] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
-                                  ) : (
-                                    <div className="w-2 h-2 rounded-full bg-current" />
-                                  )}
-                                </button>
+                                  </div>
+                                </div>
+                              </TaskTooltip>
 
-                                {/* Task title */}
-                                <span className={`text-[12px] truncate ${isComplete ? 'text-[#64748B] line-through' : 'text-[#EAF2FF]'}`}>
-                                  {task.title}
-                                </span>
+                              {/* Expanded Task Details */}
+                              {isExpanded && editingTask && (
+                                <div className="bg-[#0A0F1A] p-4 space-y-4 animate-slideDown border-t border-white/[0.04]">
+                                  {/* Description */}
+                                  <div>
+                                    <label className="block text-[9px] text-[#64748B] uppercase tracking-wider mb-1">
+                                      Description
+                                    </label>
+                                    <textarea
+                                      value={editingTask.description || ''}
+                                      onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                                      className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] placeholder:text-[#475569]"
+                                      rows={3}
+                                      placeholder="Add a description..."
+                                    />
+                                  </div>
 
-                                {/* Priority badge */}
-                                {task.priority && !isComplete && (
-                                  <span className={`
-                                    text-[9px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0
-                                    ${task.priority.toLowerCase() === 'high'
-                                      ? 'bg-[#EF4444]/15 text-[#EF4444]'
-                                      : task.priority.toLowerCase() === 'medium'
-                                        ? 'bg-[#F59E0B]/15 text-[#F59E0B]'
-                                        : 'bg-[#64748B]/15 text-[#64748B]'
-                                    }
-                                  `}>
-                                    {task.priority}
-                                  </span>
-                                )}
-                              </div>
+                                  {/* Status, Priority, Due Date in a row */}
+                                  <div className="grid grid-cols-3 gap-3">
+                                    {/* Status Selector */}
+                                    <div>
+                                      <label className="block text-[9px] text-[#64748B] uppercase tracking-wider mb-1">
+                                        Status
+                                      </label>
+                                      <select
+                                        value={editingTask.status}
+                                        onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                                        style={{ colorScheme: 'dark' }}
+                                      >
+                                        <option value="To Do">To Do</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Done">Done</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                      </select>
+                                    </div>
 
-                              <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                                {/* Due date */}
-                                {task.dueDate && (
-                                  <span className={`text-[10px] tabular-nums ${
-                                    isComplete
-                                      ? 'text-[#64748B]'
-                                      : isOverdue
-                                        ? 'text-[#EF4444]'
-                                        : 'text-[#64748B]'
-                                  }`}>
-                                    {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                  </span>
-                                )}
+                                    {/* Priority Selector */}
+                                    <div>
+                                      <label className="block text-[9px] text-[#64748B] uppercase tracking-wider mb-1">
+                                        Priority
+                                      </label>
+                                      <select
+                                        value={editingTask.priority || 'medium'}
+                                        onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                                        style={{ colorScheme: 'dark' }}
+                                      >
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="urgent">Urgent</option>
+                                      </select>
+                                    </div>
 
-                                {/* Delete button */}
-                                <button
-                                  onClick={() => handleDeleteTask(task.id)}
-                                  className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-all opacity-0 group-hover:opacity-100"
-                                  title="Delete task"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
-                              </div>
+                                    {/* Due Date Picker */}
+                                    <div>
+                                      <label className="block text-[9px] text-[#64748B] uppercase tracking-wider mb-1">
+                                        Due Date
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={editingTask.dueDate || ''}
+                                        onChange={(e) => setEditingTask({ ...editingTask, dueDate: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] cursor-pointer"
+                                        style={{ colorScheme: 'dark' }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Assignee */}
+                                  <div>
+                                    <label className="block text-[9px] text-[#64748B] uppercase tracking-wider mb-1">
+                                      Assignee Email
+                                    </label>
+                                    <input
+                                      type="email"
+                                      value={editingTask.assignee_email || ''}
+                                      onChange={(e) => setEditingTask({ ...editingTask, assignee_email: e.target.value })}
+                                      className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] placeholder:text-[#475569]"
+                                      placeholder="email@example.com"
+                                    />
+                                  </div>
+
+                                  {/* Action Buttons */}
+                                  <div className="flex items-center justify-between pt-2">
+                                    <button
+                                      onClick={() => handleNavigateToTask(task)}
+                                      className="flex items-center gap-2 px-3 py-2 text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded-lg transition-colors text-xs"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                      </svg>
+                                      View in Tasks Tab
+                                    </button>
+
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => {
+                                          setExpandedTaskId(null);
+                                          setEditingTask(null);
+                                        }}
+                                        className="px-3 py-2 text-xs text-[#8FA3BF] hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        onClick={handleSaveTask}
+                                        className="px-3 py-2 rounded-lg bg-[#38BDF8] text-white text-xs font-medium hover:bg-[#38BDF8]/80 transition-colors"
+                                      >
+                                        Save Changes
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}

@@ -116,6 +116,7 @@ function DraggableTaskCard({
   onDelete,
   onOpenContractDetail,
   contracts,
+  highlightedTaskId,
 }: {
   task: Task;
   columnStatus: 'pending' | 'in_progress' | 'completed';
@@ -124,6 +125,7 @@ function DraggableTaskCard({
   onDelete: (id: string) => void;
   onOpenContractDetail?: (contractId: string) => void;
   contracts: Contract[];
+  highlightedTaskId?: string | null;
 }) {
   // Find the associated contract for this task
   const taskContract = task.contract_salesforce_id
@@ -152,15 +154,18 @@ function DraggableTaskCard({
   };
 
   const isOverdue = isTaskOverdue(task.due_date, task.status);
+  const isHighlighted = highlightedTaskId === task.id;
 
   return (
     <motion.div
+      id={`task-${task.id}`}
       ref={setNodeRef}
       style={style}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: isDragging ? 0.5 : 1, y: 0 }}
       transition={{ delay: index * 0.03 }}
       className={`p-3 rounded-lg border bg-[#0B1220] cursor-grab active:cursor-grabbing ${
+        isHighlighted ? 'ring-2 ring-[#38BDF8] bg-[#38BDF8]/20 border-[#38BDF8] animate-pulse' :
         isOverdue ? 'border-red-500/30' : 'border-white/[0.04]'
       } ${isDragging ? 'shadow-lg shadow-[#38BDF8]/20 ring-2 ring-[#38BDF8]/30' : 'hover:border-white/[0.08]'}`}
       {...attributes}
@@ -254,6 +259,8 @@ interface TasksTabProps {
   contracts: Contract[];
   onOpenContractDetail?: (contractId: string) => void;
   focusMode?: boolean;
+  highlightedTaskId?: string | null;
+  onClearHighlight?: () => void;
 }
 
 /**
@@ -265,7 +272,7 @@ interface TasksTabProps {
  * - Inline task creation and editing
  * - Auto-generated task indicators
  */
-export default function TasksTabSupabase({ contracts, onOpenContractDetail, focusMode = false }: TasksTabProps) {
+export default function TasksTabSupabase({ contracts, onOpenContractDetail, focusMode = false, highlightedTaskId, onClearHighlight }: TasksTabProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('byContract');
@@ -389,6 +396,26 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
     fetchTasks();
     fetchBundles();
   }, [fetchTasks, fetchBundles]);
+
+  // Handle task highlighting when navigated from contract drawer
+  useEffect(() => {
+    if (highlightedTaskId) {
+      // Wait for tasks to load and DOM to update
+      setTimeout(() => {
+        const taskElement = document.getElementById(`task-${highlightedTaskId}`);
+        if (taskElement) {
+          taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+
+      // Clear highlight after 3 seconds
+      const timer = setTimeout(() => {
+        onClearHighlight?.();
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedTaskId, onClearHighlight]);
 
   // Filter out contracts that are in bundles to avoid duplicates in dropdown
   const unbundledContracts = useMemo(() => {
@@ -954,8 +981,11 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
     const isSelected = selectedTasks.has(task.id!);
     const relativeDate = formatRelativeDate(task.due_date);
 
+    const isHighlighted = highlightedTaskId === task.id;
+
     return (
       <motion.div
+        id={`task-${task.id}`}
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: 10, height: 0 }}
@@ -967,6 +997,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
           }
         }}
         className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all cursor-pointer ${
+          isHighlighted ? 'ring-2 ring-[#38BDF8] bg-[#38BDF8]/20 border-[#38BDF8] animate-pulse' :
           isSelected ? 'bg-[#38BDF8]/10 border-[#38BDF8]/40' :
           isCompleted ? 'bg-[#0B1220]/30 border-white/[0.02] opacity-50' :
           isOverdue ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' :
@@ -1933,6 +1964,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
                           onDelete={deleteTask}
                           onOpenContractDetail={onOpenContractDetail}
                           contracts={contracts}
+                          highlightedTaskId={highlightedTaskId}
                         />
                       ))}
                       {column.tasks.length === 0 && (

@@ -775,6 +775,7 @@ export default function ContractsDashboard() {
 
   // Contract detail drawer state
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
 
   // Bundle modal state
   const [bundleModalOpen, setBundleModalOpen] = useState(false);
@@ -787,6 +788,13 @@ export default function ContractsDashboard() {
     setBundleModalMode(mode);
     setBundleModalOpen(true);
   }, []);
+
+  // Handle navigation to task in Tasks Tab
+  const handleNavigateToTask = useCallback((taskId: string) => {
+    setHighlightedTaskId(taskId);
+    setActiveTab('tasks');
+    setSelectedContract(null);
+  }, [setActiveTab]);
 
   // Batch editing state - track pending status changes
   const [pendingChanges, setPendingChanges] = useState<Record<string, { contractId: string; salesforceId?: string; contractName: string; notionName?: string; newStatus: string; originalStatus: string }>>({});
@@ -2464,6 +2472,8 @@ export default function ContractsDashboard() {
                   }
                 }}
                 focusMode={focusMode}
+                highlightedTaskId={highlightedTaskId}
+                onClearHighlight={() => setHighlightedTaskId(null)}
               />
             </motion.div>
           )}
@@ -2793,6 +2803,7 @@ export default function ContractsDashboard() {
         onClose={() => setSelectedContract(null)}
         onUpdate={fetchData}
         openBundleModal={openBundleModal}
+        onNavigateToTask={handleNavigateToTask}
       />
     </div>
   );
