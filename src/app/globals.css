@@ -47,35 +47,3 @@ select option {
   background: #0d1d35;
   color: white;
 }
-
-/* Word Document Preview Styles */
-.docx-container {
-  padding: 2rem;
-}
-
-.docx-wrapper {
-  background: white;
-  min-height: 100%;
-}
-
-.docx-wrapper > section.docx {
-  background: white;
-  padding: 2rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Tracked changes styling */
-.docx ins {
-  background-color: #d4edda !important;
-  color: #155724 !important;
-  text-decoration: underline !important;
-  border-bottom: 2px solid #28a745;
-}
-
-.docx del {
-  background-color: #f8d7da !important;
-  color: #721c24 !important;
-  text-decoration: line-through !important;
-  border-bottom: 2px solid #dc3545;
-}

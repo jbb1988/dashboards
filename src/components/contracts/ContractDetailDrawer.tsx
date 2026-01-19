@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import WordDocumentPreview from '@/components/documents/WordDocumentPreview';
+import WordDocumentViewer from '@/components/documents/WordDocumentViewer';
 
 // Types
 interface BundleInfo {
@@ -1966,9 +1966,9 @@ export default function ContractDetailDrawer({
       )}
     </AnimatePresence>
 
-    {/* Word Document Preview Modal */}
+    {/* Word Document Viewer Modal */}
     {previewDocument && previewDocument.file_url && (
-      <WordDocumentPreview
+      <WordDocumentViewer
         fileUrl={previewDocument.file_url}
         fileName={previewDocument.file_name || 'document.docx'}
         onClose={() => setPreviewDocument(null)}
