@@ -191,6 +191,7 @@ export default function ContractDetailDrawer({
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<NotionTask | null>(null);
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
 
   // Documents state
   const [documents, setDocuments] = useState<ContractDocument[]>([]);
@@ -1525,8 +1526,18 @@ export default function ContractDetailDrawer({
                                     ${isComplete ? 'bg-[#22C55E]/5 hover:bg-[#22C55E]/10' : isOverdue ? 'bg-[#EF4444]/5 hover:bg-[#EF4444]/10' : 'bg-[#151F2E] hover:bg-[#1E293B]'}
                                   `}
                                   onClick={() => handleTaskClick(task)}
-                                  onMouseEnter={() => setHoveredTaskId(task.id)}
-                                  onMouseLeave={() => setHoveredTaskId(null)}
+                                  onMouseEnter={(e) => {
+                                    setHoveredTaskId(task.id);
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setTooltipPosition({
+                                      top: rect.top + rect.height / 2,
+                                      left: rect.right + 10
+                                    });
+                                  }}
+                                  onMouseLeave={() => {
+                                    setHoveredTaskId(null);
+                                    setTooltipPosition(null);
+                                  }}
                                 >
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {/* Status Toggle */}
@@ -1633,14 +1644,18 @@ export default function ContractDetailDrawer({
 
                                 {/* Hover Tooltip */}
                                 <AnimatePresence>
-                                  {hoveredTaskId === task.id && (task.description || task.assignee_email || task.assignee) && (
+                                  {hoveredTaskId === task.id && tooltipPosition && (task.description || task.assignee_email || task.assignee) && (
                                     <motion.div
-                                      initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                                      exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                                      initial={{ opacity: 0, x: -8, scale: 0.95 }}
+                                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                                      exit={{ opacity: 0, x: -8, scale: 0.95 }}
                                       transition={{ duration: 0.15, ease: 'easeOut' }}
-                                      className="absolute z-50 left-0 top-full mt-1 pointer-events-none"
-                                      onMouseEnter={(e) => e.stopPropagation()}
+                                      className="fixed z-[9999] pointer-events-none"
+                                      style={{
+                                        left: `${tooltipPosition.left}px`,
+                                        top: `${tooltipPosition.top}px`,
+                                        transform: 'translateY(-50%)'
+                                      }}
                                     >
                                       <div className="bg-[#0F1722] border border-white/10 rounded-lg shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[250px] max-w-[350px]">
                                         <div className="p-3 space-y-2">
