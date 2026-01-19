@@ -271,20 +271,36 @@ export async function GET(request: Request) {
           // Calculate actual cost from both line_cost AND quantity fields
           // NetSuite stores costs differently based on item type:
           // - Material/Labor/Overhead: use line_cost
-          // - Expense Reports/Shipping: use quantity (absolute value)
+          // - Expense Reports/Shipping/Outside Services: use quantity (absolute value)
           const totalActualCost = woLineItems.reduce((sum, li) => {
-            const itemName = li.itemName || '';
+            const itemName = (li.itemName || '').toLowerCase();
             const itemType = li.itemType || '';
+            const quantity = li.quantity || 0;
+            const lineCost = li.lineCost || 0;
 
-            // For Expense Reports and Shipping items, use quantity field
-            if (itemName.includes('Expense Report') ||
-                itemName.includes('-MATERIAL') ||
-                itemName.includes('-FREIGHT')) {
-              return sum + Math.abs(li.quantity || 0);
+            // For OthCharge items with zero line_cost but non-zero quantity,
+            // check if it's an expense/shipping/service item that uses quantity field
+            if (itemType === 'OthCharge' && Math.abs(lineCost) < 0.01 && Math.abs(quantity) > 0.01) {
+              // Common patterns for items that store cost in quantity field:
+              const usesQuantityField =
+                itemName.includes('expense') ||
+                itemName.includes('expense report') ||
+                itemName.includes('exp rpt') ||
+                itemName.includes('travel') ||
+                itemName.includes('freight') ||
+                itemName.includes('-freight') ||
+                itemName.includes('shipping') ||
+                itemName.includes('-material') ||
+                itemName.includes('outside service') ||
+                itemName.includes('misc material');
+
+              if (usesQuantityField) {
+                return sum + Math.abs(quantity);
+              }
             }
 
             // For all other items, use line_cost
-            return sum + Math.abs(li.lineCost || 0);
+            return sum + Math.abs(lineCost);
           }, 0);
 
           const hasActualCost = totalActualCost > 0;
