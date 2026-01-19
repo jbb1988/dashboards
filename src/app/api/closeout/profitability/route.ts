@@ -267,9 +267,26 @@ export async function GET(request: Request) {
           }));
 
           const totalEstimatedCost = woLineItems.reduce((sum, li) => sum + li.costEstimate, 0);
-          // Use line_cost as actual cost (NetSuite stores closed WO costs here)
-          const totalLineCost = woLineItems.reduce((sum, li) => sum + Math.abs(li.lineCost || 0), 0);
-          const totalActualCost = (wo as any).total_actual_cost || totalLineCost;
+
+          // Calculate actual cost from both line_cost AND quantity fields
+          // NetSuite stores costs differently based on item type:
+          // - Material/Labor/Overhead: use line_cost
+          // - Expense Reports/Shipping: use quantity (absolute value)
+          const totalActualCost = woLineItems.reduce((sum, li) => {
+            const itemName = li.itemName || '';
+            const itemType = li.itemType || '';
+
+            // For Expense Reports and Shipping items, use quantity field
+            if (itemName.includes('Expense Report') ||
+                itemName.includes('-MATERIAL') ||
+                itemName.includes('-FREIGHT')) {
+              return sum + Math.abs(li.quantity || 0);
+            }
+
+            // For all other items, use line_cost
+            return sum + Math.abs(li.lineCost || 0);
+          }, 0);
+
           const hasActualCost = totalActualCost > 0;
 
           workOrders.push({
