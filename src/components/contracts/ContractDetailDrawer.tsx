@@ -704,7 +704,7 @@ export default function ContractDetailDrawer({
     }
   };
 
-  const handleView = (doc: ContractDocument) => {
+  const handleView = async (doc: ContractDocument) => {
     if (!doc.file_url) return;
 
     const fileName = doc.file_name?.toLowerCase() || '';
@@ -713,19 +713,35 @@ export default function ContractDetailDrawer({
     if (isWordDoc) {
       setOpeningDocId(doc.id);
 
-      // Try ms-word protocol with anchor tag click
-      const wordUrl = `ms-word:ofe|u|${doc.file_url}`;
-      const link = document.createElement('a');
-      link.href = wordUrl;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      try {
+        // Convert Word document to PDF with tracked changes visible
+        const response = await fetch('/api/contracts/documents/convert-to-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId: doc.id,
+            fileUrl: doc.file_url,
+            fileName: doc.file_name,
+          }),
+        });
 
-      // Reset loading state
-      setTimeout(() => {
+        const data = await response.json();
+
+        if (response.ok && data.pdfUrl) {
+          // Open converted PDF in new tab
+          window.open(data.pdfUrl, '_blank');
+        } else {
+          // Fallback: download original file
+          console.warn('PDF conversion failed, falling back to download');
+          window.open(doc.file_url, '_blank');
+        }
+      } catch (error) {
+        console.error('Failed to convert document:', error);
+        // Fallback: download original file
+        window.open(doc.file_url, '_blank');
+      } finally {
         setOpeningDocId(null);
-      }, 1000);
+      }
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
