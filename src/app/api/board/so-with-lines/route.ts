@@ -6,19 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const supabase = getSupabaseAdmin();
 
-  // Count how many 2025 SOs have lines
-  const { data: sosWithLines } = await supabase
-    .from('netsuite_sales_order_lines')
-    .select('sales_order_id')
-    .in('sales_order_id',
-      supabase
-        .from('netsuite_sales_orders')
-        .select('id')
-        .gte('so_date', '2025-01-01')
-        .lte('so_date', '2025-12-31')
-    );
-
-  // Simpler approach: just count lines for 2025 SOs
+  // Get all 2025 SOs first
   const { data: allSOs } = await supabase
     .from('netsuite_sales_orders')
     .select('id')
@@ -27,6 +15,7 @@ export async function GET() {
 
   const soIds = (allSOs || []).map(s => s.id);
 
+  // Then count lines for those SOs
   const { count: lineCount } = await supabase
     .from('netsuite_sales_order_lines')
     .select('*', { count: 'exact', head: true })
