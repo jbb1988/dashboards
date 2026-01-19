@@ -5,9 +5,10 @@ import { verifyWOPIAccessToken } from '@/lib/wopi-token';
 export const dynamic = 'force-dynamic';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://word-view.officeapps.live.com',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-WOPI-Override',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-WOPI-Override, X-WOPI-Lock',
+  'Access-Control-Expose-Headers': 'X-WOPI-ItemVersion',
 };
 
 export async function OPTIONS() {

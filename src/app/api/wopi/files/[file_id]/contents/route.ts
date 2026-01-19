@@ -5,9 +5,10 @@ import { verifyWOPIAccessToken } from '@/lib/wopi-token';
 export const dynamic = 'force-dynamic';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://word-view.officeapps.live.com',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-WOPI-Override',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-WOPI-Override, X-WOPI-Lock',
+  'Access-Control-Expose-Headers': 'X-WOPI-ItemVersion, Content-Length, Content-Type',
 };
 
 export async function OPTIONS() {
@@ -44,14 +45,24 @@ export async function GET(
 
   // Download file from Supabase storage
   const storagePath = document.file_url.split('/data-files/')[1];
+
+  if (!storagePath) {
+    console.error('Failed to parse storage path from file_url:', document.file_url);
+    return new NextResponse('Invalid file URL', { status: 500, headers: corsHeaders });
+  }
+
+  console.log('Downloading file from storage:', storagePath);
   const { data: fileData, error } = await supabase
     .storage
     .from('data-files')
     .download(storagePath);
 
   if (error || !fileData) {
-    return new NextResponse('Failed to download file', { status: 500, headers: corsHeaders });
+    console.error('Failed to download file from storage:', error);
+    return new NextResponse(`Failed to download file: ${error?.message || 'Unknown error'}`, { status: 500, headers: corsHeaders });
   }
+
+  console.log('File downloaded successfully, size:', fileData.size);
 
   // Convert Blob to Buffer
   const arrayBuffer = await fileData.arrayBuffer();
