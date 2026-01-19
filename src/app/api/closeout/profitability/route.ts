@@ -25,6 +25,7 @@ const PRODUCT_TYPE_NAMES: Record<string, string> = {
   'M3IU': 'M3 Install Upgrade',
   'M3NEW': 'M3 Software New',
   'M3 Software': 'M3 Software',
+  'DRM3': 'Deferred Revenue M3',
   'TB Service': 'Test Bench Service/Maintenance',
   'MCC': 'Maintenance & Calibration Services',
   'TB Components': 'Test Bench Components',

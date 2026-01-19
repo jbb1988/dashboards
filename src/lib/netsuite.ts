@@ -678,7 +678,9 @@ export function parseProjectType(
         if (acct === '4051' || acct === '5051') return 'M3NEW';
         if ((acct.startsWith('405') && acct !== '4050' && acct !== '4051') ||
             (acct.startsWith('505') && acct !== '5050' && acct !== '5051')) return 'M3 Software';
-        // M3 Software Renewals and Upgrades
+        // M3 Deferred Revenue (multi-year contracted renewals)
+        if (acct === '4081' || acct === '5081') return 'DRM3';
+        // M3 Software Renewals and Upgrades (other 408x/409x)
         if (acct.startsWith('408') || acct.startsWith('409') ||
             acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
         // Project Management and Shipping
@@ -705,6 +707,7 @@ export function parseProjectType(
         const acct = accountNumber.trim();
         if (acct.startsWith('404') || acct.startsWith('504')) return 'M3IN';
         if (acct === '4051' || acct === '5051') return 'M3NEW'; // M3 Software New
+        if (acct === '4081' || acct === '5081') return 'DRM3'; // Deferred Revenue M3
         if (acct.startsWith('405') || acct.startsWith('408') || acct.startsWith('409') ||
             acct.startsWith('505') || acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
       }
@@ -745,6 +748,7 @@ export function parseProjectType(
 
   // M3 Software - separate New from other software
   if (acct === '4051' || acct === '5051') return 'M3NEW'; // M3 Software New
+  if (acct === '4081' || acct === '5081') return 'DRM3'; // Deferred Revenue M3 (multi-year contracted renewals)
   if (acct.startsWith('405') && acct !== '4050' && acct !== '4051' ||
       acct.startsWith('505') && acct !== '5050' && acct !== '5051') return 'M3 Software';
   if (acct.startsWith('408') || acct.startsWith('409') ||
