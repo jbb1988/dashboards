@@ -199,6 +199,7 @@ export default function ContractDetailDrawer({
   const [docsFetched, setDocsFetched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [openingDocId, setOpeningDocId] = useState<string | null>(null);
 
   // Reviews state
   const [reviews, setReviews] = useState<ContractReviewItem[]>([]);
@@ -710,10 +711,25 @@ export default function ContractDetailDrawer({
     const isWordDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
 
     if (isWordDoc) {
+      // Show loading feedback
+      setOpeningDocId(doc.id);
+
       // Open in Word Online using ms-word protocol (requires Office 365 license)
       // This will open in Word Online in the browser with full tracked changes support
       const wordOnlineUrl = `ms-word:ofe|u|${doc.file_url}`;
-      window.location.href = wordOnlineUrl;
+
+      // Use a temporary anchor element to trigger the protocol handler
+      const link = document.createElement('a');
+      link.href = wordOnlineUrl;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Reset loading state after a brief moment
+      setTimeout(() => {
+        setOpeningDocId(null);
+      }, 2000);
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
@@ -1229,16 +1245,22 @@ export default function ContractDetailDrawer({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                           </svg>
                                         </button>
-                                        <button
-                                          onClick={() => handleView(doc)}
-                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
-                                          title="View"
-                                        >
-                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                          </svg>
-                                        </button>
+                                        {openingDocId === doc.id ? (
+                                          <div className="p-1.5 text-[#38BDF8]" title="Opening in Word...">
+                                            <div className="w-3.5 h-3.5 border-2 border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin" />
+                                          </div>
+                                        ) : (
+                                          <button
+                                            onClick={() => handleView(doc)}
+                                            className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                            title="View"
+                                          >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                          </button>
+                                        )}
                                         <button
                                           onClick={() => handleDeleteDocument(doc)}
                                           className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-colors"
@@ -1348,16 +1370,22 @@ export default function ContractDetailDrawer({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                           </svg>
                                         </button>
-                                        <button
-                                          onClick={() => handleView(doc)}
-                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
-                                          title="View"
-                                        >
-                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                          </svg>
-                                        </button>
+                                        {openingDocId === doc.id ? (
+                                          <div className="p-1.5 text-[#38BDF8]" title="Opening in Word...">
+                                            <div className="w-3.5 h-3.5 border-2 border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin" />
+                                          </div>
+                                        ) : (
+                                          <button
+                                            onClick={() => handleView(doc)}
+                                            className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                            title="View"
+                                          >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                          </button>
+                                        )}
                                         <button
                                           onClick={() => handleDeleteDocument(doc)}
                                           className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-colors"

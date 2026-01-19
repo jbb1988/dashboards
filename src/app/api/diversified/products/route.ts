@@ -303,6 +303,12 @@ export async function GET(request: NextRequest) {
       .map(([name, data]) => ({ class_name: name, ...data }))
       .sort((a, b) => b.revenue - a.revenue);
 
+    console.log('Products API - Returning response:', {
+      total_products: products.length,
+      total_current_revenue: totalCurrentRevenue,
+      className_filter: className,
+    });
+
     return NextResponse.json({
       products,
       summary: {

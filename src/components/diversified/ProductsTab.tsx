@@ -118,6 +118,11 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
           throw new Error('Failed to fetch products data');
         }
         const result = await response.json();
+        console.log('ProductsTab - Received data:', {
+          total_products: result.summary?.total_products,
+          products_count: result.products?.length,
+          first_product_class: result.products?.[0]?.class_name,
+        });
         setData(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -172,30 +177,31 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
     return sorted;
   }, [data, filterTrend, searchTerm, sortBy, sortDir]);
 
-  // Compute class-specific summary when class filter is active
-  // MUST be called before any conditional returns to follow Rules of Hooks
-  const filteredSummary = useMemo(() => {
-    if (!selectedClass || !data) return null;
+  // When class filter is active at the API level, the API already returns filtered summary
+  // So we can use data.summary directly instead of recalculating
+  const displaySummary = useMemo(() => {
+    if (!data) return null;
 
-    // Filter products by selected class
-    const classProducts = data.products.filter(p => p.class_name === selectedClass);
+    // If class filter is applied, API has already filtered, so use API summary directly
+    if (selectedClass) {
+      return {
+        totalProducts: data.summary.total_products,
+        currentRevenue: data.summary.total_current_revenue,
+        priorRevenue: data.summary.total_prior_revenue,
+        changePct: data.summary.overall_change_pct,
+        growingProducts: data.summary.growing_products,
+        decliningProducts: data.summary.declining_products,
+      };
+    }
 
-    const totalProducts = classProducts.length;
-    const currentRevenue = classProducts.reduce((sum, p) => sum + p.current_revenue, 0);
-    const priorRevenue = classProducts.reduce((sum, p) => sum + p.prior_revenue, 0);
-    const changePct = priorRevenue > 0
-      ? ((currentRevenue - priorRevenue) / priorRevenue) * 100
-      : currentRevenue > 0 ? 100 : 0;
-    const growingProducts = classProducts.filter(p => p.trend === 'growing').length;
-    const decliningProducts = classProducts.filter(p => p.trend === 'declining').length;
-
+    // No filter - use API summary
     return {
-      totalProducts,
-      currentRevenue,
-      priorRevenue,
-      changePct,
-      growingProducts,
-      decliningProducts,
+      totalProducts: data.summary.total_products,
+      currentRevenue: data.summary.total_current_revenue,
+      priorRevenue: data.summary.total_prior_revenue,
+      changePct: data.summary.overall_change_pct,
+      growingProducts: data.summary.growing_products,
+      decliningProducts: data.summary.declining_products,
     };
   }, [selectedClass, data]);
 
@@ -236,35 +242,35 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
       <div className="grid grid-cols-5 gap-4">
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">
-            {filteredSummary ? 'Products in Class' : 'Total Products'}
+            {selectedClass ? 'Products in Class' : 'Total Products'}
           </div>
           <div className="text-2xl font-bold text-white">
-            {filteredSummary ? filteredSummary.totalProducts : data.summary.total_products}
+            {displaySummary?.totalProducts ?? 0}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">R12 Revenue</div>
           <div className="text-2xl font-bold text-white">
-            {formatCurrency(filteredSummary ? filteredSummary.currentRevenue : data.summary.total_current_revenue)}
+            {formatCurrency(displaySummary?.currentRevenue ?? 0)}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">R12 Change</div>
-          <div className={`text-2xl font-bold ${(filteredSummary ? filteredSummary.changePct : data.summary.overall_change_pct) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {(filteredSummary ? filteredSummary.changePct : data.summary.overall_change_pct) >= 0 ? '+' : ''}
-            {(filteredSummary ? filteredSummary.changePct : data.summary.overall_change_pct).toFixed(1)}%
+          <div className={`text-2xl font-bold ${(displaySummary?.changePct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {(displaySummary?.changePct ?? 0) >= 0 ? '+' : ''}
+            {(displaySummary?.changePct ?? 0).toFixed(1)}%
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Growing</div>
           <div className="text-2xl font-bold text-green-400">
-            {filteredSummary ? filteredSummary.growingProducts : data.summary.growing_products}
+            {displaySummary?.growingProducts ?? 0}
           </div>
         </div>
         <div className="p-4 rounded-xl bg-[#151F2E] border border-white/[0.04]">
           <div className="text-[10px] text-[#64748B] uppercase tracking-wide mb-1">Declining</div>
           <div className="text-2xl font-bold text-red-400">
-            {filteredSummary ? filteredSummary.decliningProducts : data.summary.declining_products}
+            {displaySummary?.decliningProducts ?? 0}
           </div>
         </div>
       </div>
