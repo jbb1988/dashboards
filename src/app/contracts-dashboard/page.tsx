@@ -376,17 +376,20 @@ function ContractRow({
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // Parse date string directly to avoid timezone issues
+    const [year, month, day] = dateStr.split('T')[0].split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   // Compact date format for tooltip: MM/DD/YY
+  // Parse date string directly to avoid timezone issues
+  // Database stores dates as YYYY-MM-DD, so split and use directly
   const formatDateCompact = (dateStr: string | null) => {
     if (!dateStr) return '—';
-    const date = new Date(dateStr);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const year = date.getFullYear().toString().slice(-2);
-    return `${month}/${day}/${year}`;
+    const [year, month, day] = dateStr.split('T')[0].split('-');
+    const yearShort = year.slice(-2);
+    return `${month}/${day}/${yearShort}`;
   };
 
   // Construct Salesforce Lightning URL
@@ -1541,13 +1544,16 @@ export default function ContractsDashboard() {
       sortKey: any;
     }
 
-    const groups = new Map<string | null, BundleGroup>();
+    const groups = new Map<string, BundleGroup>();
 
     filtered.forEach(contract => {
+      // For bundled contracts, use the bundleId as the group key
+      // For unbundled contracts, use a unique key so each sorts independently
       const bundleId = contract.bundleInfo?.bundleId ?? null;
+      const groupKey = bundleId ?? `unbundled-${contract.id}`;
 
-      if (!groups.has(bundleId)) {
-        groups.set(bundleId, {
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
           bundleId,
           contracts: [],
           primary: null,
@@ -1555,7 +1561,7 @@ export default function ContractsDashboard() {
         });
       }
 
-      const group = groups.get(bundleId)!;
+      const group = groups.get(groupKey)!;
       group.contracts.push(contract);
 
       if (contract.bundleInfo?.isPrimary) {
