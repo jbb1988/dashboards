@@ -324,10 +324,11 @@ export async function GET(request: Request) {
 
       if (nsSOs) {
         for (const so of nsSOs) {
-          // Filter out NetSuite metadata lines (subtotals, tax groups, comments)
+          // Filter out NetSuite metadata lines (subtotals, tax groups, comments, taxes)
           const validLines = (so.netsuite_sales_order_lines || []).filter((line: any) => {
             const itemName = line.item_name || '';
             const itemType = line.item_type || '';
+            const accountNumber = line.account_number || '';
             // Exclude: Subtotal, -Not Taxable-, tax groups, and comment lines
             if (itemName === 'Subtotal') return false;
             if (itemName === 'Comment') return false;
@@ -335,6 +336,8 @@ export async function GET(request: Request) {
             if (itemType === 'TaxGroup') return false;
             if (itemType === 'Subtotal') return false;
             if (itemType === 'Description') return false; // Comment lines
+            // Exclude tax lines (account 2050 = Sales Taxes Payable)
+            if (accountNumber === '2050') return false;
             // Only include revenue line items (those with account numbers)
             if (!line.account_number) return false;
             return true;
