@@ -714,22 +714,17 @@ export default function ContractDetailDrawer({
       // Show loading feedback
       setOpeningDocId(doc.id);
 
-      // Open in Word Online using ms-word protocol (requires Office 365 license)
-      // This will open in Word Online in the browser with full tracked changes support
-      const wordOnlineUrl = `ms-word:ofe|u|${doc.file_url}`;
+      // Open in Word Online viewer with tracked changes visible
+      // This opens in the browser and displays all tracked changes
+      const wordOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.file_url)}`;
 
-      // Use a temporary anchor element to trigger the protocol handler
-      const link = document.createElement('a');
-      link.href = wordOnlineUrl;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Open in new tab
+      window.open(wordOnlineUrl, '_blank');
 
       // Reset loading state after a brief moment
       setTimeout(() => {
         setOpeningDocId(null);
-      }, 2000);
+      }, 1000);
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
