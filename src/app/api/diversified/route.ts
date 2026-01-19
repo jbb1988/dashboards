@@ -31,7 +31,11 @@ export async function GET(request: NextRequest) {
     // Run initial queries in parallel for better performance
     const [filterOptions, summary] = await Promise.all([
       getDiversifiedFilterOptions(),
-      getDiversifiedDashboardSummary({ years, months }),
+      getDiversifiedDashboardSummary({
+        years,
+        months,
+        className: classNameParam || undefined
+      }),
     ]);
 
     // Get aggregated data based on view
