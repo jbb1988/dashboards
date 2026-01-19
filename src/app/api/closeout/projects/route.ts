@@ -12,11 +12,11 @@ export async function GET() {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Get distinct project names with their years
+    // Get distinct project names with their years (2025 and later only)
     const { data: projects, error } = await supabase
       .from('closeout_projects')
       .select('project_name, project_year')
-      .gt('project_year', 0) // Exclude year=0 summary rows
+      .gte('project_year', 2025) // Only include 2025 and later
       .order('project_name', { ascending: true });
 
     if (error) {
