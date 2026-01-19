@@ -972,11 +972,11 @@ export default function ContractDetailDrawer({
                       <span className="text-[13px] text-white">{contract.salesRep || '-'}</span>
                     </div>
 
-                    {/* Probability */}
+                    {/* MCP % (Manual Close Probability) */}
                     <div className="flex items-center justify-between py-2 border-t border-white/[0.04]">
-                      <span className="text-[12px] text-[#64748B]">Probability</span>
+                      <span className="text-[12px] text-[#64748B]">MCP %</span>
                       <span className="text-[15px] font-semibold text-white">
-                        {contract.probability || 0}%
+                        {contract.manualCloseProbability ?? 0}%
                       </span>
                     </div>
 
