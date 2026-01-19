@@ -267,7 +267,9 @@ export async function GET(request: Request) {
           }));
 
           const totalEstimatedCost = woLineItems.reduce((sum, li) => sum + li.costEstimate, 0);
-          const totalActualCost = (wo as any).total_actual_cost || woLineItems.reduce((sum, li) => sum + (li.actualCost || 0), 0);
+          // Use line_cost as actual cost (NetSuite stores closed WO costs here)
+          const totalLineCost = woLineItems.reduce((sum, li) => sum + Math.abs(li.lineCost || 0), 0);
+          const totalActualCost = (wo as any).total_actual_cost || totalLineCost;
           const hasActualCost = totalActualCost > 0;
 
           workOrders.push({
