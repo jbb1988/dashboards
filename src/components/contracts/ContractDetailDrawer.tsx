@@ -160,40 +160,7 @@ function formatCurrency(value: number): string {
   return `$${value.toLocaleString()}`;
 }
 
-// TaskTooltip Component
-interface TaskTooltipProps {
-  task: NotionTask;
-  children: React.ReactNode;
-}
-
-const TaskTooltip: React.FC<TaskTooltipProps> = ({ task, children }) => {
-  return (
-    <div className="relative group">
-      {children}
-      <div className="absolute z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-300 bg-[#1F2937] text-white text-sm rounded-lg p-3 shadow-xl max-w-xs -left-2 top-full mt-2 pointer-events-none">
-        {task.description && (
-          <div className="mb-2">
-            <div className="font-semibold mb-1 text-[11px] text-[#9CA3AF]">Description:</div>
-            <div className="text-[#E5E7EB] text-[11px] leading-relaxed">
-              {task.description.length > 200
-                ? task.description.substring(0, 200) + '...'
-                : task.description}
-            </div>
-          </div>
-        )}
-        {(task.assignee_email || task.assignee) && (
-          <div className="text-[#E5E7EB] text-[11px]">
-            <span className="font-semibold text-[#9CA3AF]">Assigned to:</span> {task.assignee_email || task.assignee}
-          </div>
-        )}
-        {!task.description && !task.assignee_email && !task.assignee && (
-          <div className="text-[#9CA3AF] italic text-[11px]">No additional details</div>
-        )}
-        <div className="absolute -top-1 left-4 w-2 h-2 bg-[#1F2937] transform rotate-45"></div>
-      </div>
-    </div>
-  );
-};
+// No separate TaskTooltip component - using inline state-based tooltip
 
 export default function ContractDetailDrawer({
   contract,
@@ -223,6 +190,7 @@ export default function ContractDetailDrawer({
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<NotionTask | null>(null);
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
 
   // Documents state
   const [documents, setDocuments] = useState<ContractDocument[]>([]);
@@ -230,6 +198,7 @@ export default function ContractDetailDrawer({
   const [docsFetched, setDocsFetched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [convertingDocId, setConvertingDocId] = useState<string | null>(null);
 
   // Reviews state
   const [reviews, setReviews] = useState<ContractReviewItem[]>([]);
@@ -280,6 +249,8 @@ export default function ContractDetailDrawer({
                   dueDate: t.due_date || null,
                   priority: t.priority,
                   assignee: t.assignee_email || null,
+                  assignee_email: t.assignee_email || null,
+                  description: t.description || null,
                   contractName: t.contract_name || contract.name,
                   completed: t.status === 'completed',
                 })))
@@ -296,6 +267,8 @@ export default function ContractDetailDrawer({
                   dueDate: t.due_date || null,
                   priority: t.priority,
                   assignee: t.assignee_email || null,
+                  assignee_email: t.assignee_email || null,
+                  description: t.description || null,
                   contractName: `📦 ${contract.bundleInfo?.bundleName || 'Bundle'}`,
                   completed: t.status === 'completed',
                 })))
@@ -730,15 +703,30 @@ export default function ContractDetailDrawer({
     }
   };
 
-  const handleView = (doc: ContractDocument) => {
-    if (doc.file_url) {
-      // Check if it's a Word document
-      const fileName = doc.file_name?.toLowerCase() || '';
-      const isWordDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
+  const handleView = async (doc: ContractDocument) => {
+    if (!doc.file_url) return;
 
-      if (isWordDoc) {
-        // For Word documents, open directly to download and view in local Word
-        // This preserves tracked changes/redlines that web viewers don't show
+    const fileName = doc.file_name?.toLowerCase() || '';
+    const isWordDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
+
+    if (isWordDoc) {
+      try {
+        setConvertingDocId(doc.id);
+
+        // Call conversion API to convert DOCX to PDF with tracked changes visible
+        const response = await fetch(`/api/contracts/documents/convert-to-pdf?documentId=${doc.id}`);
+        const data = await response.json();
+
+        if (data.success && data.pdfUrl) {
+          // Open converted PDF in new tab - tracked changes will be visible
+          window.open(data.pdfUrl, '_blank');
+        } else {
+          // Fallback: download Word doc if conversion fails
+          throw new Error(data.error || 'Conversion failed');
+        }
+      } catch (error) {
+        console.error('PDF conversion failed:', error);
+        // Fallback: download original Word document
         const link = document.createElement('a');
         link.href = doc.file_url;
         link.download = doc.file_name || 'document.docx';
@@ -746,10 +734,12 @@ export default function ContractDetailDrawer({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      } else {
-        // Open PDFs and other files directly in browser
-        window.open(doc.file_url, '_blank');
+      } finally {
+        setConvertingDocId(null);
       }
+    } else {
+      // PDFs and other files open directly in browser
+      window.open(doc.file_url, '_blank');
     }
   };
 
@@ -1261,16 +1251,22 @@ export default function ContractDetailDrawer({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                           </svg>
                                         </button>
-                                        <button
-                                          onClick={() => handleView(doc)}
-                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
-                                          title="View"
-                                        >
-                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                          </svg>
-                                        </button>
+                                        {convertingDocId === doc.id ? (
+                                          <div className="p-1.5 text-[#38BDF8]" title="Converting...">
+                                            <div className="w-3.5 h-3.5 border-2 border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin" />
+                                          </div>
+                                        ) : (
+                                          <button
+                                            onClick={() => handleView(doc)}
+                                            className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                            title="View"
+                                          >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                          </button>
+                                        )}
                                         <button
                                           onClick={() => handleDeleteDocument(doc)}
                                           className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-colors"
@@ -1380,16 +1376,22 @@ export default function ContractDetailDrawer({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                           </svg>
                                         </button>
-                                        <button
-                                          onClick={() => handleView(doc)}
-                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
-                                          title="View"
-                                        >
-                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                          </svg>
-                                        </button>
+                                        {convertingDocId === doc.id ? (
+                                          <div className="p-1.5 text-[#38BDF8]" title="Converting...">
+                                            <div className="w-3.5 h-3.5 border-2 border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin" />
+                                          </div>
+                                        ) : (
+                                          <button
+                                            onClick={() => handleView(doc)}
+                                            className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                            title="View"
+                                          >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                          </button>
+                                        )}
                                         <button
                                           onClick={() => handleDeleteDocument(doc)}
                                           className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-colors"
@@ -1516,13 +1518,15 @@ export default function ContractDetailDrawer({
                           return (
                             <div key={task.id} className="border-b border-white/[0.04] last:border-b-0">
                               {/* Compact Row (always visible) */}
-                              <TaskTooltip task={task}>
+                              <div className="relative">
                                 <div
                                   className={`
                                     group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors
                                     ${isComplete ? 'bg-[#22C55E]/5 hover:bg-[#22C55E]/10' : isOverdue ? 'bg-[#EF4444]/5 hover:bg-[#EF4444]/10' : 'bg-[#151F2E] hover:bg-[#1E293B]'}
                                   `}
                                   onClick={() => handleTaskClick(task)}
+                                  onMouseEnter={() => setHoveredTaskId(task.id)}
+                                  onMouseLeave={() => setHoveredTaskId(null)}
                                 >
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {/* Status Toggle */}
@@ -1626,22 +1630,56 @@ export default function ContractDetailDrawer({
                                     </svg>
                                   </div>
                                 </div>
-                              </TaskTooltip>
+
+                                {/* Hover Tooltip */}
+                                <AnimatePresence>
+                                  {hoveredTaskId === task.id && (task.description || task.assignee_email || task.assignee) && (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: -4, scale: 0.95 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                                      className="absolute z-50 left-0 top-full mt-1 pointer-events-none"
+                                      onMouseEnter={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="bg-[#0F1722] border border-white/10 rounded-lg shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[250px] max-w-[350px]">
+                                        <div className="p-3 space-y-2">
+                                          {task.description && (
+                                            <div>
+                                              <div className="text-[9px] font-semibold text-[#64748B] uppercase tracking-wider mb-1">Notes:</div>
+                                              <div className="text-[11px] text-[#E5E7EB] leading-relaxed">
+                                                {task.description.length > 200
+                                                  ? task.description.substring(0, 200) + '...'
+                                                  : task.description}
+                                              </div>
+                                            </div>
+                                          )}
+                                          {(task.assignee_email || task.assignee) && (
+                                            <div className="text-[11px] text-[#E5E7EB]">
+                                              <span className="font-semibold text-[#64748B]">Assigned to:</span> {task.assignee_email || task.assignee}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
 
                               {/* Expanded Task Details */}
                               {isExpanded && editingTask && (
                                 <div className="bg-[#0A0F1A] p-4 space-y-4 animate-slideDown border-t border-white/[0.04]">
-                                  {/* Description */}
+                                  {/* Notes */}
                                   <div>
                                     <label className="block text-[9px] text-[#64748B] uppercase tracking-wider mb-1">
-                                      Description
+                                      Notes
                                     </label>
                                     <textarea
                                       value={editingTask.description || ''}
                                       onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
                                       className="w-full px-3 py-2 rounded-lg bg-[#0F1722] border border-white/10 text-[#EAF2FF] text-xs focus:outline-none focus:border-[#38BDF8] placeholder:text-[#475569]"
                                       rows={3}
-                                      placeholder="Add a description..."
+                                      placeholder="Add notes or additional details..."
                                     />
                                   </div>
 

@@ -399,14 +399,27 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
 
   // Handle task highlighting when navigated from contract drawer
   useEffect(() => {
-    if (highlightedTaskId) {
-      // Wait for tasks to load and DOM to update
-      setTimeout(() => {
-        const taskElement = document.getElementById(`task-${highlightedTaskId}`);
-        if (taskElement) {
-          taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (highlightedTaskId && tasks.length > 0) {
+      // Find the task to determine which contract/group it belongs to
+      const task = tasks.find(t => t.id === highlightedTaskId);
+
+      if (task) {
+        // Expand the contract/group that contains this task in byContract view
+        if (viewMode === 'byContract') {
+          const contractKey = task.bundle_id
+            ? `bundle-${task.bundle_id}`
+            : task.contract_name || 'Unassigned';
+          setExpandedContracts(prev => new Set([...prev, contractKey]));
         }
-      }, 100);
+
+        // Wait for DOM to update with expanded sections
+        setTimeout(() => {
+          const taskElement = document.getElementById(`task-${highlightedTaskId}`);
+          if (taskElement) {
+            taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 200);
+      }
 
       // Clear highlight after 3 seconds
       const timer = setTimeout(() => {
@@ -415,7 +428,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
 
       return () => clearTimeout(timer);
     }
-  }, [highlightedTaskId, onClearHighlight]);
+  }, [highlightedTaskId, onClearHighlight, tasks, viewMode]);
 
   // Filter out contracts that are in bundles to avoid duplicates in dropdown
   const unbundledContracts = useMemo(() => {
