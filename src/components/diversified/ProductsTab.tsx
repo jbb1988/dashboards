@@ -111,6 +111,8 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
           params.set('className', selectedClass);
         }
         const url = `/api/diversified/products${params.toString() ? `?${params.toString()}` : ''}`;
+        console.log('ProductsTab - Fetching with filters:', { selectedYears, selectedMonths, selectedClass });
+        console.log('ProductsTab - API URL:', url);
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Failed to fetch products data');

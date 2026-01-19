@@ -8,11 +8,21 @@ export async function GET(request: NextRequest) {
     const admin = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
 
-    // Parse year/month filters
+    // Parse year/month/class filters
     const yearsParam = searchParams.get('years');
     const monthsParam = searchParams.get('months');
+    const classNameParam = searchParams.get('className');
     const years = yearsParam ? yearsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
     const months = monthsParam ? monthsParam.split(',').map(Number).filter(n => !isNaN(n)) : [];
+    const className = classNameParam && classNameParam.trim() ? classNameParam.trim() : null;
+
+    // Debug logging
+    console.log('Products API - Received filters:', {
+      years,
+      months,
+      className,
+      classNameParam
+    });
 
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
@@ -91,7 +101,7 @@ export async function GET(request: NextRequest) {
         .from('diversified_sales')
         .select('item_id, item_name, item_description, class_name, class_category, customer_id, customer_name, transaction_date, year, month, revenue, cost, quantity');
 
-      // Apply year/month filters if provided
+      // Apply year/month/class filters if provided
       if (years.length > 0) {
         // Include both current and prior years for YoY comparison
         const yearsToQuery = [...new Set([...years, ...years.map(y => y - 1)])];
@@ -102,6 +112,11 @@ export async function GET(request: NextRequest) {
 
       if (months.length > 0) {
         query = query.in('month', months);
+      }
+
+      if (className) {
+        // Use ilike for case-insensitive matching
+        query = query.ilike('class_name', className);
       }
 
       const { data, error } = await query
@@ -201,7 +216,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build products array
-    const products = Array.from(productMap.values()).map(p => {
+    let products = Array.from(productMap.values()).map(p => {
       const change_pct = p.prior_revenue > 0
         ? ((p.current_revenue - p.prior_revenue) / p.prior_revenue) * 100
         : p.current_revenue > 0 ? 100 : 0;
@@ -253,6 +268,20 @@ export async function GET(request: NextRequest) {
         top_customers: topCustomers,
       };
     }).sort((a, b) => b.current_revenue - a.current_revenue);
+
+    // Apply class name filter if provided (in-memory backup filter)
+    if (className) {
+      const beforeFilter = products.length;
+      // Case-insensitive comparison with trimmed values
+      const classNameLower = className.toLowerCase().trim();
+      products = products.filter(p => p.class_name?.toLowerCase().trim() === classNameLower);
+      console.log(`Products API - Filtered by class "${className}": ${beforeFilter} -> ${products.length} products`);
+      if (products.length === 0) {
+        console.log('No products found! Available class names:', [...new Set(Array.from(productMap.values()).map(p => p.class_name))].slice(0, 10));
+      } else {
+        console.log('Sample product class names:', products.slice(0, 3).map(p => p.class_name));
+      }
+    }
 
     // Summary stats
     const totalCurrentRevenue = products.reduce((sum, p) => sum + p.current_revenue, 0);

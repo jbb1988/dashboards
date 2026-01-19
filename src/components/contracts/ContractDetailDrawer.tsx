@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import WordDocumentViewer from '@/components/documents/WordDocumentViewer';
 
 // Types
 interface BundleInfo {
@@ -200,7 +199,6 @@ export default function ContractDetailDrawer({
   const [docsFetched, setDocsFetched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
-  const [previewDocument, setPreviewDocument] = useState<ContractDocument | null>(null);
 
   // Reviews state
   const [reviews, setReviews] = useState<ContractReviewItem[]>([]);
@@ -716,11 +714,6 @@ export default function ContractDetailDrawer({
       // This will open in Word Online in the browser with full tracked changes support
       const wordOnlineUrl = `ms-word:ofe|u|${doc.file_url}`;
       window.location.href = wordOnlineUrl;
-
-      // Fallback: if protocol handler doesn't work, show modal viewer
-      setTimeout(() => {
-        setPreviewDocument(doc);
-      }, 1000);
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
@@ -1972,15 +1965,6 @@ export default function ContractDetailDrawer({
         </>
       )}
     </AnimatePresence>
-
-    {/* Word Document Viewer Modal */}
-    {previewDocument && previewDocument.file_url && (
-      <WordDocumentViewer
-        fileUrl={previewDocument.file_url}
-        fileName={previewDocument.file_name || 'document.docx'}
-        onClose={() => setPreviewDocument(null)}
-      />
-    )}
   </>
   );
 }

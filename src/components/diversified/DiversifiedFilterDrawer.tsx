@@ -51,6 +51,7 @@ export default function DiversifiedFilterDrawer({
   };
 
   const selectClass = (className: string | null) => {
+    console.log('Filter Drawer - Class selected:', className);
     updateFilter('selectedClass', className);
   };
 
