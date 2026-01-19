@@ -704,7 +704,7 @@ export default function ContractDetailDrawer({
     }
   };
 
-  const handleView = async (doc: ContractDocument) => {
+  const handleView = (doc: ContractDocument) => {
     if (!doc.file_url) return;
 
     const fileName = doc.file_name?.toLowerCase() || '';
@@ -713,41 +713,14 @@ export default function ContractDetailDrawer({
     if (isWordDoc) {
       setOpeningDocId(doc.id);
 
-      try {
-        // Generate WOPI access token
-        const tokenResponse = await fetch('/api/wopi/generate-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
+      // Open in desktop Word using ms-word protocol
+      const wordUrl = `ms-word:ofe|u|${doc.file_url}`;
+      window.location.href = wordUrl;
 
-        if (!tokenResponse.ok) {
-          throw new Error('Failed to generate WOPI token');
-        }
-
-        const { access_token, file_id } = await tokenResponse.json();
-
-        // Construct WOPI URL
-        const wopiSrc = `${window.location.origin}/api/wopi/files/${file_id}`;
-        const wordOnlineUrl = `https://word-view.officeapps.live.com/wv/wordviewerframe.aspx?WOPISrc=${encodeURIComponent(wopiSrc)}&access_token=${access_token}`;
-
-        // Open Word Online
-        window.open(wordOnlineUrl, '_blank');
-
-      } catch (error) {
-        console.error('Failed to open document:', error);
-        // Fallback: download file
-        const link = document.createElement('a');
-        link.href = doc.file_url;
-        link.download = doc.file_name || 'document.docx';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } finally {
-        setTimeout(() => {
-          setOpeningDocId(null);
-        }, 1000);
-      }
+      // Reset loading state
+      setTimeout(() => {
+        setOpeningDocId(null);
+      }, 1000);
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
