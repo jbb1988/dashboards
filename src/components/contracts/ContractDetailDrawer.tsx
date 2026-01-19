@@ -704,27 +704,50 @@ export default function ContractDetailDrawer({
     }
   };
 
-  const handleView = (doc: ContractDocument) => {
+  const handleView = async (doc: ContractDocument) => {
     if (!doc.file_url) return;
 
     const fileName = doc.file_name?.toLowerCase() || '';
     const isWordDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
 
     if (isWordDoc) {
-      // Show loading feedback
       setOpeningDocId(doc.id);
 
-      // Open in Word Online viewer with tracked changes visible
-      // This opens in the browser and displays all tracked changes
-      const wordOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.file_url)}`;
+      try {
+        // Generate WOPI access token
+        const tokenResponse = await fetch('/api/wopi/generate-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
 
-      // Open in new tab
-      window.open(wordOnlineUrl, '_blank');
+        if (!tokenResponse.ok) {
+          throw new Error('Failed to generate WOPI token');
+        }
 
-      // Reset loading state after a brief moment
-      setTimeout(() => {
-        setOpeningDocId(null);
-      }, 1000);
+        const { access_token, file_id } = await tokenResponse.json();
+
+        // Construct WOPI URL
+        const wopiSrc = `${window.location.origin}/api/wopi/files/${file_id}`;
+        const wordOnlineUrl = `https://word-view.officeapps.live.com/wv/wordviewerframe.aspx?WOPISrc=${encodeURIComponent(wopiSrc)}&access_token=${access_token}`;
+
+        // Open Word Online
+        window.open(wordOnlineUrl, '_blank');
+
+      } catch (error) {
+        console.error('Failed to open document:', error);
+        // Fallback: download file
+        const link = document.createElement('a');
+        link.href = doc.file_url;
+        link.download = doc.file_name || 'document.docx';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } finally {
+        setTimeout(() => {
+          setOpeningDocId(null);
+        }, 1000);
+      }
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
