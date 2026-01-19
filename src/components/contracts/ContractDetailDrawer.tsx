@@ -1530,8 +1530,8 @@ export default function ContractDetailDrawer({
                                     setHoveredTaskId(task.id);
                                     const rect = e.currentTarget.getBoundingClientRect();
                                     setTooltipPosition({
-                                      top: rect.top + rect.height / 2,
-                                      left: rect.right + 10
+                                      top: rect.bottom + 8,
+                                      left: rect.left
                                     });
                                   }}
                                   onMouseLeave={() => {
@@ -1646,15 +1646,14 @@ export default function ContractDetailDrawer({
                                 <AnimatePresence>
                                   {hoveredTaskId === task.id && tooltipPosition && (task.description || task.assignee_email || task.assignee) && (
                                     <motion.div
-                                      initial={{ opacity: 0, x: -8, scale: 0.95 }}
-                                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                                      exit={{ opacity: 0, x: -8, scale: 0.95 }}
+                                      initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      exit={{ opacity: 0, y: -8, scale: 0.95 }}
                                       transition={{ duration: 0.15, ease: 'easeOut' }}
                                       className="fixed z-[9999] pointer-events-none"
                                       style={{
                                         left: `${tooltipPosition.left}px`,
-                                        top: `${tooltipPosition.top}px`,
-                                        transform: 'translateY(-50%)'
+                                        top: `${tooltipPosition.top}px`
                                       }}
                                     >
                                       <div className="bg-[#0F1722] border border-white/10 rounded-lg shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[250px] max-w-[350px]">
