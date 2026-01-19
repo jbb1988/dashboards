@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import WordDocumentPreview from '@/components/documents/WordDocumentPreview';
 
 // Types
 interface BundleInfo {
@@ -199,7 +200,7 @@ export default function ContractDetailDrawer({
   const [docsFetched, setDocsFetched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
-  const [convertingDocId, setConvertingDocId] = useState<string | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<ContractDocument | null>(null);
 
   // Reviews state
   const [reviews, setReviews] = useState<ContractReviewItem[]>([]);
@@ -704,40 +705,15 @@ export default function ContractDetailDrawer({
     }
   };
 
-  const handleView = async (doc: ContractDocument) => {
+  const handleView = (doc: ContractDocument) => {
     if (!doc.file_url) return;
 
     const fileName = doc.file_name?.toLowerCase() || '';
     const isWordDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
 
     if (isWordDoc) {
-      try {
-        setConvertingDocId(doc.id);
-
-        // Call conversion API to convert DOCX to PDF with tracked changes visible
-        const response = await fetch(`/api/contracts/documents/convert-to-pdf?documentId=${doc.id}`);
-        const data = await response.json();
-
-        if (data.success && data.pdfUrl) {
-          // Open converted PDF in new tab - tracked changes will be visible
-          window.open(data.pdfUrl, '_blank');
-        } else {
-          // Fallback: download Word doc if conversion fails
-          throw new Error(data.error || 'Conversion failed');
-        }
-      } catch (error) {
-        console.error('PDF conversion failed:', error);
-        // Fallback: download original Word document
-        const link = document.createElement('a');
-        link.href = doc.file_url;
-        link.download = doc.file_name || 'document.docx';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } finally {
-        setConvertingDocId(null);
-      }
+      // Show Word document in preview modal with tracked changes
+      setPreviewDocument(doc);
     } else {
       // PDFs and other files open directly in browser
       window.open(doc.file_url, '_blank');
@@ -774,6 +750,7 @@ export default function ContractDetailDrawer({
   const pendingTasksCount = tasks.filter(t => !t.status.toLowerCase().includes('done') && !t.status.toLowerCase().includes('complete')).length;
 
   return (
+    <>
     <AnimatePresence>
       {contract && (
         <>
@@ -1252,22 +1229,16 @@ export default function ContractDetailDrawer({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                           </svg>
                                         </button>
-                                        {convertingDocId === doc.id ? (
-                                          <div className="p-1.5 text-[#38BDF8]" title="Converting...">
-                                            <div className="w-3.5 h-3.5 border-2 border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin" />
-                                          </div>
-                                        ) : (
-                                          <button
-                                            onClick={() => handleView(doc)}
-                                            className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
-                                            title="View"
-                                          >
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                          </button>
-                                        )}
+                                        <button
+                                          onClick={() => handleView(doc)}
+                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                          title="View"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                          </svg>
+                                        </button>
                                         <button
                                           onClick={() => handleDeleteDocument(doc)}
                                           className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-colors"
@@ -1377,22 +1348,16 @@ export default function ContractDetailDrawer({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                           </svg>
                                         </button>
-                                        {convertingDocId === doc.id ? (
-                                          <div className="p-1.5 text-[#38BDF8]" title="Converting...">
-                                            <div className="w-3.5 h-3.5 border-2 border-[#38BDF8]/20 border-t-[#38BDF8] rounded-full animate-spin" />
-                                          </div>
-                                        ) : (
-                                          <button
-                                            onClick={() => handleView(doc)}
-                                            className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
-                                            title="View"
-                                          >
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                          </button>
-                                        )}
+                                        <button
+                                          onClick={() => handleView(doc)}
+                                          className="p-1.5 text-[#64748B] hover:text-[#38BDF8] hover:bg-[#38BDF8]/10 rounded transition-colors"
+                                          title="View"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                          </svg>
+                                        </button>
                                         <button
                                           onClick={() => handleDeleteDocument(doc)}
                                           className="p-1.5 text-[#64748B] hover:text-[#EF4444] hover:bg-[#EF4444]/10 rounded transition-colors"
@@ -2000,5 +1965,15 @@ export default function ContractDetailDrawer({
         </>
       )}
     </AnimatePresence>
+
+    {/* Word Document Preview Modal */}
+    {previewDocument && previewDocument.file_url && (
+      <WordDocumentPreview
+        fileUrl={previewDocument.file_url}
+        fileName={previewDocument.file_name || 'document.docx'}
+        onClose={() => setPreviewDocument(null)}
+      />
+    )}
+  </>
   );
 }
