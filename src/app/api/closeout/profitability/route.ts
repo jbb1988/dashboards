@@ -403,9 +403,9 @@ export async function GET(request: Request) {
           // Sort groups by revenue descending
           productTypeGroups.sort((a, b) => b.totals.revenue - a.totals.revenue);
 
-          // Calculate SO totals
-          // Use SO's total_amount (positive) instead of summing line amounts (which can be negative)
-          const soRevenue = so.total_amount || Math.abs(enhancedLines.reduce((sum, li) => sum + li.amount, 0));
+          // Calculate SO totals from filtered line items (excludes tax)
+          // Use absolute values since NetSuite stores some amounts as negative
+          const soRevenue = Math.abs(enhancedLines.reduce((sum, li) => sum + li.amount, 0));
           const soCostEstimate = enhancedLines.reduce((sum, li) => sum + li.costEstimate, 0);
           const soGrossProfit = soRevenue - soCostEstimate;
 
@@ -416,7 +416,7 @@ export async function GET(request: Request) {
           }));
 
           const lineItemsTotal = Math.abs(enhancedLines.reduce((sum, li) => sum + li.amount, 0));
-          const expectedTotal = so.total_amount || lineItemsTotal;
+          const expectedTotal = lineItemsTotal; // Use filtered line items total (excludes tax)
           const variance = lineItemsTotal - expectedTotal;
           const variancePct = expectedTotal > 0 ? Math.abs(variance / expectedTotal) * 100 : 0;
 
@@ -426,7 +426,7 @@ export async function GET(request: Request) {
             soDate: so.so_date,
             status: so.status,
             customerName: so.customer_name,
-            totalAmount: so.total_amount || soRevenue,
+            totalAmount: soRevenue, // Use calculated revenue (excludes tax)
             productTypeGroups,
             rollupValidation: {
               productTypeBreakdown,
