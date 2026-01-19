@@ -713,9 +713,14 @@ export default function ContractDetailDrawer({
     if (isWordDoc) {
       setOpeningDocId(doc.id);
 
-      // Use download endpoint to force file download which will open in desktop Word
-      const downloadUrl = `/api/contracts/documents/download?url=${encodeURIComponent(doc.file_url)}&name=${encodeURIComponent(doc.file_name || 'document.docx')}`;
-      window.open(downloadUrl, '_blank');
+      // Try ms-word protocol with anchor tag click
+      const wordUrl = `ms-word:ofe|u|${doc.file_url}`;
+      const link = document.createElement('a');
+      link.href = wordUrl;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
       // Reset loading state
       setTimeout(() => {
