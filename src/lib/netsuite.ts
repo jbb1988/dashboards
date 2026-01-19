@@ -678,10 +678,15 @@ export function parseProjectType(
         if (acct === '4051' || acct === '5051') return 'M3NEW';
         if ((acct.startsWith('405') && acct !== '4050' && acct !== '4051') ||
             (acct.startsWith('505') && acct !== '5050' && acct !== '5051')) return 'M3 Software';
+        // M3 Software Renewals and Upgrades
+        if (acct.startsWith('408') || acct.startsWith('409') ||
+            acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
         // Project Management and Shipping
         if (acct === '4013' || acct === '5013') return 'PM';
         if (acct === '4018' || acct === '5018') return 'SCH';
-        // Test Bench specific accounts
+        // Test Bench specific accounts - CHECK SPECIFICS BEFORE GENERAL PATTERNS
+        if (acct === '4011' || acct === '5011') return 'TBEN';
+        if (acct === '4012' || acct === '5012') return 'TBEU';
         if (acct.startsWith('401') || acct.startsWith('501')) return 'TBEN';
         if (acct.startsWith('403') || acct.startsWith('503')) return 'TBIN';
         if (acct.startsWith('407') || acct.startsWith('507')) return 'TB Service';

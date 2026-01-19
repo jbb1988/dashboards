@@ -334,6 +334,8 @@ export async function GET(request: Request) {
             if (itemType === 'TaxGroup') return false;
             if (itemType === 'Subtotal') return false;
             if (itemType === 'Description') return false; // Comment lines
+            // Only include revenue line items (those with account numbers)
+            if (!line.account_number) return false;
             return true;
           });
 
