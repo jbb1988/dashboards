@@ -714,29 +714,12 @@ export default function ContractDetailDrawer({
       setOpeningDocId(doc.id);
 
       try {
-        // Convert Word document to PDF with tracked changes visible
-        const response = await fetch('/api/contracts/documents/convert-to-pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            documentId: doc.id,
-            fileUrl: doc.file_url,
-            fileName: doc.file_name,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.pdfUrl) {
-          // Open converted PDF in new tab
-          window.open(data.pdfUrl, '_blank');
-        } else {
-          // Fallback: download original file
-          console.warn('PDF conversion failed, falling back to download');
-          window.open(doc.file_url, '_blank');
-        }
+        // Phase 0: Test Office Online viewer for tracked changes
+        // This viewer may preserve tracked changes markup without needing PDF conversion
+        const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.file_url)}`;
+        window.open(viewerUrl, '_blank');
       } catch (error) {
-        console.error('Failed to convert document:', error);
+        console.error('Failed to open in Office viewer:', error);
         // Fallback: download original file
         window.open(doc.file_url, '_blank');
       } finally {
