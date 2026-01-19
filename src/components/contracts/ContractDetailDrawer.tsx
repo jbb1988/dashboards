@@ -645,7 +645,18 @@ export default function ContractDetailDrawer({
 
   const handleView = (doc: ContractDocument) => {
     if (doc.file_url) {
-      window.open(doc.file_url, '_blank');
+      // Check if it's a Word document
+      const fileName = doc.file_name?.toLowerCase() || '';
+      const isWordDoc = fileName.endsWith('.doc') || fileName.endsWith('.docx');
+
+      if (isWordDoc) {
+        // Use Microsoft Office Online viewer for Word documents
+        const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.file_url)}`;
+        window.open(viewerUrl, '_blank');
+      } else {
+        // Open PDFs and other files directly
+        window.open(doc.file_url, '_blank');
+      }
     }
   };
 
