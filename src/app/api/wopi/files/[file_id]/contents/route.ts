@@ -17,9 +17,9 @@ export async function OPTIONS() {
 // GetFile - Returns file binary contents
 export async function GET(
   request: NextRequest,
-  { params }: { params: { file_id: string } }
+  { params }: { params: Promise<{ file_id: string }> }
 ) {
-  const fileId = params.file_id;
+  const { file_id: fileId } = await params;
   const accessToken = request.nextUrl.searchParams.get('access_token');
 
   if (!accessToken) {
