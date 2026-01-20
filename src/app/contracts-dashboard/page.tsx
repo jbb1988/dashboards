@@ -2013,8 +2013,18 @@ export default function ContractsDashboard() {
                           placeholder="Search contracts..."
                           value={searchQuery}
                           onChange={e => setSearchQuery(e.target.value)}
-                          className="pl-9 pr-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-[#0189CB]/50 text-sm w-56"
+                          className="pl-9 pr-10 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-[#0189CB]/50 text-sm w-56"
                         />
+                        {searchQuery && (
+                          <button
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
 
                       {/* Year Quick Filter */}

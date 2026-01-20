@@ -172,8 +172,19 @@ export function SearchableBundleOrContractSelect({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder={`Search ${activeTab === 'bundle' ? 'bundles' : 'contracts'}...`}
-                  className="w-full bg-[#111827] border border-white/[0.08] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-[#475569] focus:outline-none focus:border-[#38BDF8]/50"
+                  className="w-full bg-[#111827] border border-white/[0.08] rounded-lg pl-9 pr-10 py-2 text-sm text-white placeholder-[#475569] focus:outline-none focus:border-[#38BDF8]/50"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#64748B] hover:text-white transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
 

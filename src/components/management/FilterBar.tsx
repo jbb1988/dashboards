@@ -166,8 +166,18 @@ export default function FilterBar({
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             placeholder="Search initiatives..."
-            className="w-full pl-10 pr-4 py-2 bg-[#0F1722] rounded-lg text-[13px] text-white placeholder-[#64748B] border border-white/[0.06] focus:border-orange-500/50 focus:outline-none transition-colors"
+            className="w-full pl-10 pr-10 py-2 bg-[#0F1722] rounded-lg text-[13px] text-white placeholder-[#64748B] border border-white/[0.06] focus:border-orange-500/50 focus:outline-none transition-colors"
           />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#64748B] hover:text-white transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Filters */}

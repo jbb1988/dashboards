@@ -421,8 +421,18 @@ export function ProductsTab({ onCustomerClick, selectedYears, selectedMonths, se
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search products..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg bg-[#0F1722] border border-white/[0.04] text-[13px] text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
+            className="w-full pl-10 pr-10 py-2 rounded-lg bg-[#0F1722] border border-white/[0.04] text-[13px] text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#64748B] hover:text-white transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Trend Filter */}

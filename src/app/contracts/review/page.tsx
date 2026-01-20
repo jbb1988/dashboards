@@ -2610,11 +2610,21 @@ export default function ContractReviewPage() {
                   value={saveModalSearch}
                   onChange={(e) => setSaveModalSearch(e.target.value)}
                   placeholder="Search contracts..."
-                  className="w-full bg-[#151F2E] border border-white/[0.08] rounded-lg px-4 py-2.5 pl-10 text-white text-sm placeholder-[#475569] focus:outline-none focus:ring-2 focus:ring-[#38BDF8]/50"
+                  className="w-full bg-[#151F2E] border border-white/[0.08] rounded-lg px-4 py-2.5 pl-10 pr-10 text-white text-sm placeholder-[#475569] focus:outline-none focus:ring-2 focus:ring-[#38BDF8]/50"
                 />
                 <svg className="w-4 h-4 text-[#475569] absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
+                {saveModalSearch && (
+                  <button
+                    onClick={() => setSaveModalSearch('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#64748B] hover:text-white transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
 
               {/* Contract List */}

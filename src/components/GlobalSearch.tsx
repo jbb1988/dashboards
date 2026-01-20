@@ -210,6 +210,16 @@ export default function GlobalSearch() {
                     placeholder="Search contracts, documents, tasks..."
                     className="flex-1 bg-transparent text-white placeholder-[#64748B] focus:outline-none text-lg"
                   />
+                  {query && !loading && (
+                    <button
+                      onClick={() => setQuery('')}
+                      className="text-[#64748B] hover:text-white transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                   {loading && (
                     <div className="w-5 h-5 border-2 border-[#38BDF8] border-t-transparent rounded-full animate-spin" />
                   )}
