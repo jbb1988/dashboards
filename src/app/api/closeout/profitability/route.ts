@@ -166,6 +166,8 @@ export async function GET(request: Request) {
     const projectName = url.searchParams.get('project');
     const yearParam = url.searchParams.get('year');
     const year = yearParam ? parseInt(yearParam) : null;
+    // Optional: Use WIP reports for real-time cost data (defaults to false)
+    const useWipReport = url.searchParams.get('useWipReport') === 'true';
 
     if (!projectName) {
       return NextResponse.json({
@@ -196,9 +198,34 @@ export async function GET(request: Request) {
       }, { status: 404 });
     }
 
-    // Calculate KPIs from Excel data
-    const budgetRevenue = excelProjects.reduce((sum, p) => sum + (p.budget_revenue || 0), 0);
-    const budgetCost = excelProjects.reduce((sum, p) => sum + (p.budget_cost || 0), 0);
+    // Try to get budget data from NetSuite budget table (if available)
+    let budgetQuery = supabase
+      .from('netsuite_project_budgets')
+      .select('*')
+      .ilike('project_name', `%${projectName}%`);
+
+    if (year) {
+      budgetQuery = budgetQuery.eq('project_year', year);
+    }
+
+    const { data: netSuiteBudgets } = await budgetQuery;
+
+    // Calculate KPIs - prioritize NetSuite budget data over Excel
+    let budgetRevenue = 0;
+    let budgetCost = 0;
+    let budgetSource = 'excel';
+
+    if (netSuiteBudgets && netSuiteBudgets.length > 0) {
+      // Use NetSuite budget data
+      budgetRevenue = netSuiteBudgets.reduce((sum, p) => sum + (p.budget_revenue || 0), 0);
+      budgetCost = netSuiteBudgets.reduce((sum, p) => sum + (p.budget_cost || 0), 0);
+      budgetSource = 'netsuite';
+    } else {
+      // Fall back to Excel data
+      budgetRevenue = excelProjects.reduce((sum, p) => sum + (p.budget_revenue || 0), 0);
+      budgetCost = excelProjects.reduce((sum, p) => sum + (p.budget_cost || 0), 0);
+    }
+
     const actualRevenue = excelProjects.reduce((sum, p) => sum + (p.actual_revenue || 0), 0);
     const actualCost = excelProjects.reduce((sum, p) => sum + (p.actual_cost || 0), 0);
 
@@ -536,6 +563,11 @@ export async function GET(request: Request) {
         lastSyncedAt: syncData?.[0]?.synced_at || null,
         workOrderCount: woCount || 0,
         salesOrderCount: soCount || 0,
+        dataSource: useWipReport ? 'wip-report' : 'database',
+        budgetSource,
+        note: useWipReport
+          ? 'Using NetSuite WIP reports for real-time cost data'
+          : 'Using synced database for cost data (recommended for closed projects)',
       },
     };
 
