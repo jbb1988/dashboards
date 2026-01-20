@@ -72,6 +72,7 @@ export default function ProfitabilityKPIs({ kpis, projectName }: ProfitabilityKP
           color={isCostGood ? '#22C55E' : '#F59E0B'}
           trend={isCostGood ? 'down' : 'up'}
           trendLabel={`${formatCurrency(Math.abs(kpis.variance))} ${isCostGood ? 'under' : 'over'}`}
+          invertTrendColor={true}
         />
 
         {/* Gross Profit KPI */}
@@ -107,6 +108,7 @@ export default function ProfitabilityKPIs({ kpis, projectName }: ProfitabilityKP
           color={isCPIGood ? '#22C55E' : '#EF4444'}
           trend={isCPIGood ? 'up' : 'down'}
           trendLabel={isCPIGood ? 'Under Budget' : 'Over Budget'}
+          tooltip="Cost Performance Index (CPI) = Budget Cost ÷ Actual Cost. CPI > 1.0 means project is under budget (good). CPI < 1.0 means over budget (bad)."
         />
       </div>
     </div>

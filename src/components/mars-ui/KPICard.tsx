@@ -37,6 +37,10 @@ export interface KPICardProps {
   gradient?: boolean;
   /** Glow intensity for the card */
   glowIntensity?: 'none' | 'subtle' | 'strong';
+  /** Invert trend color logic (e.g., for cost where down=good, up=bad) */
+  invertTrendColor?: boolean;
+  /** Tooltip text to show on hover */
+  tooltip?: string;
 }
 
 // =============================================================================
@@ -118,6 +122,8 @@ export function KPICard({
   badge,
   gradient = true,
   glowIntensity = 'subtle',
+  invertTrendColor = false,
+  tooltip,
 }: KPICardProps) {
   // Gradient styling inspired by Mind-Muscle project
   const getGradientStyle = () => {
@@ -176,9 +182,21 @@ export function KPICard({
       />
 
       <div className="flex items-start justify-between mb-3">
-        <span className={`text-[12px] font-semibold ${tokens.text.muted} uppercase tracking-[0.08em]`}>
-          {title}
-        </span>
+        <div className="flex items-center gap-1">
+          <span className={`text-[12px] font-semibold ${tokens.text.muted} uppercase tracking-[0.08em]`}>
+            {title}
+          </span>
+          {tooltip && (
+            <div className="group relative">
+              <svg className="w-3.5 h-3.5 text-gray-500 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="absolute left-0 top-6 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 shadow-xl border border-gray-700">
+                {tooltip}
+              </div>
+            </div>
+          )}
+        </div>
         {icon && (
           <div className="relative">
             <div
@@ -210,9 +228,9 @@ export function KPICard({
           <div
             className={`flex items-center gap-1 text-[11px] font-medium ${
               trend === 'up'
-                ? 'text-[#22C55E]'
+                ? invertTrendColor ? 'text-[#EF4444]' : 'text-[#22C55E]'
                 : trend === 'down'
-                ? 'text-[#EF4444]'
+                ? invertTrendColor ? 'text-[#22C55E]' : 'text-[#EF4444]'
                 : tokens.text.muted
             }`}
           >
