@@ -145,6 +145,10 @@ export async function uploadFileToSlack(params: {
   initialComment?: string;
 }): Promise<{ success: boolean; error?: string; fileUrl?: string }> {
   if (!SLACK_BOT_TOKEN || !SLACK_CHANNEL_ID) {
+    console.error('[Slack Upload] Missing config:', {
+      hasBotToken: !!SLACK_BOT_TOKEN,
+      hasChannelId: !!SLACK_CHANNEL_ID,
+    });
     return {
       success: false,
       error: 'Slack file upload not configured. Set SLACK_BOT_TOKEN and SLACK_CHANNEL_ID.'
@@ -153,8 +157,16 @@ export async function uploadFileToSlack(params: {
 
   const { fileBuffer, filename, title, initialComment } = params;
 
+  console.log('[Slack Upload] Starting upload:', {
+    filename,
+    fileSize: fileBuffer.length,
+    title,
+    channelId: SLACK_CHANNEL_ID,
+  });
+
   try {
     // Step 1: Get upload URL
+    console.log('[Slack Upload] Step 1: Getting upload URL...');
     const getUploadUrlResponse = await fetch('https://slack.com/api/files.getUploadURLExternal', {
       method: 'POST',
       headers: {
@@ -168,25 +180,42 @@ export async function uploadFileToSlack(params: {
     });
 
     const uploadUrlData = await getUploadUrlResponse.json();
+    console.log('[Slack Upload] Step 1 response:', {
+      ok: uploadUrlData.ok,
+      hasUploadUrl: !!uploadUrlData.upload_url,
+      fileId: uploadUrlData.file_id,
+      error: uploadUrlData.error,
+    });
 
     if (!uploadUrlData.ok) {
       return { success: false, error: `Failed to get upload URL: ${uploadUrlData.error}` };
     }
 
     // Step 2: Upload file to the URL
+    console.log('[Slack Upload] Step 2: Uploading file content to external URL...');
     const uploadResponse = await fetch(uploadUrlData.upload_url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
       },
-      body: new Uint8Array(fileBuffer),
+      // Buffer is a Uint8Array subclass in Node.js - use type assertion for fetch compatibility
+      body: fileBuffer as unknown as BodyInit,
+    });
+
+    console.log('[Slack Upload] Step 2 response:', {
+      ok: uploadResponse.ok,
+      status: uploadResponse.status,
+      statusText: uploadResponse.statusText,
     });
 
     if (!uploadResponse.ok) {
-      return { success: false, error: 'Failed to upload file content' };
+      const errorText = await uploadResponse.text();
+      console.error('[Slack Upload] Step 2 failed:', errorText);
+      return { success: false, error: `Failed to upload file content: ${uploadResponse.status} ${errorText}` };
     }
 
     // Step 3: Complete the upload
+    console.log('[Slack Upload] Step 3: Completing upload and sharing to channel...');
     const completeResponse = await fetch('https://slack.com/api/files.completeUploadExternal', {
       method: 'POST',
       headers: {
@@ -204,16 +233,23 @@ export async function uploadFileToSlack(params: {
     });
 
     const completeData = await completeResponse.json();
+    console.log('[Slack Upload] Step 3 response:', {
+      ok: completeData.ok,
+      error: completeData.error,
+      filesCount: completeData.files?.length,
+    });
 
     if (!completeData.ok) {
       return { success: false, error: `Failed to complete upload: ${completeData.error}` };
     }
 
+    console.log('[Slack Upload] Upload completed successfully');
     return {
       success: true,
       fileUrl: completeData.files?.[0]?.url_private || undefined
     };
   } catch (error) {
+    console.error('[Slack Upload] Exception during upload:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error uploading to Slack'
@@ -233,6 +269,14 @@ export async function notifyAcceptanceSignedWithDocument(params: {
 }): Promise<{ success: boolean; error?: string; fileUploaded?: boolean }> {
   const { customerName, type, signedDate, envelopeId, documentBuffer } = params;
 
+  console.log('[Slack] notifyAcceptanceSignedWithDocument called:', {
+    customerName,
+    type,
+    envelopeId,
+    hasDocumentBuffer: !!documentBuffer,
+    bufferSize: documentBuffer?.length || 0,
+  });
+
   // First, send the notification message
   const messageResult = await notifyAcceptanceSigned({
     customerName,
@@ -242,14 +286,28 @@ export async function notifyAcceptanceSignedWithDocument(params: {
   });
 
   if (!messageResult.success) {
+    console.error('[Slack] Message notification failed:', messageResult.error);
     return { success: false, error: messageResult.error, fileUploaded: false };
   }
 
+  console.log('[Slack] Message notification sent successfully');
+
+  // Check file upload prerequisites
+  const fileUploadConfigured = isSlackFileUploadConfigured();
+  console.log('[Slack] File upload check:', {
+    hasDocumentBuffer: !!documentBuffer,
+    isFileUploadConfigured: fileUploadConfigured,
+    hasBotToken: !!SLACK_BOT_TOKEN,
+    hasChannelId: !!SLACK_CHANNEL_ID,
+  });
+
   // If document is provided and file upload is configured, upload it to Slack
-  if (documentBuffer && isSlackFileUploadConfigured()) {
+  if (documentBuffer && fileUploadConfigured) {
     const typeLabel = type === 'project' ? 'Project' : 'MCC';
     const sanitizedName = customerName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_');
     const filename = `${sanitizedName}_${typeLabel}_Acceptance.pdf`;
+
+    console.log('[Slack] Attempting file upload:', { filename, bufferSize: documentBuffer.length });
 
     const uploadResult = await uploadFileToSlack({
       fileBuffer: documentBuffer,
@@ -259,12 +317,19 @@ export async function notifyAcceptanceSignedWithDocument(params: {
     });
 
     if (!uploadResult.success) {
-      console.error('Failed to upload document to Slack:', uploadResult.error);
+      console.error('[Slack] Failed to upload document to Slack:', uploadResult.error);
       // Still return success for the message, just note file wasn't uploaded
       return { success: true, fileUploaded: false, error: uploadResult.error };
     }
 
+    console.log('[Slack] File uploaded successfully:', uploadResult.fileUrl);
     return { success: true, fileUploaded: true };
+  }
+
+  if (!documentBuffer) {
+    console.log('[Slack] No document buffer provided - skipping file upload');
+  } else if (!fileUploadConfigured) {
+    console.log('[Slack] File upload not configured - skipping file upload');
   }
 
   return { success: true, fileUploaded: false };

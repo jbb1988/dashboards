@@ -88,21 +88,37 @@ export async function POST(request: NextRequest) {
     let supabaseUrl: string | undefined;
 
     // Step 1: Fetch the signed document from DocuSign
-    if (isDocuSignConfigured()) {
+    const docuSignConfigured = isDocuSignConfigured();
+    console.log('[DocuSign Webhook] Configuration check:', {
+      isDocuSignConfigured: docuSignConfigured,
+      hasUserId: !!process.env.DOCUSIGN_USER_ID,
+      hasIntegrationKey: !!process.env.DOCUSIGN_INTEGRATION_KEY,
+      hasPrivateKey: !!process.env.DOCUSIGN_PRIVATE_KEY,
+      hasAccountId: !!process.env.DOCUSIGN_ACCOUNT_ID,
+    });
+
+    if (docuSignConfigured) {
       try {
-        console.log('Fetching signed document for envelope:', envelopeId);
+        console.log('[DocuSign Webhook] Fetching signed document for envelope:', envelopeId);
         documentBuffer = await getDocumentDownload(envelopeId, 'combined');
-        console.log('Document fetched successfully, size:', documentBuffer.length);
+        console.log('[DocuSign Webhook] Document fetched successfully, size:', documentBuffer.length);
       } catch (error) {
-        console.error('Failed to fetch document from DocuSign:', error);
+        console.error('[DocuSign Webhook] Failed to fetch document from DocuSign:', error);
         // Continue without document
       }
+    } else {
+      console.warn('[DocuSign Webhook] DocuSign not configured - skipping document fetch');
     }
 
     // Step 2: Store document in Supabase (always, as backup and audit trail)
+    console.log('[DocuSign Webhook] Document buffer status before Supabase:', {
+      hasBuffer: !!documentBuffer,
+      bufferSize: documentBuffer?.length || 0,
+    });
+
     if (documentBuffer) {
       try {
-        console.log('Storing document in Supabase for:', customerName);
+        console.log('[DocuSign Webhook] Storing document in Supabase for:', customerName);
         const { path, url } = await uploadDocuSignDocument({
           buffer: documentBuffer,
           customerName,
@@ -110,7 +126,7 @@ export async function POST(request: NextRequest) {
           envelopeId,
         });
         supabaseUrl = url;
-        console.log('Document stored in Supabase:', path);
+        console.log('[DocuSign Webhook] Document stored in Supabase:', path);
 
         // Step 3: Save metadata to database
         const record = await saveDocuSignDocumentRecord({
@@ -126,15 +142,25 @@ export async function POST(request: NextRequest) {
         if (record) {
           supabaseDocId = record.id;
           supabaseStored = true;
-          console.log('Document metadata saved, ID:', record.id);
+          console.log('[DocuSign Webhook] Document metadata saved, ID:', record.id);
         }
       } catch (error) {
-        console.error('Failed to store document in Supabase:', error);
+        console.error('[DocuSign Webhook] Failed to store document in Supabase:', error);
         // Continue to Slack notification - document still in memory
       }
+    } else {
+      console.warn('[DocuSign Webhook] No document buffer available - skipping Supabase storage');
     }
 
     // Step 4: Send Slack notification with document attachment
+    console.log('[DocuSign Webhook] Sending Slack notification:', {
+      customerName,
+      type,
+      envelopeId,
+      hasDocumentBuffer: !!documentBuffer,
+      documentBufferSize: documentBuffer?.length || 0,
+    });
+
     const result = await notifyAcceptanceSignedWithDocument({
       customerName,
       type,
@@ -142,6 +168,8 @@ export async function POST(request: NextRequest) {
       envelopeId,
       documentBuffer,
     });
+
+    console.log('[DocuSign Webhook] Slack notification result:', result);
 
     if (!result.success) {
       console.error('Failed to send Slack notification:', result.error);
