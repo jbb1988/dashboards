@@ -170,8 +170,10 @@ NetSuite WIP Reports (1654/1963)
 
 ```bash
 npx supabase db push
-# Applies 030_add_project_budgets.sql
+# Applies 038_add_project_budgets.sql
 ```
+
+**Note**: Migration was renumbered from 030 to 038 to avoid conflicts with existing migrations.
 
 ### Step 2: Sync Budget Data
 
@@ -325,7 +327,7 @@ Response:
 
 ### Soon
 - [ ] Sync budget data for all projects
-- [ ] Add DRMCC product type classification (need account number)
+- [x] Add DRMCC product type classification (4181/5181)
 - [ ] Create budget variance dashboard
 - [ ] Add budget trend analysis
 
@@ -369,13 +371,15 @@ Response:
 | 4081 | Deferred Revenue M3 | DRM3 |
 | 408x/409x | M3 Software Renewal | M3 Software |
 | 410x/411x | MCC Services | MCC |
+| 4181 | Deferred Revenue MCC | DRMCC |
 
 ### COGS Accounts (5xxx)
 
 Mirror structure of 4xxx accounts:
 - 5011 = Cost for 4011
 - 5012 = Cost for 4012
-- 5081 = Cost for 4081
+- 5081 = Cost for 4081 (DRM3)
+- 5181 = Cost for 4181 (DRMCC)
 - etc.
 
 ## 12. Troubleshooting
@@ -397,10 +401,11 @@ Mirror structure of 4xxx accounts:
 
 ### Missing DRMCC Classification
 
-**Need:** Account number for Deferred Revenue MCC
-- Similar to DRM3 (4081/5081)
-- Likely 4181/5181 or similar
-- Check NetSuite chart of accounts
+**RESOLVED:** DRMCC classification now implemented
+- Account 4181 = Deferred Revenue MCC (Revenue)
+- Account 5181 = Deferred Revenue MCC (COGS)
+- Added to all three classification locations in parseProjectType
+- Added to PRODUCT_TYPE_NAMES in profitability route
 
 ## Summary
 
