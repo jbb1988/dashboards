@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, Clock, Database, Search, AlertCircle, ChevronDown, ChevronRight, X, Package, Wrench } from 'lucide-react';
+import { RefreshCw, Clock, Database, Search, AlertCircle, ChevronDown, ChevronRight, X, Package, Wrench, List } from 'lucide-react';
 import ProfitabilityKPIs from './ProfitabilityKPIs';
 import ProductTypeGroup from './ProductTypeGroup';
 import WorkOrderCostBreakdown from './WorkOrderCostBreakdown';
 import RollupValidation from './RollupValidation';
+import ProjectBrowser from './ProjectBrowser';
 
 interface ProjectOption {
   name: string;
@@ -151,6 +152,9 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Browser state
+  const [showBrowser, setShowBrowser] = useState(false);
+
   // Dropdown state
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -292,6 +296,14 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     setData(null);
   };
 
+  const handleBrowserSelection = (project: string, selectedYear?: number) => {
+    setSearchInput(project);
+    setProjectName(project);
+    setYear(selectedYear || '');
+    setShowBrowser(false);
+    fetchData(project, selectedYear || '');
+  };
+
   const formatSyncTime = (timestamp: string | null) => {
     if (!timestamp) return 'Never';
     const date = new Date(timestamp);
@@ -323,6 +335,25 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
       {/* Search Bar */}
       <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-4">
         <div className="flex items-center gap-4">
+          {/* Browse/Search Toggle */}
+          <button
+            onClick={() => setShowBrowser(!showBrowser)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#0A0F1E] border border-white/[0.10] rounded-lg text-gray-300 hover:text-white hover:border-white/[0.20] transition-colors"
+            title={showBrowser ? 'Switch to Search' : 'Browse Projects'}
+          >
+            {showBrowser ? (
+              <>
+                <Search className="w-4 h-4" />
+                <span className="text-sm">Search</span>
+              </>
+            ) : (
+              <>
+                <List className="w-4 h-4" />
+                <span className="text-sm">Browse</span>
+              </>
+            )}
+          </button>
+
           {/* Searchable Dropdown */}
           <div className="flex-1 relative" ref={dropdownRef}>
             <div className="relative">
@@ -422,6 +453,19 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
           </div>
         )}
       </div>
+
+      {/* Project Browser */}
+      {showBrowser && !data && (
+        <div className="bg-[#111827] rounded-xl border border-white/[0.04] p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-white">Browse Projects</h2>
+            <p className="text-sm text-gray-400 mt-1">
+              Explore projects by category and year
+            </p>
+          </div>
+          <ProjectBrowser onSelectProject={handleBrowserSelection} />
+        </div>
+      )}
 
       {/* Error State */}
       {error && (
