@@ -69,6 +69,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 2b. Check if this contract is part of a bundle
+    // If bundled, use the bundle name for the file title instead of individual opportunity name
+    let bundleName: string | null = null;
+    const contractId = document.contract_id || document.salesforce_id;
+    if (contractId) {
+      try {
+        const { data: bundleContract } = await supabase
+          .from('bundle_contracts')
+          .select(`
+            bundle_id,
+            contract_bundles (
+              name
+            )
+          `)
+          .eq('contract_id', contractId)
+          .single();
+
+        if (bundleContract?.contract_bundles) {
+          // Supabase returns the joined record as an object (not array) for single relations
+          const bundle = bundleContract.contract_bundles as unknown as { name: string } | null;
+          if (bundle?.name) {
+            bundleName = bundle.name;
+          }
+        }
+      } catch {
+        // Not part of a bundle or bundle tables don't exist - continue with opportunity name
+      }
+    }
+
     // 3. Download file from Supabase storage
     const fileUrl = document.file_url;
     if (!fileUrl) {
@@ -120,7 +149,9 @@ export async function POST(request: NextRequest) {
 
     // 4. Upload to Salesforce and link to Account
     const fileName = document.file_name || storagePath.split('/').pop() || 'document';
-    const title = `${document.document_type} - ${document.account_name || 'Unknown'}`;
+    // Use bundle name if contract is bundled, otherwise use opportunity name
+    const contractOrBundleName = bundleName || document.opportunity_name || document.account_name || 'Unknown';
+    const title = `${document.document_type} - ${contractOrBundleName}`;
 
     const result = await uploadFileToAccount(
       fileBuffer,

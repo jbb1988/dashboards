@@ -55,6 +55,8 @@ interface ContractDocuments {
   documents: Document[];
   completeness: CompletenessScore;
   priority: PriorityScore;
+  isBundle?: boolean;
+  bundleContractCount?: number;
 }
 
 interface AccountGroup {
@@ -329,9 +331,27 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
           }));
 
         // Find matching contract for salesforce_id
-        const matchingContract = contracts.find(
-          c => c.id === contract.contractId || c.salesforceId === contract.contractId
-        );
+        // For bundles (contractId starts with 'bundle:'), we need to find any contract in that bundle
+        let matchingContract: Contract | undefined;
+        if (contract.contractId.startsWith('bundle:')) {
+          // For bundles, find any contract that matches one of the documents' contract_ids
+          const docContractIds = contract.documents.map(d => d.contract_id).filter(Boolean);
+          matchingContract = contracts.find(c =>
+            docContractIds.includes(c.id) || docContractIds.includes(c.salesforceId || '')
+          );
+        } else {
+          matchingContract = contracts.find(
+            c => c.id === contract.contractId || c.salesforceId === contract.contractId
+          );
+        }
+
+        // Use bundle info from API response if available, fall back to bundleInfoMap
+        const apiBundleInfo = contract.isBundle ? {
+          bundleId: contract.contractId.replace('bundle:', ''),
+          bundleName: contract.contractName,
+          isPrimary: true, // The consolidated entry represents the bundle
+          contractCount: contract.bundleContractCount || 0,
+        } : null;
 
         items.push({
           id: contract.contractId,
@@ -353,7 +373,7 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
             total: REQUIRED_DOCUMENT_TYPES.length + OPTIONAL_DOCUMENT_TYPES.length,
             percentage: contract.completeness.percentage,
           },
-          bundleInfo: bundleInfoMap[contract.contractId] || null,
+          bundleInfo: apiBundleInfo || bundleInfoMap[contract.contractId] || null,
         });
       });
     });
