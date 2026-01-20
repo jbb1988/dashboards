@@ -6,6 +6,9 @@
 -- Drop existing helper function (we'll replace it with a better approach)
 DROP FUNCTION IF EXISTS set_sync_operation_flag();
 
+-- Drop existing upsert function if it exists (to allow changing return type)
+DROP FUNCTION IF EXISTS upsert_contracts_from_sync(jsonb);
+
 -- Create function to upsert contracts with sync flag set atomically
 CREATE OR REPLACE FUNCTION upsert_contracts_from_sync(contracts_data jsonb)
 RETURNS TABLE(salesforce_id text) AS $$

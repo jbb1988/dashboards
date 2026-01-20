@@ -680,6 +680,8 @@ export function parseProjectType(
             (acct.startsWith('505') && acct !== '5050' && acct !== '5051')) return 'M3 Software';
         // M3 Deferred Revenue (multi-year contracted renewals)
         if (acct === '4081' || acct === '5081') return 'DRM3';
+        // MCC Deferred Revenue (multi-year contracted MCC)
+        if (acct === '4181' || acct === '5181') return 'DRMCC';
         // M3 Software Renewals and Upgrades (other 408x/409x)
         if (acct.startsWith('408') || acct.startsWith('409') ||
             acct.startsWith('508') || acct.startsWith('509')) return 'M3 Software';
@@ -698,6 +700,11 @@ export function parseProjectType(
     }
 
     if (className.includes('mcc') || className.includes('maintenance') || className.includes('calibration')) {
+      // Check for MCC Deferred Revenue
+      if (accountNumber) {
+        const acct = accountNumber.trim();
+        if (acct === '4181' || acct === '5181') return 'DRMCC';
+      }
       return 'MCC';
     }
 
@@ -758,6 +765,7 @@ export function parseProjectType(
   if (acct.startsWith('407') || acct.startsWith('507')) return 'TB Service';
 
   // MCC Services (4100-4111, 5100-5111, but exclude 414x for Diversified Products)
+  if (acct === '4181' || acct === '5181') return 'DRMCC'; // Deferred Revenue MCC (multi-year contracted MCC)
   if ((acct.startsWith('410') || acct.startsWith('411')) && !acct.startsWith('414')) return 'MCC';
   if ((acct.startsWith('510') || acct.startsWith('511')) && !acct.startsWith('514')) return 'MCC';
 

@@ -26,6 +26,7 @@ const PRODUCT_TYPE_NAMES: Record<string, string> = {
   'M3NEW': 'M3 Software New',
   'M3 Software': 'M3 Software',
   'DRM3': 'Deferred Revenue M3',
+  'DRMCC': 'Deferred Revenue MCC',
   'TB Service': 'Test Bench Service/Maintenance',
   'MCC': 'Maintenance & Calibration Services',
   'TB Components': 'Test Bench Components',
@@ -157,6 +158,9 @@ interface ProjectProfitabilityResponse {
     lastSyncedAt: string | null;
     workOrderCount: number;
     salesOrderCount: number;
+    dataSource?: 'database' | 'wip-report';
+    budgetSource?: 'netsuite' | 'excel';
+    note?: string;
   };
 }
 
