@@ -40,11 +40,11 @@ export async function GET(request: Request) {
 
     const supabase = getSupabaseAdmin();
 
-    // Get project data with financial information
+    // Get project data with financial information (2025 and later only)
     let query = supabase
       .from('closeout_projects')
       .select('project_name, project_year, project_type, actual_revenue, actual_gp_pct, variance')
-      .gt('project_year', 0) // Include all valid years
+      .gte('project_year', 2025) // Only include 2025 and later
       .order('project_name', { ascending: true })
       .order('project_year', { ascending: false });
 
@@ -75,12 +75,16 @@ export async function GET(request: Request) {
       projectMap.get(row.project_name)!.push(row as ProjectData);
     }
 
+    // Get current year for recent projects filter
+    const currentYear = new Date().getFullYear();
+
     // Convert to enhanced project summaries
     let projectList: ProjectSummary[] = Array.from(projectMap.entries()).map(([name, yearData]) => {
       // Sort by year descending to get most recent first
       const sortedData = yearData.sort((a, b) => b.project_year - a.project_year);
       const mostRecent = sortedData[0];
-      const years = sortedData.map(d => d.project_year);
+      // Deduplicate years using Set
+      const years = Array.from(new Set(sortedData.map(d => d.project_year))).sort((a, b) => b - a);
 
       const recentRevenue = mostRecent.actual_revenue || 0;
       const recentGPM = mostRecent.actual_gp_pct || 0;
@@ -96,7 +100,7 @@ export async function GET(request: Request) {
         recentVariance,
         isAtRisk: recentGPM < 50 || recentVariance < -10000,
         isHighValue: recentRevenue > 500000,
-        isRecent: mostRecent.project_year >= 2024,
+        isRecent: mostRecent.project_year >= 2024 && mostRecent.project_year <= currentYear,
         hasData: recentRevenue > 0,
       };
     });
@@ -113,21 +117,48 @@ export async function GET(request: Request) {
         case 'high-value':
           projectList = projectList.filter(p => p.isHighValue);
           break;
+        case 'mcc':
+          projectList = projectList.filter(p => p.projectType === 'MCC');
+          break;
         case 'all':
           // No filtering needed
           break;
       }
     }
 
-    // Calculate stats
+    // Calculate stats (before filtering to get all counts)
+    const allProjects = Array.from(projectMap.entries()).map(([name, yearData]) => {
+      const sortedData = yearData.sort((a, b) => b.project_year - a.project_year);
+      const mostRecent = sortedData[0];
+      const years = Array.from(new Set(sortedData.map(d => d.project_year))).sort((a, b) => b - a);
+      const recentRevenue = mostRecent.actual_revenue || 0;
+      const recentGPM = mostRecent.actual_gp_pct || 0;
+      const recentVariance = mostRecent.variance || 0;
+
+      return {
+        name,
+        years,
+        latestYear: mostRecent.project_year,
+        projectType: mostRecent.project_type || '',
+        recentRevenue,
+        recentGPM,
+        recentVariance,
+        isAtRisk: recentGPM < 50 || recentVariance < -10000,
+        isHighValue: recentRevenue > 500000,
+        isRecent: mostRecent.project_year >= 2024 && mostRecent.project_year <= currentYear,
+        hasData: recentRevenue > 0,
+      };
+    });
+
     const stats = {
       totalProjects: projectMap.size,
-      recentCount: projectList.filter(p => p.isRecent).length,
-      atRiskCount: projectList.filter(p => p.isAtRisk).length,
-      highValueCount: projectList.filter(p => p.isHighValue).length,
+      recentCount: allProjects.filter(p => p.isRecent).length,
+      atRiskCount: allProjects.filter(p => p.isAtRisk).length,
+      highValueCount: allProjects.filter(p => p.isHighValue).length,
+      mccCount: allProjects.filter(p => p.projectType === 'MCC').length,
       yearRange: {
-        min: Math.min(...projectList.map(p => Math.min(...p.years))),
-        max: Math.max(...projectList.map(p => Math.max(...p.years))),
+        min: Math.min(...allProjects.map(p => Math.min(...p.years))),
+        max: Math.max(...allProjects.map(p => Math.max(...p.years))),
       },
     };
 

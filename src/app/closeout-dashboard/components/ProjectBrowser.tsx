@@ -28,7 +28,7 @@ interface ProjectBrowserProps {
   onSelectProject: (project: string, year?: number) => void;
 }
 
-type TabType = 'recent' | 'all' | 'at-risk' | 'high-value';
+type TabType = 'recent' | 'all' | 'mcc' | 'at-risk' | 'high-value';
 
 export default function ProjectBrowser({ onSelectProject }: ProjectBrowserProps) {
   const [activeTab, setActiveTab] = useState<TabType>('recent');
@@ -80,6 +80,9 @@ export default function ProjectBrowser({ onSelectProject }: ProjectBrowserProps)
     switch (activeTab) {
       case 'recent':
         filtered = filtered.filter(p => p.isRecent);
+        break;
+      case 'mcc':
+        filtered = filtered.filter(p => p.projectType === 'MCC');
         break;
       case 'at-risk':
         filtered = filtered.filter(p => p.isAtRisk);
@@ -225,6 +228,19 @@ export default function ProjectBrowser({ onSelectProject }: ProjectBrowserProps)
         >
           All Years
           <span className="ml-2 text-xs opacity-60">({projects.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('mcc')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'mcc'
+              ? 'border-blue-500 text-blue-400'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          MCC
+          <span className="ml-2 text-xs opacity-60">
+            ({projects.filter(p => p.projectType === 'MCC').length})
+          </span>
         </button>
         <button
           onClick={() => setActiveTab('at-risk')}
