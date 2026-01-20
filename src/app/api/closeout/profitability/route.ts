@@ -217,7 +217,7 @@ export async function GET(request: Request) {
     // Calculate KPIs - prioritize NetSuite budget data over Excel
     let budgetRevenue = 0;
     let budgetCost = 0;
-    let budgetSource = 'excel';
+    let budgetSource: 'netsuite' | 'excel' = 'excel';
 
     if (netSuiteBudgets && netSuiteBudgets.length > 0) {
       // Use NetSuite budget data
