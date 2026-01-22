@@ -1,16 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText,
   History,
   Paperclip,
   MessageSquare,
+  MessageCircle,
   ChevronRight,
+  Send,
+  Highlighter,
 } from 'lucide-react';
 import { ActivityLogEntry } from './ActivityLog';
 
-type TabType = 'summary' | 'activity' | 'documents' | 'comments';
+type TabType = 'summary' | 'activity' | 'documents' | 'annotations' | 'discussion';
 
 interface Document {
   id: string;
@@ -22,10 +26,20 @@ interface Document {
   convertedPdfUrl: string | null;
 }
 
-interface Comment {
+// Document annotations (yellow highlights on specific text)
+interface Annotation {
   id: string;
   text: string;
   highlightedText: string;
+}
+
+// Discussion comments (general comments about the document)
+interface DiscussionComment {
+  id: string;
+  authorEmail: string;
+  authorName?: string;
+  comment: string;
+  createdAt: string;
 }
 
 interface ApprovalContextSidebarProps {
@@ -35,10 +49,13 @@ interface ApprovalContextSidebarProps {
   summary: string[];
   activityLog: ActivityLogEntry[];
   documents: Document[];
-  comments: Comment[];
+  annotations: Annotation[];
+  discussionComments: DiscussionComment[];
   onViewDocument: (doc: Document) => void;
   onDownloadDocument: (doc: Document) => void;
-  onCommentClick?: (commentId: string) => void;
+  onAnnotationClick?: (annotationId: string) => void;
+  onAddDiscussionComment?: (comment: string) => void;
+  canAddComments?: boolean;
 }
 
 function isWordDocument(fileName: string): boolean {
@@ -116,7 +133,8 @@ const tabs: { id: TabType; icon: React.ReactNode; label: string }[] = [
   { id: 'summary', icon: <FileText className="w-5 h-5" />, label: 'Summary' },
   { id: 'activity', icon: <History className="w-5 h-5" />, label: 'Activity' },
   { id: 'documents', icon: <Paperclip className="w-5 h-5" />, label: 'Documents' },
-  { id: 'comments', icon: <MessageSquare className="w-5 h-5" />, label: 'Comments' },
+  { id: 'annotations', icon: <Highlighter className="w-5 h-5" />, label: 'Annotations' },
+  { id: 'discussion', icon: <MessageCircle className="w-5 h-5" />, label: 'Discussion' },
 ];
 
 export default function ApprovalContextSidebar({
@@ -126,11 +144,15 @@ export default function ApprovalContextSidebar({
   summary,
   activityLog,
   documents,
-  comments,
+  annotations,
+  discussionComments,
   onViewDocument,
   onDownloadDocument,
-  onCommentClick,
+  onAnnotationClick,
+  onAddDiscussionComment,
+  canAddComments = true,
 }: ApprovalContextSidebarProps) {
+  const [newComment, setNewComment] = useState('');
   const handleTabClick = (tab: TabType) => {
     if (activeTab === tab && isOpen) {
       onTabChange(null);
@@ -149,7 +171,8 @@ export default function ApprovalContextSidebar({
             (tab.id === 'summary' && summary.length > 0) ||
             (tab.id === 'activity' && activityLog.length > 0) ||
             (tab.id === 'documents' && documents.length > 0) ||
-            (tab.id === 'comments' && comments.length > 0);
+            (tab.id === 'annotations' && annotations.length > 0) ||
+            (tab.id === 'discussion' && discussionComments.length > 0);
 
           return (
             <button
@@ -304,33 +327,119 @@ export default function ApprovalContextSidebar({
                 </div>
               )}
 
-              {/* Comments Tab */}
-              {activeTab === 'comments' && (
+              {/* Annotations Tab - Document highlights with notes */}
+              {activeTab === 'annotations' && (
                 <div className="space-y-2">
-                  {comments.length > 0 ? (
-                    comments.map((comment, idx) => (
+                  <p className="text-[10px] text-[#64748B] mb-3 pb-2 border-b border-white/10">
+                    Yellow highlights added to specific text in the document
+                  </p>
+                  {annotations.length > 0 ? (
+                    annotations.map((annotation, idx) => (
                       <motion.div
-                        key={comment.id}
+                        key={annotation.id}
                         initial={{ opacity: 0, x: 10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.03 }}
-                        onClick={() => onCommentClick?.(comment.id)}
+                        onClick={() => onAnnotationClick?.(annotation.id)}
                         className="p-2 rounded bg-yellow-500/10 border border-yellow-500/20 cursor-pointer hover:bg-yellow-500/20 transition-colors"
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <MessageSquare className="w-3 h-3 text-yellow-400" />
+                          <Highlighter className="w-3 h-3 text-yellow-400" />
                           <span className="text-[10px] text-yellow-400 font-medium">#{idx + 1}</span>
                         </div>
                         <p className="text-[10px] text-yellow-200/60 italic truncate border-l-2 border-yellow-500/30 pl-2 mb-1">
-                          {comment.highlightedText.slice(0, 40)}{comment.highlightedText.length > 40 ? '...' : ''}
+                          &ldquo;{annotation.highlightedText.slice(0, 40)}{annotation.highlightedText.length > 40 ? '...' : ''}&rdquo;
                         </p>
                         <p className="text-xs text-white">
-                          {comment.text || <span className="text-gray-500 italic">No comment text</span>}
+                          {annotation.text || <span className="text-gray-500 italic">No note added</span>}
                         </p>
                       </motion.div>
                     ))
                   ) : (
-                    <p className="text-xs text-[#64748B]">No comments in the document</p>
+                    <p className="text-xs text-[#64748B]">No annotations in the document. Select text and click the comment button to add one.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Discussion Tab - General comments */}
+              {activeTab === 'discussion' && (
+                <div className="flex flex-col h-full">
+                  <p className="text-[10px] text-[#64748B] mb-3 pb-2 border-b border-white/10">
+                    General comments and questions about this review
+                  </p>
+
+                  {/* Comments list */}
+                  <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                    {discussionComments.length > 0 ? (
+                      discussionComments.map((comment, idx) => (
+                        <motion.div
+                          key={comment.id}
+                          initial={{ opacity: 0, x: 10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          className="p-3 rounded bg-[#0B1220] border border-white/10"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-6 h-6 rounded-full bg-[#38BDF8]/20 flex items-center justify-center">
+                              <span className="text-[10px] text-[#38BDF8] font-medium">
+                                {(comment.authorName || comment.authorEmail).charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-white font-medium truncate">
+                                {comment.authorName || comment.authorEmail}
+                              </p>
+                              <p className="text-[10px] text-[#64748B]">
+                                {formatDate(comment.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-[#8FA3BF] whitespace-pre-wrap">
+                            {comment.comment}
+                          </p>
+                        </motion.div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-[#64748B] text-center py-4">No comments yet. Start the discussion below.</p>
+                    )}
+                  </div>
+
+                  {/* Add comment input */}
+                  {canAddComments && onAddDiscussionComment && (
+                    <div className="border-t border-white/10 pt-3">
+                      <div className="flex gap-2">
+                        <textarea
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          placeholder="Add a comment..."
+                          className="flex-1 px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50 resize-none"
+                          rows={2}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey && newComment.trim()) {
+                              e.preventDefault();
+                              onAddDiscussionComment(newComment.trim());
+                              setNewComment('');
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-[10px] text-[#64748B]">Press Enter to send</span>
+                        <button
+                          onClick={() => {
+                            if (newComment.trim()) {
+                              onAddDiscussionComment(newComment.trim());
+                              setNewComment('');
+                            }
+                          }}
+                          disabled={!newComment.trim()}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-[#38BDF8] text-white text-xs font-medium rounded hover:bg-[#38BDF8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Send className="w-3 h-3" />
+                          Send
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

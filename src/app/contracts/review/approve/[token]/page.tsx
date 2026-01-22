@@ -56,7 +56,15 @@ interface ReviewData {
   documents: Document[];
 }
 
-type ContextTab = 'summary' | 'activity' | 'documents' | 'comments';
+type ContextTab = 'summary' | 'activity' | 'documents' | 'annotations' | 'discussion';
+
+interface DiscussionComment {
+  id: string;
+  authorEmail: string;
+  authorName?: string;
+  comment: string;
+  createdAt: string;
+}
 
 export default function ApprovalPage({ params }: { params: Promise<{ token: string }> }) {
   const resolvedParams = use(params);
@@ -75,7 +83,8 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [contextTab, setContextTab] = useState<ContextTab | null>('summary');
   const [contextSidebarOpen, setContextSidebarOpen] = useState(true);
-  const [editorComments, setEditorComments] = useState<Comment[]>([]);
+  const [editorAnnotations, setEditorAnnotations] = useState<Comment[]>([]);
+  const [discussionComments, setDiscussionComments] = useState<DiscussionComment[]>([]);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject' | null>(null);
 
@@ -83,12 +92,61 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
 
   useEffect(() => {
     fetchReviewByToken();
+    fetchDiscussionComments();
     // Load sidebar collapsed state from localStorage
     const saved = localStorage.getItem('sidebar-collapsed');
     if (saved !== null) {
       setSidebarCollapsed(saved === 'true');
     }
   }, [resolvedParams.token]);
+
+  const fetchDiscussionComments = async () => {
+    try {
+      const response = await fetch(`/api/contracts/review/comments?token=${resolvedParams.token}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDiscussionComments(data.comments.map((c: { id: string; author_email: string; author_name?: string; comment: string; created_at: string }) => ({
+          id: c.id,
+          authorEmail: c.author_email,
+          authorName: c.author_name,
+          comment: c.comment,
+          createdAt: c.created_at,
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to fetch discussion comments:', err);
+    }
+  };
+
+  const handleAddDiscussionComment = async (comment: string) => {
+    if (!approverEmail.trim()) {
+      alert('Please enter your email address in the header before adding comments.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/contracts/review/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: resolvedParams.token,
+          authorEmail: approverEmail.trim(),
+          comment,
+        }),
+      });
+
+      if (response.ok) {
+        // Refresh comments
+        fetchDiscussionComments();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to add comment');
+      }
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+      alert('Failed to add comment');
+    }
+  };
 
   const fetchReviewByToken = async () => {
     try {
@@ -154,7 +212,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
       }
     });
 
-    setEditorComments(newComments);
+    setEditorAnnotations(newComments);
   }, []);
 
   const handleContextTabChange = useCallback((tab: ContextTab | null) => {
@@ -253,16 +311,16 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
     }
   }, []);
 
-  const scrollToComment = useCallback((commentId: string) => {
+  const scrollToAnnotation = useCallback((annotationId: string) => {
     if (!editorRef.current) return;
-    const commentElement = editorRef.current.querySelector(
-      `span[data-comment-id="${commentId}"]`
+    const annotationElement = editorRef.current.querySelector(
+      `span[data-comment-id="${annotationId}"]`
     );
-    if (commentElement) {
-      commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      commentElement.classList.add('ring-2', 'ring-yellow-400');
+    if (annotationElement) {
+      annotationElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      annotationElement.classList.add('ring-2', 'ring-yellow-400');
       setTimeout(() => {
-        commentElement.classList.remove('ring-2', 'ring-yellow-400');
+        annotationElement.classList.remove('ring-2', 'ring-yellow-400');
       }, 2000);
     }
   }, []);
@@ -367,10 +425,13 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
             ]}
             activityLog={review.activityLog || []}
             documents={review.documents}
-            comments={editorComments}
+            annotations={editorAnnotations}
+            discussionComments={discussionComments}
             onViewDocument={openDocumentOnline}
             onDownloadDocument={downloadDocument}
-            onCommentClick={scrollToComment}
+            onAnnotationClick={scrollToAnnotation}
+            onAddDiscussionComment={handleAddDiscussionComment}
+            canAddComments={!decision}
           />
         </div>
       </motion.div>
