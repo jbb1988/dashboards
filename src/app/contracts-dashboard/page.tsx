@@ -523,15 +523,6 @@ function ContractRow({
                     B
                   </span>
                 )}
-                {contract.bundleInfo && (
-                  <span
-                    className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 flex-shrink-0 uppercase tracking-wider"
-                    title={`Bundle: ${contract.bundleInfo.bundleName} (${contract.bundleInfo.contractCount} contracts)`}
-                  >
-                    Bundle
-                  </span>
-                )}
-
                 {/* Task Icon - shows only when tasks exist */}
                 {tasks.length > 0 && (
                   <div className="relative flex-shrink-0">
@@ -726,7 +717,7 @@ function ContractRow({
               </div>
               {contract.bundleInfo ? (
                 <p className="text-purple-400 text-[12px] truncate" title={`${contract.bundleInfo.bundleName} (${contract.bundleInfo.contractCount} contracts)`}>
-                  {contract.bundleInfo.bundleName}
+                  📦 {contract.bundleInfo.bundleName}
                 </p>
               ) : contract.opportunityName && contract.opportunityName !== contract.name && (
                 <span className="text-[12px] text-[#64748B] truncate block" title={contract.opportunityName}>
