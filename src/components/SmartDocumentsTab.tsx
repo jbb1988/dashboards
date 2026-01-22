@@ -277,18 +277,12 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
     }
   };
 
-  // Compute stats for KPI cards
+  // Compute stats for KPI cards - use contracts prop directly
   const stats = useMemo(() => {
-    if (!data) return { closingSoon: 0, budgeted: 0 };
-
-    const allContracts = Object.values(data.byAccount).flatMap(account =>
-      Object.values(account.contracts)
-    );
+    if (!contracts) return { closingSoon: 0, budgeted: 0 };
 
     // Count contracts closing soon (within 90 days)
-    const closingSoon = allContracts.filter(c => {
-      const contract = contracts.find(ct => ct.id === c.contractId || ct.salesforceId === c.contractId);
-      if (!contract) return false;
+    const closingSoon = contracts.filter(contract => {
       const targetDateStr = contract.closeDate || contract.contractDate || contract.awardDate;
       if (!targetDateStr) return false;
       const targetDate = new Date(targetDateStr);
@@ -297,89 +291,79 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
     }).length;
 
     // Count budgeted contracts
-    const budgeted = allContracts.filter(c => {
-      const contract = contracts.find(ct => ct.id === c.contractId || ct.salesforceId === c.contractId);
-      return contract?.budgeted === true;
-    }).length;
+    const budgeted = contracts.filter(contract => contract.budgeted === true).length;
 
     return { closingSoon, budgeted };
-  }, [data, contracts]);
+  }, [contracts]);
 
-  // Transform data to contract-centric format for ContractListView
+  // Transform contracts prop to contract-centric format for ContractListView
+  // Uses same data source as Pipeline tab to avoid duplicates
   const contractItems: ContractItem[] = useMemo(() => {
-    if (!data) return [];
+    if (!contracts) return [];
 
-    const items: ContractItem[] = [];
+    return contracts.map(contract => {
+      // Find documents for this contract
+      const contractDocs: ContractDocument[] = (data?.documents || [])
+        .filter(d =>
+          d.contract_id === contract.id ||
+          d.contract_id === contract.salesforceId ||
+          d.salesforce_id === contract.salesforceId
+        )
+        .filter(d => d.is_current_version)
+        .map(doc => ({
+          id: doc.id,
+          document_type: doc.document_type,
+          file_name: doc.file_name,
+          file_url: doc.file_url,
+          file_size: doc.file_size || undefined,
+          uploaded_at: doc.uploaded_at,
+          uploaded_by: doc.uploaded_by || undefined,
+          status: 'uploaded' as const,
+          is_required: REQUIRED_DOCUMENT_TYPES.includes(doc.document_type),
+          version: doc.version,
+        }));
 
-    // Iterate through all accounts and contracts
-    Object.values(data.byAccount).forEach(account => {
-      Object.values(account.contracts).forEach(contract => {
-        // Get all uploaded documents for this contract
-        const uploadedDocs: ContractDocument[] = contract.documents
-          .filter(d => d.is_current_version)
-          .map(doc => ({
-            id: doc.id,
-            document_type: doc.document_type,
-            file_name: doc.file_name,
-            file_url: doc.file_url,
-            file_size: doc.file_size || undefined,
-            uploaded_at: doc.uploaded_at,
-            uploaded_by: doc.uploaded_by || undefined,
-            status: 'uploaded' as const,
-            is_required: REQUIRED_DOCUMENT_TYPES.includes(doc.document_type),
-            version: doc.version,
-          }));
+      // Calculate completeness based on required documents present
+      const presentRequired = REQUIRED_DOCUMENT_TYPES.filter(type =>
+        contractDocs.some(d => d.document_type === type)
+      );
 
-        // Find matching contract for salesforce_id
-        // For bundles (contractId starts with 'bundle:'), we need to find any contract in that bundle
-        let matchingContract: Contract | undefined;
-        if (contract.contractId.startsWith('bundle:')) {
-          // For bundles, find any contract that matches one of the documents' contract_ids
-          const docContractIds = contract.documents.map(d => d.contract_id).filter(Boolean);
-          matchingContract = contracts.find(c =>
-            docContractIds.includes(c.id) || docContractIds.includes(c.salesforceId || '')
-          );
-        } else {
-          matchingContract = contracts.find(
-            c => c.id === contract.contractId || c.salesforceId === contract.contractId
-          );
-        }
-
-        // Use bundle info from API response if available, fall back to bundleInfoMap
-        const apiBundleInfo = contract.isBundle ? {
-          bundleId: contract.contractId.replace('bundle:', ''),
-          bundleName: contract.contractName,
-          isPrimary: true, // The consolidated entry represents the bundle
-          contractCount: contract.bundleContractCount || 0,
-        } : null;
-
-        items.push({
-          id: contract.contractId,
-          contract_name: contract.contractName,
-          account_name: account.accountName,
-          opportunity_name: matchingContract?.opportunityName || contract.contractName,
-          contract_type: matchingContract?.contractType?.join(', ') || undefined,
-          salesforce_id: matchingContract?.salesforceId,
-          // Filter fields
-          status: matchingContract?.status,
-          contract_date: matchingContract?.contractDate,
-          close_date: matchingContract?.closeDate,
-          budgeted: matchingContract?.budgeted,
-          value: matchingContract?.value,
-          documents: uploadedDocs,
-          completeness: {
-            uploaded: contract.completeness.required,
-            required: REQUIRED_DOCUMENT_TYPES.length,
-            total: REQUIRED_DOCUMENT_TYPES.length + OPTIONAL_DOCUMENT_TYPES.length,
-            percentage: contract.completeness.percentage,
-          },
-          bundleInfo: apiBundleInfo || bundleInfoMap[contract.contractId] || null,
-        });
-      });
+      return {
+        id: contract.id,
+        contract_name: contract.name,           // Account name (title) - same as Pipeline
+        account_name: contract.name,            // Account name
+        opportunity_name: contract.opportunityName, // Contract name (subtitle)
+        contract_type: contract.contractType?.join(', ') || undefined,
+        salesforce_id: contract.salesforceId,
+        status: contract.status,
+        contract_date: contract.contractDate,
+        close_date: contract.closeDate,
+        budgeted: contract.budgeted,
+        value: contract.value,
+        documents: contractDocs,
+        completeness: {
+          uploaded: presentRequired.length,
+          required: REQUIRED_DOCUMENT_TYPES.length,
+          total: REQUIRED_DOCUMENT_TYPES.length + OPTIONAL_DOCUMENT_TYPES.length,
+          percentage: Math.round((presentRequired.length / REQUIRED_DOCUMENT_TYPES.length) * 100),
+        },
+        bundleInfo: bundleInfoMap[contract.id] || null,
+      };
     });
+  }, [contracts, data?.documents, bundleInfoMap]);
 
-    return items;
-  }, [data, contracts, bundleInfoMap]);
+  // Derive stats from contractItems - same data source as Pipeline
+  const derivedStats = useMemo(() => {
+    const totalDocuments = contractItems.reduce((sum, c) => sum + c.documents.length, 0);
+    const totalContracts = contractItems.length;
+    const needsAttention = contractItems.filter(c => c.completeness.percentage < 100).length;
+    const complete = contractItems.filter(c => c.completeness.percentage === 100).length;
+    const averageCompleteness = totalContracts > 0
+      ? Math.round(contractItems.reduce((sum, c) => sum + c.completeness.percentage, 0) / totalContracts)
+      : 0;
+
+    return { totalDocuments, totalContracts, needsAttention, complete, averageCompleteness };
+  }, [contractItems]);
 
   if (loading) {
     return (
@@ -395,8 +379,8 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
       <div className="grid grid-cols-5 gap-4 mb-6">
         <KPICard
           title="Total Documents"
-          value={data?.stats.totalDocuments || 0}
-          subtitle={`${data?.stats.totalContracts || 0} contracts`}
+          value={derivedStats.totalDocuments}
+          subtitle={`${derivedStats.totalContracts} contracts`}
           icon={KPIIcons.document}
           color={colors.accent.blue}
           delay={0.1}
@@ -404,12 +388,12 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
         />
         <KPICard
           title="Needs Attention"
-          value={data?.stats.needsAttention || 0}
+          value={derivedStats.needsAttention}
           subtitle="Missing docs or overdue"
           icon={KPIIcons.warning}
           color={colors.accent.red}
           delay={0.2}
-          badge={data?.stats.needsAttention}
+          badge={derivedStats.needsAttention}
           onClick={() => setFilterPreset('needsAttention')}
         />
         <KPICard
@@ -432,8 +416,8 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
         />
         <KPICard
           title="Complete"
-          value={data?.stats.complete || 0}
-          subtitle={`${data?.stats.averageCompleteness || 0}% avg completion`}
+          value={derivedStats.complete}
+          subtitle={`${derivedStats.averageCompleteness}% avg completion`}
           icon={KPIIcons.checkCircle}
           color={colors.accent.green}
           delay={0.5}
