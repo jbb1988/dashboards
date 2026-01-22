@@ -1079,6 +1079,37 @@ export default function ContractDetailDrawer({
                           {contract.bundleInfo.isPrimary && (
                             <span className="text-[9px] text-[#8B5CF6]">Primary</span>
                           )}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm('Remove this contract from the bundle?')) return;
+                              try {
+                                const response = await fetch('/api/bundles', {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    bundle_id: contract.bundleInfo?.bundleId,
+                                    remove_contracts: [contract.id],
+                                  }),
+                                });
+                                if (response.ok) {
+                                  onUpdate?.();
+                                } else {
+                                  const result = await response.json();
+                                  alert(`Failed to remove from bundle: ${result.error || 'Unknown error'}`);
+                                }
+                              } catch (err) {
+                                console.error('Remove from bundle error:', err);
+                                alert('Network error removing from bundle');
+                              }
+                            }}
+                            className="p-1 text-[#64748B] hover:text-red-400 transition-colors"
+                            title="Remove from bundle"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
                       ) : openBundleModal ? (
                         <button

@@ -384,8 +384,34 @@ export async function GET(request: NextRequest) {
       return bundleInfo ? bundleInfo.bundleName : fallbackName;
     };
 
-    // Track which contracts have been added (to avoid duplicates within bundles)
-    const processedContractIds = new Set<string>();
+    // Create lookup maps for contracts by both id and salesforce_id
+    const contractById = new Map<string, any>();
+    const contractBySalesforceId = new Map<string, any>();
+    (contracts || []).forEach(contract => {
+      contractById.set(contract.id, contract);
+      if (contract.salesforce_id) {
+        contractBySalesforceId.set(contract.salesforce_id, contract);
+      }
+    });
+
+    // Helper to find contract by any identifier (handles contract_id being a salesforce_id)
+    const findContract = (contractId: string | null, salesforceId: string | null): any | undefined => {
+      if (contractId) {
+        // First try by id
+        let contract = contractById.get(contractId);
+        if (contract) return contract;
+        // Then try as salesforce_id
+        contract = contractBySalesforceId.get(contractId);
+        if (contract) return contract;
+      }
+      if (salesforceId) {
+        return contractBySalesforceId.get(salesforceId);
+      }
+      return undefined;
+    };
+
+    // Track which bundle keys have been added (to avoid duplicates within bundles)
+    const processedBundleKeys = new Set<string>();
 
     // Group documents by account and contract/bundle
     const byAccount: Record<string, {
@@ -402,51 +428,7 @@ export async function GET(request: NextRequest) {
       }>;
     }> = {};
 
-    (documents || []).forEach((doc: Document) => {
-      const accountKey = doc.account_name || 'Unknown';
-      const rawContractId = doc.contract_id || doc.salesforce_id || 'unknown';
-      const contractKey = getContractKey(rawContractId);
-      const bundleInfo = contractBundleMap[rawContractId];
-
-      if (!byAccount[accountKey]) {
-        byAccount[accountKey] = {
-          accountName: accountKey,
-          contracts: {},
-        };
-      }
-
-      if (!byAccount[accountKey].contracts[contractKey]) {
-        const contract = (contracts || []).find(
-          c => c.id === doc.contract_id || c.salesforce_id === doc.salesforce_id
-        );
-
-        // For bundles, get combined completeness from all contracts in the bundle
-        let combinedCompleteness = completenessScores[contract?.id] || calculateCompleteness([]);
-        let combinedPriority = priorityScores[contract?.id] || {
-          contractId: contractKey,
-          score: 0,
-          reasons: [],
-          category: 'low' as const,
-        };
-
-        byAccount[accountKey].contracts[contractKey] = {
-          contractId: contractKey,
-          contractName: getDisplayName(rawContractId, doc.opportunity_name || contract?.name || 'Unknown Contract'),
-          opportunityYear: doc.opportunity_year,
-          documents: [],
-          completeness: combinedCompleteness,
-          priority: combinedPriority,
-          isBundle: !!bundleInfo,
-          bundleContractCount: bundleInfo ? bundleContractsMap[bundleInfo.bundleId]?.length : undefined,
-        };
-      }
-
-      byAccount[accountKey].contracts[contractKey].documents.push(doc);
-      processedContractIds.add(rawContractId);
-    });
-
-    // Also add contracts without documents (for completeness tracking)
-    // But skip contracts that are part of a bundle if we've already added the bundle
+    // STEP 1: Build structure from ALL contracts first (ensures correct account_name)
     (contracts || []).forEach(contract => {
       const accountKey = contract.account_name || 'Unknown';
       const contractKey = getContractKey(contract.id);
@@ -454,11 +436,11 @@ export async function GET(request: NextRequest) {
 
       // Skip if this contract is in a bundle and we've already processed another contract from that bundle
       if (bundleInfo) {
-        const bundleContracts = bundleContractsMap[bundleInfo.bundleId] || [];
-        const anyBundleContractProcessed = bundleContracts.some(id => processedContractIds.has(id));
-        if (anyBundleContractProcessed) {
+        const bundleKey = `bundle:${bundleInfo.bundleId}`;
+        if (processedBundleKeys.has(bundleKey)) {
           return; // Skip - bundle already represented
         }
+        processedBundleKeys.add(bundleKey);
       }
 
       if (!byAccount[accountKey]) {
@@ -471,7 +453,7 @@ export async function GET(request: NextRequest) {
       if (!byAccount[accountKey].contracts[contractKey]) {
         byAccount[accountKey].contracts[contractKey] = {
           contractId: contractKey,
-          contractName: getDisplayName(contract.id, contract.name || contract.account_name),
+          contractName: getDisplayName(contract.id, contract.name || 'Unknown Contract'),
           opportunityYear: null,
           documents: [],
           completeness: completenessScores[contract.id] || calculateCompleteness([]),
@@ -485,8 +467,30 @@ export async function GET(request: NextRequest) {
           bundleContractCount: bundleInfo ? bundleContractsMap[bundleInfo.bundleId]?.length : undefined,
         };
       }
+    });
 
-      processedContractIds.add(contract.id);
+    // STEP 2: Attach documents to their contracts
+    (documents || []).forEach((doc: Document) => {
+      // Find the matching contract using robust lookup
+      const contract = findContract(doc.contract_id, doc.salesforce_id);
+
+      if (!contract) {
+        // Document has no matching contract - skip it (orphaned document)
+        console.log('Orphaned document (no matching contract):', doc.id, doc.contract_id, doc.salesforce_id);
+        return;
+      }
+
+      const accountKey = contract.account_name || 'Unknown';
+      const contractKey = getContractKey(contract.id);
+
+      // Find the contract entry and add the document
+      if (byAccount[accountKey]?.contracts[contractKey]) {
+        byAccount[accountKey].contracts[contractKey].documents.push(doc);
+        // Update opportunity year if available
+        if (doc.opportunity_year && !byAccount[accountKey].contracts[contractKey].opportunityYear) {
+          byAccount[accountKey].contracts[contractKey].opportunityYear = doc.opportunity_year;
+        }
+      }
     });
 
     // Calculate summary stats

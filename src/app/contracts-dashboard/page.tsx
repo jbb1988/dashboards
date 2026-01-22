@@ -446,11 +446,8 @@ function ContractRow({
     // Handle Archive selection specially
     if (newStatus === ARCHIVE_STATUS) {
       const idToUse = contract.salesforceId || contract.id;
-      console.log('[Archive] Selected archive for:', contract.name, 'ID:', idToUse);
       if (onArchive && idToUse) {
         onArchive(idToUse, contract.name);
-      } else {
-        console.error('[Archive] Missing onArchive or contract ID');
       }
       return;
     }
@@ -1251,7 +1248,6 @@ export default function ContractsDashboard() {
 
   // Archive a contract
   const handleArchiveContract = async (salesforceId: string, contractName: string) => {
-    console.log('[Archive] Archiving contract:', salesforceId, contractName);
     try {
       const response = await fetch('/api/contracts/archive', {
         method: 'POST',
@@ -1260,7 +1256,6 @@ export default function ContractsDashboard() {
       });
 
       const result = await response.json();
-      console.log('[Archive] API response:', result);
 
       if (response.ok) {
         // Show undo toast
@@ -1282,7 +1277,6 @@ export default function ContractsDashboard() {
 
   // Unarchive a contract (undo)
   const handleUnarchiveContract = async (salesforceId: string) => {
-    console.log('[Unarchive] Unarchiving contract:', salesforceId);
     try {
       const response = await fetch(`/api/contracts/archive?salesforceId=${encodeURIComponent(salesforceId)}`, {
         method: 'DELETE',
@@ -1469,7 +1463,6 @@ export default function ContractsDashboard() {
 
   // Fetch data based on selected source
   const fetchData = async () => {
-    console.log('[fetchData] Called with showArchived:', showArchived);
     setLoading(true);
     setError(null);
     try {
@@ -1479,7 +1472,6 @@ export default function ContractsDashboard() {
         t: Date.now().toString(),
         ...(showArchived && { includeArchived: 'true' }),
       });
-      console.log('[fetchData] Fetching with params:', params.toString());
       const response = await fetch(`${endpoint}?${params}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
@@ -1498,7 +1490,6 @@ export default function ContractsDashboard() {
   };
 
   useEffect(() => {
-    console.log('[useEffect] showArchived changed to:', showArchived);
     fetchData();
   }, [dataSource, showArchived]);
 
@@ -2274,10 +2265,7 @@ export default function ContractsDashboard() {
                 </div>
                 {/* Show Archived Toggle */}
                 <button
-                  onClick={() => {
-                    console.log('[Archived Button] Clicked, current showArchived:', showArchived, 'setting to:', !showArchived);
-                    setShowArchived(!showArchived);
-                  }}
+                  onClick={() => setShowArchived(!showArchived)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 flex items-center gap-2 ${
                     showArchived
                       ? 'bg-[#F59E0B]/20 text-[#F59E0B] ring-1 ring-[#F59E0B]/30'
