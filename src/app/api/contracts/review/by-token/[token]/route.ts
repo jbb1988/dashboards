@@ -48,7 +48,7 @@ export async function GET(
       }
     }
 
-    // Fetch related documents (by contract_id)
+    // Fetch related documents (by contract_id or salesforce_id)
     let documents: Array<{
       id: string;
       file_name: string;
@@ -60,11 +60,22 @@ export async function GET(
     }> = [];
 
     if (review.contract_id) {
-      const { data: docs } = await admin
+      // Try contract_id first (UUID), then salesforce_id (Salesforce ID string)
+      let { data: docs } = await admin
         .from('documents')
         .select('id, file_name, file_url, document_type, uploaded_at, file_mime_type, converted_pdf_url')
-        .eq('contract_id', review.contract_id)
+        .eq('salesforce_id', review.contract_id)
         .order('uploaded_at', { ascending: false });
+
+      // If no docs found by salesforce_id, try contract_id (for UUID references)
+      if (!docs || docs.length === 0) {
+        const result = await admin
+          .from('documents')
+          .select('id, file_name, file_url, document_type, uploaded_at, file_mime_type, converted_pdf_url')
+          .eq('contract_id', review.contract_id)
+          .order('uploaded_at', { ascending: false });
+        docs = result.data;
+      }
 
       documents = docs || [];
     }
