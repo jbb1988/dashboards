@@ -96,6 +96,7 @@ export async function GET(
       submittedBy: review.submitted_by_email,
       submittedAt: review.submitted_at,
       summary: review.summary || [],
+      reviewerNotes: review.reviewer_notes || null,
       originalText: review.original_text,
       redlinedText: review.redlined_text,
       modifiedText: review.modified_text,

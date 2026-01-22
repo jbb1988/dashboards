@@ -169,7 +169,6 @@ export default function RedlineEditor({
   readOnly = false,
   contractName = 'Contract',
 }: RedlineEditorProps) {
-  const [insertModeActive, setInsertModeActive] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -190,11 +189,8 @@ export default function RedlineEditor({
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-[calc(100vh-180px)] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-6',
       },
-      // Handle input to apply blue mark when insert mode is on
+      // Always apply approverInsert mark to typed text (blue underline)
       handleTextInput: (view, from, to, text) => {
-        if (!insertModeActive) return false;
-
-        // Insert the text with the approverInsert mark
         const { state } = view;
         const markType = state.schema.marks.approverInsert;
         if (!markType) return false;
@@ -246,10 +242,6 @@ export default function RedlineEditor({
     }
   }, [editor, approverEditedContent, extractComments]);
 
-  const handleToggleInsertMode = useCallback(() => {
-    setInsertModeActive(prev => !prev);
-  }, []);
-
   const handleAddComment = useCallback((comment: string) => {
     if (editor) {
       const id = `comment-${Date.now()}`;
@@ -278,29 +270,6 @@ export default function RedlineEditor({
 
   const hasContent = editor ? editor.getHTML().length > 0 : false;
 
-  // Update insertModeActive reference for handleTextInput
-  useEffect(() => {
-    if (editor) {
-      editor.setOptions({
-        editorProps: {
-          ...editor.options.editorProps,
-          handleTextInput: (view, from, to, text) => {
-            if (!insertModeActive) return false;
-
-            const { state } = view;
-            const markType = state.schema.marks.approverInsert;
-            if (!markType) return false;
-
-            const tr = state.tr.insertText(text, from, to);
-            tr.addMark(from, from + text.length, markType.create());
-            view.dispatch(tr);
-            return true;
-          },
-        },
-      });
-    }
-  }, [editor, insertModeActive]);
-
   return (
     <div
       ref={scrollContainerRef}
@@ -311,19 +280,10 @@ export default function RedlineEditor({
         <div className="sticky top-0 z-20 bg-[#0B1220]">
           <EditorToolbar
             editor={editor}
-            insertModeActive={insertModeActive}
-            onToggleInsertMode={handleToggleInsertMode}
             onAddComment={handleAddComment}
             onDownload={handleDownload}
             showDownload={hasContent}
           />
-          {/* Insert mode indicator */}
-          {insertModeActive && (
-            <div className="bg-blue-500/20 border-b border-blue-500/30 px-3 py-1.5 text-xs text-blue-300 flex items-center gap-2">
-              <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-              INSERT MODE ON - All text you type will appear in <span className="text-blue-400 underline font-bold">blue underline</span>
-            </div>
-          )}
         </div>
       )}
 

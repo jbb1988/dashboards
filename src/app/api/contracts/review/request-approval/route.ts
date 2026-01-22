@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { reviewId, contractName, submittedBy, summaryPreview } = body;
+    const { reviewId, contractName, submittedBy, summaryPreview, reviewerNotes } = body;
 
     // Validate required fields
     if (!reviewId || !contractName || !submittedBy) {
@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
         status: 'sent_to_boss', // Legacy status field
         updated_at: submittedAt,
         activity_log: activityLog,
+        reviewer_notes: reviewerNotes || null,
       })
       .eq('id', reviewId);
 

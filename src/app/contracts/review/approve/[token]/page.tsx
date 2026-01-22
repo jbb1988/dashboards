@@ -44,6 +44,7 @@ interface ReviewData {
   submittedBy: string;
   submittedAt: string;
   summary: string[];
+  reviewerNotes?: string | null;
   originalText: string;
   redlinedText: string;
   modifiedText?: string;
@@ -359,7 +360,11 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
             activeTab={contextTab}
             onTabChange={handleContextTabChange}
             isOpen={contextSidebarOpen}
-            summary={review.summary}
+            summary={[
+              ...(review.reviewerNotes ? [`📝 REVIEWER NOTES: ${review.reviewerNotes}`] : []),
+              ...(review.reviewerNotes && review.summary.length > 0 ? ['───────────────────'] : []),
+              ...review.summary
+            ]}
             activityLog={review.activityLog || []}
             documents={review.documents}
             comments={editorComments}

@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Editor } from '@tiptap/react';
 import {
   Strikethrough,
-  Underline,
   Bold,
   MessageSquare,
   Undo2,
@@ -15,8 +14,6 @@ import {
 
 interface EditorToolbarProps {
   editor: Editor | null;
-  insertModeActive: boolean;
-  onToggleInsertMode: () => void;
   onAddComment: (comment: string) => void;
   onDownload?: () => void;
   showDownload?: boolean;
@@ -24,8 +21,6 @@ interface EditorToolbarProps {
 
 export default function EditorToolbar({
   editor,
-  insertModeActive,
-  onToggleInsertMode,
   onAddComment,
   onDownload,
   showDownload = false,
@@ -48,7 +43,6 @@ export default function EditorToolbar({
     'p-2 rounded transition-colors flex items-center justify-center';
   const activeClass = 'bg-blue-500/30 text-blue-400';
   const inactiveClass = 'bg-white/5 text-[#8FA3BF] hover:bg-white/10 hover:text-white';
-  const insertActiveClass = 'bg-blue-500/50 text-blue-300 ring-2 ring-blue-400/50';
 
   const handleCommentClick = () => {
     const { from, to } = editor.state.selection;
@@ -89,19 +83,6 @@ export default function EditorToolbar({
           title="Strikethrough selected text (marks for removal in blue)"
         >
           <Strikethrough className="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onToggleInsertMode}
-          className={`${buttonBase} ${
-            insertModeActive ? insertActiveClass : inactiveClass
-          }`}
-          title={insertModeActive ? "Insert mode ON - new text will be blue underlined" : "Click to enable insert mode for new text"}
-        >
-          <Underline className="w-4 h-4" />
-          {insertModeActive && (
-            <span className="ml-1 text-[10px] font-bold">ON</span>
-          )}
         </button>
         <button
           type="button"
