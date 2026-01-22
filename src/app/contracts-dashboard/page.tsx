@@ -2752,14 +2752,18 @@ export default function ContractsDashboard() {
                 <div className="max-h-[600px] overflow-y-auto">
                   {filteredContracts.length > 0 ? (
                     filteredContracts.map((contract, index) => {
-                      // Get tasks for this contract (check salesforceId, id, name, notionName, opportunityName)
+                      // Get tasks for this contract (check all possible linking fields)
                       const contractTasks = [
+                        // Direct ID matches
                         ...(tasksByContractId.get(contract.salesforceId || '') || []),
                         ...(tasksByContractId.get(contract.id) || []),
+                        // Name matches
                         ...(tasksByContractId.get(contract.name) || []),
                         ...(contract.opportunityName ? (tasksByContractId.get(contract.opportunityName) || []) : []),
                         ...(contract.notionName ? (tasksByContractId.get(contract.notionName) || []) : []),
-                        // Also check for partial matches - tasks with contract_name containing account name
+                        // Bundle tasks - if contract is in a bundle, get tasks linked to that bundle
+                        ...(contract.bundleInfo?.bundleId ? allTasks.filter(task => task.bundle_id === contract.bundleInfo?.bundleId) : []),
+                        // Partial name matches - tasks with contract_name containing account name or vice versa
                         ...allTasks.filter(task =>
                           task.contract_name &&
                           (task.contract_name.toLowerCase().includes(contract.name.toLowerCase()) ||
