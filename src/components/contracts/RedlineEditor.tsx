@@ -2,11 +2,9 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { Mark, mergeAttributes, Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from 'prosemirror-state';
+import { Mark, mergeAttributes } from '@tiptap/core';
 import EditorToolbar from './EditorToolbar';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { MessageSquare, X, Edit3 } from 'lucide-react';
 
 // Custom mark for AI strikethrough (red) - text to remove
 const AIStrike = Mark.create({
@@ -100,79 +98,6 @@ const ApproverComment = Mark.create({
   },
 });
 
-// Global ref for insert mode state (accessible by the plugin)
-let insertModeRef = { current: false };
-
-// Function to create the extension with access to the ref
-function createInsertModeExtension() {
-  return Extension.create({
-    name: 'insertModeExtension',
-
-    addProseMirrorPlugins() {
-      return [
-        new Plugin({
-          key: new PluginKey('insertMode'),
-
-          // Append transaction to add marks to newly typed text
-          appendTransaction(transactions, oldState, newState) {
-            if (!insertModeRef.current) return null;
-
-            // Check if any transaction added text
-            let hasInsertions = false;
-            const ranges: { from: number; to: number }[] = [];
-
-            for (const tr of transactions) {
-              if (!tr.docChanged) continue;
-
-              tr.steps.forEach((step) => {
-                // @ts-expect-error - step has slice for ReplaceStep
-                const slice = step.slice;
-                if (slice && slice.content && slice.content.size > 0) {
-                  // @ts-expect-error - step has from/to
-                  const from = step.from;
-                  const to = from + slice.content.size;
-
-                  // Only mark if there's actual text content (not just structural changes)
-                  let hasText = false;
-                  slice.content.forEach((node: { isText: boolean; text?: string }) => {
-                    if (node.isText && node.text && node.text.length > 0) {
-                      hasText = true;
-                    }
-                  });
-
-                  if (hasText) {
-                    hasInsertions = true;
-                    ranges.push({ from, to });
-                  }
-                }
-              });
-            }
-
-            if (!hasInsertions || ranges.length === 0) return null;
-
-            // Apply the approverInsert mark to the newly inserted text
-            const markType = newState.schema.marks.approverInsert;
-            if (!markType) return null;
-
-            const tr = newState.tr;
-            for (const range of ranges) {
-              // Make sure positions are valid
-              const docSize = tr.doc.content.size;
-              const from = Math.max(0, Math.min(range.from, docSize));
-              const to = Math.max(from, Math.min(range.to, docSize));
-              if (from < to) {
-                tr.addMark(from, to, markType.create());
-              }
-            }
-
-            return tr.steps.length > 0 ? tr : null;
-          },
-        }),
-      ];
-    },
-  });
-}
-
 // Helper to convert redline markup to HTML
 function formatRedlinesToHTML(text: string): string {
   return text
@@ -246,9 +171,7 @@ export default function RedlineEditor({
 }: RedlineEditorProps) {
   const [insertModeActive, setInsertModeActive] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [editingComment, setEditingComment] = useState<string | null>(null);
-  const [editCommentText, setEditCommentText] = useState('');
-  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const contentToUse = approverEditedContent || formatRedlinesToHTML(initialContent);
 
@@ -260,13 +183,26 @@ export default function RedlineEditor({
       ApproverStrike,
       ApproverInsert,
       ApproverComment,
-      createInsertModeExtension(),
     ],
     content: contentToUse,
     editable: !readOnly,
     editorProps: {
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-[calc(100vh-180px)] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-6',
+      },
+      // Handle input to apply blue mark when insert mode is on
+      handleTextInput: (view, from, to, text) => {
+        if (!insertModeActive) return false;
+
+        // Insert the text with the approverInsert mark
+        const { state } = view;
+        const markType = state.schema.marks.approverInsert;
+        if (!markType) return false;
+
+        const tr = state.tr.insertText(text, from, to);
+        tr.addMark(from, from + text.length, markType.create());
+        view.dispatch(tr);
+        return true;
       },
     },
     onUpdate: ({ editor }) => {
@@ -276,11 +212,6 @@ export default function RedlineEditor({
       extractComments(editor.getHTML());
     },
   });
-
-  // Sync insert mode state with the global ref
-  useEffect(() => {
-    insertModeRef.current = insertModeActive;
-  }, [insertModeActive]);
 
   // Extract comments from HTML content
   const extractComments = useCallback((html: string) => {
@@ -326,57 +257,6 @@ export default function RedlineEditor({
     }
   }, [editor]);
 
-  // Scroll to comment in editor
-  const scrollToComment = useCallback((commentId: string) => {
-    if (!editorContainerRef.current) return;
-
-    const commentElement = editorContainerRef.current.querySelector(
-      `span[data-comment-id="${commentId}"]`
-    );
-
-    if (commentElement) {
-      commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Flash highlight effect
-      commentElement.classList.add('ring-2', 'ring-yellow-400');
-      setTimeout(() => {
-        commentElement.classList.remove('ring-2', 'ring-yellow-400');
-      }, 2000);
-    }
-  }, []);
-
-  const handleUpdateComment = useCallback((id: string, newText: string) => {
-    if (editor) {
-      const html = editor.getHTML();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const commentEl = doc.querySelector(`span[data-comment-id="${id}"]`);
-
-      if (commentEl) {
-        commentEl.setAttribute('data-comment', newText);
-        commentEl.setAttribute('title', newText);
-        editor.commands.setContent(doc.body.innerHTML);
-      }
-
-      setEditingComment(null);
-      setEditCommentText('');
-    }
-  }, [editor]);
-
-  const handleDeleteComment = useCallback((id: string) => {
-    if (editor) {
-      const html = editor.getHTML();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const commentEl = doc.querySelector(`span[data-comment-id="${id}"]`);
-
-      if (commentEl) {
-        const textNode = document.createTextNode(commentEl.textContent || '');
-        commentEl.parentNode?.replaceChild(textNode, commentEl);
-        editor.commands.setContent(doc.body.innerHTML);
-      }
-    }
-  }, [editor]);
-
   const handleDownload = useCallback(() => {
     if (editor) {
       const html = generateDownloadHTML(editor.getHTML(), contractName);
@@ -398,9 +278,35 @@ export default function RedlineEditor({
 
   const hasContent = editor ? editor.getHTML().length > 0 : false;
 
+  // Update insertModeActive reference for handleTextInput
+  useEffect(() => {
+    if (editor) {
+      editor.setOptions({
+        editorProps: {
+          ...editor.options.editorProps,
+          handleTextInput: (view, from, to, text) => {
+            if (!insertModeActive) return false;
+
+            const { state } = view;
+            const markType = state.schema.marks.approverInsert;
+            if (!markType) return false;
+
+            const tr = state.tr.insertText(text, from, to);
+            tr.addMark(from, from + text.length, markType.create());
+            view.dispatch(tr);
+            return true;
+          },
+        },
+      });
+    }
+  }, [editor, insertModeActive]);
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Sticky toolbar */}
+    <div
+      ref={scrollContainerRef}
+      className="h-[calc(100vh-60px)] overflow-y-auto bg-[#0B1220]"
+    >
+      {/* Sticky toolbar - sticks within the scroll container */}
       {!readOnly && (
         <div className="sticky top-0 z-20 bg-[#0B1220]">
           <EditorToolbar
@@ -423,8 +329,7 @@ export default function RedlineEditor({
 
       {/* Editor content */}
       <div
-        ref={editorContainerRef}
-        className={`flex-1 bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''}`}
+        className={`bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''}`}
         onClick={handleEditorClick}
       >
         <EditorContent editor={editor} />
@@ -432,7 +337,7 @@ export default function RedlineEditor({
 
       {/* Read-only download button */}
       {readOnly && hasContent && (
-        <div className="bg-[#0B1220] border-t border-white/10 px-4 py-2 flex justify-end">
+        <div className="sticky bottom-0 bg-[#0B1220] border-t border-white/10 px-4 py-2 flex justify-end">
           <button
             type="button"
             onClick={handleDownload}
