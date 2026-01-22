@@ -1334,20 +1334,21 @@ export default function ContractsDashboard() {
   }, [activeTab]); // Refresh when switching tabs
 
   // Fetch all documents for pipeline icons
-  useEffect(() => {
-    async function fetchAllDocuments() {
-      try {
-        const response = await fetch('/api/contracts/documents?all=true');
-        if (response.ok) {
-          const data = await response.json();
-          setAllDocuments(data.documents || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch all documents:', err);
+  const fetchAllDocuments = useCallback(async () => {
+    try {
+      const response = await fetch('/api/contracts/documents?all=true');
+      if (response.ok) {
+        const data = await response.json();
+        setAllDocuments(data.documents || []);
       }
+    } catch (err) {
+      console.error('Failed to fetch all documents:', err);
     }
+  }, []);
+
+  useEffect(() => {
     fetchAllDocuments();
-  }, [activeTab]); // Refresh when switching tabs
+  }, [activeTab, fetchAllDocuments]); // Refresh when switching tabs
 
   // Check Salesforce status
   useEffect(() => {
@@ -1416,6 +1417,12 @@ export default function ContractsDashboard() {
   const handleDataRefresh = () => {
     fetchData();
   };
+
+  // Combined refresh for data and documents (used by drawer updates)
+  const handleDataAndDocsRefresh = useCallback(() => {
+    fetchData();
+    fetchAllDocuments();
+  }, [fetchAllDocuments]);
 
   // Sync from Salesforce and handle conflicts
   const handleRefresh = useCallback(async () => {
@@ -1882,16 +1889,30 @@ export default function ContractsDashboard() {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
 
-    // Step 4: Flatten groups back to array (primary first within bundles)
+    // Step 4: Flatten groups - CONSOLIDATE bundles to show only one row per bundle
     filtered = sortedGroups.flatMap(group => {
       if (!group.bundleId) {
+        // Unbundled contract - return as-is
         return group.contracts;
       }
 
-      const primary = group.contracts.filter(c => c.bundleInfo?.isPrimary);
-      const others = group.contracts.filter(c => !c.bundleInfo?.isPrimary);
+      // For bundles: return only the primary contract (or first if no primary)
+      // This consolidates bundled contracts into a single row
+      const representative = group.primary || group.contracts[0];
 
-      return [...primary, ...others];
+      // Calculate combined value for the bundle
+      const totalBundleValue = group.contracts.reduce((sum, c) => sum + c.value, 0);
+
+      // Return the representative with combined value
+      return [{
+        ...representative,
+        value: totalBundleValue,
+        // Ensure bundleInfo shows the total count
+        bundleInfo: representative.bundleInfo ? {
+          ...representative.bundleInfo,
+          contractCount: group.contracts.length,
+        } : null,
+      }];
     });
 
     return filtered;
@@ -3153,7 +3174,7 @@ export default function ContractsDashboard() {
       <ContractDetailDrawer
         contract={selectedContract}
         onClose={() => setSelectedContract(null)}
-        onUpdate={fetchData}
+        onUpdate={handleDataAndDocsRefresh}
         openBundleModal={openBundleModal}
         onNavigateToTask={handleNavigateToTask}
       />

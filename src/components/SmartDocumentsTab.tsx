@@ -64,6 +64,13 @@ interface AccountGroup {
   contracts: Record<string, ContractDocuments>;
 }
 
+interface BundleInfo {
+  bundleId: string;
+  bundleName: string;
+  isPrimary: boolean;
+  contractCount: number;
+}
+
 interface Contract {
   id: string;
   salesforceId?: string;
@@ -77,6 +84,7 @@ interface Contract {
   budgeted?: boolean;
   contractType?: string[];
   salesRep?: string;
+  bundleInfo?: BundleInfo | null;
 }
 
 interface DocumentsData {
@@ -130,7 +138,6 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
   const [data, setData] = useState<DocumentsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
-  const [bundleInfoMap, setBundleInfoMap] = useState<Record<string, any>>({});
   const [filterPreset, setFilterPreset] = useState<'needsAttention' | 'closingSoon' | 'budgeted' | 'complete' | null>(null);
 
   // Fetch documents data
@@ -148,46 +155,9 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
     }
   }, []);
 
-  // Fetch bundle info for all contracts
-  const fetchBundleInfo = useCallback(async () => {
-    if (!contracts || contracts.length === 0) return;
-
-    try {
-      const bundleMap: Record<string, any> = {};
-
-      // Fetch bundle info for each contract
-      await Promise.all(
-        contracts.map(async (contract) => {
-          try {
-            const response = await fetch(`/api/bundles?contractId=${contract.id}`);
-            if (response.ok) {
-              const data = await response.json();
-              if (data.bundle) {
-                bundleMap[contract.id] = {
-                  bundleId: data.bundle.id,
-                  bundleName: data.bundle.name,
-                  isPrimary: data.is_primary,
-                  contractCount: data.contracts?.length || 0,
-                };
-              }
-            }
-          } catch (err) {
-            // Silently fail for individual contracts
-            console.log(`Failed to fetch bundle for contract ${contract.id}`);
-          }
-        })
-      );
-
-      setBundleInfoMap(bundleMap);
-    } catch (err) {
-      console.error('Failed to fetch bundle info:', err);
-    }
-  }, [contracts]);
-
   useEffect(() => {
     fetchDocuments();
-    fetchBundleInfo();
-  }, [fetchDocuments, fetchBundleInfo]);
+  }, [fetchDocuments]);
 
   // Clear filters when focus mode is activated
   useEffect(() => {
@@ -298,12 +268,29 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
 
   // Transform contracts prop to contract-centric format for ContractListView
   // Uses same data source as Pipeline tab to avoid duplicates
+  // BUNDLE CONSOLIDATION: Show one row per bundle with combined documents
   const contractItems: ContractItem[] = useMemo(() => {
     if (!contracts) return [];
 
-    return contracts.map(contract => {
-      // Find documents for this contract
-      const contractDocs: ContractDocument[] = (data?.documents || [])
+    // Step 1: Group contracts by bundle (or keep as individual if not bundled)
+    const bundleGroups = new Map<string, Contract[]>();
+    const unbundledContracts: Contract[] = [];
+
+    contracts.forEach(contract => {
+      if (contract.bundleInfo?.bundleId) {
+        const bundleId = contract.bundleInfo.bundleId;
+        if (!bundleGroups.has(bundleId)) {
+          bundleGroups.set(bundleId, []);
+        }
+        bundleGroups.get(bundleId)!.push(contract);
+      } else {
+        unbundledContracts.push(contract);
+      }
+    });
+
+    // Helper to get documents for a contract
+    const getDocsForContract = (contract: Contract): ContractDocument[] => {
+      return (data?.documents || [])
         .filter(d =>
           d.contract_id === contract.id ||
           d.contract_id === contract.salesforceId ||
@@ -322,17 +309,23 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
           is_required: REQUIRED_DOCUMENT_TYPES.includes(doc.document_type),
           version: doc.version,
         }));
+    };
 
-      // Calculate completeness based on required documents present
+    // Helper to create a ContractItem
+    const createContractItem = (
+      contract: Contract,
+      docs: ContractDocument[],
+      bundleInfo: BundleInfo | null
+    ): ContractItem => {
       const presentRequired = REQUIRED_DOCUMENT_TYPES.filter(type =>
-        contractDocs.some(d => d.document_type === type)
+        docs.some(d => d.document_type === type)
       );
 
       return {
         id: contract.id,
-        contract_name: contract.name,           // Account name (title) - same as Pipeline
-        account_name: contract.name,            // Account name
-        opportunity_name: contract.opportunityName, // Contract name (subtitle)
+        contract_name: contract.name,
+        account_name: contract.name,
+        opportunity_name: contract.opportunityName,
         contract_type: contract.contractType?.join(', ') || undefined,
         salesforce_id: contract.salesforceId,
         status: contract.status,
@@ -340,17 +333,60 @@ export default function SmartDocumentsTab({ contracts, openBundleModal, focusMod
         close_date: contract.closeDate,
         budgeted: contract.budgeted,
         value: contract.value,
-        documents: contractDocs,
+        documents: docs,
         completeness: {
           uploaded: presentRequired.length,
           required: REQUIRED_DOCUMENT_TYPES.length,
           total: REQUIRED_DOCUMENT_TYPES.length + OPTIONAL_DOCUMENT_TYPES.length,
           percentage: Math.round((presentRequired.length / REQUIRED_DOCUMENT_TYPES.length) * 100),
         },
-        bundleInfo: bundleInfoMap[contract.id] || null,
+        bundleInfo,
       };
+    };
+
+    const items: ContractItem[] = [];
+
+    // Step 2: Process bundled contracts - one row per bundle
+    bundleGroups.forEach((bundleContracts, bundleId) => {
+      // Find the primary contract, or use the first one
+      const primaryContract = bundleContracts.find(c => c.bundleInfo?.isPrimary) || bundleContracts[0];
+
+      // Combine documents from all contracts in the bundle
+      const allBundleDocs: ContractDocument[] = [];
+      const seenDocIds = new Set<string>();
+      bundleContracts.forEach(contract => {
+        getDocsForContract(contract).forEach(doc => {
+          if (!seenDocIds.has(doc.id)) {
+            seenDocIds.add(doc.id);
+            allBundleDocs.push(doc);
+          }
+        });
+      });
+
+      // Calculate combined value for the bundle
+      const totalValue = bundleContracts.reduce((sum, c) => sum + c.value, 0);
+
+      // Create bundle info with contract count
+      const bundleInfo: BundleInfo = {
+        bundleId,
+        bundleName: primaryContract.bundleInfo?.bundleName || primaryContract.name,
+        isPrimary: true,
+        contractCount: bundleContracts.length,
+      };
+
+      const item = createContractItem(primaryContract, allBundleDocs, bundleInfo);
+      item.value = totalValue; // Use combined bundle value
+      items.push(item);
     });
-  }, [contracts, data?.documents, bundleInfoMap]);
+
+    // Step 3: Process unbundled contracts
+    unbundledContracts.forEach(contract => {
+      const docs = getDocsForContract(contract);
+      items.push(createContractItem(contract, docs, null));
+    });
+
+    return items;
+  }, [contracts, data?.documents]);
 
   // Derive stats from contractItems - same data source as Pipeline
   const derivedStats = useMemo(() => {
