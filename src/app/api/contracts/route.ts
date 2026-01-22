@@ -188,8 +188,10 @@ export async function GET(request: NextRequest) {
     const contracts = await getContracts();
 
     // Filter contracts based on includeArchived parameter
+    // When true: show ONLY archived contracts
+    // When false: show only active (non-archived) contracts
     const filteredContracts = includeArchived
-      ? contracts
+      ? contracts.filter(c => c.is_closed)
       : contracts.filter(c => !c.is_closed);
 
     // Fetch bundle info for all contracts
