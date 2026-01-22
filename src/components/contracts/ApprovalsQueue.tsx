@@ -222,12 +222,21 @@ export default function ApprovalsQueue() {
 
             {/* Action Buttons */}
             <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => window.open(`/contracts/review?reviewId=${approval.reviewId}`, '_blank')}
-                className="flex-1 px-3 py-1.5 text-xs bg-[#38BDF8]/10 border border-[#38BDF8]/30 text-[#38BDF8] rounded-lg hover:bg-[#38BDF8]/20 transition-colors"
-              >
-                View Full Review
-              </button>
+              {approval.approvalToken ? (
+                <button
+                  onClick={() => window.open(`/contracts/review/approve/${approval.approvalToken}`, '_blank')}
+                  className="flex-1 px-3 py-1.5 text-xs bg-[#38BDF8]/10 border border-[#38BDF8]/30 text-[#38BDF8] rounded-lg hover:bg-[#38BDF8]/20 transition-colors"
+                >
+                  {approval.approvalStatus === 'pending' ? 'Review & Approve' : 'View Full Review'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => window.open(`/contracts/review?reviewId=${approval.reviewId}`, '_blank')}
+                  className="flex-1 px-3 py-1.5 text-xs bg-[#38BDF8]/10 border border-[#38BDF8]/30 text-[#38BDF8] rounded-lg hover:bg-[#38BDF8]/20 transition-colors"
+                >
+                  View Full Review
+                </button>
+              )}
               {approval.approvalStatus === 'pending' && approval.approvalToken && (
                 <button
                   onClick={() => copyApprovalLink(approval.approvalToken)}
