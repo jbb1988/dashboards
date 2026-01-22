@@ -443,8 +443,12 @@ function ContractRow({
   const handleQuickStatusChange = async (newStatus: string) => {
     // Handle Archive selection specially
     if (newStatus === ARCHIVE_STATUS) {
-      if (onArchive && contract.salesforceId) {
-        onArchive(contract.salesforceId, contract.name);
+      const idToUse = contract.salesforceId || contract.id;
+      console.log('[Archive] Selected archive for:', contract.name, 'ID:', idToUse);
+      if (onArchive && idToUse) {
+        onArchive(idToUse, contract.name);
+      } else {
+        console.error('[Archive] Missing onArchive or contract ID');
       }
       return;
     }
@@ -1243,13 +1247,17 @@ export default function ContractsDashboard() {
   }, []);
 
   // Archive a contract
-  const handleArchiveContract = useCallback(async (salesforceId: string, contractName: string) => {
+  const handleArchiveContract = async (salesforceId: string, contractName: string) => {
+    console.log('[Archive] Archiving contract:', salesforceId, contractName);
     try {
       const response = await fetch('/api/contracts/archive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ salesforceId }),
       });
+
+      const result = await response.json();
+      console.log('[Archive] API response:', result);
 
       if (response.ok) {
         // Show undo toast
@@ -1261,17 +1269,17 @@ export default function ContractsDashboard() {
         // Refresh data to remove archived contract from list
         fetchData();
       } else {
-        const result = await response.json();
         alert(`Failed to archive: ${result.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Archive error:', err);
       alert('Network error archiving contract');
     }
-  }, []);
+  };
 
   // Unarchive a contract (undo)
-  const handleUnarchiveContract = useCallback(async (salesforceId: string) => {
+  const handleUnarchiveContract = async (salesforceId: string) => {
+    console.log('[Unarchive] Unarchiving contract:', salesforceId);
     try {
       const response = await fetch(`/api/contracts/archive?salesforceId=${encodeURIComponent(salesforceId)}`, {
         method: 'DELETE',
@@ -1289,7 +1297,7 @@ export default function ContractsDashboard() {
       console.error('Unarchive error:', err);
       alert('Network error unarchiving contract');
     }
-  }, []);
+  };
 
   // Save all pending changes
   const handleSavePendingChanges = useCallback(async () => {
