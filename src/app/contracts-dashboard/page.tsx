@@ -567,7 +567,7 @@ function ContractRow({
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 8, scale: 0.95 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="absolute z-50 top-full mt-2 left-1/2 -translate-x-1/2"
+                          className="absolute z-[9999] top-full mt-2 left-1/2 -translate-x-1/2"
                           onClick={e => e.stopPropagation()}
                         >
                           <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[250px] max-w-[350px]">
@@ -656,7 +656,7 @@ function ContractRow({
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 8, scale: 0.95 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="absolute z-50 top-full mt-2 left-1/2 -translate-x-1/2"
+                          className="absolute z-[9999] top-full mt-2 left-1/2 -translate-x-1/2"
                           onClick={e => e.stopPropagation()}
                         >
                           <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[200px] max-w-[280px]">
