@@ -354,6 +354,8 @@ interface PipelineTask {
   status: string;
   priority: string;
   due_date?: string;
+  description?: string;
+  assignee_email?: string;
 }
 
 // Document type for pipeline row icons
@@ -568,11 +570,11 @@ function ContractRow({
                           className="absolute z-50 top-full mt-2 left-1/2 -translate-x-1/2"
                           onClick={e => e.stopPropagation()}
                         >
-                          <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[220px] max-w-[300px]">
+                          <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[250px] max-w-[350px]">
                             <div className="px-4 py-2.5 border-b border-white/[0.06] bg-gradient-to-r from-[#38BDF8]/10 to-transparent">
                               <span className="text-[10px] font-semibold text-[#38BDF8] uppercase tracking-wider">Tasks ({tasks.length})</span>
                             </div>
-                            <div className="p-2 space-y-1 max-h-[200px] overflow-y-auto">
+                            <div className="p-2 space-y-2 max-h-[280px] overflow-y-auto">
                               {tasks.slice(0, 5).map(task => {
                                 const isOverdue = task.status !== 'completed' && task.due_date && new Date(task.due_date) < new Date();
                                 const isCompleted = task.status === 'completed';
@@ -583,27 +585,41 @@ function ContractRow({
                                       e.stopPropagation();
                                       if (onNavigateToTask) onNavigateToTask(task.id);
                                     }}
-                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.05] transition-colors"
+                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.05] transition-colors border border-transparent hover:border-white/[0.06]"
                                   >
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 mb-1">
                                       <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                                         isOverdue ? 'bg-[#EF4444]' : isCompleted ? 'bg-[#22C55E]' : 'bg-[#38BDF8]'
                                       }`} />
-                                      <span className={`text-[12px] truncate ${isCompleted ? 'text-[#64748B] line-through' : 'text-[#E2E8F0]'}`}>
+                                      <span className={`text-[12px] font-medium truncate flex-1 ${isCompleted ? 'text-[#64748B] line-through' : 'text-[#E2E8F0]'}`}>
                                         {task.title}
                                       </span>
+                                      {task.due_date && (
+                                        <span className={`text-[10px] tabular-nums flex-shrink-0 ${isOverdue ? 'text-[#EF4444]' : 'text-[#64748B]'}`}>
+                                          {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        </span>
+                                      )}
                                     </div>
-                                    {task.due_date && (
-                                      <span className={`text-[10px] ml-3.5 ${isOverdue ? 'text-[#EF4444]' : 'text-[#64748B]'}`}>
-                                        Due: {new Date(task.due_date).toLocaleDateString()}
-                                      </span>
+                                    {task.description && (
+                                      <div className="ml-3.5 mt-1">
+                                        <span className="text-[10px] text-[#64748B] font-medium">Notes: </span>
+                                        <span className="text-[10px] text-[#94A3B8]">
+                                          {task.description.length > 100 ? task.description.substring(0, 100) + '...' : task.description}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {task.assignee_email && (
+                                      <div className="ml-3.5 mt-1">
+                                        <span className="text-[10px] text-[#64748B] font-medium">Assigned: </span>
+                                        <span className="text-[10px] text-[#94A3B8]">{task.assignee_email}</span>
+                                      </div>
                                     )}
                                   </button>
                                 );
                               })}
                               {tasks.length > 5 && (
-                                <div className="text-[10px] text-[#64748B] text-center py-1">
-                                  +{tasks.length - 5} more
+                                <div className="text-[10px] text-[#64748B] text-center py-1 border-t border-white/[0.04] mt-1">
+                                  +{tasks.length - 5} more tasks
                                 </div>
                               )}
                             </div>
@@ -962,6 +978,8 @@ export default function ContractsDashboard() {
     status: string;
     priority: string;
     due_date?: string;
+    description?: string;
+    assignee_email?: string;
     contract_id?: string;
     contract_salesforce_id?: string;
     contract_name?: string;
@@ -1883,14 +1901,15 @@ export default function ContractsDashboard() {
     return { totalPipeline, totalCount, overdueValue, overdueCount, dueNext30Value, dueNext30Count, highValueCount };
   }, [filteredContracts]);
 
-  // Build lookup map of tasks by contract ID (salesforceId or id)
+  // Build lookup map of tasks by contract ID (salesforceId, id, or name)
   const tasksByContractId = useMemo(() => {
     const map = new Map<string, typeof allTasks>();
     allTasks.forEach(task => {
-      // Tasks can be linked via contract_salesforce_id, contract_id, or bundle_id
+      // Tasks can be linked via contract_salesforce_id, contract_id, or contract_name
       const keys = [
         task.contract_salesforce_id,
         task.contract_id,
+        task.contract_name,
       ].filter(Boolean) as string[];
 
       keys.forEach(key => {
@@ -2705,10 +2724,12 @@ export default function ContractsDashboard() {
                 <div className="max-h-[600px] overflow-y-auto">
                   {filteredContracts.length > 0 ? (
                     filteredContracts.map((contract, index) => {
-                      // Get tasks for this contract (check both salesforceId and id)
+                      // Get tasks for this contract (check salesforceId, id, and name)
                       const contractTasks = [
                         ...(tasksByContractId.get(contract.salesforceId || '') || []),
                         ...(tasksByContractId.get(contract.id) || []),
+                        ...(tasksByContractId.get(contract.name) || []),
+                        ...(contract.opportunityName ? (tasksByContractId.get(contract.opportunityName) || []) : []),
                       ].filter((task, idx, arr) => arr.findIndex(t => t.id === task.id) === idx); // Dedupe
 
                       // Get documents for this contract
