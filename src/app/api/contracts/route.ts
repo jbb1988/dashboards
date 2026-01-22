@@ -102,6 +102,7 @@ interface DashboardContract {
   budgeted: boolean;
   manualCloseProbability: number | null;
   bundleInfo?: BundleInfo | null;
+  isArchived?: boolean;
 }
 
 /**
@@ -157,6 +158,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const syncStatus = searchParams.get('syncStatus');
+    const includeArchived = searchParams.get('includeArchived') === 'true';
 
     // If requesting pending sync contracts
     if (syncStatus === 'pending') {
@@ -185,8 +187,10 @@ export async function GET(request: NextRequest) {
     // Fetch contracts from Supabase
     const contracts = await getContracts();
 
-    // Filter to only active contracts (not closed)
-    const activeContracts = contracts.filter(c => !c.is_closed);
+    // Filter contracts based on includeArchived parameter
+    const filteredContracts = includeArchived
+      ? contracts
+      : contracts.filter(c => !c.is_closed);
 
     // Fetch bundle info for all contracts
     const admin = getSupabaseAdmin();
@@ -235,13 +239,15 @@ export async function GET(request: NextRequest) {
       console.log('Bundle lookup skipped (tables may not exist):', err);
     }
 
-    // Transform to dashboard format with bundle info
-    const dashboardContracts = activeContracts.map(contract => {
+    // Transform to dashboard format with bundle info and archived status
+    const dashboardContracts = filteredContracts.map(contract => {
       const transformed = transformToDashboardFormat(contract);
       const contractId = contract.id || contract.salesforce_id;
       if (contractId) {
         transformed.bundleInfo = bundleMap.get(contractId) || null;
       }
+      // Add archived status for UI styling
+      transformed.isArchived = contract.is_closed || false;
       return transformed;
     });
 

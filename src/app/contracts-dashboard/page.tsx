@@ -32,6 +32,7 @@ interface ContractsPipelineFilters {
   probabilityMin: number;
   probabilityMax: number;
   activeTab: 'pipeline' | 'tasks' | 'documents';
+  showArchived: boolean;
 }
 
 const DEFAULT_CONTRACTS_FILTERS: ContractsPipelineFilters = {
@@ -49,6 +50,7 @@ const DEFAULT_CONTRACTS_FILTERS: ContractsPipelineFilters = {
   probabilityMin: 0,
   probabilityMax: 100,
   activeTab: 'pipeline',
+  showArchived: false,
 };
 
 // Types
@@ -94,6 +96,7 @@ interface Contract {
   redlines?: string; // AI review summary from Notion
   lastRedlineDate?: string | null; // Date of last AI review
   bundleInfo?: BundleInfo | null; // Bundle info if contract is part of a bundle
+  isArchived?: boolean; // Whether contract is archived (is_closed = true)
 }
 
 interface KPIs {
@@ -366,6 +369,9 @@ interface PipelineDocument {
   status: string;
 }
 
+// Archive status constant
+const ARCHIVE_STATUS = 'Archived';
+
 // Contract Row Component - Simplified (details in drawer)
 function ContractRow({
   contract,
@@ -378,6 +384,7 @@ function ContractRow({
   tasks = [],
   documents = [],
   onNavigateToTask,
+  onArchive,
 }: {
   contract: Contract;
   index: number;
@@ -389,6 +396,7 @@ function ContractRow({
   tasks?: PipelineTask[];
   documents?: PipelineDocument[];
   onNavigateToTask?: (taskId: string) => void;
+  onArchive?: (salesforceId: string, contractName: string) => void;
 }) {
   const [isSaving, setIsSaving] = useState(false);
   const [showDateTooltip, setShowDateTooltip] = useState(false);
@@ -400,10 +408,10 @@ function ContractRow({
   const taskIconRef = useRef<HTMLButtonElement>(null);
   const docIconRef = useRef<HTMLDivElement>(null);
 
-  // Use pending status if available (batch mode)
-  const effectiveStatus = pendingStatus || contract.status;
+  // Use pending status if available (batch mode), or show Archived for archived contracts
+  const effectiveStatus = contract.isArchived ? ARCHIVE_STATUS : (pendingStatus || contract.status);
   const hasPendingChange = pendingStatus !== undefined && pendingStatus !== contract.status;
-  const statusColor = stageColors[effectiveStatus] || getStatusColor(effectiveStatus);
+  const statusColor = contract.isArchived ? '#6B7280' : (stageColors[effectiveStatus] || getStatusColor(effectiveStatus));
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—';
@@ -433,6 +441,14 @@ function ContractRow({
 
   // Quick status change - batch mode (pending) or immediate save
   const handleQuickStatusChange = async (newStatus: string) => {
+    // Handle Archive selection specially
+    if (newStatus === ARCHIVE_STATUS) {
+      if (onArchive && contract.salesforceId) {
+        onArchive(contract.salesforceId, contract.name);
+      }
+      return;
+    }
+
     // Get the effective current status (may be a pending change)
     const effectiveStatus = pendingStatus || contract.status;
     if (newStatus === effectiveStatus) return;
@@ -496,6 +512,7 @@ function ContractRow({
             ? 'bg-[#151F2E] hover:bg-[#1a2740]'
             : 'bg-[#131B28] hover:bg-[#182437]'
         } ${contract.budgeted ? 'border-l-2 border-[#22C55E]/40' : ''}
+        ${contract.isArchived ? 'opacity-60' : ''}
         hover:shadow-[0_0_20px_rgba(56,189,248,0.05)]`}
       >
         <div className="grid gap-4 px-6 py-[14px] items-center" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
@@ -769,6 +786,8 @@ function ContractRow({
                   {VALID_STATUSES.map(s => (
                     <option key={s} value={s} className="bg-[#0a1628] text-white">{s}</option>
                   ))}
+                  <option disabled className="bg-[#0a1628] text-gray-600">────────────</option>
+                  <option value={ARCHIVE_STATUS} className="bg-[#0a1628] text-gray-400">📦 Archive</option>
                 </select>
                 {/* Pending change indicator */}
                 {hasPendingChange && (
@@ -957,6 +976,7 @@ export default function ContractsDashboard() {
     probabilityMin,
     probabilityMax,
     activeTab,
+    showArchived,
   } = filters;
 
   // Filter setters that update persisted state (support both direct values and callbacks)
@@ -980,6 +1000,7 @@ export default function ContractsDashboard() {
   const setProbabilityMin = (value: number) => setFilters(f => ({ ...f, probabilityMin: value }));
   const setProbabilityMax = (value: number) => setFilters(f => ({ ...f, probabilityMax: value }));
   const setActiveTab = (value: 'pipeline' | 'tasks' | 'documents') => setFilters(f => ({ ...f, activeTab: value }));
+  const setShowArchived = (value: boolean) => setFilters(f => ({ ...f, showArchived: value }));
 
   // Non-persisted UI state
   const [contractYearDropdownOpen, setContractYearDropdownOpen] = useState(false); // Dropdown open state
@@ -993,6 +1014,13 @@ export default function ContractsDashboard() {
   const [selectedContractIndex, setSelectedContractIndex] = useState(0);
   const [taskStats, setTaskStats] = useState<{ pending: number; overdue: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Archive toast state
+  const [archiveToast, setArchiveToast] = useState<{
+    show: boolean;
+    contractName: string;
+    salesforceId: string;
+  } | null>(null);
 
   // All tasks for showing icons in pipeline rows
   const [allTasks, setAllTasks] = useState<Array<{
@@ -1214,6 +1242,55 @@ export default function ContractsDashboard() {
     setPendingChanges({});
   }, []);
 
+  // Archive a contract
+  const handleArchiveContract = useCallback(async (salesforceId: string, contractName: string) => {
+    try {
+      const response = await fetch('/api/contracts/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salesforceId }),
+      });
+
+      if (response.ok) {
+        // Show undo toast
+        setArchiveToast({ show: true, contractName, salesforceId });
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+          setArchiveToast(prev => prev?.salesforceId === salesforceId ? null : prev);
+        }, 5000);
+        // Refresh data to remove archived contract from list
+        fetchData();
+      } else {
+        const result = await response.json();
+        alert(`Failed to archive: ${result.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Archive error:', err);
+      alert('Network error archiving contract');
+    }
+  }, []);
+
+  // Unarchive a contract (undo)
+  const handleUnarchiveContract = useCallback(async (salesforceId: string) => {
+    try {
+      const response = await fetch(`/api/contracts/archive?salesforceId=${encodeURIComponent(salesforceId)}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Hide toast and refresh
+        setArchiveToast(null);
+        fetchData();
+      } else {
+        const result = await response.json();
+        alert(`Failed to unarchive: ${result.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Unarchive error:', err);
+      alert('Network error unarchiving contract');
+    }
+  }, []);
+
   // Save all pending changes
   const handleSavePendingChanges = useCallback(async () => {
     const changes = Object.values(pendingChanges);
@@ -1385,9 +1462,12 @@ export default function ContractsDashboard() {
     setError(null);
     try {
       const endpoint = dataSource === 'salesforce' ? '/api/salesforce' : '/api/contracts';
-      // Add cache-busting timestamp to force fresh data
-      const cacheBuster = `?t=${Date.now()}`;
-      const response = await fetch(endpoint + cacheBuster, {
+      // Add cache-busting timestamp and includeArchived param
+      const params = new URLSearchParams({
+        t: Date.now().toString(),
+        ...(showArchived && { includeArchived: 'true' }),
+      });
+      const response = await fetch(`${endpoint}?${params}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
@@ -1406,7 +1486,7 @@ export default function ContractsDashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [dataSource]);
+  }, [dataSource, showArchived]);
 
   // Refresh data callback for inline editing
   const handleDataRefresh = () => {
@@ -2178,6 +2258,21 @@ export default function ContractsDashboard() {
                     </div>
                   </div>
                 </div>
+                {/* Show Archived Toggle */}
+                <button
+                  onClick={() => setShowArchived(!showArchived)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 flex items-center gap-2 ${
+                    showArchived
+                      ? 'bg-[#6B7280]/20 text-[#9CA3AF] ring-1 ring-[#6B7280]/30'
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                  }`}
+                  title={showArchived ? 'Hide archived contracts' : 'Show archived contracts'}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  Archived
+                </button>
                 <button
                   onClick={handleRefresh}
                   disabled={isSyncing}
@@ -2809,6 +2904,7 @@ export default function ContractsDashboard() {
                           tasks={contractTasks}
                           documents={contractDocs}
                           onNavigateToTask={handleNavigateToTask}
+                          onArchive={handleArchiveContract}
                         />
                       );
                     })
@@ -3179,6 +3275,43 @@ export default function ContractsDashboard() {
         openBundleModal={openBundleModal}
         onNavigateToTask={handleNavigateToTask}
       />
+
+      {/* Archive Undo Toast */}
+      <AnimatePresence>
+        {archiveToast && archiveToast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div className="flex items-center gap-3 px-4 py-3 bg-[#1E293B] border border-white/10 rounded-lg shadow-xl">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#6B7280]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+                <span className="text-[#CBD5E1] text-sm">
+                  Contract archived
+                </span>
+              </div>
+              <button
+                onClick={() => handleUnarchiveContract(archiveToast.salesforceId)}
+                className="px-3 py-1 text-[#38BDF8] text-sm font-medium hover:bg-[#38BDF8]/10 rounded transition-colors"
+              >
+                Undo
+              </button>
+              <button
+                onClick={() => setArchiveToast(null)}
+                className="p-1 text-[#64748B] hover:text-white transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
