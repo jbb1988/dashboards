@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useEffect, use, useCallback } from 'react';
+import { useState, useEffect, use, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
-import ActivityLog, { ActivityLogEntry } from '@/components/contracts/ActivityLog';
+import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
+import ApprovalHeader from '@/components/contracts/ApprovalHeader';
+import ApprovalContextSidebar from '@/components/contracts/ApprovalContextSidebar';
+import { ActivityLogEntry } from '@/components/contracts/ActivityLog';
 
 // Dynamically import RedlineEditor to avoid SSR issues with TipTap
 const RedlineEditor = dynamic(
   () => import('@/components/contracts/RedlineEditor'),
-  { ssr: false, loading: () => <div className="h-[300px] bg-[#0B1220] rounded-lg animate-pulse" /> }
+  { ssr: false, loading: () => <div className="h-full bg-white animate-pulse rounded" /> }
 );
 
 interface Document {
@@ -19,6 +22,12 @@ interface Document {
   uploadedAt: string;
   mimeType: string | null;
   convertedPdfUrl: string | null;
+}
+
+interface Comment {
+  id: string;
+  text: string;
+  highlightedText: string;
 }
 
 // Check if file is a Word document
@@ -46,6 +55,8 @@ interface ReviewData {
   documents: Document[];
 }
 
+type ContextTab = 'summary' | 'activity' | 'documents' | 'comments';
+
 export default function ApprovalPage({ params }: { params: Promise<{ token: string }> }) {
   const resolvedParams = use(params);
   const [review, setReview] = useState<ReviewData | null>(null);
@@ -59,8 +70,23 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const [hasEdits, setHasEdits] = useState(false);
   const [initialEditorContent, setInitialEditorContent] = useState<string | null>(null);
 
+  // Layout state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [contextTab, setContextTab] = useState<ContextTab | null>('summary');
+  const [contextSidebarOpen, setContextSidebarOpen] = useState(true);
+  const [editorComments, setEditorComments] = useState<Comment[]>([]);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject' | null>(null);
+
+  const editorRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     fetchReviewByToken();
+    // Load sidebar collapsed state from localStorage
+    const saved = localStorage.getItem('sidebar-collapsed');
+    if (saved !== null) {
+      setSidebarCollapsed(saved === 'true');
+    }
   }, [resolvedParams.token]);
 
   const fetchReviewByToken = async () => {
@@ -108,27 +134,72 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
     if (!hasEdits && html !== initialEditorContent) {
       setHasEdits(true);
     }
+    // Extract comments from editor
+    extractCommentsFromHTML(html);
   }, [hasEdits, initialEditorContent]);
 
-  const handleDecision = async (approve: boolean) => {
-    if (!approve && !feedback.trim()) {
+  const extractCommentsFromHTML = useCallback((html: string) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const commentElements = doc.querySelectorAll('span[data-approver-comment]');
+    const newComments: Comment[] = [];
+
+    commentElements.forEach((el, index) => {
+      const id = el.getAttribute('data-comment-id') || `comment-${index}`;
+      const text = el.getAttribute('data-comment') || '';
+      const highlightedText = el.textContent || '';
+      if (text || highlightedText) {
+        newComments.push({ id, text, highlightedText });
+      }
+    });
+
+    setEditorComments(newComments);
+  }, []);
+
+  const handleContextTabChange = useCallback((tab: ContextTab | null) => {
+    if (tab === null) {
+      setContextSidebarOpen(false);
+      setContextTab(null);
+    } else {
+      setContextTab(tab);
+      setContextSidebarOpen(true);
+    }
+  }, []);
+
+  const handleApprove = useCallback(() => {
+    if (!approverEmail.trim()) {
+      alert('Please enter your email address in the header.');
+      return;
+    }
+    setPendingDecision('approve');
+    setShowFeedbackModal(true);
+  }, [approverEmail]);
+
+  const handleReject = useCallback(() => {
+    if (!approverEmail.trim()) {
+      alert('Please enter your email address in the header.');
+      return;
+    }
+    setPendingDecision('reject');
+    setShowFeedbackModal(true);
+  }, [approverEmail]);
+
+  const submitDecision = async () => {
+    if (pendingDecision === 'reject' && !feedback.trim()) {
       alert('Feedback is required when rejecting a contract.');
       return;
     }
 
-    if (!approverEmail.trim()) {
-      alert('Please enter your email address.');
-      return;
-    }
-
     setSubmitting(true);
+    setShowFeedbackModal(false);
+
     try {
       const response = await fetch('/api/contracts/review/approvals/decision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: resolvedParams.token,
-          decision: approve ? 'approve' : 'reject',
+          decision: pendingDecision === 'approve' ? 'approve' : 'reject',
           feedback: feedback.trim() || null,
           approverEmail: approverEmail.trim(),
           editedText: editorContent,
@@ -144,61 +215,58 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
         return;
       }
 
-      setDecision(approve ? 'approve' : 'reject');
+      setDecision(pendingDecision);
     } catch (err) {
       console.error('Error submitting decision:', err);
       alert('Failed to submit decision');
     } finally {
       setSubmitting(false);
+      setPendingDecision(null);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getDocumentTypeColor = (type: string) => {
-    switch (type) {
-      case 'Original Contract':
-        return 'text-blue-400 bg-blue-500/10 border-blue-500/30';
-      case 'Client Response':
-        return 'text-purple-400 bg-purple-500/10 border-purple-500/30';
-      case 'MARS Redlines':
-        return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
-      case 'Final Agreement':
-        return 'text-green-400 bg-green-500/10 border-green-500/30';
-      case 'Amendment':
-        return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30';
-      default:
-        return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
-    }
-  };
-
-  const openDocumentOnline = (doc: Document) => {
-    // For Word documents, use Microsoft Office Online viewer
+  const openDocumentOnline = useCallback((doc: Document) => {
     if (isWordDocument(doc.fileName)) {
       const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.fileUrl)}`;
       window.open(viewerUrl, '_blank');
       return;
     }
-
-    // For PDFs and other files, open directly
     window.open(doc.fileUrl, '_blank');
-  };
+  }, []);
 
-  const openInDesktopWord = (doc: Document) => {
-    // Use ms-word protocol to open in desktop Word
-    // This works when Word is installed on the user's machine
-    const wordUrl = `ms-word:ofe|u|${doc.fileUrl}`;
-    window.location.href = wordUrl;
-  };
+  const downloadDocument = useCallback(async (doc: Document) => {
+    try {
+      const response = await fetch(doc.fileUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading file:', err);
+      window.open(doc.fileUrl, '_blank');
+    }
+  }, []);
 
+  const scrollToComment = useCallback((commentId: string) => {
+    if (!editorRef.current) return;
+    const commentElement = editorRef.current.querySelector(
+      `span[data-comment-id="${commentId}"]`
+    );
+    if (commentElement) {
+      commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      commentElement.classList.add('ring-2', 'ring-yellow-400');
+      setTimeout(() => {
+        commentElement.classList.remove('ring-2', 'ring-yellow-400');
+      }, 2000);
+    }
+  }, []);
+
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0B1220] flex items-center justify-center">
@@ -210,6 +278,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="min-h-screen bg-[#0B1220] flex items-center justify-center p-6">
@@ -228,251 +297,172 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
     return null;
   }
 
+  const mainSidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+
   return (
-    <div className="min-h-screen bg-[#0B1220] p-6">
-      {/* Header */}
-      <div className="max-w-4xl mx-auto mb-8">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Contract Approval Request
-          </h1>
-          <p className="text-[#8FA3BF]">Review the analyzed contract and provide your decision</p>
-        </motion.div>
-      </div>
+    <div className="min-h-screen bg-[#0B1220]">
+      {/* Main Navigation Sidebar (Left) */}
+      <Sidebar
+        isCollapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+      />
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Contract Info Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
-        >
-          <h2 className="text-xl font-bold text-white mb-1">{review.contractName}</h2>
-          <p className="text-sm text-[#8FA3BF] mb-4">{review.provisionName}</p>
-          <div className="flex flex-wrap gap-4 text-sm">
-            <p className="text-[#8FA3BF]">
-              <span className="text-white font-medium">Submitted by:</span> {review.submittedBy}
-            </p>
-            <p className="text-[#8FA3BF]">
-              <span className="text-white font-medium">Submitted:</span> {formatDate(review.submittedAt)}
-            </p>
+      {/* Main Content Area */}
+      <motion.div
+        animate={{ marginLeft: mainSidebarWidth }}
+        transition={{ duration: 0.2 }}
+        className="min-h-screen flex flex-col"
+      >
+        {/* Header Bar */}
+        <ApprovalHeader
+          contractName={review.contractName}
+          provisionName={review.provisionName}
+          submittedBy={review.submittedBy}
+          submittedAt={review.submittedAt}
+          status={
+            decision === 'approve' ? 'approved' :
+            decision === 'reject' ? 'rejected' :
+            (review.approvalStatus as 'pending' | 'approved' | 'rejected')
+          }
+          approverEmail={approverEmail}
+          onApproverEmailChange={setApproverEmail}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          submitting={submitting}
+          hasEdits={hasEdits}
+          readOnly={!!decision}
+        />
+
+        {/* Main Content: Document + Context Sidebar */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Document Viewer Area */}
+          <div className="flex-1 overflow-auto bg-[#0B1220] p-6">
+            {/* Paper-style Document Container */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-4xl mx-auto"
+            >
+              {/* Document Paper */}
+              <div
+                ref={editorRef}
+                className="bg-white rounded shadow-lg shadow-black/20 min-h-[calc(100vh-180px)]"
+              >
+                <RedlineEditor
+                  initialContent={review.redlinedText}
+                  approverEditedContent={review.approverEditedText}
+                  onChange={handleEditorChange}
+                  readOnly={!!decision}
+                  contractName={review.contractName}
+                  paperMode={true}
+                />
+              </div>
+            </motion.div>
           </div>
-        </motion.div>
 
-        {/* Analysis Summary Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
-        >
-          <h3 className="text-lg font-bold text-white mb-4">Analysis Summary</h3>
-          {review.summary.length > 0 ? (
-            <ul className="space-y-2">
-              {review.summary.map((item, idx) => (
-                <motion.li
-                  key={idx}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + idx * 0.05 }}
-                  className="text-sm text-[#8FA3BF] flex items-start gap-2"
-                >
-                  <span className="text-[#38BDF8] mt-1 flex-shrink-0">•</span>
-                  <span>{item}</span>
-                </motion.li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-[#64748B]">No summary available</p>
-          )}
-        </motion.div>
-
-        {/* Redlined Document with Editor */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-white">Redlined Document</h3>
-            {hasEdits && !decision && (
-              <span className="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded border border-blue-500/30">
-                You have made edits
-              </span>
-            )}
-          </div>
-          <RedlineEditor
-            initialContent={review.redlinedText}
-            approverEditedContent={review.approverEditedText}
-            onChange={handleEditorChange}
-            readOnly={!!decision}
-            contractName={review.contractName}
+          {/* Context Sidebar (Right) */}
+          <ApprovalContextSidebar
+            activeTab={contextTab}
+            onTabChange={handleContextTabChange}
+            isOpen={contextSidebarOpen}
+            summary={review.summary}
+            activityLog={review.activityLog || []}
+            documents={review.documents}
+            comments={editorComments}
+            onViewDocument={openDocumentOnline}
+            onDownloadDocument={downloadDocument}
+            onCommentClick={scrollToComment}
           />
-        </motion.div>
+        </div>
+      </motion.div>
 
-        {/* Activity Log */}
-        {review.activityLog && review.activityLog.length > 0 && (
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-6">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[#151F2E] border border-white/10 rounded-lg p-6 max-w-md w-full"
           >
-            <ActivityLog entries={review.activityLog} />
-          </motion.div>
-        )}
+            <h3 className="text-lg font-bold text-white mb-4">
+              {pendingDecision === 'approve' ? 'Approve Contract' : 'Reject Contract'}
+            </h3>
 
-        {/* Supporting Documents */}
-        {review.documents.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
-          >
-            <h3 className="text-lg font-bold text-white mb-4">Supporting Documents</h3>
-            <div className="space-y-2">
-              {review.documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center justify-between bg-[#0B1220] border border-white/10 rounded-lg p-3 hover:border-white/20 transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <svg className="w-5 h-5 text-[#8FA3BF] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="text-sm text-white truncate">{doc.fileName}</span>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded border flex-shrink-0 ${getDocumentTypeColor(doc.documentType)}`}>
-                      {doc.documentType}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => openDocumentOnline(doc)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#38BDF8]/10 text-[#38BDF8] rounded-lg hover:bg-[#38BDF8]/20 transition-colors"
-                      title="Open in browser"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      View
-                    </button>
-                    {isWordDocument(doc.fileName) && (
-                      <button
-                        onClick={() => openInDesktopWord(doc)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors"
-                        title="Open in Microsoft Word (requires Word installed)"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Word
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Decision Section */}
-        {!decision && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
-          >
-            <h3 className="text-lg font-bold text-white mb-4">Your Decision</h3>
-
-            {/* Email Input */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
-                Your Email <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="email"
-                value={approverEmail}
-                onChange={(e) => setApproverEmail(e.target.value)}
-                placeholder="your.email@example.com"
-                className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-[#38BDF8]"
-              />
-            </div>
-
-            {/* Feedback Input */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
-                Feedback <span className="text-sm text-[#64748B]">(required for rejection)</span>
+                Feedback {pendingDecision === 'reject' && <span className="text-red-400">*</span>}
               </label>
               <textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Add any comments or required changes..."
+                placeholder={
+                  pendingDecision === 'approve'
+                    ? 'Optional comments or notes...'
+                    : 'Please explain why you are rejecting this contract...'
+                }
                 rows={4}
                 className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-[#38BDF8] resize-none"
               />
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-3">
               <button
-                onClick={() => handleDecision(false)}
-                disabled={submitting}
-                className="flex-1 px-4 py-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50 font-medium"
+                onClick={() => {
+                  setShowFeedbackModal(false);
+                  setPendingDecision(null);
+                }}
+                className="flex-1 px-4 py-2 text-sm bg-white/5 text-[#8FA3BF] rounded-lg hover:bg-white/10 transition-colors"
               >
-                {submitting ? 'Rejecting...' : 'Reject'}
+                Cancel
               </button>
               <button
-                onClick={() => handleDecision(true)}
-                disabled={submitting}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 font-medium"
+                onClick={submitDecision}
+                disabled={submitting || (pendingDecision === 'reject' && !feedback.trim())}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                  pendingDecision === 'approve'
+                    ? 'bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white hover:opacity-90'
+                    : 'bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30'
+                }`}
               >
-                {submitting ? 'Approving...' : 'Approve'}
+                {submitting ? 'Submitting...' : pendingDecision === 'approve' ? 'Approve' : 'Reject'}
               </button>
             </div>
           </motion.div>
-        )}
+        </div>
+      )}
 
-        {/* Success State */}
-        {decision && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className={`bg-[#151F2E] border rounded-lg p-6 ${
-              decision === 'approve'
-                ? 'border-green-500/30 bg-green-500/5'
-                : 'border-red-500/30 bg-red-500/5'
-            }`}
-          >
-            <div className="flex items-center gap-3 mb-2">
+      {/* Success State Overlay */}
+      {decision && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed bottom-6 right-6 z-50"
+        >
+          <div className={`px-4 py-3 rounded-lg shadow-lg ${
+            decision === 'approve'
+              ? 'bg-green-500/20 border border-green-500/30'
+              : 'bg-red-500/20 border border-red-500/30'
+          }`}>
+            <div className="flex items-center gap-2">
               {decision === 'approve' ? (
-                <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+                <>
+                  <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-green-400 font-medium text-sm">Contract Approved</span>
+                </>
               ) : (
-                <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <>
+                  <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span className="text-red-400 font-medium text-sm">Contract Rejected</span>
+                </>
               )}
-              <h3 className={`text-lg font-bold ${decision === 'approve' ? 'text-green-400' : 'text-red-400'}`}>
-                {decision === 'approve' ? 'Contract Approved!' : 'Contract Rejected'}
-              </h3>
             </div>
-            <p className="text-sm text-[#8FA3BF]">
-              {decision === 'approve'
-                ? 'The legal team has been notified of your approval.'
-                : 'The legal team will review your feedback and make necessary changes. They can resubmit for approval once updated.'}
-            </p>
-          </motion.div>
-        )}
-      </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Mark, mergeAttributes, Extension } from '@tiptap/core';
+import { Plugin, PluginKey } from 'prosemirror-state';
 import EditorToolbar from './EditorToolbar';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { MessageSquare, X, Edit3 } from 'lucide-react';
@@ -10,177 +11,159 @@ import { MessageSquare, X, Edit3 } from 'lucide-react';
 // Custom mark for AI strikethrough (red) - text to remove
 const AIStrike = Mark.create({
   name: 'aiStrike',
-
   parseHTML() {
     return [
       { tag: 'del' },
       { tag: 'span[data-ai-strike]' },
-      { style: 'text-decoration: line-through', consuming: false },
     ];
   },
-
   renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes, {
-        'data-ai-strike': '',
-        style: 'color: #f87171; text-decoration: line-through;',
-      }),
-      0,
-    ];
+    return ['span', mergeAttributes(HTMLAttributes, {
+      'data-ai-strike': '',
+      style: 'color: #f87171; text-decoration: line-through;',
+    }), 0];
   },
 });
 
 // Custom mark for AI insert (green) - text to add
 const AIInsert = Mark.create({
   name: 'aiInsert',
-
   parseHTML() {
     return [
       { tag: 'ins' },
       { tag: 'span[data-ai-insert]' },
     ];
   },
-
   renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes, {
-        'data-ai-insert': '',
-        style: 'color: #4ade80; text-decoration: underline;',
-      }),
-      0,
-    ];
+    return ['span', mergeAttributes(HTMLAttributes, {
+      'data-ai-insert': '',
+      style: 'color: #4ade80; text-decoration: underline;',
+    }), 0];
   },
 });
 
 // Custom mark for approver strikethrough (blue)
 const ApproverStrike = Mark.create({
   name: 'approverStrike',
-
   parseHTML() {
-    return [
-      { tag: 'span[data-approver-strike]' },
-    ];
+    return [{ tag: 'span[data-approver-strike]' }];
   },
-
   renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes, {
-        'data-approver-strike': '',
-        style: 'color: #60A5FA; text-decoration: line-through;',
-      }),
-      0,
-    ];
+    return ['span', mergeAttributes(HTMLAttributes, {
+      'data-approver-strike': '',
+      style: 'color: #60A5FA; text-decoration: line-through;',
+    }), 0];
   },
 });
 
 // Custom mark for approver insert/underline (blue)
 const ApproverInsert = Mark.create({
   name: 'approverInsert',
-
   parseHTML() {
-    return [
-      { tag: 'span[data-approver-insert]' },
-    ];
+    return [{ tag: 'span[data-approver-insert]' }];
   },
-
   renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes, {
-        'data-approver-insert': '',
-        style: 'color: #60A5FA; text-decoration: underline;',
-      }),
-      0,
-    ];
+    return ['span', mergeAttributes(HTMLAttributes, {
+      'data-approver-insert': '',
+      style: 'color: #60A5FA; text-decoration: underline;',
+    }), 0];
   },
 });
 
 // Custom mark for approver comments (yellow highlight with data)
 const ApproverComment = Mark.create({
   name: 'approverComment',
-
   addAttributes() {
     return {
       comment: {
         default: '',
         parseHTML: (element) => element.getAttribute('data-comment') || '',
-        renderHTML: (attributes) => ({
-          'data-comment': attributes.comment || '',
-        }),
+        renderHTML: (attributes) => ({ 'data-comment': attributes.comment || '' }),
       },
       id: {
         default: null,
         parseHTML: (element) => element.getAttribute('data-comment-id'),
-        renderHTML: (attributes) => ({
-          'data-comment-id': attributes.id || '',
-        }),
+        renderHTML: (attributes) => ({ 'data-comment-id': attributes.id || '' }),
       },
     };
   },
-
   parseHTML() {
-    return [
-      { tag: 'span[data-approver-comment]' },
-    ];
+    return [{ tag: 'span[data-approver-comment]' }];
   },
-
   renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes, {
-        'data-approver-comment': '',
-        class: 'approver-comment',
-        style: 'background-color: rgba(250, 204, 21, 0.3); padding: 0 2px; border-radius: 2px; cursor: pointer;',
-      }),
-      0,
-    ];
+    return ['span', mergeAttributes(HTMLAttributes, {
+      'data-approver-comment': '',
+      class: 'approver-comment',
+      style: 'background-color: rgba(250, 204, 21, 0.3); padding: 0 2px; border-radius: 2px; cursor: pointer; position: relative;',
+      title: HTMLAttributes['data-comment'] || '',
+    }), 0];
   },
 });
 
-// Extension to handle insert mode
-const InsertMode = Extension.create({
-  name: 'insertMode',
+// Global ref for insert mode state (accessible by the plugin)
+let insertModeRef = { current: false };
 
-  addStorage() {
-    return {
-      active: false,
-    };
-  },
+// Function to create the extension with access to the ref
+function createInsertModeExtension() {
+  return Extension.create({
+    name: 'insertModeExtension',
 
-  addKeyboardShortcuts() {
-    return {
-      // Capture all printable characters when insert mode is active
-    };
-  },
-});
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          key: new PluginKey('insertMode'),
 
-// Helper to convert redline markup to HTML with proper custom tags
+          // Append transaction to add marks to newly typed text
+          appendTransaction(transactions, oldState, newState) {
+            if (!insertModeRef.current) return null;
+
+            // Check if any transaction added text
+            let textAdded = false;
+            let insertFrom = 0;
+            let insertTo = 0;
+
+            for (const tr of transactions) {
+              if (!tr.docChanged) continue;
+
+              tr.steps.forEach((step) => {
+                // @ts-expect-error - step has slice for ReplaceStep
+                if (step.slice && step.slice.content.size > 0) {
+                  textAdded = true;
+                  // @ts-expect-error - step has from/to
+                  insertFrom = step.from;
+                  // @ts-expect-error - step has from/to
+                  insertTo = step.from + step.slice.content.size;
+                }
+              });
+            }
+
+            if (!textAdded) return null;
+
+            // Apply the approverInsert mark to the newly inserted text
+            const markType = newState.schema.marks.approverInsert;
+            if (!markType) return null;
+
+            const tr = newState.tr;
+            tr.addMark(insertFrom, insertTo, markType.create());
+            return tr;
+          },
+        }),
+      ];
+    },
+  });
+}
+
+// Helper to convert redline markup to HTML
 function formatRedlinesToHTML(text: string): string {
   return text
-    // Convert [strikethrough] markers to our custom span
-    .replace(
-      /\[strikethrough\]([\s\S]*?)\[\/strikethrough\]/g,
-      '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>'
-    )
-    // Convert [underline] markers to our custom span
-    .replace(
-      /\[underline\]([\s\S]*?)\[\/underline\]/g,
-      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>'
-    )
-    // Convert ~~ markers to strike
-    .replace(
-      /~~([\s\S]*?)~~/g,
-      '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>'
-    )
-    // Convert ++ markers to insert
-    .replace(
-      /\+\+([\s\S]*?)\+\+/g,
-      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>'
-    )
-    // Preserve line breaks
+    .replace(/\[strikethrough\]([\s\S]*?)\[\/strikethrough\]/g,
+      '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>')
+    .replace(/\[underline\]([\s\S]*?)\[\/underline\]/g,
+      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>')
+    .replace(/~~([\s\S]*?)~~/g,
+      '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>')
+    .replace(/\+\+([\s\S]*?)\+\+/g,
+      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>')
     .replace(/\n/g, '<br>');
 }
 
@@ -193,31 +176,29 @@ function generateDownloadHTML(content: string, contractName: string): string {
   <title>${contractName} - Redlined Document</title>
   <style>
     body { font-family: 'Courier New', monospace; font-size: 12pt; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 20px; color: #333; }
-    span[data-ai-strike] { color: #dc2626; text-decoration: line-through; }
-    span[data-ai-insert] { color: #16a34a; text-decoration: underline; }
-    span[data-approver-strike] { color: #2563eb; text-decoration: line-through; }
-    span[data-approver-insert] { color: #2563eb; text-decoration: underline; }
+    span[data-ai-strike] { color: #dc2626 !important; text-decoration: line-through !important; }
+    span[data-ai-insert] { color: #16a34a !important; text-decoration: underline !important; }
+    span[data-approver-strike] { color: #2563eb !important; text-decoration: line-through !important; }
+    span[data-approver-insert] { color: #2563eb !important; text-decoration: underline !important; }
     span[data-approver-comment] { background-color: rgba(250, 204, 21, 0.4); padding: 0 2px; border-radius: 2px; }
-    span[data-approver-comment]::after { content: " [Comment: " attr(data-comment) "]"; font-size: 10pt; color: #666; font-style: italic; }
+    span[data-approver-comment]::after { content: " [" attr(data-comment) "]"; font-size: 10pt; color: #666; font-style: italic; }
     .legend { margin-bottom: 30px; padding: 15px; background: #f5f5f5; border-radius: 8px; }
-    .legend h3 { margin: 0 0 10px 0; font-size: 14pt; }
-    .legend-item { display: inline-block; margin-right: 20px; font-size: 11pt; }
+    .legend h3 { margin: 0 0 10px 0; }
     h1 { font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 10px; }
-    .generated { font-size: 10pt; color: #666; margin-top: 30px; padding-top: 10px; border-top: 1px solid #ddd; }
   </style>
 </head>
 <body>
   <h1>${contractName} - Redlined Document</h1>
   <div class="legend">
     <h3>Legend</h3>
-    <span class="legend-item"><span style="color: #dc2626; text-decoration: line-through;">Red Strike</span> = Original to Remove</span>
-    <span class="legend-item"><span style="color: #16a34a; text-decoration: underline;">Green Underline</span> = Original to Add</span>
-    <span class="legend-item"><span style="color: #2563eb; text-decoration: line-through;">Blue Strike</span> = Approver Remove</span>
-    <span class="legend-item"><span style="color: #2563eb; text-decoration: underline;">Blue Underline</span> = Approver Add</span>
-    <span class="legend-item"><span style="background-color: rgba(250, 204, 21, 0.4); padding: 0 4px;">Yellow</span> = Comment</span>
+    <span style="color: #dc2626; text-decoration: line-through;">Red Strike</span> = Remove |
+    <span style="color: #16a34a; text-decoration: underline;">Green Underline</span> = Add |
+    <span style="color: #2563eb; text-decoration: line-through;">Blue Strike</span> = Approver Remove |
+    <span style="color: #2563eb; text-decoration: underline;">Blue Underline</span> = Approver Add |
+    <span style="background-color: rgba(250, 204, 21, 0.4); padding: 0 4px;">Yellow</span> = Comment
   </div>
   <div class="content">${content}</div>
-  <div class="generated">Generated on ${new Date().toLocaleString()}</div>
+  <p style="margin-top: 30px; font-size: 10pt; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">Generated on ${new Date().toLocaleString()}</p>
 </body>
 </html>`;
 }
@@ -234,6 +215,7 @@ interface RedlineEditorProps {
   onChange?: (html: string) => void;
   readOnly?: boolean;
   contractName?: string;
+  paperMode?: boolean;
 }
 
 export default function RedlineEditor({
@@ -242,60 +224,47 @@ export default function RedlineEditor({
   onChange,
   readOnly = false,
   contractName = 'Contract',
+  paperMode = false,
 }: RedlineEditorProps) {
   const [insertModeActive, setInsertModeActive] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState('');
-  const insertModeRef = useRef(insertModeActive);
-
-  useEffect(() => {
-    insertModeRef.current = insertModeActive;
-  }, [insertModeActive]);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
 
   const contentToUse = approverEditedContent || formatRedlinesToHTML(initialContent);
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        strike: false,
-      }),
+      StarterKit.configure({ strike: false }),
       AIStrike,
       AIInsert,
       ApproverStrike,
       ApproverInsert,
       ApproverComment,
-      InsertMode,
+      createInsertModeExtension(),
     ],
     content: contentToUse,
     editable: !readOnly,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[300px] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-4',
-      },
-      handleTextInput: (view, from, to, text) => {
-        // When insert mode is active, wrap new text in approverInsert mark
-        if (insertModeRef.current && text) {
-          const { state } = view;
-          const insertMarkType = state.schema.marks.approverInsert;
-          if (insertMarkType) {
-            const tr = state.tr.insertText(text, from, to);
-            tr.addMark(from, from + text.length, insertMarkType.create());
-            view.dispatch(tr);
-            return true;
-          }
-        }
-        return false;
+        class: paperMode
+          ? 'prose max-w-none focus:outline-none min-h-[500px] text-gray-900 text-sm font-mono whitespace-pre-wrap leading-relaxed p-12'
+          : 'prose prose-invert max-w-none focus:outline-none min-h-[300px] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-4',
       },
     },
     onUpdate: ({ editor }) => {
       if (onChange) {
         onChange(editor.getHTML());
       }
-      // Extract comments from content
       extractComments(editor.getHTML());
     },
   });
+
+  // Sync insert mode state with the global ref
+  useEffect(() => {
+    insertModeRef.current = insertModeActive;
+  }, [insertModeActive]);
 
   // Extract comments from HTML content
   const extractComments = useCallback((html: string) => {
@@ -308,7 +277,7 @@ export default function RedlineEditor({
       const id = el.getAttribute('data-comment-id') || `comment-${index}`;
       const text = el.getAttribute('data-comment') || '';
       const highlightedText = el.textContent || '';
-      if (text) {
+      if (text || highlightedText) {
         newComments.push({ id, text, highlightedText });
       }
     });
@@ -341,9 +310,26 @@ export default function RedlineEditor({
     }
   }, [editor]);
 
+  // Scroll to comment in editor
+  const scrollToComment = useCallback((commentId: string) => {
+    if (!editorContainerRef.current) return;
+
+    const commentElement = editorContainerRef.current.querySelector(
+      `span[data-comment-id="${commentId}"]`
+    );
+
+    if (commentElement) {
+      commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Flash highlight effect
+      commentElement.classList.add('ring-2', 'ring-yellow-400');
+      setTimeout(() => {
+        commentElement.classList.remove('ring-2', 'ring-yellow-400');
+      }, 2000);
+    }
+  }, []);
+
   const handleUpdateComment = useCallback((id: string, newText: string) => {
     if (editor) {
-      // Find and update the comment in the document
       const html = editor.getHTML();
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
@@ -351,6 +337,7 @@ export default function RedlineEditor({
 
       if (commentEl) {
         commentEl.setAttribute('data-comment', newText);
+        commentEl.setAttribute('title', newText);
         editor.commands.setContent(doc.body.innerHTML);
       }
 
@@ -367,7 +354,6 @@ export default function RedlineEditor({
       const commentEl = doc.querySelector(`span[data-comment-id="${id}"]`);
 
       if (commentEl) {
-        // Replace the comment span with just its text content
         const textNode = document.createTextNode(commentEl.textContent || '');
         commentEl.parentNode?.replaceChild(textNode, commentEl);
         editor.commands.setContent(doc.body.innerHTML);
@@ -396,6 +382,61 @@ export default function RedlineEditor({
 
   const hasContent = editor ? editor.getHTML().length > 0 : false;
 
+  // Paper mode: clean white document look for PandaDoc-style layout
+  if (paperMode) {
+    return (
+      <div className="overflow-hidden">
+        {!readOnly && (
+          <div className="bg-gray-50 border-b border-gray-200">
+            <EditorToolbar
+              editor={editor}
+              insertModeActive={insertModeActive}
+              onToggleInsertMode={handleToggleInsertMode}
+              onAddComment={handleAddComment}
+              onDownload={handleDownload}
+              showDownload={hasContent}
+              paperMode={true}
+            />
+          </div>
+        )}
+
+        {/* Insert mode indicator */}
+        {!readOnly && insertModeActive && (
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-xs text-blue-700 flex items-center gap-2">
+            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            INSERT MODE ON - All text you type will appear in <span className="text-blue-600 underline font-bold">blue underline</span>
+          </div>
+        )}
+
+        {/* Editor - paper style */}
+        <div
+          ref={editorContainerRef}
+          className={`bg-white ${!readOnly ? 'cursor-text' : ''} min-h-[500px] overflow-y-auto`}
+          onClick={handleEditorClick}
+        >
+          <EditorContent editor={editor} />
+        </div>
+
+        {/* Read-only download button */}
+        {readOnly && hasContent && (
+          <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 flex justify-end">
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded hover:bg-gray-200 hover:text-gray-900 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download Redlined Document
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Default dark mode layout
   return (
     <div className="border border-white/10 rounded-lg overflow-hidden">
       {!readOnly && (
@@ -413,14 +454,15 @@ export default function RedlineEditor({
       {!readOnly && insertModeActive && (
         <div className="bg-blue-500/20 border-b border-blue-500/30 px-3 py-1.5 text-xs text-blue-300 flex items-center gap-2">
           <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-          Insert mode ON - text you type will appear in blue underline
+          INSERT MODE ON - All text you type will appear in <span className="text-blue-400 underline font-bold">blue underline</span>
         </div>
       )}
 
       <div className="flex">
-        {/* Editor */}
+        {/* Editor - generous height for legal document review */}
         <div
-          className={`flex-1 bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''} max-h-[500px] overflow-y-auto`}
+          ref={editorContainerRef}
+          className={`flex-1 bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''} min-h-[600px] max-h-[calc(100vh-300px)] overflow-y-auto`}
           onClick={handleEditorClick}
         >
           <EditorContent editor={editor} />
@@ -428,74 +470,98 @@ export default function RedlineEditor({
 
         {/* Comments sidebar */}
         {comments.length > 0 && (
-          <div className="w-64 bg-[#0D1520] border-l border-white/10 max-h-[500px] overflow-y-auto">
-            <div className="p-3 border-b border-white/10">
+          <div className="w-80 bg-[#0D1520] border-l border-white/10 min-h-[600px] max-h-[calc(100vh-300px)] overflow-y-auto">
+            <div className="p-3 border-b border-white/10 sticky top-0 bg-[#0D1520] z-10">
               <h4 className="text-sm font-medium text-white flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" />
+                <MessageSquare className="w-4 h-4 text-yellow-400" />
                 Comments ({comments.length})
               </h4>
+              <p className="text-[10px] text-[#8FA3BF] mt-1">Click a comment to scroll to it</p>
             </div>
             <div className="p-2 space-y-2">
-              {comments.map((comment) => (
+              {comments.map((comment, idx) => (
                 <div
                   key={comment.id}
-                  className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2 text-xs"
+                  onClick={() => !editingComment && scrollToComment(comment.id)}
+                  className={`bg-yellow-500/10 border border-yellow-500/20 rounded p-2 text-xs cursor-pointer hover:bg-yellow-500/20 transition-colors ${
+                    editingComment === comment.id ? 'ring-1 ring-yellow-400' : ''
+                  }`}
                 >
-                  <div className="text-yellow-200/70 truncate mb-1 italic">
-                    &ldquo;{comment.highlightedText.slice(0, 30)}...&rdquo;
-                  </div>
-                  {editingComment === comment.id ? (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={editCommentText}
-                        onChange={(e) => setEditCommentText(e.target.value)}
-                        className="w-full px-2 py-1 bg-[#0B1220] border border-white/20 rounded text-white text-xs"
-                        autoFocus
-                      />
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-yellow-400 font-medium">#{idx + 1}</span>
+                    {!readOnly && !editingComment && (
                       <div className="flex gap-1">
                         <button
-                          onClick={() => handleUpdateComment(comment.id, editCommentText)}
-                          className="flex-1 px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs hover:bg-blue-500/30"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingComment(comment.id);
+                            setEditCommentText(comment.text);
+                          }}
+                          className="p-1 text-gray-400 hover:text-white"
+                          title="Edit comment"
                         >
-                          Save
+                          <Edit3 className="w-3 h-3" />
                         </button>
                         <button
-                          onClick={() => {
-                            setEditingComment(null);
-                            setEditCommentText('');
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteComment(comment.id);
                           }}
-                          className="px-2 py-1 text-gray-400 hover:text-white"
+                          className="p-1 text-gray-400 hover:text-red-400"
+                          title="Delete comment"
                         >
                           <X className="w-3 h-3" />
                         </button>
                       </div>
+                    )}
+                  </div>
+                  <div className="text-yellow-200/60 text-[10px] truncate mb-1 italic border-l-2 border-yellow-500/30 pl-2">
+                    {comment.highlightedText.slice(0, 50)}{comment.highlightedText.length > 50 ? '...' : ''}
+                  </div>
+                  {editingComment === comment.id ? (
+                    <div className="space-y-2 mt-2">
+                      <input
+                        type="text"
+                        value={editCommentText}
+                        onChange={(e) => setEditCommentText(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full px-2 py-1 bg-[#0B1220] border border-white/20 rounded text-white text-xs"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleUpdateComment(comment.id, editCommentText);
+                          } else if (e.key === 'Escape') {
+                            setEditingComment(null);
+                            setEditCommentText('');
+                          }
+                        }}
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdateComment(comment.id, editCommentText);
+                          }}
+                          className="flex-1 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs hover:bg-yellow-500/30"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingComment(null);
+                            setEditCommentText('');
+                          }}
+                          className="px-2 py-1 text-gray-400 hover:text-white text-xs"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <>
-                      <div className="text-white mb-2">{comment.text}</div>
-                      {!readOnly && (
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingComment(comment.id);
-                              setEditCommentText(comment.text);
-                            }}
-                            className="p-1 text-gray-400 hover:text-white"
-                            title="Edit comment"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteComment(comment.id)}
-                            className="p-1 text-gray-400 hover:text-red-400"
-                            title="Delete comment"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                    </>
+                    <div className="text-white mt-1 bg-[#0B1220]/50 p-1.5 rounded">
+                      {comment.text || <span className="text-gray-500 italic">No comment text</span>}
+                    </div>
                   )}
                 </div>
               ))}
