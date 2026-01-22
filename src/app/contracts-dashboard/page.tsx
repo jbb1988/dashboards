@@ -347,6 +347,23 @@ interface NotionTask {
   assignee: string | null;
 }
 
+// Task type for pipeline row icons
+interface PipelineTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  due_date?: string;
+}
+
+// Document type for pipeline row icons
+interface PipelineDocument {
+  id: string;
+  document_type: string;
+  file_name: string;
+  status: string;
+}
+
 // Contract Row Component - Simplified (details in drawer)
 function ContractRow({
   contract,
@@ -356,6 +373,9 @@ function ContractRow({
   onPendingStatusChange,
   openBundleModal,
   onClick,
+  tasks = [],
+  documents = [],
+  onNavigateToTask,
 }: {
   contract: Contract;
   index: number;
@@ -364,10 +384,17 @@ function ContractRow({
   onPendingStatusChange?: (contractId: string, salesforceId: string | undefined, contractName: string, notionName: string | undefined, newStatus: string, originalStatus: string) => void;
   openBundleModal?: (contract: Contract, mode: 'create' | 'add') => void;
   onClick?: () => void;
+  tasks?: PipelineTask[];
+  documents?: PipelineDocument[];
+  onNavigateToTask?: (taskId: string) => void;
 }) {
   const [isSaving, setIsSaving] = useState(false);
   const [showDateTooltip, setShowDateTooltip] = useState(false);
+  const [showTaskTooltip, setShowTaskTooltip] = useState(false);
+  const [showDocTooltip, setShowDocTooltip] = useState(false);
   const dateTooltipRef = useRef<HTMLDivElement>(null);
+  const taskIconRef = useRef<HTMLButtonElement>(null);
+  const docIconRef = useRef<HTMLDivElement>(null);
 
   // Use pending status if available (batch mode)
   const effectiveStatus = pendingStatus || contract.status;
@@ -499,6 +526,158 @@ function ContractRow({
                   >
                     {contract.bundleInfo.isPrimary ? '★' : '⚏'}
                   </span>
+                )}
+
+                {/* Task Icon - shows only when tasks exist */}
+                {tasks.length > 0 && (
+                  <div className="relative flex-shrink-0">
+                    <button
+                      ref={taskIconRef}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Navigate to the first task when clicked
+                        const pendingTask = tasks.find(t => t.status !== 'completed') || tasks[0];
+                        if (pendingTask && onNavigateToTask) {
+                          onNavigateToTask(pendingTask.id);
+                        }
+                      }}
+                      onMouseEnter={() => setShowTaskTooltip(true)}
+                      onMouseLeave={() => setShowTaskTooltip(false)}
+                      className={`p-1 rounded transition-all flex-shrink-0 ${
+                        tasks.some(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) < new Date())
+                          ? 'text-[#EF4444] hover:bg-[#EF4444]/10'
+                          : tasks.every(t => t.status === 'completed')
+                            ? 'text-[#22C55E] hover:bg-[#22C55E]/10'
+                            : 'text-[#38BDF8] hover:bg-[#38BDF8]/10'
+                      }`}
+                      title={`${tasks.length} task${tasks.length !== 1 ? 's' : ''}`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                    </button>
+
+                    {/* Task Tooltip */}
+                    <AnimatePresence>
+                      {showTaskTooltip && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                          transition={{ duration: 0.15, ease: 'easeOut' }}
+                          className="absolute z-50 top-full mt-2 left-1/2 -translate-x-1/2"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[220px] max-w-[300px]">
+                            <div className="px-4 py-2.5 border-b border-white/[0.06] bg-gradient-to-r from-[#38BDF8]/10 to-transparent">
+                              <span className="text-[10px] font-semibold text-[#38BDF8] uppercase tracking-wider">Tasks ({tasks.length})</span>
+                            </div>
+                            <div className="p-2 space-y-1 max-h-[200px] overflow-y-auto">
+                              {tasks.slice(0, 5).map(task => {
+                                const isOverdue = task.status !== 'completed' && task.due_date && new Date(task.due_date) < new Date();
+                                const isCompleted = task.status === 'completed';
+                                return (
+                                  <button
+                                    key={task.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (onNavigateToTask) onNavigateToTask(task.id);
+                                    }}
+                                    className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.05] transition-colors"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                        isOverdue ? 'bg-[#EF4444]' : isCompleted ? 'bg-[#22C55E]' : 'bg-[#38BDF8]'
+                                      }`} />
+                                      <span className={`text-[12px] truncate ${isCompleted ? 'text-[#64748B] line-through' : 'text-[#E2E8F0]'}`}>
+                                        {task.title}
+                                      </span>
+                                    </div>
+                                    {task.due_date && (
+                                      <span className={`text-[10px] ml-3.5 ${isOverdue ? 'text-[#EF4444]' : 'text-[#64748B]'}`}>
+                                        Due: {new Date(task.due_date).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                              {tasks.length > 5 && (
+                                <div className="text-[10px] text-[#64748B] text-center py-1">
+                                  +{tasks.length - 5} more
+                                </div>
+                              )}
+                            </div>
+                            <div className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-[#0F1722] border-l border-t border-white/10 rotate-45" />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+
+                {/* Documents Icon - shows only when documents exist */}
+                {documents.length > 0 && (
+                  <div
+                    ref={docIconRef}
+                    className="relative flex-shrink-0"
+                    onMouseEnter={() => setShowDocTooltip(true)}
+                    onMouseLeave={() => setShowDocTooltip(false)}
+                  >
+                    <div
+                      className="p-1 rounded text-[#A78BFA] hover:bg-[#A78BFA]/10 transition-all flex-shrink-0 cursor-default"
+                      title={`${documents.length} document${documents.length !== 1 ? 's' : ''}`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+
+                    {/* Documents Tooltip */}
+                    <AnimatePresence>
+                      {showDocTooltip && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                          transition={{ duration: 0.15, ease: 'easeOut' }}
+                          className="absolute z-50 top-full mt-2 left-1/2 -translate-x-1/2"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[200px] max-w-[280px]">
+                            <div className="px-4 py-2.5 border-b border-white/[0.06] bg-gradient-to-r from-[#A78BFA]/10 to-transparent">
+                              <span className="text-[10px] font-semibold text-[#A78BFA] uppercase tracking-wider">Documents ({documents.length})</span>
+                            </div>
+                            <div className="p-2 space-y-1 max-h-[200px] overflow-y-auto">
+                              {documents.slice(0, 5).map(doc => (
+                                <div
+                                  key={doc.id}
+                                  className="px-2 py-1.5 rounded hover:bg-white/[0.03] transition-colors"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-[#A78BFA]" />
+                                    <span className="text-[12px] text-[#E2E8F0] truncate">
+                                      {doc.document_type}
+                                    </span>
+                                  </div>
+                                  {doc.file_name && (
+                                    <span className="text-[10px] text-[#64748B] ml-3.5 truncate block">
+                                      {doc.file_name}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                              {documents.length > 5 && (
+                                <div className="text-[10px] text-[#64748B] text-center py-1">
+                                  +{documents.length - 5} more
+                                </div>
+                              )}
+                            </div>
+                            <div className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-[#0F1722] border-l border-t border-white/10 rotate-45" />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )}
               </div>
               {contract.opportunityName && contract.opportunityName !== contract.name && (
@@ -775,6 +954,29 @@ export default function ContractsDashboard() {
   const [selectedContractIndex, setSelectedContractIndex] = useState(0);
   const [taskStats, setTaskStats] = useState<{ pending: number; overdue: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // All tasks for showing icons in pipeline rows
+  const [allTasks, setAllTasks] = useState<Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    due_date?: string;
+    contract_id?: string;
+    contract_salesforce_id?: string;
+    contract_name?: string;
+    bundle_id?: string;
+    bundle_name?: string;
+  }>>([]);
+
+  // All documents for showing icons in pipeline rows
+  const [allDocuments, setAllDocuments] = useState<Array<{
+    id: string;
+    document_type: string;
+    file_name: string;
+    contract_id: string;
+    status: string;
+  }>>([]);
 
   // Contract detail drawer state
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
@@ -1055,7 +1257,7 @@ export default function ContractsDashboard() {
     }
   }, [pendingChanges]);
 
-  // Fetch task stats for KPI display
+  // Fetch task stats and all tasks for KPI display and pipeline icons
   useEffect(() => {
     async function fetchTaskStats() {
       try {
@@ -1068,7 +1270,37 @@ export default function ContractsDashboard() {
         console.error('Failed to fetch task stats:', err);
       }
     }
+
+    async function fetchAllTasks() {
+      try {
+        const response = await fetch('/api/tasks');
+        if (response.ok) {
+          const data = await response.json();
+          setAllTasks(data.tasks || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch all tasks:', err);
+      }
+    }
+
     fetchTaskStats();
+    fetchAllTasks();
+  }, [activeTab]); // Refresh when switching tabs
+
+  // Fetch all documents for pipeline icons
+  useEffect(() => {
+    async function fetchAllDocuments() {
+      try {
+        const response = await fetch('/api/contracts/documents?all=true');
+        if (response.ok) {
+          const data = await response.json();
+          setAllDocuments(data.documents || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch all documents:', err);
+      }
+    }
+    fetchAllDocuments();
   }, [activeTab]); // Refresh when switching tabs
 
   // Check Salesforce status
@@ -1650,6 +1882,36 @@ export default function ContractsDashboard() {
 
     return { totalPipeline, totalCount, overdueValue, overdueCount, dueNext30Value, dueNext30Count, highValueCount };
   }, [filteredContracts]);
+
+  // Build lookup map of tasks by contract ID (salesforceId or id)
+  const tasksByContractId = useMemo(() => {
+    const map = new Map<string, typeof allTasks>();
+    allTasks.forEach(task => {
+      // Tasks can be linked via contract_salesforce_id, contract_id, or bundle_id
+      const keys = [
+        task.contract_salesforce_id,
+        task.contract_id,
+      ].filter(Boolean) as string[];
+
+      keys.forEach(key => {
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(task);
+      });
+    });
+    return map;
+  }, [allTasks]);
+
+  // Build lookup map of documents by contract ID
+  const documentsByContractId = useMemo(() => {
+    const map = new Map<string, typeof allDocuments>();
+    allDocuments.forEach(doc => {
+      if (doc.contract_id) {
+        if (!map.has(doc.contract_id)) map.set(doc.contract_id, []);
+        map.get(doc.contract_id)!.push(doc);
+      }
+    });
+    return map;
+  }, [allDocuments]);
 
   // Calculate status breakdown from filtered contracts for the stage chart
   const filteredStatusBreakdown = useMemo(() => {
@@ -2442,18 +2704,32 @@ export default function ContractsDashboard() {
                 {/* Table Body */}
                 <div className="max-h-[600px] overflow-y-auto">
                   {filteredContracts.length > 0 ? (
-                    filteredContracts.map((contract, index) => (
-                      <ContractRow
-                        key={contract.id}
-                        contract={contract}
-                        index={index}
-                        onUpdate={handleDataRefresh}
-                        pendingStatus={pendingChanges[contract.id]?.newStatus}
-                        onPendingStatusChange={handlePendingStatusChange}
-                        openBundleModal={openBundleModal}
-                        onClick={() => setSelectedContract(contract)}
-                      />
-                    ))
+                    filteredContracts.map((contract, index) => {
+                      // Get tasks for this contract (check both salesforceId and id)
+                      const contractTasks = [
+                        ...(tasksByContractId.get(contract.salesforceId || '') || []),
+                        ...(tasksByContractId.get(contract.id) || []),
+                      ].filter((task, idx, arr) => arr.findIndex(t => t.id === task.id) === idx); // Dedupe
+
+                      // Get documents for this contract
+                      const contractDocs = documentsByContractId.get(contract.id) || [];
+
+                      return (
+                        <ContractRow
+                          key={contract.id}
+                          contract={contract}
+                          index={index}
+                          onUpdate={handleDataRefresh}
+                          pendingStatus={pendingChanges[contract.id]?.newStatus}
+                          onPendingStatusChange={handlePendingStatusChange}
+                          openBundleModal={openBundleModal}
+                          onClick={() => setSelectedContract(contract)}
+                          tasks={contractTasks}
+                          documents={contractDocs}
+                          onNavigateToTask={handleNavigateToTask}
+                        />
+                      );
+                    })
                   ) : (
                     <div className="px-6 py-12 text-center text-gray-500">
                       No contracts match the current filter
