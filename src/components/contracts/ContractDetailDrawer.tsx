@@ -1093,6 +1093,8 @@ export default function ContractDetailDrawer({
                                   }),
                                 });
                                 if (response.ok) {
+                                  // Close drawer and refresh data
+                                  onClose();
                                   onUpdate?.();
                                 } else {
                                   const result = await response.json();
