@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
@@ -131,7 +131,7 @@ interface ComparisonAnalysisResult {
 // Using Claude Sonnet 4 for all AI operations (hardcoded for best quality)
 const AI_MODEL = 'anthropic/claude-sonnet-4';
 
-export default function ContractReviewPage() {
+function ContractReviewPageContent() {
   const searchParams = useSearchParams();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<string>('');
@@ -2717,6 +2717,19 @@ export default function ContractReviewPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Wrap in Suspense for useSearchParams
+export default function ContractReviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0B1220] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#38BDF8] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ContractReviewPageContent />
+    </Suspense>
   );
 }
 
