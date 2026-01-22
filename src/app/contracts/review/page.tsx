@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 import ApprovalsQueue from '@/components/contracts/ApprovalsQueue';
 
 interface Contract {
@@ -1069,34 +1069,6 @@ export default function ContractReviewPage() {
         {/* Review Tab Content */}
         {mainTab === 'review' && (
           <>
-            {/* KPI Summary */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-          <KPICard
-            title="Contracts Available"
-            value={contracts.length}
-            subtitle="In Salesforce"
-            icon={KPIIcons.document}
-            color="#38BDF8"
-            delay={0.1}
-          />
-          <KPICard
-            title="Reviews"
-            value={history.length}
-            subtitle="Analyses completed"
-            icon={KPIIcons.trending}
-            color="#8B5CF6"
-            delay={0.2}
-          />
-          <KPICard
-            title="Quick Review"
-            value="Paste"
-            subtitle="Or upload documents"
-            icon={KPIIcons.clipboard}
-            color="#22C55E"
-            delay={0.3}
-          />
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Input Panel */}
           <motion.div
