@@ -48,7 +48,35 @@ export async function GET(
       }
     }
 
-    // Return review data
+    // Fetch related documents (by contract_id)
+    let documents: Array<{
+      id: string;
+      file_name: string;
+      file_url: string;
+      document_type: string;
+      uploaded_at: string;
+      file_mime_type: string | null;
+      converted_pdf_url: string | null;
+    }> = [];
+
+    if (review.contract_id) {
+      const { data: docs } = await admin
+        .from('documents')
+        .select('id, file_name, file_url, document_type, uploaded_at, file_mime_type, converted_pdf_url')
+        .eq('contract_id', review.contract_id)
+        .order('uploaded_at', { ascending: false });
+
+      documents = docs || [];
+    }
+
+    // Fetch comments for this review
+    const { data: comments } = await admin
+      .from('approval_comments')
+      .select('id, author_email, author_name, comment, created_at')
+      .eq('review_id', review.id)
+      .order('created_at', { ascending: true });
+
+    // Return review data with documents and comments
     return NextResponse.json({
       id: review.id,
       contractId: review.contract_id,
@@ -61,6 +89,22 @@ export async function GET(
       redlinedText: review.redlined_text,
       modifiedText: review.modified_text,
       approvalStatus: review.approval_status,
+      documents: documents.map(doc => ({
+        id: doc.id,
+        fileName: doc.file_name,
+        fileUrl: doc.file_url,
+        documentType: doc.document_type,
+        uploadedAt: doc.uploaded_at,
+        mimeType: doc.file_mime_type,
+        convertedPdfUrl: doc.converted_pdf_url,
+      })),
+      comments: (comments || []).map(c => ({
+        id: c.id,
+        authorEmail: c.author_email,
+        authorName: c.author_name,
+        comment: c.comment,
+        createdAt: c.created_at,
+      })),
     });
 
   } catch (error) {

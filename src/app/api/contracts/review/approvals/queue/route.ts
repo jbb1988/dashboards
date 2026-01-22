@@ -38,6 +38,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get comment counts for all reviews
+    const reviewIds = (reviews || []).map(r => r.id);
+    let commentCountsMap: Record<string, number> = {};
+
+    if (reviewIds.length > 0) {
+      const { data: commentCounts } = await admin
+        .from('approval_comments')
+        .select('review_id')
+        .in('review_id', reviewIds);
+
+      // Count comments per review
+      if (commentCounts) {
+        for (const c of commentCounts) {
+          commentCountsMap[c.review_id] = (commentCountsMap[c.review_id] || 0) + 1;
+        }
+      }
+    }
+
     // Calculate urgency and days in queue
     const now = new Date();
     const approvals = (reviews || []).map(review => {
@@ -69,6 +87,7 @@ export async function GET(request: NextRequest) {
         summary: review.summary || [],
         urgency,
         approvalToken: review.approval_token,
+        commentCount: commentCountsMap[review.id] || 0,
       };
     });
 

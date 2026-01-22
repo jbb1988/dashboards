@@ -18,6 +18,7 @@ interface Approval {
   summary: string[];
   urgency: 'critical' | 'high' | 'normal';
   approvalToken?: string;
+  commentCount: number;
 }
 
 interface ApprovalsData {
@@ -206,17 +207,27 @@ export default function ApprovalsQueue() {
                 )}
               </div>
 
-              {/* Status Badge */}
-              <div
-                className={`px-3 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
-                  approval.approvalStatus === 'pending'
-                    ? 'bg-amber-500/20 text-amber-400'
-                    : approval.approvalStatus === 'approved'
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-red-500/20 text-red-400'
-                }`}
-              >
-                {approval.approvalStatus.toUpperCase()}
+              {/* Status Badge and Comment Count */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {approval.commentCount > 0 && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-[#38BDF8]/10 text-[#38BDF8] rounded-full text-xs">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <span>{approval.commentCount}</span>
+                  </div>
+                )}
+                <div
+                  className={`px-3 py-1 text-xs font-medium rounded-full ${
+                    approval.approvalStatus === 'pending'
+                      ? 'bg-amber-500/20 text-amber-400'
+                      : approval.approvalStatus === 'approved'
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-red-500/20 text-red-400'
+                  }`}
+                >
+                  {approval.approvalStatus.toUpperCase()}
+                </div>
               </div>
             </div>
 
