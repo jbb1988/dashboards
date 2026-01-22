@@ -2271,7 +2271,7 @@ export default function ContractsDashboard() {
                   onClick={() => setShowArchived(!showArchived)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 flex items-center gap-2 ${
                     showArchived
-                      ? 'bg-[#6B7280]/20 text-[#9CA3AF] ring-1 ring-[#6B7280]/30'
+                      ? 'bg-[#F59E0B]/20 text-[#F59E0B] ring-1 ring-[#F59E0B]/30'
                       : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
                   }`}
                   title={showArchived ? 'Hide archived contracts' : 'Show archived contracts'}
