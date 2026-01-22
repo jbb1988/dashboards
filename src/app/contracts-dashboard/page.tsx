@@ -1783,20 +1783,26 @@ export default function ContractsDashboard() {
       });
     }
 
-    // Focus Mode filter - next 90 days, all types, budgeted only
+    // Focus Mode filter - next 6 months, 60%+ probability, actionable only (Year 1 and Final)
     if (focusMode) {
       const today = new Date();
-      const ninetyDaysFromNow = new Date(today);
-      ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+      const sixMonthsFromNow = new Date(today);
+      sixMonthsFromNow.setDate(sixMonthsFromNow.getDate() + 180);
 
       filtered = filtered.filter(c => {
-        // Must be budgeted
-        if (!c.budgeted) return false;
-
-        // Must have a close date within next 90 days
+        // Must have a close date within next 6 months
         if (!c.closeDate) return false;
         const closeDate = new Date(c.closeDate);
-        return closeDate >= today && closeDate <= ninetyDaysFromNow;
+        if (closeDate < today || closeDate > sixMonthsFromNow) return false;
+
+        // Must have 60%+ probability
+        const prob = c.manualCloseProbability ?? c.probability ?? 0;
+        if (prob < 60) return false;
+
+        // Must be actionable (Year 1, Final year, or no year info)
+        if (!isActionableContract(c.opportunityName)) return false;
+
+        return true;
       });
     }
 
@@ -2167,7 +2173,7 @@ export default function ContractsDashboard() {
                   <div className="absolute top-full right-0 mt-2 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
                     <div className="bg-[#1E293B] border border-white/10 rounded-lg p-3 shadow-xl">
                       <p className="text-[12px] text-[#94A3B8] leading-relaxed">
-                        Shows only budgeted contracts closing in the next 90 days. Clears all other filters.
+                        Next 6 months • 60%+ probability • Actionable only (Year 1 & Final). Clears other filters.
                       </p>
                     </div>
                   </div>
