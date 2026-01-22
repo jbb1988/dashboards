@@ -393,7 +393,9 @@ function ContractRow({
   const [isSaving, setIsSaving] = useState(false);
   const [showDateTooltip, setShowDateTooltip] = useState(false);
   const [showTaskTooltip, setShowTaskTooltip] = useState(false);
+  const [taskTooltipPosition, setTaskTooltipPosition] = useState<{ top: number; left: number } | null>(null);
   const [showDocTooltip, setShowDocTooltip] = useState(false);
+  const [docTooltipPosition, setDocTooltipPosition] = useState<{ top: number; left: number } | null>(null);
   const dateTooltipRef = useRef<HTMLDivElement>(null);
   const taskIconRef = useRef<HTMLButtonElement>(null);
   const docIconRef = useRef<HTMLDivElement>(null);
@@ -543,8 +545,18 @@ function ContractRow({
                           onNavigateToTask(pendingTask.id);
                         }
                       }}
-                      onMouseEnter={() => setShowTaskTooltip(true)}
-                      onMouseLeave={() => setShowTaskTooltip(false)}
+                      onMouseEnter={(e) => {
+                        setShowTaskTooltip(true);
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setTaskTooltipPosition({
+                          top: rect.bottom + 8,
+                          left: rect.left + rect.width / 2
+                        });
+                      }}
+                      onMouseLeave={() => {
+                        setShowTaskTooltip(false);
+                        setTaskTooltipPosition(null);
+                      }}
                       className={`p-1 rounded transition-all flex-shrink-0 ${
                         tasks.some(t => t.status !== 'completed' && t.due_date && new Date(t.due_date) < new Date())
                           ? 'text-[#EF4444] hover:bg-[#EF4444]/10'
@@ -552,23 +564,26 @@ function ContractRow({
                             ? 'text-[#22C55E] hover:bg-[#22C55E]/10'
                             : 'text-[#38BDF8] hover:bg-[#38BDF8]/10'
                       }`}
-                      title={`${tasks.length} task${tasks.length !== 1 ? 's' : ''}`}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                       </svg>
                     </button>
 
-                    {/* Task Tooltip */}
+                    {/* Task Tooltip - Fixed position to escape overflow containers */}
                     <AnimatePresence>
-                      {showTaskTooltip && (
+                      {showTaskTooltip && taskTooltipPosition && (
                         <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                          initial={{ opacity: 0, y: -8, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.95 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="absolute z-[9999] top-full mt-2 left-1/2 -translate-x-1/2"
-                          onClick={e => e.stopPropagation()}
+                          className="fixed z-[9999] pointer-events-none"
+                          style={{
+                            top: `${taskTooltipPosition.top}px`,
+                            left: `${taskTooltipPosition.left}px`,
+                            transform: 'translateX(-50%)'
+                          }}
                         >
                           <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[250px] max-w-[350px]">
                             <div className="px-4 py-2.5 border-b border-white/[0.06] bg-gradient-to-r from-[#38BDF8]/10 to-transparent">
@@ -636,28 +651,41 @@ function ContractRow({
                   <div
                     ref={docIconRef}
                     className="relative flex-shrink-0"
-                    onMouseEnter={() => setShowDocTooltip(true)}
-                    onMouseLeave={() => setShowDocTooltip(false)}
+                    onMouseEnter={(e) => {
+                      setShowDocTooltip(true);
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setDocTooltipPosition({
+                        top: rect.bottom + 8,
+                        left: rect.left + rect.width / 2
+                      });
+                    }}
+                    onMouseLeave={() => {
+                      setShowDocTooltip(false);
+                      setDocTooltipPosition(null);
+                    }}
                   >
                     <div
                       className="p-1 rounded text-[#A78BFA] hover:bg-[#A78BFA]/10 transition-all flex-shrink-0 cursor-default"
-                      title={`${documents.length} document${documents.length !== 1 ? 's' : ''}`}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </div>
 
-                    {/* Documents Tooltip */}
+                    {/* Documents Tooltip - Fixed position to escape overflow containers */}
                     <AnimatePresence>
-                      {showDocTooltip && (
+                      {showDocTooltip && docTooltipPosition && (
                         <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                          initial={{ opacity: 0, y: -8, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.95 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="absolute z-[9999] top-full mt-2 left-1/2 -translate-x-1/2"
-                          onClick={e => e.stopPropagation()}
+                          className="fixed z-[9999] pointer-events-none"
+                          style={{
+                            top: `${docTooltipPosition.top}px`,
+                            left: `${docTooltipPosition.left}px`,
+                            transform: 'translateX(-50%)'
+                          }}
                         >
                           <div className="bg-[#0F1722] border border-white/10 rounded-xl shadow-2xl shadow-black/50 backdrop-blur-xl overflow-hidden min-w-[200px] max-w-[280px]">
                             <div className="px-4 py-2.5 border-b border-white/[0.06] bg-gradient-to-r from-[#A78BFA]/10 to-transparent">
@@ -2724,12 +2752,19 @@ export default function ContractsDashboard() {
                 <div className="max-h-[600px] overflow-y-auto">
                   {filteredContracts.length > 0 ? (
                     filteredContracts.map((contract, index) => {
-                      // Get tasks for this contract (check salesforceId, id, and name)
+                      // Get tasks for this contract (check salesforceId, id, name, notionName, opportunityName)
                       const contractTasks = [
                         ...(tasksByContractId.get(contract.salesforceId || '') || []),
                         ...(tasksByContractId.get(contract.id) || []),
                         ...(tasksByContractId.get(contract.name) || []),
                         ...(contract.opportunityName ? (tasksByContractId.get(contract.opportunityName) || []) : []),
+                        ...(contract.notionName ? (tasksByContractId.get(contract.notionName) || []) : []),
+                        // Also check for partial matches - tasks with contract_name containing account name
+                        ...allTasks.filter(task =>
+                          task.contract_name &&
+                          (task.contract_name.toLowerCase().includes(contract.name.toLowerCase()) ||
+                           contract.name.toLowerCase().includes(task.contract_name.toLowerCase()))
+                        ),
                       ].filter((task, idx, arr) => arr.findIndex(t => t.id === task.id) === idx); // Dedupe
 
                       // Get documents for this contract
