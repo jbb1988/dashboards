@@ -14,6 +14,12 @@ interface Document {
   convertedPdfUrl: string | null;
 }
 
+// Check if file is a Word document
+function isWordDocument(fileName: string): boolean {
+  const lower = fileName.toLowerCase();
+  return lower.endsWith('.docx') || lower.endsWith('.doc');
+}
+
 interface ReviewData {
   id: string;
   contractId?: string;
@@ -49,6 +55,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const [decision, setDecision] = useState<'approve' | 'reject' | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [approverEmail, setApproverEmail] = useState('');
+  const [convertingDocs, setConvertingDocs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchReviewByToken();
@@ -154,10 +161,63 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
     }
   };
 
-  const openDocument = (doc: Document) => {
-    // Prefer converted PDF for DOCX files, otherwise use original URL
-    const url = doc.convertedPdfUrl || doc.fileUrl;
-    window.open(url, '_blank');
+  const openDocument = async (doc: Document) => {
+    // For PDFs, open directly
+    if (!isWordDocument(doc.fileName)) {
+      window.open(doc.fileUrl, '_blank');
+      return;
+    }
+
+    // For Word docs, check if we have a converted PDF
+    if (doc.convertedPdfUrl) {
+      window.open(doc.convertedPdfUrl, '_blank');
+      return;
+    }
+
+    // Need to convert the Word doc to PDF first
+    setConvertingDocs(prev => new Set(prev).add(doc.id));
+
+    try {
+      const response = await fetch('/api/contracts/documents/convert-to-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: doc.id,
+          fileUrl: doc.fileUrl,
+          fileName: doc.fileName,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.pdfUrl) {
+        // Update the document in state with the new PDF URL
+        if (review) {
+          setReview({
+            ...review,
+            documents: review.documents.map(d =>
+              d.id === doc.id ? { ...d, convertedPdfUrl: result.pdfUrl } : d
+            ),
+          });
+        }
+        window.open(result.pdfUrl, '_blank');
+      } else if (result.fallback) {
+        // Conversion service not available, fall back to download
+        alert('Document preview is not available. The file will download instead.');
+        window.open(doc.fileUrl, '_blank');
+      } else {
+        alert('Failed to convert document for preview. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error converting document:', err);
+      alert('Failed to convert document for preview. Please try again.');
+    } finally {
+      setConvertingDocs(prev => {
+        const next = new Set(prev);
+        next.delete(doc.id);
+        return next;
+      });
+    }
   };
 
   if (loading) {
@@ -280,13 +340,23 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                   </div>
                   <button
                     onClick={() => openDocument(doc)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#38BDF8]/10 text-[#38BDF8] rounded-lg hover:bg-[#38BDF8]/20 transition-colors flex-shrink-0"
+                    disabled={convertingDocs.has(doc.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#38BDF8]/10 text-[#38BDF8] rounded-lg hover:bg-[#38BDF8]/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-wait"
                     title="Open in new tab"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    Open
+                    {convertingDocs.has(doc.id) ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-[#38BDF8] border-t-transparent rounded-full animate-spin" />
+                        Converting...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Open
+                      </>
+                    )}
                   </button>
                 </div>
               ))}
