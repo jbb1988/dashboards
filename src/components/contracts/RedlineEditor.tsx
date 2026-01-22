@@ -2,12 +2,57 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import Highlight from '@tiptap/extension-highlight';
-import { Mark, mergeAttributes } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Mark, mergeAttributes, Extension } from '@tiptap/core';
 import EditorToolbar from './EditorToolbar';
 import { useCallback, useEffect, useState, useRef } from 'react';
+import { MessageSquare, X, Edit3 } from 'lucide-react';
+
+// Custom mark for AI strikethrough (red) - text to remove
+const AIStrike = Mark.create({
+  name: 'aiStrike',
+
+  parseHTML() {
+    return [
+      { tag: 'del' },
+      { tag: 'span[data-ai-strike]' },
+      { style: 'text-decoration: line-through', consuming: false },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, {
+        'data-ai-strike': '',
+        style: 'color: #f87171; text-decoration: line-through;',
+      }),
+      0,
+    ];
+  },
+});
+
+// Custom mark for AI insert (green) - text to add
+const AIInsert = Mark.create({
+  name: 'aiInsert',
+
+  parseHTML() {
+    return [
+      { tag: 'ins' },
+      { tag: 'span[data-ai-insert]' },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, {
+        'data-ai-insert': '',
+        style: 'color: #4ade80; text-decoration: underline;',
+      }),
+      0,
+    ];
+  },
+});
 
 // Custom mark for approver strikethrough (blue)
 const ApproverStrike = Mark.create({
@@ -15,9 +60,7 @@ const ApproverStrike = Mark.create({
 
   parseHTML() {
     return [
-      {
-        tag: 'span[data-approver-strike]',
-      },
+      { tag: 'span[data-approver-strike]' },
     ];
   },
 
@@ -39,9 +82,7 @@ const ApproverInsert = Mark.create({
 
   parseHTML() {
     return [
-      {
-        tag: 'span[data-approver-insert]',
-      },
+      { tag: 'span[data-approver-insert]' },
     ];
   },
 
@@ -57,32 +98,32 @@ const ApproverInsert = Mark.create({
   },
 });
 
-// Custom mark for approver comments (yellow highlight with tooltip)
+// Custom mark for approver comments (yellow highlight with data)
 const ApproverComment = Mark.create({
   name: 'approverComment',
 
   addAttributes() {
     return {
       comment: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-comment') || '',
+        renderHTML: (attributes) => ({
+          'data-comment': attributes.comment || '',
+        }),
+      },
+      id: {
         default: null,
-        parseHTML: (element) => element.getAttribute('data-comment'),
-        renderHTML: (attributes) => {
-          if (!attributes.comment) {
-            return {};
-          }
-          return {
-            'data-comment': attributes.comment,
-          };
-        },
+        parseHTML: (element) => element.getAttribute('data-comment-id'),
+        renderHTML: (attributes) => ({
+          'data-comment-id': attributes.id || '',
+        }),
       },
     };
   },
 
   parseHTML() {
     return [
-      {
-        tag: 'span[data-approver-comment]',
-      },
+      { tag: 'span[data-approver-comment]' },
     ];
   },
 
@@ -91,33 +132,55 @@ const ApproverComment = Mark.create({
       'span',
       mergeAttributes(HTMLAttributes, {
         'data-approver-comment': '',
-        style: 'background-color: rgba(250, 204, 21, 0.3); padding: 0 2px; border-radius: 2px; cursor: help;',
-        title: HTMLAttributes['data-comment'] || '',
+        class: 'approver-comment',
+        style: 'background-color: rgba(250, 204, 21, 0.3); padding: 0 2px; border-radius: 2px; cursor: pointer;',
       }),
       0,
     ];
   },
 });
 
-// Helper to convert redline markup to HTML with proper styling
+// Extension to handle insert mode
+const InsertMode = Extension.create({
+  name: 'insertMode',
+
+  addStorage() {
+    return {
+      active: false,
+    };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      // Capture all printable characters when insert mode is active
+    };
+  },
+});
+
+// Helper to convert redline markup to HTML with proper custom tags
 function formatRedlinesToHTML(text: string): string {
   return text
+    // Convert [strikethrough] markers to our custom span
     .replace(
-      /\[strikethrough\](.*?)\[\/strikethrough\]/g,
-      '<del style="color: #f87171; text-decoration: line-through;">$1</del>'
+      /\[strikethrough\]([\s\S]*?)\[\/strikethrough\]/g,
+      '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>'
     )
+    // Convert [underline] markers to our custom span
     .replace(
-      /\[underline\](.*?)\[\/underline\]/g,
-      '<ins style="color: #4ade80; text-decoration: underline;">$1</ins>'
+      /\[underline\]([\s\S]*?)\[\/underline\]/g,
+      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>'
     )
+    // Convert ~~ markers to strike
     .replace(
-      /~~(.*?)~~/g,
-      '<del style="color: #f87171; text-decoration: line-through;">$1</del>'
+      /~~([\s\S]*?)~~/g,
+      '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>'
     )
+    // Convert ++ markers to insert
     .replace(
-      /\+\+(.*?)\+\+/g,
-      '<ins style="color: #4ade80; text-decoration: underline;">$1</ins>'
+      /\+\+([\s\S]*?)\+\+/g,
+      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>'
     )
+    // Preserve line breaks
     .replace(/\n/g, '<br>');
 }
 
@@ -129,93 +192,40 @@ function generateDownloadHTML(content: string, contractName: string): string {
   <meta charset="UTF-8">
   <title>${contractName} - Redlined Document</title>
   <style>
-    body {
-      font-family: 'Courier New', monospace;
-      font-size: 12pt;
-      line-height: 1.6;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 20px;
-      color: #333;
-    }
-    del {
-      color: #dc2626;
-      text-decoration: line-through;
-    }
-    ins {
-      color: #16a34a;
-      text-decoration: underline;
-    }
-    span[data-approver-strike] {
-      color: #2563eb;
-      text-decoration: line-through;
-    }
-    span[data-approver-insert] {
-      color: #2563eb;
-      text-decoration: underline;
-    }
-    span[data-approver-comment] {
-      background-color: rgba(250, 204, 21, 0.4);
-      padding: 0 2px;
-      border-radius: 2px;
-    }
-    span[data-approver-comment]::after {
-      content: " [Comment: " attr(data-comment) "]";
-      font-size: 10pt;
-      color: #666;
-      font-style: italic;
-    }
-    .legend {
-      margin-bottom: 30px;
-      padding: 15px;
-      background: #f5f5f5;
-      border-radius: 8px;
-    }
-    .legend h3 {
-      margin: 0 0 10px 0;
-      font-size: 14pt;
-    }
-    .legend-item {
-      display: inline-block;
-      margin-right: 20px;
-      font-size: 11pt;
-    }
-    .legend-strike { color: #dc2626; text-decoration: line-through; }
-    .legend-add { color: #16a34a; text-decoration: underline; }
-    .legend-approver { color: #2563eb; }
-    .legend-comment { background-color: rgba(250, 204, 21, 0.4); padding: 0 4px; }
-    h1 {
-      font-size: 18pt;
-      border-bottom: 2px solid #333;
-      padding-bottom: 10px;
-    }
-    .generated {
-      font-size: 10pt;
-      color: #666;
-      margin-top: 30px;
-      padding-top: 10px;
-      border-top: 1px solid #ddd;
-    }
+    body { font-family: 'Courier New', monospace; font-size: 12pt; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 20px; color: #333; }
+    span[data-ai-strike] { color: #dc2626; text-decoration: line-through; }
+    span[data-ai-insert] { color: #16a34a; text-decoration: underline; }
+    span[data-approver-strike] { color: #2563eb; text-decoration: line-through; }
+    span[data-approver-insert] { color: #2563eb; text-decoration: underline; }
+    span[data-approver-comment] { background-color: rgba(250, 204, 21, 0.4); padding: 0 2px; border-radius: 2px; }
+    span[data-approver-comment]::after { content: " [Comment: " attr(data-comment) "]"; font-size: 10pt; color: #666; font-style: italic; }
+    .legend { margin-bottom: 30px; padding: 15px; background: #f5f5f5; border-radius: 8px; }
+    .legend h3 { margin: 0 0 10px 0; font-size: 14pt; }
+    .legend-item { display: inline-block; margin-right: 20px; font-size: 11pt; }
+    h1 { font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 10px; }
+    .generated { font-size: 10pt; color: #666; margin-top: 30px; padding-top: 10px; border-top: 1px solid #ddd; }
   </style>
 </head>
 <body>
   <h1>${contractName} - Redlined Document</h1>
   <div class="legend">
     <h3>Legend</h3>
-    <span class="legend-item"><span class="legend-strike">Strikethrough (Red)</span> = Remove</span>
-    <span class="legend-item"><span class="legend-add">Underline (Green)</span> = Add</span>
-    <span class="legend-item"><span class="legend-approver" style="text-decoration: line-through;">Strike (Blue)</span> = Approver Remove</span>
-    <span class="legend-item"><span class="legend-approver" style="text-decoration: underline;">Underline (Blue)</span> = Approver Add</span>
-    <span class="legend-item"><span class="legend-comment">Highlight</span> = Comment</span>
+    <span class="legend-item"><span style="color: #dc2626; text-decoration: line-through;">Red Strike</span> = Original to Remove</span>
+    <span class="legend-item"><span style="color: #16a34a; text-decoration: underline;">Green Underline</span> = Original to Add</span>
+    <span class="legend-item"><span style="color: #2563eb; text-decoration: line-through;">Blue Strike</span> = Approver Remove</span>
+    <span class="legend-item"><span style="color: #2563eb; text-decoration: underline;">Blue Underline</span> = Approver Add</span>
+    <span class="legend-item"><span style="background-color: rgba(250, 204, 21, 0.4); padding: 0 4px;">Yellow</span> = Comment</span>
   </div>
-  <div class="content">
-    ${content}
-  </div>
-  <div class="generated">
-    Generated on ${new Date().toLocaleString()}
-  </div>
+  <div class="content">${content}</div>
+  <div class="generated">Generated on ${new Date().toLocaleString()}</div>
 </body>
 </html>`;
+}
+
+interface Comment {
+  id: string;
+  text: string;
+  highlightedText: string;
 }
 
 interface RedlineEditorProps {
@@ -234,105 +244,45 @@ export default function RedlineEditor({
   contractName = 'Contract',
 }: RedlineEditorProps) {
   const [insertModeActive, setInsertModeActive] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState('');
   const insertModeRef = useRef(insertModeActive);
 
-  // Keep ref in sync with state
   useEffect(() => {
     insertModeRef.current = insertModeActive;
   }, [insertModeActive]);
 
   const contentToUse = approverEditedContent || formatRedlinesToHTML(initialContent);
 
-  // Create insert mode plugin
-  const createInsertModePlugin = useCallback(() => {
-    return new Plugin({
-      key: new PluginKey('insertMode'),
-      appendTransaction: (transactions, oldState, newState) => {
-        // Only process if insert mode is active and there are text changes
-        if (!insertModeRef.current) return null;
-
-        let hasTextInsert = false;
-        transactions.forEach((tr) => {
-          tr.steps.forEach((step) => {
-            // Check if this is a text insertion (ReplaceStep with content)
-            if (step.toJSON().stepType === 'replace' && step.toJSON().slice?.content?.length) {
-              hasTextInsert = true;
-            }
-          });
-        });
-
-        if (!hasTextInsert) return null;
-
-        // Find newly inserted text and apply the mark
-        const tr = newState.tr;
-        let modified = false;
-
-        newState.doc.descendants((node, pos) => {
-          if (node.isText) {
-            const marks = node.marks;
-            const hasInsertMark = marks.some((m) => m.type.name === 'approverInsert');
-
-            // Check if this text was just inserted (exists in new state but position differs or doesn't exist in old)
-            if (!hasInsertMark) {
-              // Apply mark to text that doesn't have any special formatting
-              const hasAnyRedlineMark = marks.some((m) =>
-                ['approverStrike', 'approverInsert', 'approverComment'].includes(m.type.name) ||
-                node.text?.includes('style=')
-              );
-
-              if (!hasAnyRedlineMark && node.text && !node.text.match(/^\s*$/)) {
-                // Only mark if it's likely new content (heuristic)
-                const oldText = oldState.doc.textBetween(
-                  Math.max(0, pos),
-                  Math.min(oldState.doc.content.size, pos + (node.text?.length || 0)),
-                  ''
-                );
-                if (oldText !== node.text) {
-                  // This is new or modified text
-                }
-              }
-            }
-          }
-        });
-
-        return modified ? tr : null;
-      },
-    });
-  }, []);
-
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         strike: false,
       }),
-      Underline,
-      Highlight.configure({
-        multicolor: true,
-      }),
+      AIStrike,
+      AIInsert,
       ApproverStrike,
       ApproverInsert,
       ApproverComment,
+      InsertMode,
     ],
     content: contentToUse,
     editable: !readOnly,
     editorProps: {
       attributes: {
-        class:
-          'prose prose-invert max-w-none focus:outline-none min-h-[300px] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-4',
+        class: 'prose prose-invert max-w-none focus:outline-none min-h-[300px] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-4',
       },
-      handleKeyDown: (view, event) => {
-        // When insert mode is active and user types, ensure the mark is applied
-        if (insertModeRef.current && event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+      handleTextInput: (view, from, to, text) => {
+        // When insert mode is active, wrap new text in approverInsert mark
+        if (insertModeRef.current && text) {
           const { state } = view;
-          const { from, to } = state.selection;
-
-          // If there's a selection, the typed character will replace it
-          // We need to ensure the new character gets the insert mark
-          if (!state.storedMarks?.some((m) => m.type.name === 'approverInsert')) {
-            const insertMarkType = state.schema.marks.approverInsert;
-            if (insertMarkType) {
-              view.dispatch(state.tr.addStoredMark(insertMarkType.create()));
-            }
+          const insertMarkType = state.schema.marks.approverInsert;
+          if (insertMarkType) {
+            const tr = state.tr.insertText(text, from, to);
+            tr.addMark(from, from + text.length, insertMarkType.create());
+            view.dispatch(tr);
+            return true;
           }
         }
         return false;
@@ -342,43 +292,89 @@ export default function RedlineEditor({
       if (onChange) {
         onChange(editor.getHTML());
       }
+      // Extract comments from content
+      extractComments(editor.getHTML());
     },
   });
+
+  // Extract comments from HTML content
+  const extractComments = useCallback((html: string) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const commentElements = doc.querySelectorAll('span[data-approver-comment]');
+    const newComments: Comment[] = [];
+
+    commentElements.forEach((el, index) => {
+      const id = el.getAttribute('data-comment-id') || `comment-${index}`;
+      const text = el.getAttribute('data-comment') || '';
+      const highlightedText = el.textContent || '';
+      if (text) {
+        newComments.push({ id, text, highlightedText });
+      }
+    });
+
+    setComments(newComments);
+  }, []);
+
+  // Initial comment extraction
+  useEffect(() => {
+    if (editor) {
+      extractComments(editor.getHTML());
+    }
+  }, [editor, extractComments]);
 
   useEffect(() => {
     if (editor && approverEditedContent) {
       editor.commands.setContent(approverEditedContent);
+      extractComments(approverEditedContent);
     }
-  }, [editor, approverEditedContent]);
+  }, [editor, approverEditedContent, extractComments]);
 
-  // Toggle insert mode
   const handleToggleInsertMode = useCallback(() => {
-    setInsertModeActive((prev) => {
-      const newValue = !prev;
-      if (editor) {
-        if (newValue) {
-          // Activate insert mode - set stored mark
-          const insertMarkType = editor.schema.marks.approverInsert;
-          if (insertMarkType) {
-            editor.chain().focus().setMark('approverInsert').run();
-          }
-        } else {
-          // Deactivate insert mode - remove stored mark
-          editor.chain().focus().unsetMark('approverInsert').run();
-        }
-      }
-      return newValue;
-    });
-  }, [editor]);
+    setInsertModeActive(prev => !prev);
+  }, []);
 
-  // Add comment to selected text
   const handleAddComment = useCallback((comment: string) => {
     if (editor) {
-      editor.chain().focus().setMark('approverComment', { comment }).run();
+      const id = `comment-${Date.now()}`;
+      editor.chain().focus().setMark('approverComment', { comment, id }).run();
     }
   }, [editor]);
 
-  // Download redlined document
+  const handleUpdateComment = useCallback((id: string, newText: string) => {
+    if (editor) {
+      // Find and update the comment in the document
+      const html = editor.getHTML();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const commentEl = doc.querySelector(`span[data-comment-id="${id}"]`);
+
+      if (commentEl) {
+        commentEl.setAttribute('data-comment', newText);
+        editor.commands.setContent(doc.body.innerHTML);
+      }
+
+      setEditingComment(null);
+      setEditCommentText('');
+    }
+  }, [editor]);
+
+  const handleDeleteComment = useCallback((id: string) => {
+    if (editor) {
+      const html = editor.getHTML();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const commentEl = doc.querySelector(`span[data-comment-id="${id}"]`);
+
+      if (commentEl) {
+        // Replace the comment span with just its text content
+        const textNode = document.createTextNode(commentEl.textContent || '');
+        commentEl.parentNode?.replaceChild(textNode, commentEl);
+        editor.commands.setContent(doc.body.innerHTML);
+      }
+    }
+  }, [editor]);
+
   const handleDownload = useCallback(() => {
     if (editor) {
       const html = generateDownloadHTML(editor.getHTML(), contractName);
@@ -398,13 +394,7 @@ export default function RedlineEditor({
     editor?.chain().focus().run();
   }, [editor]);
 
-  // Track if edits have been made for showing download button
-  const [hasContent, setHasContent] = useState(false);
-  useEffect(() => {
-    if (editor) {
-      setHasContent(editor.getHTML().length > 0);
-    }
-  }, [editor]);
+  const hasContent = editor ? editor.getHTML().length > 0 : false;
 
   return (
     <div className="border border-white/10 rounded-lg overflow-hidden">
@@ -418,18 +408,102 @@ export default function RedlineEditor({
           showDownload={hasContent}
         />
       )}
+
       {/* Insert mode indicator */}
       {!readOnly && insertModeActive && (
-        <div className="bg-blue-500/20 border-b border-blue-500/30 px-3 py-1.5 text-xs text-blue-300">
-          Insert mode active - text you type will appear in blue underline. Click the underline button again to turn off.
+        <div className="bg-blue-500/20 border-b border-blue-500/30 px-3 py-1.5 text-xs text-blue-300 flex items-center gap-2">
+          <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+          Insert mode ON - text you type will appear in blue underline
         </div>
       )}
-      <div
-        className={`bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''} max-h-[500px] overflow-y-auto`}
-        onClick={handleEditorClick}
-      >
-        <EditorContent editor={editor} />
+
+      <div className="flex">
+        {/* Editor */}
+        <div
+          className={`flex-1 bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''} max-h-[500px] overflow-y-auto`}
+          onClick={handleEditorClick}
+        >
+          <EditorContent editor={editor} />
+        </div>
+
+        {/* Comments sidebar */}
+        {comments.length > 0 && (
+          <div className="w-64 bg-[#0D1520] border-l border-white/10 max-h-[500px] overflow-y-auto">
+            <div className="p-3 border-b border-white/10">
+              <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Comments ({comments.length})
+              </h4>
+            </div>
+            <div className="p-2 space-y-2">
+              {comments.map((comment) => (
+                <div
+                  key={comment.id}
+                  className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2 text-xs"
+                >
+                  <div className="text-yellow-200/70 truncate mb-1 italic">
+                    &ldquo;{comment.highlightedText.slice(0, 30)}...&rdquo;
+                  </div>
+                  {editingComment === comment.id ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editCommentText}
+                        onChange={(e) => setEditCommentText(e.target.value)}
+                        className="w-full px-2 py-1 bg-[#0B1220] border border-white/20 rounded text-white text-xs"
+                        autoFocus
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleUpdateComment(comment.id, editCommentText)}
+                          className="flex-1 px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs hover:bg-blue-500/30"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingComment(null);
+                            setEditCommentText('');
+                          }}
+                          className="px-2 py-1 text-gray-400 hover:text-white"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-white mb-2">{comment.text}</div>
+                      {!readOnly && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingComment(comment.id);
+                              setEditCommentText(comment.text);
+                            }}
+                            className="p-1 text-gray-400 hover:text-white"
+                            title="Edit comment"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="p-1 text-gray-400 hover:text-red-400"
+                            title="Delete comment"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
       {/* Read-only download button */}
       {readOnly && hasContent && (
         <div className="bg-[#0B1220] border-t border-white/10 px-4 py-2 flex justify-end">

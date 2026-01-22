@@ -180,7 +180,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
     }
   };
 
-  const openDocument = (doc: Document) => {
+  const openDocumentOnline = (doc: Document) => {
     // For Word documents, use Microsoft Office Online viewer
     if (isWordDocument(doc.fileName)) {
       const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(doc.fileUrl)}`;
@@ -190,6 +190,13 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
 
     // For PDFs and other files, open directly
     window.open(doc.fileUrl, '_blank');
+  };
+
+  const openInDesktopWord = (doc: Document) => {
+    // Use ms-word protocol to open in desktop Word
+    // This works when Word is installed on the user's machine
+    const wordUrl = `ms-word:ofe|u|${doc.fileUrl}`;
+    window.location.href = wordUrl;
   };
 
   if (loading) {
@@ -286,46 +293,6 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
           )}
         </motion.div>
 
-        {/* Supporting Documents */}
-        {review.documents.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
-          >
-            <h3 className="text-lg font-bold text-white mb-4">Supporting Documents</h3>
-            <div className="space-y-2">
-              {review.documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center justify-between bg-[#0B1220] border border-white/10 rounded-lg p-3 hover:border-white/20 transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <svg className="w-5 h-5 text-[#8FA3BF] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="text-sm text-white truncate">{doc.fileName}</span>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded border flex-shrink-0 ${getDocumentTypeColor(doc.documentType)}`}>
-                      {doc.documentType}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => openDocument(doc)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#38BDF8]/10 text-[#38BDF8] rounded-lg hover:bg-[#38BDF8]/20 transition-colors flex-shrink-0"
-                    title="Open in new tab"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    Open
-                  </button>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
         {/* Redlined Document with Editor */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -358,6 +325,60 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
             transition={{ delay: 0.45 }}
           >
             <ActivityLog entries={review.activityLog} />
+          </motion.div>
+        )}
+
+        {/* Supporting Documents */}
+        {review.documents.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
+          >
+            <h3 className="text-lg font-bold text-white mb-4">Supporting Documents</h3>
+            <div className="space-y-2">
+              {review.documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between bg-[#0B1220] border border-white/10 rounded-lg p-3 hover:border-white/20 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <svg className="w-5 h-5 text-[#8FA3BF] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-sm text-white truncate">{doc.fileName}</span>
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded border flex-shrink-0 ${getDocumentTypeColor(doc.documentType)}`}>
+                      {doc.documentType}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => openDocumentOnline(doc)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#38BDF8]/10 text-[#38BDF8] rounded-lg hover:bg-[#38BDF8]/20 transition-colors"
+                      title="Open in browser"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      View
+                    </button>
+                    {isWordDocument(doc.fileName) && (
+                      <button
+                        onClick={() => openInDesktopWord(doc)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors"
+                        title="Open in Microsoft Word (requires Word installed)"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Word
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </motion.div>
         )}
 
