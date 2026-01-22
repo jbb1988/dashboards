@@ -33,6 +33,7 @@ interface ContractsPipelineFilters {
   probabilityMax: number;
   activeTab: 'pipeline' | 'tasks' | 'documents';
   showArchived: boolean;
+  focusMode: boolean;
 }
 
 const DEFAULT_CONTRACTS_FILTERS: ContractsPipelineFilters = {
@@ -51,6 +52,7 @@ const DEFAULT_CONTRACTS_FILTERS: ContractsPipelineFilters = {
   probabilityMax: 100,
   activeTab: 'pipeline',
   showArchived: false,
+  focusMode: false,
 };
 
 // Types
@@ -981,6 +983,7 @@ export default function ContractsDashboard() {
     probabilityMax,
     activeTab,
     showArchived,
+    focusMode,
   } = filters;
 
   // Filter setters that update persisted state (support both direct values and callbacks)
@@ -1005,10 +1008,10 @@ export default function ContractsDashboard() {
   const setProbabilityMax = (value: number) => setFilters(f => ({ ...f, probabilityMax: value }));
   const setActiveTab = (value: 'pipeline' | 'tasks' | 'documents') => setFilters(f => ({ ...f, activeTab: value }));
   const setShowArchived = (value: boolean) => setFilters(f => ({ ...f, showArchived: value }));
+  const setFocusMode = (value: boolean) => setFilters(f => ({ ...f, focusMode: value }));
 
   // Non-persisted UI state
   const [contractYearDropdownOpen, setContractYearDropdownOpen] = useState(false); // Dropdown open state
-  const [focusMode, setFocusMode] = useState(false); // Focus Mode - highlight critical items
   const [filterPanelOpen, setFilterPanelOpen] = useState(false); // Slide-out filter panel
   const [dataSource, setDataSource] = useState<DataSource>('supabase');
   const [salesforceStatus, setSalesforceStatus] = useState<'connected' | 'needs_auth' | 'not_configured'>('connected');
