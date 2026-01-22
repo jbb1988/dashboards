@@ -787,7 +787,7 @@ function ContractRow({
                     <option key={s} value={s} className="bg-[#0a1628] text-white">{s}</option>
                   ))}
                   <option disabled className="bg-[#0a1628] text-gray-600">────────────</option>
-                  <option value={ARCHIVE_STATUS} className="bg-[#0a1628] text-gray-400">📦 Archive</option>
+                  <option value={ARCHIVE_STATUS} className="bg-[#0a1628] text-gray-400">Archive</option>
                 </select>
                 {/* Pending change indicator */}
                 {hasPendingChange && (
