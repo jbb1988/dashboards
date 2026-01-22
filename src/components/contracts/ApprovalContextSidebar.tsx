@@ -183,7 +183,7 @@ export default function ApprovalContextSidebar({
         {isOpen && activeTab && (
           <motion.div
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 450, opacity: 1 }}
+            animate={{ width: 500, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="bg-[#151F2E] border-l border-white/10 overflow-hidden flex flex-col"
