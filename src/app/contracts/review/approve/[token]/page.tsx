@@ -295,7 +295,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
           <h1 className="text-3xl font-bold text-white mb-2">
             Contract Approval Request
           </h1>
-          <p className="text-[#8FA3BF]">Review the AI-analyzed contract and provide your decision</p>
+          <p className="text-[#8FA3BF]">Review the analyzed contract and provide your decision</p>
         </motion.div>
       </div>
 
@@ -320,14 +320,14 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
           </div>
         </motion.div>
 
-        {/* AI Summary Card */}
+        {/* Analysis Summary Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
         >
-          <h3 className="text-lg font-bold text-white mb-4">AI Analysis Summary</h3>
+          <h3 className="text-lg font-bold text-white mb-4">Analysis Summary</h3>
           <ul className="space-y-2">
             {review.summary.map((item, idx) => (
               <motion.li
