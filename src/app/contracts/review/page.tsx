@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
@@ -131,6 +132,7 @@ interface ComparisonAnalysisResult {
 const AI_MODEL = 'anthropic/claude-sonnet-4';
 
 export default function ContractReviewPage() {
+  const searchParams = useSearchParams();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<string>('');
   const [contractSearch, setContractSearch] = useState('');
@@ -205,6 +207,44 @@ export default function ContractReviewPage() {
     fetchContracts();
     fetchHistory();
   }, []);
+
+  // Handle reviewId from URL query params (from "View Full Review" button)
+  useEffect(() => {
+    const reviewId = searchParams.get('reviewId');
+    if (reviewId) {
+      loadReviewById(reviewId);
+    }
+  }, [searchParams]);
+
+  async function loadReviewById(reviewId: string) {
+    try {
+      const response = await fetch(`/api/contracts/review/by-id/${reviewId}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Load the review data into the editor
+        if (data.originalText && data.redlinedText) {
+          setInputText(data.originalText);
+          setProvisionName(data.provisionName || '');
+          if (data.contractId) {
+            setSelectedContract(data.contractId);
+          }
+          setResult({
+            redlinedText: data.redlinedText,
+            originalText: data.originalText,
+            modifiedText: data.modifiedText || '',
+            summary: data.summary || [],
+            timestamp: data.createdAt,
+          });
+          setActiveTab('paste');
+          setMainTab('review');
+        }
+      } else {
+        console.error('Failed to fetch review by ID:', response.status);
+      }
+    } catch (err) {
+      console.error('Error loading review by ID:', err);
+    }
+  }
 
   async function fetchHistory() {
     try {

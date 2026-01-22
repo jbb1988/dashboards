@@ -39,6 +39,16 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
+    // Create initial activity log entry for submission
+    const submittedAt = new Date().toISOString();
+    const activityLog = [
+      {
+        action: 'submitted',
+        by: submittedBy,
+        at: submittedAt,
+      },
+    ];
+
     // Update contract_reviews with approval data
     const { error: updateError } = await admin
       .from('contract_reviews')
@@ -47,9 +57,10 @@ export async function POST(request: NextRequest) {
         approval_token: approvalToken,
         token_expires_at: expiresAt.toISOString(),
         submitted_by_email: submittedBy,
-        submitted_at: new Date().toISOString(),
+        submitted_at: submittedAt,
         status: 'sent_to_boss', // Legacy status field
-        updated_at: new Date().toISOString(),
+        updated_at: submittedAt,
+        activity_log: activityLog,
       })
       .eq('id', reviewId);
 
