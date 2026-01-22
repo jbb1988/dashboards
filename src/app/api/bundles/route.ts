@@ -312,11 +312,20 @@ export async function PATCH(request: NextRequest) {
 
     // Remove contracts from bundle
     if (remove_contracts && remove_contracts.length > 0) {
+      // First, try to resolve any salesforce_ids to database UUIDs
+      const { data: contractsData } = await supabase
+        .from('contracts')
+        .select('id, salesforce_id')
+        .or(remove_contracts.map((id: string) => `id.eq.${id},salesforce_id.eq.${id}`).join(','));
+
+      // Get the actual database UUIDs
+      const dbIds = contractsData?.map(c => c.id) || remove_contracts;
+
       const { error: removeError } = await supabase
         .from('bundle_contracts')
         .delete()
         .eq('bundle_id', bundle_id)
-        .in('contract_id', remove_contracts);
+        .in('contract_id', dbIds);
 
       if (removeError) {
         console.error('[BUNDLES] Error removing contracts:', removeError);
