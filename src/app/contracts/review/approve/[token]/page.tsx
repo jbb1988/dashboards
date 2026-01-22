@@ -11,7 +11,7 @@ import { ActivityLogEntry } from '@/components/contracts/ActivityLog';
 // Dynamically import RedlineEditor to avoid SSR issues with TipTap
 const RedlineEditor = dynamic(
   () => import('@/components/contracts/RedlineEditor'),
-  { ssr: false, loading: () => <div className="h-full bg-white animate-pulse rounded" /> }
+  { ssr: false, loading: () => <div className="h-full bg-[#0B1220] animate-pulse rounded" /> }
 );
 
 interface Document {
@@ -335,32 +335,26 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
 
         {/* Main Content: Document + Context Sidebar */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Document Viewer Area */}
-          <div className="flex-1 overflow-auto bg-[#0B1220] p-6">
-            {/* Paper-style Document Container */}
+          {/* Document Viewer Area - aligned left */}
+          <div className="flex-1 overflow-auto bg-[#0B1220]">
+            {/* Document Container */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-4xl mx-auto"
+              ref={editorRef}
+              className="min-h-[calc(100vh-60px)]"
             >
-              {/* Document Paper */}
-              <div
-                ref={editorRef}
-                className="bg-white rounded shadow-lg shadow-black/20 min-h-[calc(100vh-180px)]"
-              >
-                <RedlineEditor
-                  initialContent={review.redlinedText}
-                  approverEditedContent={review.approverEditedText}
-                  onChange={handleEditorChange}
-                  readOnly={!!decision}
-                  contractName={review.contractName}
-                  paperMode={true}
-                />
-              </div>
+              <RedlineEditor
+                initialContent={review.redlinedText}
+                approverEditedContent={review.approverEditedText}
+                onChange={handleEditorChange}
+                readOnly={!!decision}
+                contractName={review.contractName}
+              />
             </motion.div>
           </div>
 
-          {/* Context Sidebar (Right) */}
+          {/* Context Sidebar (Right) - wider */}
           <ApprovalContextSidebar
             activeTab={contextTab}
             onTabChange={handleContextTabChange}

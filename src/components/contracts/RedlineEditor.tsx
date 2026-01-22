@@ -118,34 +118,54 @@ function createInsertModeExtension() {
             if (!insertModeRef.current) return null;
 
             // Check if any transaction added text
-            let textAdded = false;
-            let insertFrom = 0;
-            let insertTo = 0;
+            let hasInsertions = false;
+            const ranges: { from: number; to: number }[] = [];
 
             for (const tr of transactions) {
               if (!tr.docChanged) continue;
 
               tr.steps.forEach((step) => {
                 // @ts-expect-error - step has slice for ReplaceStep
-                if (step.slice && step.slice.content.size > 0) {
-                  textAdded = true;
+                const slice = step.slice;
+                if (slice && slice.content && slice.content.size > 0) {
                   // @ts-expect-error - step has from/to
-                  insertFrom = step.from;
-                  // @ts-expect-error - step has from/to
-                  insertTo = step.from + step.slice.content.size;
+                  const from = step.from;
+                  const to = from + slice.content.size;
+
+                  // Only mark if there's actual text content (not just structural changes)
+                  let hasText = false;
+                  slice.content.forEach((node: { isText: boolean; text?: string }) => {
+                    if (node.isText && node.text && node.text.length > 0) {
+                      hasText = true;
+                    }
+                  });
+
+                  if (hasText) {
+                    hasInsertions = true;
+                    ranges.push({ from, to });
+                  }
                 }
               });
             }
 
-            if (!textAdded) return null;
+            if (!hasInsertions || ranges.length === 0) return null;
 
             // Apply the approverInsert mark to the newly inserted text
             const markType = newState.schema.marks.approverInsert;
             if (!markType) return null;
 
             const tr = newState.tr;
-            tr.addMark(insertFrom, insertTo, markType.create());
-            return tr;
+            for (const range of ranges) {
+              // Make sure positions are valid
+              const docSize = tr.doc.content.size;
+              const from = Math.max(0, Math.min(range.from, docSize));
+              const to = Math.max(from, Math.min(range.to, docSize));
+              if (from < to) {
+                tr.addMark(from, to, markType.create());
+              }
+            }
+
+            return tr.steps.length > 0 ? tr : null;
           },
         }),
       ];
@@ -215,7 +235,6 @@ interface RedlineEditorProps {
   onChange?: (html: string) => void;
   readOnly?: boolean;
   contractName?: string;
-  paperMode?: boolean;
 }
 
 export default function RedlineEditor({
@@ -224,7 +243,6 @@ export default function RedlineEditor({
   onChange,
   readOnly = false,
   contractName = 'Contract',
-  paperMode = false,
 }: RedlineEditorProps) {
   const [insertModeActive, setInsertModeActive] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -248,9 +266,7 @@ export default function RedlineEditor({
     editable: !readOnly,
     editorProps: {
       attributes: {
-        class: paperMode
-          ? 'prose max-w-none focus:outline-none min-h-[500px] text-gray-900 text-sm font-mono whitespace-pre-wrap leading-relaxed p-12'
-          : 'prose prose-invert max-w-none focus:outline-none min-h-[300px] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-4',
+        class: 'prose prose-invert max-w-none focus:outline-none min-h-[calc(100vh-180px)] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-6',
       },
     },
     onUpdate: ({ editor }) => {
@@ -382,192 +398,36 @@ export default function RedlineEditor({
 
   const hasContent = editor ? editor.getHTML().length > 0 : false;
 
-  // Paper mode: clean white document look for PandaDoc-style layout
-  if (paperMode) {
-    return (
-      <div className="overflow-hidden">
-        {!readOnly && (
-          <div className="bg-gray-50 border-b border-gray-200">
-            <EditorToolbar
-              editor={editor}
-              insertModeActive={insertModeActive}
-              onToggleInsertMode={handleToggleInsertMode}
-              onAddComment={handleAddComment}
-              onDownload={handleDownload}
-              showDownload={hasContent}
-              paperMode={true}
-            />
-          </div>
-        )}
-
-        {/* Insert mode indicator */}
-        {!readOnly && insertModeActive && (
-          <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-xs text-blue-700 flex items-center gap-2">
-            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-            INSERT MODE ON - All text you type will appear in <span className="text-blue-600 underline font-bold">blue underline</span>
-          </div>
-        )}
-
-        {/* Editor - paper style */}
-        <div
-          ref={editorContainerRef}
-          className={`bg-white ${!readOnly ? 'cursor-text' : ''} min-h-[500px] overflow-y-auto`}
-          onClick={handleEditorClick}
-        >
-          <EditorContent editor={editor} />
-        </div>
-
-        {/* Read-only download button */}
-        {readOnly && hasContent && (
-          <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 flex justify-end">
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded hover:bg-gray-200 hover:text-gray-900 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download Redlined Document
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Default dark mode layout
   return (
-    <div className="border border-white/10 rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full">
+      {/* Sticky toolbar */}
       {!readOnly && (
-        <EditorToolbar
-          editor={editor}
-          insertModeActive={insertModeActive}
-          onToggleInsertMode={handleToggleInsertMode}
-          onAddComment={handleAddComment}
-          onDownload={handleDownload}
-          showDownload={hasContent}
-        />
-      )}
-
-      {/* Insert mode indicator */}
-      {!readOnly && insertModeActive && (
-        <div className="bg-blue-500/20 border-b border-blue-500/30 px-3 py-1.5 text-xs text-blue-300 flex items-center gap-2">
-          <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-          INSERT MODE ON - All text you type will appear in <span className="text-blue-400 underline font-bold">blue underline</span>
+        <div className="sticky top-0 z-20 bg-[#0B1220]">
+          <EditorToolbar
+            editor={editor}
+            insertModeActive={insertModeActive}
+            onToggleInsertMode={handleToggleInsertMode}
+            onAddComment={handleAddComment}
+            onDownload={handleDownload}
+            showDownload={hasContent}
+          />
+          {/* Insert mode indicator */}
+          {insertModeActive && (
+            <div className="bg-blue-500/20 border-b border-blue-500/30 px-3 py-1.5 text-xs text-blue-300 flex items-center gap-2">
+              <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+              INSERT MODE ON - All text you type will appear in <span className="text-blue-400 underline font-bold">blue underline</span>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="flex">
-        {/* Editor - generous height for legal document review */}
-        <div
-          ref={editorContainerRef}
-          className={`flex-1 bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''} min-h-[600px] max-h-[calc(100vh-300px)] overflow-y-auto`}
-          onClick={handleEditorClick}
-        >
-          <EditorContent editor={editor} />
-        </div>
-
-        {/* Comments sidebar */}
-        {comments.length > 0 && (
-          <div className="w-80 bg-[#0D1520] border-l border-white/10 min-h-[600px] max-h-[calc(100vh-300px)] overflow-y-auto">
-            <div className="p-3 border-b border-white/10 sticky top-0 bg-[#0D1520] z-10">
-              <h4 className="text-sm font-medium text-white flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-yellow-400" />
-                Comments ({comments.length})
-              </h4>
-              <p className="text-[10px] text-[#8FA3BF] mt-1">Click a comment to scroll to it</p>
-            </div>
-            <div className="p-2 space-y-2">
-              {comments.map((comment, idx) => (
-                <div
-                  key={comment.id}
-                  onClick={() => !editingComment && scrollToComment(comment.id)}
-                  className={`bg-yellow-500/10 border border-yellow-500/20 rounded p-2 text-xs cursor-pointer hover:bg-yellow-500/20 transition-colors ${
-                    editingComment === comment.id ? 'ring-1 ring-yellow-400' : ''
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-yellow-400 font-medium">#{idx + 1}</span>
-                    {!readOnly && !editingComment && (
-                      <div className="flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingComment(comment.id);
-                            setEditCommentText(comment.text);
-                          }}
-                          className="p-1 text-gray-400 hover:text-white"
-                          title="Edit comment"
-                        >
-                          <Edit3 className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteComment(comment.id);
-                          }}
-                          className="p-1 text-gray-400 hover:text-red-400"
-                          title="Delete comment"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-yellow-200/60 text-[10px] truncate mb-1 italic border-l-2 border-yellow-500/30 pl-2">
-                    {comment.highlightedText.slice(0, 50)}{comment.highlightedText.length > 50 ? '...' : ''}
-                  </div>
-                  {editingComment === comment.id ? (
-                    <div className="space-y-2 mt-2">
-                      <input
-                        type="text"
-                        value={editCommentText}
-                        onChange={(e) => setEditCommentText(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full px-2 py-1 bg-[#0B1220] border border-white/20 rounded text-white text-xs"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleUpdateComment(comment.id, editCommentText);
-                          } else if (e.key === 'Escape') {
-                            setEditingComment(null);
-                            setEditCommentText('');
-                          }
-                        }}
-                      />
-                      <div className="flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUpdateComment(comment.id, editCommentText);
-                          }}
-                          className="flex-1 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs hover:bg-yellow-500/30"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingComment(null);
-                            setEditCommentText('');
-                          }}
-                          className="px-2 py-1 text-gray-400 hover:text-white text-xs"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-white mt-1 bg-[#0B1220]/50 p-1.5 rounded">
-                      {comment.text || <span className="text-gray-500 italic">No comment text</span>}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Editor content */}
+      <div
+        ref={editorContainerRef}
+        className={`flex-1 bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''}`}
+        onClick={handleEditorClick}
+      >
+        <EditorContent editor={editor} />
       </div>
 
       {/* Read-only download button */}

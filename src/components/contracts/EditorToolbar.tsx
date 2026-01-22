@@ -20,7 +20,6 @@ interface EditorToolbarProps {
   onAddComment: (comment: string) => void;
   onDownload?: () => void;
   showDownload?: boolean;
-  paperMode?: boolean;
 }
 
 export default function EditorToolbar({
@@ -30,7 +29,6 @@ export default function EditorToolbar({
   onAddComment,
   onDownload,
   showDownload = false,
-  paperMode = false,
 }: EditorToolbarProps) {
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -48,15 +46,9 @@ export default function EditorToolbar({
 
   const buttonBase =
     'p-2 rounded transition-colors flex items-center justify-center';
-  const activeClass = paperMode
-    ? 'bg-blue-100 text-blue-600'
-    : 'bg-blue-500/30 text-blue-400';
-  const inactiveClass = paperMode
-    ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-    : 'bg-white/5 text-[#8FA3BF] hover:bg-white/10 hover:text-white';
-  const insertActiveClass = paperMode
-    ? 'bg-blue-200 text-blue-700 ring-2 ring-blue-300'
-    : 'bg-blue-500/50 text-blue-300 ring-2 ring-blue-400/50';
+  const activeClass = 'bg-blue-500/30 text-blue-400';
+  const inactiveClass = 'bg-white/5 text-[#8FA3BF] hover:bg-white/10 hover:text-white';
+  const insertActiveClass = 'bg-blue-500/50 text-blue-300 ring-2 ring-blue-400/50';
 
   const handleCommentClick = () => {
     const { from, to } = editor.state.selection;
@@ -84,16 +76,10 @@ export default function EditorToolbar({
     }
   };
 
-  const containerClass = paperMode
-    ? 'flex items-center gap-1 p-2 bg-gray-50 border-b border-gray-200 relative'
-    : 'flex items-center gap-1 p-2 bg-[#0B1220] border border-white/10 rounded-t-lg relative';
-
-  const dividerClass = paperMode ? 'border-gray-200' : 'border-white/10';
-
   return (
-    <div className={containerClass}>
+    <div className="flex items-center gap-1 p-2 bg-[#0B1220] border-b border-white/10 relative">
       {/* Editing tools */}
-      <div className={`flex items-center gap-1 pr-2 border-r ${dividerClass}`}>
+      <div className="flex items-center gap-1 pr-2 border-r border-white/10">
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleMark('approverStrike').run()}
@@ -140,7 +126,7 @@ export default function EditorToolbar({
       </div>
 
       {/* Undo/Redo */}
-      <div className={`flex items-center gap-1 pl-2 pr-2 border-r ${dividerClass}`}>
+      <div className="flex items-center gap-1 pl-2 pr-2 border-r border-white/10">
         <button
           type="button"
           onClick={() => editor.chain().focus().undo().run()}
@@ -163,7 +149,7 @@ export default function EditorToolbar({
 
       {/* Download */}
       {showDownload && onDownload && (
-        <div className={`flex items-center gap-1 pl-2 pr-2 border-r ${dividerClass}`}>
+        <div className="flex items-center gap-1 pl-2 pr-2 border-r border-white/10">
           <button
             type="button"
             onClick={onDownload}
@@ -176,41 +162,37 @@ export default function EditorToolbar({
       )}
 
       {/* Legend */}
-      <div className={`ml-auto flex items-center gap-3 text-xs ${paperMode ? 'text-gray-500' : 'text-[#8FA3BF]'}`}>
+      <div className="ml-auto flex items-center gap-3 text-xs text-[#8FA3BF]">
         <span className="flex items-center gap-1">
-          <span className={`w-3 h-3 rounded-sm ${paperMode ? 'bg-red-100 border border-red-300' : 'bg-red-400/30 border border-red-400/50'}`} />
+          <span className="w-3 h-3 rounded-sm bg-red-400/30 border border-red-400/50" />
           Strike
         </span>
         <span className="flex items-center gap-1">
-          <span className={`w-3 h-3 rounded-sm ${paperMode ? 'bg-green-100 border border-green-300' : 'bg-green-400/30 border border-green-400/50'}`} />
+          <span className="w-3 h-3 rounded-sm bg-green-400/30 border border-green-400/50" />
           Add
         </span>
         <span className="flex items-center gap-1">
-          <span className={`w-3 h-3 rounded-sm ${paperMode ? 'bg-blue-100 border border-blue-300' : 'bg-blue-400/30 border border-blue-400/50'}`} />
+          <span className="w-3 h-3 rounded-sm bg-blue-400/30 border border-blue-400/50" />
           Your Edits
         </span>
         <span className="flex items-center gap-1">
-          <span className={`w-3 h-3 rounded-sm ${paperMode ? 'bg-yellow-100 border border-yellow-300' : 'bg-yellow-400/30 border border-yellow-400/50'}`} />
+          <span className="w-3 h-3 rounded-sm bg-yellow-400/30 border border-yellow-400/50" />
           Comments
         </span>
       </div>
 
       {/* Comment Input Popover */}
       {showCommentInput && (
-        <div className={`absolute top-full left-0 mt-1 z-50 rounded-lg shadow-xl p-3 w-80 ${
-          paperMode
-            ? 'bg-white border border-gray-200'
-            : 'bg-[#1E293B] border border-white/20'
-        }`}>
+        <div className="absolute top-full left-0 mt-1 z-50 bg-[#1E293B] border border-white/20 rounded-lg shadow-xl p-3 w-80">
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-sm font-medium ${paperMode ? 'text-gray-900' : 'text-white'}`}>Add Comment</span>
+            <span className="text-sm font-medium text-white">Add Comment</span>
             <button
               type="button"
               onClick={() => {
                 setShowCommentInput(false);
                 setCommentText('');
               }}
-              className={paperMode ? 'text-gray-400 hover:text-gray-600' : 'text-[#8FA3BF] hover:text-white'}
+              className="text-[#8FA3BF] hover:text-white"
             >
               <X className="w-4 h-4" />
             </button>
@@ -222,11 +204,7 @@ export default function EditorToolbar({
             onChange={(e) => setCommentText(e.target.value)}
             onKeyDown={handleCommentKeyDown}
             placeholder="Enter your comment..."
-            className={`w-full px-3 py-2 rounded text-sm focus:outline-none ${
-              paperMode
-                ? 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-blue-400'
-                : 'bg-[#0B1220] border border-white/10 text-white focus:border-[#38BDF8]'
-            }`}
+            className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded text-white text-sm focus:outline-none focus:border-[#38BDF8]"
           />
           <div className="flex justify-end gap-2 mt-2">
             <button
@@ -235,9 +213,7 @@ export default function EditorToolbar({
                 setShowCommentInput(false);
                 setCommentText('');
               }}
-              className={`px-3 py-1 text-sm ${
-                paperMode ? 'text-gray-500 hover:text-gray-700' : 'text-[#8FA3BF] hover:text-white'
-              }`}
+              className="px-3 py-1 text-sm text-[#8FA3BF] hover:text-white"
             >
               Cancel
             </button>
