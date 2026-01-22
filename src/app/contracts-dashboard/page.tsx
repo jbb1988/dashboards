@@ -1469,6 +1469,7 @@ export default function ContractsDashboard() {
 
   // Fetch data based on selected source
   const fetchData = async () => {
+    console.log('[fetchData] Called with showArchived:', showArchived);
     setLoading(true);
     setError(null);
     try {
@@ -1478,6 +1479,7 @@ export default function ContractsDashboard() {
         t: Date.now().toString(),
         ...(showArchived && { includeArchived: 'true' }),
       });
+      console.log('[fetchData] Fetching with params:', params.toString());
       const response = await fetch(`${endpoint}?${params}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
@@ -1496,6 +1498,7 @@ export default function ContractsDashboard() {
   };
 
   useEffect(() => {
+    console.log('[useEffect] showArchived changed to:', showArchived);
     fetchData();
   }, [dataSource, showArchived]);
 
@@ -2271,7 +2274,10 @@ export default function ContractsDashboard() {
                 </div>
                 {/* Show Archived Toggle */}
                 <button
-                  onClick={() => setShowArchived(!showArchived)}
+                  onClick={() => {
+                    console.log('[Archived Button] Clicked, current showArchived:', showArchived, 'setting to:', !showArchived);
+                    setShowArchived(!showArchived);
+                  }}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 flex items-center gap-2 ${
                     showArchived
                       ? 'bg-[#F59E0B]/20 text-[#F59E0B] ring-1 ring-[#F59E0B]/30'
