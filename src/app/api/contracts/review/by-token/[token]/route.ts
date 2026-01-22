@@ -48,6 +48,34 @@ export async function GET(
       }
     }
 
+    // Log view activity when approval is accessed (only once - first view)
+    if (review.approval_status === 'pending') {
+      const currentLog = review.activity_log || [];
+      // Only log first view (no existing 'viewed' entries)
+      const hasBeenViewed = currentLog.some(
+        (entry: { action: string }) => entry.action === 'viewed'
+      );
+
+      if (!hasBeenViewed) {
+        const viewEntry = {
+          action: 'viewed',
+          by: 'Approver',
+          at: new Date().toISOString(),
+        };
+
+        await admin
+          .from('contract_reviews')
+          .update({
+            activity_log: [...currentLog, viewEntry],
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', review.id);
+
+        // Update local review object for response
+        review.activity_log = [...currentLog, viewEntry];
+      }
+    }
+
     // Fetch related documents (by contract_id or salesforce_id)
     let documents: Array<{
       id: string;
