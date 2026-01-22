@@ -309,6 +309,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const [expandedDateGroups, setExpandedDateGroups] = useState<Set<string>>(new Set(['overdue', 'today', 'thisWeek']));
+  const [showCompleted, setShowCompleted] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const quickAddInputRef = useRef<HTMLInputElement>(null);
 
@@ -552,6 +553,13 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
         if (!matchesTitle && !matchesContract) return false;
       }
 
+      // Completed/Incomplete toggle filter (takes precedence)
+      if (showCompleted) {
+        if (task.status !== 'completed') return false;
+      } else {
+        if (task.status === 'completed') return false;
+      }
+
       // Status filter
       if (filter === 'all') return true;
       if (filter === 'overdue') {
@@ -588,7 +596,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
     });
 
     return result;
-  }, [tasks, filter, searchQuery, sortBy]);
+  }, [tasks, filter, searchQuery, sortBy, showCompleted]);
 
   // Tasks grouped by due date for "By Due Date" view
   const tasksByDueDate = useMemo(() => {
@@ -1280,26 +1288,6 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
         />
       </div>
 
-      {/* Progress Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-[#111827] rounded-xl border border-white/[0.04] p-4"
-      >
-        <div className="flex items-center justify-between text-xs mb-2">
-          <span className="text-[#64748B]">Overall Completion Progress</span>
-          <span className="text-white font-medium">{taskKpis.progressPercent}%</span>
-        </div>
-        <div className="h-2 bg-[#0B1220] rounded-full overflow-hidden">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${taskKpis.progressPercent}%` }}
-            transition={{ duration: 1, ease: 'easeOut' }}
-            className="h-full bg-gradient-to-r from-[#22C55E] to-[#38BDF8] rounded-full"
-          />
-        </div>
-      </motion.div>
-
       {/* Search Bar */}
       <div className="relative">
         <div className="flex items-center gap-3">
@@ -1444,6 +1432,18 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
             <option value="contract">Sort: Contract</option>
             <option value="status">Sort: Status</option>
           </select>
+
+          {/* Completed/Incomplete Toggle */}
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+              showCompleted
+                ? 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
+                : 'bg-[#0B1220] text-[#8FA3BF] border border-white/[0.04] hover:text-white'
+            }`}
+          >
+            {showCompleted ? 'Completed' : 'Incomplete'}
+          </button>
 
           {/* Filter Dropdown */}
           <select
