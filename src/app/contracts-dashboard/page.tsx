@@ -2874,23 +2874,16 @@ export default function ContractsDashboard() {
                 <div className="max-h-[600px] overflow-y-auto">
                   {filteredContracts.length > 0 ? (
                     filteredContracts.map((contract, index) => {
-                      // Get tasks for this contract (check all possible linking fields)
+                      // Get tasks for this contract (check specific linking fields only - NOT account name)
                       const contractTasks = [
-                        // Direct ID matches
+                        // Direct ID matches (most reliable)
                         ...(tasksByContractId.get(contract.salesforceId || '') || []),
                         ...(tasksByContractId.get(contract.id) || []),
-                        // Name matches
-                        ...(tasksByContractId.get(contract.name) || []),
+                        // Opportunity name match (specific to this contract, not account)
                         ...(contract.opportunityName ? (tasksByContractId.get(contract.opportunityName) || []) : []),
                         ...(contract.notionName ? (tasksByContractId.get(contract.notionName) || []) : []),
                         // Bundle tasks - if contract is in a bundle, get tasks linked to that bundle
                         ...(contract.bundleInfo?.bundleId ? allTasks.filter(task => task.bundle_id === contract.bundleInfo?.bundleId) : []),
-                        // Partial name matches - tasks with contract_name containing account name or vice versa
-                        ...allTasks.filter(task =>
-                          task.contract_name &&
-                          (task.contract_name.toLowerCase().includes(contract.name.toLowerCase()) ||
-                           contract.name.toLowerCase().includes(task.contract_name.toLowerCase()))
-                        ),
                       ].filter((task, idx, arr) => arr.findIndex(t => t.id === task.id) === idx); // Dedupe
 
                       // Get documents for this contract
