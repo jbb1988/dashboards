@@ -2737,35 +2737,35 @@ export default function ContractsDashboard() {
                 </AnimatePresence>
 
                 {/* Table Column Headers */}
-                <div className="grid gap-4 px-6 py-3 text-[12px] font-semibold text-[#64748B] uppercase tracking-[0.05em] border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
+                <div className="grid gap-4 px-6 py-3 text-[11px] font-semibold text-[#64748B] tracking-wider border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 0.8fr 1.1fr 0.5fr 0.9fr 0.8fr' }}>
                   <button
                     className="text-left hover:text-white flex items-center gap-1"
                     onClick={() => { setSortField('name'); setSortDirection(d => d === 'asc' ? 'desc' : 'asc'); }}
                   >
-                    Contract
+                    CONTRACT
                     {sortField === 'name' && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
                   </button>
                   <button
-                    className="text-right hover:text-white"
+                    className="text-center hover:text-white"
                     onClick={() => { setSortField('value'); setSortDirection(d => d === 'asc' ? 'desc' : 'asc'); }}
                   >
-                    Value
+                    VALUE
                     {sortField === 'value' && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
                   </button>
-                  <div>Status</div>
-                  <div className="text-center">SF Stage</div>
+                  <div>STATUS</div>
+                  <div className="text-center">SF STAGE</div>
                   <button
                     className="text-center hover:text-white"
                     onClick={() => { setSortField('contractDate'); setSortDirection(d => d === 'asc' ? 'desc' : 'asc'); }}
                   >
-                    Contract Date
+                    CONTRACT DATE
                     {sortField === 'contractDate' && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
                   </button>
                   <button
                     className="text-center hover:text-white"
                     onClick={() => { setSortField('daysInStage'); setSortDirection(d => d === 'asc' ? 'desc' : 'asc'); }}
                   >
-                    Days Left
+                    DAYS LEFT
                     {sortField === 'daysInStage' && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
                   </button>
                 </div>
