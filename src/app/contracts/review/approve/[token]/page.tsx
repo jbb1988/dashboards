@@ -1,8 +1,15 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import DOMPurify from 'dompurify';
+import dynamic from 'next/dynamic';
+import ActivityLog, { ActivityLogEntry } from '@/components/contracts/ActivityLog';
+
+// Dynamically import RedlineEditor to avoid SSR issues with TipTap
+const RedlineEditor = dynamic(
+  () => import('@/components/contracts/RedlineEditor'),
+  { ssr: false, loading: () => <div className="h-[300px] bg-[#0B1220] rounded-lg animate-pulse" /> }
+);
 
 interface Document {
   id: string;
@@ -34,16 +41,9 @@ interface ReviewData {
   approvalStatus: string;
   approverEmail?: string;
   approvalFeedback?: string;
+  approverEditedText?: string | null;
+  activityLog?: ActivityLogEntry[];
   documents: Document[];
-}
-
-// Helper to format redlines with HTML (same as contract review page)
-function formatRedlines(text: string): string {
-  return text
-    .replace(/\[strikethrough\](.*?)\[\/strikethrough\]/g, '<del style="color: #f87171; text-decoration: line-through;">$1</del>')
-    .replace(/\[underline\](.*?)\[\/underline\]/g, '<ins style="color: #4ade80; text-decoration: underline;">$1</ins>')
-    .replace(/~~(.*?)~~/g, '<del style="color: #f87171; text-decoration: line-through;">$1</del>')
-    .replace(/\+\+(.*?)\+\+/g, '<ins style="color: #4ade80; text-decoration: underline;">$1</ins>');
 }
 
 export default function ApprovalPage({ params }: { params: Promise<{ token: string }> }) {
@@ -56,6 +56,9 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const [submitting, setSubmitting] = useState(false);
   const [approverEmail, setApproverEmail] = useState('');
   const [convertingDocs, setConvertingDocs] = useState<Set<string>>(new Set());
+  const [editorContent, setEditorContent] = useState<string | null>(null);
+  const [hasEdits, setHasEdits] = useState(false);
+  const [initialEditorContent, setInitialEditorContent] = useState<string | null>(null);
 
   useEffect(() => {
     fetchReviewByToken();
@@ -80,6 +83,12 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
       const data = await response.json();
       setReview(data);
 
+      // Set initial editor content from approver edits or null
+      if (data.approverEditedText) {
+        setEditorContent(data.approverEditedText);
+        setInitialEditorContent(data.approverEditedText);
+      }
+
       // Check if already decided
       if (data.approvalStatus === 'approved' || data.approvalStatus === 'rejected') {
         setDecision(data.approvalStatus);
@@ -92,6 +101,15 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
       setLoading(false);
     }
   };
+
+  // Handler for editor content changes
+  const handleEditorChange = useCallback((html: string) => {
+    setEditorContent(html);
+    // Mark as having edits if content differs from initial
+    if (!hasEdits && html !== initialEditorContent) {
+      setHasEdits(true);
+    }
+  }, [hasEdits, initialEditorContent]);
 
   const handleDecision = async (approve: boolean) => {
     if (!approve && !feedback.trim()) {
@@ -114,6 +132,8 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
           decision: approve ? 'approve' : 'reject',
           feedback: feedback.trim() || null,
           approverEmail: approverEmail.trim(),
+          editedText: editorContent,
+          hasEdits,
         }),
       });
 
@@ -364,26 +384,39 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
           </motion.div>
         )}
 
-        {/* Redlined Document */}
+        {/* Redlined Document with Editor */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
           className="bg-[#151F2E] border border-white/10 rounded-lg p-6"
         >
-          <h3 className="text-lg font-bold text-white mb-4">Redlined Document</h3>
-          <div className="bg-[#0B1220] border border-white/10 rounded-lg p-4 max-h-[500px] overflow-y-auto">
-            <div
-              className="text-white text-sm font-mono whitespace-pre-wrap leading-relaxed"
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(formatRedlines(review.redlinedText), {
-                  ALLOWED_TAGS: ['del', 'ins', 'span', 'br'],
-                  ALLOWED_ATTR: ['style']
-                })
-              }}
-            />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-white">Redlined Document</h3>
+            {hasEdits && !decision && (
+              <span className="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded border border-blue-500/30">
+                You have made edits
+              </span>
+            )}
           </div>
+          <RedlineEditor
+            initialContent={review.redlinedText}
+            approverEditedContent={review.approverEditedText}
+            onChange={handleEditorChange}
+            readOnly={!!decision}
+          />
         </motion.div>
+
+        {/* Activity Log */}
+        {review.activityLog && review.activityLog.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+          >
+            <ActivityLog entries={review.activityLog} />
+          </motion.div>
+        )}
 
         {/* Decision Section */}
         {!decision && (

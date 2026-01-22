@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { token, decision, feedback, approverEmail } = body;
+    const { token, decision, feedback, approverEmail, editedText, hasEdits } = body;
 
     // Validate required fields
     if (!token || !decision || !approverEmail) {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     // Fetch review by token
     const { data: review, error: fetchError } = await admin
       .from('contract_reviews')
-      .select('id, approval_status, token_expires_at')
+      .select('id, approval_status, token_expires_at, activity_log')
       .eq('approval_token', token)
       .single();
 
@@ -78,15 +78,40 @@ export async function POST(request: NextRequest) {
     const approvalStatus = decision === 'approve' ? 'approved' : 'rejected';
     const legacyStatus = decision === 'approve' ? 'approved' : 'sent_to_boss'; // Keep rejected ones as 'sent_to_boss' for resubmission
 
+    // Build activity log entries
+    const existingLog = review.activity_log || [];
+    const now = new Date().toISOString();
+    const newLogEntries = [...existingLog];
+
+    // Add edit entry if approver made edits
+    if (hasEdits && editedText) {
+      newLogEntries.push({
+        action: 'edited',
+        by: approverEmail,
+        at: now,
+        note: 'Made inline edits to the document',
+      });
+    }
+
+    // Add decision entry
+    newLogEntries.push({
+      action: decision === 'approve' ? 'approved' : 'rejected',
+      by: approverEmail,
+      at: now,
+      feedback: feedback || undefined,
+    });
+
     const { error: updateError } = await admin
       .from('contract_reviews')
       .update({
         approval_status: approvalStatus,
         approver_email: approverEmail,
         approval_feedback: feedback || null,
-        approved_at: new Date().toISOString(),
+        approved_at: now,
         status: legacyStatus,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
+        approver_edited_text: editedText || null,
+        activity_log: newLogEntries,
       })
       .eq('id', review.id);
 

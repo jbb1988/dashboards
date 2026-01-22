@@ -100,6 +100,8 @@ export async function GET(
       redlinedText: review.redlined_text,
       modifiedText: review.modified_text,
       approvalStatus: review.approval_status,
+      approverEditedText: review.approver_edited_text || null,
+      activityLog: review.activity_log || [],
       documents: documents.map(doc => ({
         id: doc.id,
         fileName: doc.file_name,
