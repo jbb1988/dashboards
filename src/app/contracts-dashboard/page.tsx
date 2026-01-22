@@ -525,10 +525,10 @@ function ContractRow({
                 )}
                 {contract.bundleInfo && (
                   <span
-                    className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#8B5CF6] flex-shrink-0 cursor-help"
-                    title={`Part of bundle: ${contract.bundleInfo.bundleName} (${contract.bundleInfo.contractCount} contracts)${contract.bundleInfo.isPrimary ? ' - Primary' : ''}`}
+                    className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 flex-shrink-0 uppercase tracking-wider"
+                    title={`Bundle: ${contract.bundleInfo.bundleName} (${contract.bundleInfo.contractCount} contracts)`}
                   >
-                    {contract.bundleInfo.isPrimary ? '★' : '⚏'}
+                    Bundle
                   </span>
                 )}
 
@@ -724,7 +724,11 @@ function ContractRow({
                   </div>
                 )}
               </div>
-              {contract.opportunityName && contract.opportunityName !== contract.name && (
+              {contract.bundleInfo ? (
+                <p className="text-purple-400 text-[12px] truncate" title={`${contract.bundleInfo.bundleName} (${contract.bundleInfo.contractCount} contracts)`}>
+                  {contract.bundleInfo.bundleName}
+                </p>
+              ) : contract.opportunityName && contract.opportunityName !== contract.name && (
                 <span className="text-[12px] text-[#64748B] truncate block" title={contract.opportunityName}>
                   {contract.opportunityName}
                 </span>
