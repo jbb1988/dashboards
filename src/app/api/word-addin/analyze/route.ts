@@ -8,6 +8,7 @@ interface Risk {
   id: string;
   type: string;
   severity: 'high' | 'medium' | 'low';
+  verdict?: 'accept' | 'negotiate' | 'push_back'; // Matches dashboard analysis output
   title: string;
   description: string;
   suggestion: string;
@@ -165,7 +166,21 @@ async function analyzeWithAI(documentText: string): Promise<{
     return basicAnalysis(documentText);
   }
 
-  const prompt = `You are a contract risk analyst for MARS. Analyze this contract document and identify potential risks and issues.
+  const prompt = `You are an expert contract attorney advising MARS Company (the Contractor/Vendor) on contract risk analysis.
+
+MARS STANDARD NEGOTIATING POSITIONS - Use these to evaluate contract terms:
+- Liability: Cap at contract value, limit to direct damages only, exclude consequential/indirect damages
+- Indemnification: Must be mutual and proportionate to fault; never indemnify for County/Client's own negligence
+- IP/Work Product: MARS retains all pre-existing IP, tools, methodologies, templates; only deliverables specifically created become client property
+- Termination: Require payment for work performed plus reasonable wind-down costs if terminated without cause
+- Warranty: Should not exceed 1 year
+- Payment: Net 30 or longer preferred
+- Audit Rights: Reasonable notice, limited frequency (annually), scope limited to records related to the agreement
+- Disputes: Preserve right to legal remedies, no unilateral final decisions by client
+- Term Extensions: Multi-year commitments should include rate locks or limited escalation
+- Insurance: Standard commercial coverage, limits proportionate to contract value
+
+Analyze this contract document and identify clauses that deviate from MARS's standard positions:
 
 Document:
 ${documentText.substring(0, 15000)}
@@ -180,16 +195,22 @@ Provide your analysis in the following JSON format:
     {
       "type": "<category: liability|indemnification|termination|ip|payment|confidentiality|warranty|other>",
       "severity": "<high|medium|low>",
+      "verdict": "<accept|negotiate|push_back>",
       "title": "<brief title>",
-      "description": "<explanation of the risk>",
+      "description": "<explanation of why this deviates from MARS position and the risk it poses>",
       "location": "<EXACT text from the document that is problematic - copy it VERBATIM including all punctuation, quotes, and whitespace so it can be found and replaced>",
       "context_before": "<the 50 characters that appear IMMEDIATELY BEFORE the problematic text in the document>",
       "context_after": "<the 50 characters that appear IMMEDIATELY AFTER the problematic text in the document>",
-      "suggestion": "<the EXACT replacement text that should replace the problematic text - write complete clause language ready to insert>",
+      "suggestion": "<the EXACT replacement text that should replace the problematic text - write complete clause language ready to insert that aligns with MARS position>",
       "clause_category": "<MUST be one of: Limitation of Liability, Indemnification, Intellectual Property, Confidentiality, Termination, Warranty, Payment Terms, Insurance, Compliance, Dispute Resolution, Force Majeure, Assignment, Notices, Governing Law, General>"
     }
   ]
 }
+
+VERDICT GUIDELINES:
+- "accept": Clause is favorable to MARS, neutral, or industry standard with no material risk
+- "negotiate": Clause has some risk but could be improved with modifications
+- "push_back": Clause is materially unfavorable and should be rejected or significantly revised
 
 CRITICAL RULES - FOLLOW EXACTLY:
 
@@ -213,15 +234,17 @@ CRITICAL RULES - FOLLOW EXACTLY:
 4. CLAUSE CATEGORY RULES:
    - "clause_category" must map to one of the MARS Clause Library categories so we can suggest pre-approved language
 
-Focus on:
-1. Unlimited liability exposure (clause_category: "Limitation of Liability")
-2. Broad indemnification requirements (clause_category: "Indemnification")
-3. Unfavorable termination terms (clause_category: "Termination")
-4. IP ownership issues (clause_category: "Intellectual Property")
-5. Payment terms and penalties (clause_category: "Payment Terms")
-6. Missing or weak confidentiality protections (clause_category: "Confidentiality")
-7. Warranty disclaimers (clause_category: "Warranty")
-8. Governing law and jurisdiction (clause_category: "Governing Law" or "Dispute Resolution")
+ANALYZE THESE KEY AREAS against MARS positions:
+1. Liability - Is it capped at contract value? Are consequential damages excluded? (clause_category: "Limitation of Liability")
+2. Indemnification - Is it mutual? Does it exclude client's own negligence? (clause_category: "Indemnification")
+3. IP/Work Product - Does MARS retain pre-existing IP? (clause_category: "Intellectual Property")
+4. Termination - Is there payment for work performed if terminated? (clause_category: "Termination")
+5. Warranty - Is warranty period 1 year or less? (clause_category: "Warranty")
+6. Payment - Net 30 or better? (clause_category: "Payment Terms")
+7. Audit Rights - Reasonable notice and frequency? (clause_category: "Compliance")
+8. Disputes - Are legal remedies preserved? (clause_category: "Dispute Resolution")
+
+For each deviation from MARS position, provide a risk entry with appropriate verdict.
 
 Return ONLY valid JSON, no additional text.`;
 
