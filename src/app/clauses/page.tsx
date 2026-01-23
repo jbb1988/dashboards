@@ -70,8 +70,8 @@ function EmptyState({ onAction }: { onAction: () => void }) {
       <div
         className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center border border-white/10"
         style={{
-          background: `linear-gradient(135deg, ${colors.accent.teal}20, ${colors.accent.teal}05)`,
-          boxShadow: `0 0 40px ${colors.accent.teal}15`,
+          background: `linear-gradient(135deg, ${colors.accent.cyan}20, ${colors.accent.cyan}05)`,
+          boxShadow: `0 0 40px ${colors.accent.cyan}15`,
         }}
       >
         <svg className="w-10 h-10 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
