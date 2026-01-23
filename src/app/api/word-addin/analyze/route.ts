@@ -61,15 +61,19 @@ export async function POST(request: NextRequest) {
     // Get relevant clause suggestions from library
     const clauseSuggestions = await getClauseSuggestions(analysisResult.identified_clause_types);
 
-    // Log the analysis
+    // Log the analysis (non-critical, ignore errors)
     const admin = getSupabaseAdmin();
-    await admin.from('word_addin_analyses').insert({
-      user_email: user.email,
-      document_length: document_text.length,
-      risk_score: analysisResult.overall_risk_score,
-      risk_count: analysisResult.risks.length,
-      analyzed_at: new Date().toISOString(),
-    }).catch(() => {/* Logging failure is non-critical */});
+    try {
+      await admin.from('word_addin_analyses').insert({
+        user_email: user.email,
+        document_length: document_text.length,
+        risk_score: analysisResult.overall_risk_score,
+        risk_count: analysisResult.risks.length,
+        analyzed_at: new Date().toISOString(),
+      });
+    } catch {
+      // Logging failure is non-critical
+    }
 
     return NextResponse.json({
       overall_risk_score: analysisResult.overall_risk_score,
