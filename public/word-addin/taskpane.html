@@ -231,6 +231,9 @@
       <button class="btn btn-primary" onclick="signIn()">
         Sign in with Microsoft
       </button>
+      <button class="btn btn-secondary" onclick="refreshAuth()" style="margin-top: 12px;">
+        Already signed in? Click to refresh
+      </button>
     </div>
 
     <!-- Main View -->
@@ -297,6 +300,8 @@
       Office.context.ui.displayDialogAsync(authUrl, {height: 60, width: 30}, function(result) {
         if (result.status === Office.AsyncResultStatus.Succeeded) {
           var dialog = result.value;
+
+          // Listen for messages from dialog
           dialog.addEventHandler(Office.EventType.DialogMessageReceived, function(args) {
             var message = JSON.parse(args.message);
             if (message.type === 'auth_success') {
@@ -310,8 +315,26 @@
               dialog.close();
             }
           });
+
+          // Also listen for dialog closed event and check localStorage
+          dialog.addEventHandler(Office.EventType.DialogEventReceived, function(args) {
+            // Dialog was closed - check if we got logged in via localStorage
+            setTimeout(checkAuth, 500);
+          });
         }
       });
+    }
+
+    // Manual refresh button
+    function refreshAuth() {
+      var token = localStorage.getItem('mars_addin_token');
+      var user = localStorage.getItem('mars_addin_user');
+      if (token && user) {
+        currentUser = JSON.parse(user);
+        showMainView();
+      } else {
+        showError('Not signed in. Please sign in again.');
+      }
     }
 
     // Show main view after login
