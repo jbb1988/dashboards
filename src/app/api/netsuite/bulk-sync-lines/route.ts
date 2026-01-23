@@ -95,9 +95,12 @@ export async function POST(request: Request) {
     const lineTable = type === 'WorkOrd' ? 'netsuite_work_order_lines' : 'netsuite_sales_order_lines';
     const fkColumn = type === 'WorkOrd' ? 'work_order_id' : 'sales_order_id';
 
+    // CRITICAL: Must fetch ALL records, not just first 1000 (Supabase default limit)
+    // There are 3000+ SOs in the database, so we need to paginate or use large limit
     const { data: txnMap } = await supabase
       .from(table)
-      .select('id, netsuite_id');
+      .select('id, netsuite_id')
+      .limit(100000); // Fetch up to 100k records
 
     const idMap: Record<string, string> = {};
     for (const row of txnMap || []) {
