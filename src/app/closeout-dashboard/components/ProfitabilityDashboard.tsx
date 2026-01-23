@@ -155,6 +155,10 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
   // Browser state
   const [showBrowser, setShowBrowser] = useState(false);
 
+  // Refresh state
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+
   // Dropdown state
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -304,6 +308,37 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     fetchData(project, selectedYear || '');
   };
 
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+
+      // Call delta sync endpoint - only fetches changed data
+      const response = await fetch('/api/profitability/sync?mode=delta', {
+        method: 'POST'
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        // Update last refresh time
+        setLastRefreshTime(new Date());
+
+        // If currently viewing a project, reload its data
+        if (projectName) {
+          await fetchData(projectName, year);
+        }
+
+        // Show success notification
+        alert(`✓ Synced ${result.stats?.updated || 0} projects`);
+      } else {
+        alert(`✗ Sync failed: ${result.error}`);
+      }
+    } catch (err) {
+      alert('✗ Sync failed');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const formatSyncTime = (timestamp: string | null) => {
     if (!timestamp) return 'Never';
     const date = new Date(timestamp);
@@ -435,6 +470,17 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
               </>
             )}
           </button>
+
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium transition-colors flex items-center gap-2"
+            title="Sync latest data from NetSuite"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Syncing...' : 'Refresh'}
+          </button>
         </div>
 
         {/* Sync Status */}
@@ -481,6 +527,41 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
       {/* Results */}
       {data && !error && (
         <div className="space-y-6">
+          {/* Zero Revenue Diagnostic */}
+          {data && data.kpis.actualRevenue === 0 && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-yellow-400 font-medium mb-2">NetSuite Data Missing</div>
+                  <div className="text-sm text-yellow-300/80 space-y-2">
+                    <p>This project shows $0.00 revenue. NetSuite sync may be incomplete:</p>
+                    <ul className="list-disc ml-5 space-y-1">
+                      <li>NetSuite sales orders not found for this project</li>
+                      <li>Work orders exist but have no linked sales orders in NetSuite</li>
+                      <li>Sales order line items missing or zero amount</li>
+                      <li>Project name mismatch between system and NetSuite</li>
+                      <li>Project not yet invoiced in NetSuite</li>
+                    </ul>
+                    <div className="mt-3 pt-3 border-t border-yellow-500/20 flex items-center justify-between">
+                      <p className="text-xs">
+                        Last synced: {formatSyncTime(data.syncStatus.lastSyncedAt)}
+                      </p>
+                      <button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-black rounded text-xs font-medium transition-colors flex items-center gap-1.5"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
+                        Re-sync from NetSuite
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 1. HIGH-LEVEL KPIs */}
           {transformedKPIs && (
             <ProfitabilityKPIs kpis={transformedKPIs} projectName={data.project.name} />
