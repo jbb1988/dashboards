@@ -5,13 +5,19 @@ import { motion } from 'framer-motion';
 
 interface Obligation {
   id: string;
+  contract_name: string;
+  counterparty_name: string | null;
   title: string;
   description: string | null;
-  contract_name: string;
   obligation_type: string;
   due_date: string | null;
   status: 'pending' | 'upcoming' | 'due' | 'overdue' | 'completed' | 'waived' | 'deferred';
   priority: 'low' | 'medium' | 'high' | 'critical';
+  assigned_to: string | null;
+  ai_extracted: boolean;
+  ai_confidence: number | null;
+  extraction_review_status: string;
+  created_at: string;
 }
 
 interface ObligationCalendarProps {
