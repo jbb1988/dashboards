@@ -22,9 +22,9 @@ export async function GET(request: NextRequest) {
 
     const { data: pendingReviews, error: fetchError } = await admin
       .from('contract_reviews')
-      .select('id, contract_name, submitted_by_email, submitted_at, created_at, approval_token, reminder_sent_at, reminder_count')
+      .select('id, contract_name, submitted_by_email, submitted_at, approval_token, reminder_sent_at, reminder_count')
       .eq('approval_status', 'pending')
-      .lt('created_at', twoDaysAgo.toISOString())
+      .lt('submitted_at', twoDaysAgo.toISOString())
       .or(`reminder_sent_at.is.null,reminder_sent_at.lt.${oneDayAgo.toISOString()}`);
 
     if (fetchError) {
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     // Send reminders for each pending review
     for (const review of pendingReviews) {
       const daysPending = Math.floor(
-        (Date.now() - new Date(review.submitted_at || review.created_at).getTime()) /
+        (Date.now() - new Date(review.submitted_at).getTime()) /
           (24 * 60 * 60 * 1000)
       );
 
