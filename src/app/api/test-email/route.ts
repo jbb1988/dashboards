@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendApprovalRequestEmail } from '@/lib/email';
+import { getAuthenticatedUser } from '@/lib/apiAuth';
 
 // POST: Send a test approval request email
 export async function POST(request: NextRequest) {
   try {
-    // Only allow in development or with secret
+    // Allow authenticated users or cron secret
     const authHeader = request.headers.get('authorization');
+    const user = await getAuthenticatedUser(request);
     const isAuthorized =
-      process.env.NODE_ENV === 'development' ||
+      user !== null ||
       authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
     if (!isAuthorized) {
