@@ -188,6 +188,9 @@ export default function App() {
   const [previewState, setPreviewState] = useState<PreviewState | null>(null);
   const [isApplyingChange, setIsApplyingChange] = useState(false);
 
+  // Track which fixes have been applied (by risk id)
+  const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
+
   // Initialize Office.js
   useEffect(() => {
     Office.onReady(() => {
@@ -271,6 +274,7 @@ export default function App() {
 
     setIsAnalyzing(true);
     setError(null);
+    setAppliedFixes(new Set()); // Clear applied fixes on new analysis
 
     try {
       const documentText = await getDocumentText();
@@ -715,6 +719,9 @@ export default function App() {
           trackClauseUsage(riskItem.matched_clause.id, previewState.clauseType);
         }
 
+        // Mark this fix as applied
+        setAppliedFixes(prev => new Set(prev).add(previewState.riskId));
+
         setPreviewState(null);
         setSuccessMessage('Change applied successfully with track changes!');
         setTimeout(() => setSuccessMessage(null), 3000);
@@ -1054,8 +1061,16 @@ export default function App() {
                           <AccordionItem key={risk.id} value={risk.id}>
                             <AccordionHeader>
                               <div style={styles.riskHeader}>
-                                {getRiskBadge(risk.severity)}
-                                <Text size={200}>{risk.title}</Text>
+                                {appliedFixes.has(risk.id) ? (
+                                  <Badge appearance="filled" color="success" icon={<CheckmarkCircle24Filled />}>
+                                    Fixed
+                                  </Badge>
+                                ) : (
+                                  getRiskBadge(risk.severity)
+                                )}
+                                <Text size={200} style={appliedFixes.has(risk.id) ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>
+                                  {risk.title}
+                                </Text>
                               </div>
                             </AccordionHeader>
                             <AccordionPanel>
@@ -1086,13 +1101,13 @@ export default function App() {
                                         size="small"
                                         appearance="primary"
                                         onClick={() => initiateFixIt(risk, 'primary')}
-                                        disabled={isApplyingChange}
-                                        style={{ backgroundColor: '#16A34A' }}
+                                        disabled={isApplyingChange || appliedFixes.has(risk.id)}
+                                        style={{ backgroundColor: appliedFixes.has(risk.id) ? '#4B5563' : '#16A34A' }}
                                       >
-                                        Fix It: Primary
+                                        {appliedFixes.has(risk.id) ? 'Applied' : 'Fix It: Primary'}
                                       </Button>
 
-                                      {risk.matched_clause.fallback_text && (
+                                      {risk.matched_clause.fallback_text && !appliedFixes.has(risk.id) && (
                                         <Button
                                           size="small"
                                           appearance="outline"
@@ -1103,7 +1118,7 @@ export default function App() {
                                         </Button>
                                       )}
 
-                                      {risk.matched_clause.last_resort_text && (
+                                      {risk.matched_clause.last_resort_text && !appliedFixes.has(risk.id) && (
                                         <Button
                                           size="small"
                                           appearance="subtle"
@@ -1126,7 +1141,7 @@ export default function App() {
                                     <Text size={200}>{risk.suggestion.substring(0, 200)}
                                       {risk.suggestion.length > 200 ? '...' : ''}</Text>
                                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                                      {risk.location && (
+                                      {risk.location && !appliedFixes.has(risk.id) && (
                                         <Button
                                           size="small"
                                           appearance="outline"

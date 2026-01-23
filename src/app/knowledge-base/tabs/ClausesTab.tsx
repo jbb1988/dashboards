@@ -21,8 +21,9 @@ interface Clause {
   primary_text: string;
   fallback_text: string | null;
   last_resort_text: string | null;
-  risk_level: 'low' | 'medium' | 'high';
-  tags: string[];
+  position_type?: 'favorable' | 'neutral' | 'fallback';
+  risk_level?: 'low' | 'medium' | 'high';
+  tags?: string[];
   usage_count: number;
   created_at: string;
   category?: ClauseCategory;
