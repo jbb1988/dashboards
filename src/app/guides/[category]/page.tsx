@@ -1065,6 +1065,205 @@ const guideContent: Record<string, GuideData> = {
           </div>
         ),
       },
+      {
+        id: 'mentions',
+        title: '@Mentions in Discussions',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Tag team members in approval discussions to get their input. Mentioned users receive instant email notifications.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">How to Use @Mentions</h4>
+              <ol className="space-y-2 text-sm list-decimal list-inside text-[#8FA3BF]">
+                <li>Open a contract review in the approval sidebar</li>
+                <li>Navigate to the <strong className="text-white">Discussion</strong> tab</li>
+                <li>In the comment box, type <strong className="text-[#38BDF8]">@</strong> followed by an email</li>
+                <li>Select from the autocomplete dropdown (shows matching users)</li>
+                <li>Submit your comment - mentioned users receive email notification</li>
+              </ol>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#38BDF8]/20">
+                <h4 className="text-[#38BDF8] font-medium mb-2">Instant Notifications</h4>
+                <p className="text-[#64748B] text-sm">
+                  Mentioned users receive an email with the comment preview and a link to view the full discussion thread.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#8B5CF6]/20">
+                <h4 className="text-[#8B5CF6] font-medium mb-2">Highlighted Mentions</h4>
+                <p className="text-[#64748B] text-sm">
+                  Mentions are highlighted in blue in the comment thread, making it easy to see who was tagged in each discussion.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#38BDF8]/10 to-[#8B5CF6]/10 rounded-lg p-4 border border-white/[0.06] mt-4">
+              <p className="text-[#8FA3BF] text-sm">
+                <strong className="text-white">Tip:</strong> Use @mentions to loop in subject matter experts for specific clauses, or notify stakeholders about important discussion points before final approval.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'reminders',
+        title: 'Approval Reminders',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              MARS automatically sends reminder emails for pending approvals to ensure contracts don't get stuck in the queue.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">How Reminders Work</h4>
+              <ul className="space-y-2 text-sm text-[#8FA3BF]">
+                <li>• Reminders are sent daily at <strong className="text-white">9:00 AM</strong></li>
+                <li>• Only pending approvals <strong className="text-white">older than 2 days</strong> receive reminders</li>
+                <li>• Each pending review gets at most <strong className="text-white">one reminder per 24 hours</strong></li>
+                <li>• Reminders include how long the approval has been pending</li>
+                <li>• Direct link to the approval page is included for quick action</li>
+              </ul>
+            </div>
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-green-500/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-bold">0-2 DAYS</span>
+                </div>
+                <p className="text-[#64748B] text-sm">
+                  Normal queue time. No reminders sent yet.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-yellow-500/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">3-5 DAYS</span>
+                </div>
+                <p className="text-[#64748B] text-sm">
+                  Daily reminders begin. Marked as "high priority" in queue.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-red-500/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-bold">6+ DAYS</span>
+                </div>
+                <p className="text-[#64748B] text-sm">
+                  Marked as "critical" with urgent reminder emails.
+                </p>
+              </div>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04] mt-4">
+              <h4 className="text-white font-medium mb-2">Confirmation Emails</h4>
+              <p className="text-[#64748B] text-sm">
+                When an approval is completed (approved or rejected), the original submitter automatically receives a confirmation email with the decision, any feedback provided, and a link to view the final review.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'version-diff',
+        title: 'Version Diff Comparison',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Compare different versions of playbooks side-by-side to see exactly what changed between updates.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Comparing Playbook Versions</h4>
+              <ol className="space-y-2 text-sm list-decimal list-inside text-[#8FA3BF]">
+                <li>Open a playbook from the <strong className="text-white">Playbooks</strong> page</li>
+                <li>In the <strong className="text-white">Version History</strong> sidebar, find the version to compare</li>
+                <li>Click <strong className="text-white">"Compare with vX"</strong> button</li>
+                <li>View the side-by-side diff showing additions and deletions</li>
+              </ol>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-red-500/20">
+                <h4 className="text-red-400 font-medium mb-2">Deletions</h4>
+                <p className="text-[#64748B] text-sm">
+                  Removed text is highlighted in <span className="bg-red-500/20 text-red-400 px-1 line-through">red with strikethrough</span>
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-green-500/20">
+                <h4 className="text-green-400 font-medium mb-2">Additions</h4>
+                <p className="text-[#64748B] text-sm">
+                  New text is highlighted in <span className="bg-green-500/20 text-green-400 px-1">green</span>
+                </p>
+              </div>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04] mt-4">
+              <h4 className="text-white font-medium mb-2">Diff Statistics</h4>
+              <p className="text-[#64748B] text-sm mb-3">
+                Each comparison shows summary statistics:
+              </p>
+              <ul className="space-y-1 text-sm text-[#8FA3BF]">
+                <li>• Total number of changes</li>
+                <li>• Characters added vs removed</li>
+                <li>• Percentage of content changed</li>
+              </ul>
+            </div>
+            <div className="bg-gradient-to-r from-[#22C55E]/10 to-[#38BDF8]/10 rounded-lg p-4 border border-white/[0.06] mt-4">
+              <p className="text-[#8FA3BF] text-sm">
+                <strong className="text-white">Use Case:</strong> Before approving a playbook update, use the diff view to verify only intended changes were made and no unintended modifications slipped through.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'search-filter',
+        title: 'Search & Filter',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Quickly find contracts, approvals, and playbooks with powerful search and filter tools throughout MARS.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Search Locations</h4>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">1</span>
+                  <div>
+                    <span className="text-white font-medium">Playbooks Page</span>
+                    <p className="text-[#64748B] text-sm">Search by playbook name or description</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">2</span>
+                  <div>
+                    <span className="text-white font-medium">Approvals Queue</span>
+                    <p className="text-[#64748B] text-sm">Search by contract name, submitter, or provision</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#38BDF8]/20 text-[#38BDF8] flex items-center justify-center flex-shrink-0 text-xs font-bold">3</span>
+                  <div>
+                    <span className="text-white font-medium">Review History</span>
+                    <p className="text-[#64748B] text-sm">Search by contract name or provision name</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#F59E0B]/20">
+                <h4 className="text-[#F59E0B] font-medium mb-2">Approval Status Filters</h4>
+                <p className="text-[#64748B] text-sm">
+                  Filter the approval queue by status: <span className="text-amber-400">Pending</span>, <span className="text-green-400">Approved</span>, <span className="text-red-400">Rejected</span>, or <span className="text-[#38BDF8]">All</span>
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#8B5CF6]/20">
+                <h4 className="text-[#8B5CF6] font-medium mb-2">Clear Search</h4>
+                <p className="text-[#64748B] text-sm">
+                  Click the X button in the search field to quickly clear your search and see all results again.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#F59E0B]/10 to-[#38BDF8]/10 rounded-lg p-4 border border-white/[0.06] mt-4">
+              <p className="text-[#8FA3BF] text-sm">
+                <strong className="text-white">Tip:</strong> Combine search with status filters in the Approvals Queue to quickly find pending items for a specific contract.
+              </p>
+            </div>
+          </div>
+        ),
+      },
     ],
   },
   insights: {

@@ -106,8 +106,10 @@ const guideCategories: GuideCategory[] = [
       'AI-First Approach',
       'Risk Scoring (High/Medium/Low)',
       'Approval Workflow & CC Others',
+      '@Mentions & Discussions',
+      'Version Diff Comparison',
+      'Automated Reminders',
       'Playbooks & Standard Agreements',
-      'AI Redlines & Recommendations',
     ],
     href: '/guides/review',
   },
@@ -155,9 +157,9 @@ const guideCategories: GuideCategory[] = [
 
 const quickStartItems = [
   {
-    title: 'Command Palette',
-    description: 'Press Cmd+K to quickly search contracts, run commands, and navigate',
-    icon: '🔍',
+    title: 'Use the Sidebar',
+    description: 'Navigate between dashboards using the sidebar. Click collapse to save space.',
+    icon: '📍',
   },
   {
     title: 'Pipeline Stages',
@@ -170,9 +172,9 @@ const quickStartItems = [
     icon: '✨',
   },
   {
-    title: 'Document Completeness',
-    description: 'Track required documents and get notified when items are missing',
-    icon: '📑',
+    title: 'Get Help Anytime',
+    description: 'Click the help button in the bottom-right corner to search or ask AI',
+    icon: '💡',
   },
 ];
 
