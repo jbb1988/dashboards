@@ -23,7 +23,7 @@ export async function GET() {
   }
 
   // Also check for SO3009 by number
-  const { data: so3009 } = await supabase
+  const { data: so3009ByNumber } = await supabase
     .from('netsuite_sales_orders')
     .select('*')
     .eq('so_number', 'SO3009')
@@ -32,7 +32,7 @@ export async function GET() {
   return NextResponse.json({
     wo4158: wo,
     soByCreatedFromId: soByCreatedFrom,
-    so3009ByNumber: so3009,
+    so3009ByNumber: so3009ByNumber,
     diagnosis: !wo
       ? 'WO4158 not found'
       : !wo.created_from_so_id
