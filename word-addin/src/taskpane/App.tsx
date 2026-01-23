@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FluentProvider,
   webDarkTheme,
@@ -234,6 +234,7 @@ export default function App() {
   const [contractSearch, setContractSearch] = useState('');
   const [showContractDropdown, setShowContractDropdown] = useState(false);
   const [isLoadingContracts, setIsLoadingContracts] = useState(false);
+  const contractDropdownRef = useRef<HTMLDivElement>(null);
 
   // Initialize Office.js
   useEffect(() => {
