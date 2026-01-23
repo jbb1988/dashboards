@@ -329,11 +329,12 @@
     function refreshAuth() {
       var token = localStorage.getItem('mars_addin_token');
       var user = localStorage.getItem('mars_addin_user');
+      alert('Token found: ' + (token ? 'Yes (' + token.substring(0,20) + '...)' : 'No') + '\nUser found: ' + (user ? 'Yes' : 'No'));
       if (token && user) {
         currentUser = JSON.parse(user);
         showMainView();
       } else {
-        showError('Not signed in. Please sign in again.');
+        showError('Not signed in. Token not found in storage.');
       }
     }
 
