@@ -373,60 +373,73 @@ export default function CommandPalette({
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 overflow-hidden">
-        {/* Backdrop */}
+        {/* Backdrop - dark, no blur */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: 0.2 }}
           onClick={onClose}
-          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          className="absolute inset-0 bg-[#0B1220]/90"
         />
 
-        {/* Palette */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: -20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -20 }}
-          transition={{ duration: 0.15 }}
-          className="absolute top-[15%] left-1/2 -translate-x-1/2 w-full max-w-2xl"
-        >
-          <div className="mx-4 bg-[#1A2332] border border-white/[0.08] rounded-xl shadow-2xl overflow-hidden">
+        {/* Palette - centered */}
+        <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -10 }}
+            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            className="w-full max-w-2xl pointer-events-auto"
+          >
+          <div className="bg-[#111827] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
             {/* Search input */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06]">
-              <span className="text-[#64748B]">{icons.search}</span>
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={placeholder}
-                className="flex-1 bg-transparent text-white placeholder-[#64748B] text-[15px] outline-none"
-              />
-              {loading && (
-                <div className="w-4 h-4 border-2 border-[#38BDF8] border-t-transparent rounded-full animate-spin" />
-              )}
-              <kbd className="px-2 py-0.5 text-[11px] font-medium text-[#64748B] bg-[#0B1220] rounded border border-white/[0.08]">
-                ESC
-              </kbd>
+            <div className="relative">
+              <div className="flex items-center gap-4 px-6 py-5">
+                <div className="relative">
+                  {loading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      className="w-6 h-6 border-2 border-[#38BDF8] border-t-transparent rounded-full"
+                    />
+                  ) : (
+                    <span className="text-[#38BDF8]">{icons.search}</span>
+                  )}
+                </div>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={placeholder}
+                  className="flex-1 bg-transparent text-white placeholder-[#64748B] text-lg font-light outline-none"
+                />
+                <div className="flex items-center gap-1.5 pl-4 border-l border-white/[0.06]">
+                  <kbd className="px-2 py-1 text-xs font-medium text-[#64748B] bg-[#0B1220] rounded-md border border-white/[0.08]">
+                    ESC
+                  </kbd>
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
             </div>
 
             {/* Scope Tabs (shown when searching) */}
             {showScopeTabs && (
-              <div className="flex items-center gap-1 px-4 py-2 border-b border-white/[0.04]">
+              <div className="flex items-center gap-2 px-6 py-3 border-b border-white/[0.04]">
                 {(['all', 'contracts', 'documents', 'tasks'] as const).map((scope) => (
                   <button
                     key={scope}
                     onClick={() => setActiveScope(scope)}
-                    className={`px-3 py-1 rounded-lg text-sm transition-colors capitalize ${
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all capitalize ${
                       activeScope === scope
-                        ? 'bg-[#38BDF8]/10 text-[#38BDF8]'
+                        ? 'bg-[#38BDF8] text-white shadow-lg shadow-[#38BDF8]/20'
                         : 'text-[#64748B] hover:text-white hover:bg-white/[0.04]'
                     }`}
                   >
                     {scope}
-                    {resultCounts[scope] > 0 && (
-                      <span className="ml-1.5 px-1.5 py-0.5 bg-white/[0.1] rounded text-xs">
+                    {resultCounts[scope] > 0 && activeScope !== scope && (
+                      <span className="ml-2 px-1.5 py-0.5 bg-white/[0.1] rounded text-xs">
                         {resultCounts[scope]}
                       </span>
                     )}
@@ -438,107 +451,137 @@ export default function CommandPalette({
             {/* Results */}
             <div
               ref={listRef}
-              className="max-h-[400px] overflow-y-auto py-2"
+              className="max-h-[420px] overflow-y-auto py-3"
             >
               {Object.entries(results).length === 0 ? (
-                <div className="px-4 py-8 text-center text-[#64748B]">
-                  {query.length < 2 ? 'Type at least 2 characters to search' : 'No results found'}
+                <div className="px-6 py-12 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#38BDF8]/10 flex items-center justify-center">
+                    {icons.search}
+                  </div>
+                  <p className="text-[#8FA3BF] text-lg font-light mb-2">
+                    {query.length < 2 ? 'Search or run a command' : 'No results found'}
+                  </p>
+                  <p className="text-[#64748B] text-sm">
+                    {query.length < 2 ? 'Type to search contracts, documents, and tasks' : 'Try different keywords'}
+                  </p>
                 </div>
               ) : (
                 Object.entries(results).map(([category, items]) => (
-                  <div key={category}>
+                  <div key={category} className="px-4 mb-3">
                     {/* Category header */}
-                    <div className="px-4 py-1.5 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">
-                      {category}
+                    <div className="flex items-center gap-2 px-2 mb-2">
+                      <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
+                        {category}
+                      </span>
                     </div>
 
                     {/* Items */}
-                    {items.map((item: ResultItem) => {
-                      currentFlatIndex++;
-                      const isSelected = currentFlatIndex === selectedIndex;
-                      const isSearchResult = item.type !== undefined;
+                    <div className="space-y-1">
+                      {items.map((item: ResultItem) => {
+                        currentFlatIndex++;
+                        const isSelected = currentFlatIndex === selectedIndex;
+                        const isSearchResult = item.type !== undefined;
 
-                      return (
-                        <button
-                          key={item.id}
-                          data-selected={isSelected}
-                          onClick={() => {
-                            item.action();
-                            onClose();
-                          }}
-                          onMouseEnter={() => setSelectedIndex(currentFlatIndex)}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                            isSelected
-                              ? 'bg-[#38BDF8]/10 text-white'
-                              : 'text-[#A1B4C9] hover:bg-white/[0.03]'
-                          }`}
-                        >
-                          {/* Icon */}
-                          <span className={isSelected && isSearchResult && item.type ? TYPE_COLORS[item.type] : isSelected ? 'text-[#38BDF8]' : 'text-[#64748B]'}>
-                            {item.icon || icons.navigate}
-                          </span>
+                        return (
+                          <button
+                            key={item.id}
+                            data-selected={isSelected}
+                            onClick={() => {
+                              item.action();
+                              onClose();
+                            }}
+                            onMouseEnter={() => setSelectedIndex(currentFlatIndex)}
+                            className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-left transition-all ${
+                              isSelected
+                                ? 'bg-[#38BDF8]/10 border border-[#38BDF8]/20 text-white'
+                                : 'hover:bg-white/[0.03] border border-transparent text-[#E2E8F0]'
+                            }`}
+                          >
+                            {/* Icon */}
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                              isSelected ? 'bg-[#38BDF8]/20' : 'bg-white/[0.04]'
+                            }`}>
+                              <span className={isSelected ? 'text-[#38BDF8]' : 'text-[#64748B]'}>
+                                {item.icon || icons.navigate}
+                              </span>
+                            </div>
 
-                          {/* Label & description */}
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{item.label}</div>
-                            {item.description && (
-                              <div className="text-[12px] text-[#64748B] truncate">
-                                {item.description}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Metadata for search results */}
-                          {isSearchResult && (
-                            <div className="flex-shrink-0 text-right">
-                              {item.value && (
-                                <p className="text-[#22C55E] text-sm font-medium">
-                                  {formatCurrency(item.value)}
-                                </p>
-                              )}
-                              {item.status && (
-                                <p className="text-[#64748B] text-xs capitalize">
-                                  {item.status.replace(/_/g, ' ')}
-                                </p>
-                              )}
-                              {item.documentType && (
-                                <p className="text-[#A78BFA] text-xs">{item.documentType}</p>
+                            {/* Label & description */}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{item.label}</div>
+                              {item.description && (
+                                <div className="text-sm text-[#64748B] truncate mt-0.5">
+                                  {item.description}
+                                </div>
                               )}
                             </div>
-                          )}
 
-                          {/* Shortcut for commands */}
-                          {!isSearchResult && item.shortcut && (
-                            <kbd className="px-2 py-0.5 text-[11px] font-medium text-[#64748B] bg-[#0B1220] rounded border border-white/[0.08]">
-                              {item.shortcut}
-                            </kbd>
-                          )}
-                        </button>
-                      );
-                    })}
+                            {/* Metadata for search results */}
+                            {isSearchResult && (
+                              <div className="flex-shrink-0 text-right">
+                                {item.value && (
+                                  <p className="text-[#22C55E] text-sm font-semibold">
+                                    {formatCurrency(item.value)}
+                                  </p>
+                                )}
+                                {item.status && (
+                                  <p className="text-[#64748B] text-xs capitalize">
+                                    {item.status.replace(/_/g, ' ')}
+                                  </p>
+                                )}
+                                {item.documentType && (
+                                  <p className="text-[#A78BFA] text-xs font-medium">{item.documentType}</p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Shortcut for commands */}
+                            {!isSearchResult && item.shortcut && (
+                              <kbd className="px-2.5 py-1 text-xs font-medium text-[#64748B] bg-[#0B1220] rounded-lg border border-white/[0.08]">
+                                {item.shortcut}
+                              </kbd>
+                            )}
+
+                            {/* Arrow for selected */}
+                            {isSelected && (
+                              <div className="flex-shrink-0 text-[#38BDF8]">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))
               )}
             </div>
 
             {/* Footer hint */}
-            <div className="px-4 py-2 border-t border-white/[0.06] flex items-center gap-4 text-[11px] text-[#64748B]">
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-[#0B1220] rounded border border-white/[0.08]">↑</kbd>
-                <kbd className="px-1.5 py-0.5 bg-[#0B1220] rounded border border-white/[0.08]">↓</kbd>
-                Navigate
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-[#0B1220] rounded border border-white/[0.08]">↵</kbd>
-                Select
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-[#0B1220] rounded border border-white/[0.08]">ESC</kbd>
-                Close
-              </span>
+            <div className="px-6 py-3 border-t border-white/[0.04] bg-[#0B1220]/30">
+              <div className="flex items-center justify-between text-xs text-[#64748B]">
+                <div className="flex items-center gap-4">
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">↑</kbd>
+                    <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">↓</kbd>
+                    <span className="ml-1">Navigate</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">↵</kbd>
+                    <span className="ml-1">Select</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">ESC</kbd>
+                    <span className="ml-1">Close</span>
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
     </AnimatePresence>
   );
