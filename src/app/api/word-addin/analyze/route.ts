@@ -12,6 +12,8 @@ interface Risk {
   description: string;
   suggestion: string;
   location?: string;
+  context_before?: string; // 50 chars before the problematic text for better matching
+  context_after?: string;  // 50 chars after the problematic text for better matching
   clause_category?: string; // Maps to clause_categories.name
   matched_clause?: MatchedClause | null;
 }
@@ -144,7 +146,9 @@ Provide your analysis in the following JSON format:
       "severity": "<high|medium|low>",
       "title": "<brief title>",
       "description": "<explanation of the risk>",
-      "location": "<EXACT text from the document that is problematic - copy it VERBATIM so it can be found and replaced>",
+      "location": "<EXACT text from the document that is problematic - copy it VERBATIM including all punctuation, quotes, and whitespace so it can be found and replaced>",
+      "context_before": "<the 50 characters that appear IMMEDIATELY BEFORE the problematic text in the document>",
+      "context_after": "<the 50 characters that appear IMMEDIATELY AFTER the problematic text in the document>",
       "suggestion": "<the EXACT replacement text that should replace the problematic text - write complete clause language ready to insert>",
       "clause_category": "<MUST be one of: Limitation of Liability, Indemnification, Intellectual Property, Confidentiality, Termination, Warranty, Payment Terms, Insurance, Compliance, Dispute Resolution, Force Majeure, Assignment, Notices, Governing Law, General>"
     }
@@ -152,7 +156,10 @@ Provide your analysis in the following JSON format:
 }
 
 CRITICAL: For each risk:
-- "location" must be the EXACT problematic text copied verbatim from the document (not a summary)
+- "location" must be the EXACT problematic text copied VERBATIM from the document (not a summary or paraphrase)
+  - Include the exact punctuation, quotes (whether smart or straight), and spacing from the document
+  - Copy the complete clause or sentence, not just a few words
+- "context_before" and "context_after" help locate the exact position in documents with similar clauses
 - "suggestion" must be the COMPLETE replacement clause text ready to insert (not advice, but actual contract language)
 - "clause_category" must map to one of the MARS Clause Library categories so we can suggest pre-approved language
 

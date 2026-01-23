@@ -16,28 +16,27 @@ Phase 3 adds six enterprise-grade Contract Lifecycle Management (CLM) features t
 
 **Purpose:** Enable contract review directly in Microsoft Word without copy/paste workflows.
 
-**Location:** `/word-addin/`
+**Location:** `/word-addin/`, `/public/word-addin/`
 
 #### Capabilities
 - Analyze entire document with one click
 - AI-powered risk identification with severity levels
-- Highlight problematic clauses directly in the document
+- **Smart Clause Matching**: Risks automatically matched to Clause Library categories
+- **Three-Tier Fix It Buttons**: Primary, Fallback, Last Resort positions
+- **Playbooks Tab**: Compare documents against MARS standard agreements
 - Insert approved clauses from library at cursor position
 - Microsoft OAuth authentication (Azure AD)
+- **Fixed OAuth Token Passing**: Uses messageParent for cross-frame communication
 
-#### Files Created
+#### Files Created/Updated
 
 | File | Description |
 |------|-------------|
 | `manifest.xml` | Office add-in manifest for sideloading/store |
 | `package.json` | Node dependencies (Fluent UI, Office.js, React 18) |
-| `tsconfig.json` | TypeScript configuration |
-| `webpack.config.js` | Build configuration |
-| `src/taskpane/App.tsx` | Main React UI with tabs for Analyze/Clauses |
-| `src/taskpane/index.tsx` | React entry point |
-| `src/commands/analyze.ts` | Ribbon button command handlers |
-| `public/*.html` | HTML hosts for taskpane, commands, auth |
-| `public/styles.css` | Base styling |
+| `public/word-addin/taskpane.html` | Main UI with Analyze, Clauses, Playbooks tabs |
+| `public/word-addin/auth-callback.html` | OAuth callback with messageParent token passing |
+| `public/word-addin/assets/icon-*.png` | Blue drop icons for ribbon (16, 32, 64, 80px) |
 
 #### API Routes
 
@@ -45,8 +44,18 @@ Phase 3 adds six enterprise-grade Contract Lifecycle Management (CLM) features t
 |-------|--------|---------|
 | `/api/word-addin/auth` | POST | Exchange OAuth code for JWT |
 | `/api/word-addin/auth/verify` | GET | Verify JWT token |
-| `/api/word-addin/analyze` | POST | AI document analysis |
+| `/api/word-addin/analyze` | POST | AI document analysis with clause matching |
 | `/api/word-addin/clauses` | GET/POST | Fetch clauses, record usage |
+| `/api/word-addin/playbooks` | GET | Fetch available playbooks |
+| `/api/word-addin/compare` | POST | Compare document against playbook |
+
+#### Analyze API Enhancement
+The analyze endpoint now:
+1. Identifies risks with AI (unchanged)
+2. Maps each risk to a clause_category
+3. Queries Clause Library for matching clauses
+4. Returns matched clause with all three positions (primary, fallback, last_resort)
+5. Enables "Fix It" buttons with position selection
 
 ---
 
@@ -62,14 +71,42 @@ Phase 3 adds six enterprise-grade Contract Lifecycle Management (CLM) features t
 - AI-powered bulk import from historical contracts
 - Usage tracking and analytics
 - Risk level classification (low/medium/high)
+- **Clause Library in Sidebar**: Added to Contracts section navigation
 
 #### Database Tables
 
 ```sql
-clause_categories    -- Hierarchical category structure
+clause_categories    -- Hierarchical category structure (15 standard categories)
 clause_library       -- Main clause storage with positions
 clause_usage_history -- Track which clauses used where
 ```
+
+#### Training Data Import Script
+
+**File:** `/scripts/import-training-clauses.ts`
+
+Scalable batch processor for populating Clause Library from historical contracts:
+
+```bash
+npm run import-clauses          # Full import
+npm run import-clauses:dry      # Extract only, no DB insert
+npm run import-clauses:resume   # Resume from checkpoint
+```
+
+**Features:**
+- Parallel processing (3 concurrent PDF extractions)
+- Resumable via checkpoint file (`/tmp/mars-clause-import-checkpoint.json`)
+- Chunked database inserts (50 per batch)
+- Retry logic for API failures (3 attempts)
+- Automatic three-tier position consolidation
+
+**Process:**
+1. Scans PDF files in training folder
+2. AI extracts legal clauses (8-20 per contract)
+3. Categorizes into 15 standard categories
+4. Consolidates similar clauses by favorability
+5. Creates primary/fallback/last_resort positions
+6. Inserts to database with usage tracking
 
 #### Files Created
 
@@ -83,6 +120,8 @@ clause_usage_history -- Track which clauses used where
 | `/src/app/api/clauses/categories/route.ts` | Category management |
 | `/src/components/clauses/ClauseEditor.tsx` | Edit modal with position tabs |
 | `/src/components/clauses/ClauseSuggestionPanel.tsx` | Review integration panel |
+| `/scripts/import-training-clauses.ts` | Bulk training import script |
+| `/src/components/Sidebar.tsx` | Updated with Clause Library link |
 
 ---
 

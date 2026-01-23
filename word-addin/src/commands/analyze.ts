@@ -3,8 +3,10 @@
  * Ribbon button command handlers
  */
 
-declare const Office: typeof import('@microsoft/office-js').Office;
-declare const Word: typeof import('@microsoft/office-js').Word;
+// Office.js types are loaded from @types/office-js
+// Office.js library is loaded from CDN in HTML
+declare const Office: typeof globalThis.Office;
+declare const Word: typeof globalThis.Word;
 
 const API_BASE = process.env.NODE_ENV === 'production'
   ? 'https://mars-contracts.vercel.app'
@@ -22,7 +24,7 @@ Office.onReady(() => {
  */
 async function getDocumentText(): Promise<string> {
   return new Promise((resolve, reject) => {
-    Word.run(async (context) => {
+    Word.run(async (context: Word.RequestContext) => {
       const body = context.document.body;
       body.load('text');
       await context.sync();
@@ -38,7 +40,7 @@ function showNotification(title: string, message: string, type: 'info' | 'error'
   Office.context.ui.displayDialogAsync(
     `${API_BASE}/word-addin/notification.html?title=${encodeURIComponent(title)}&message=${encodeURIComponent(message)}&type=${type}`,
     { height: 20, width: 30 },
-    (result) => {
+    (result: Office.AsyncResult<Office.Dialog>) => {
       if (result.status === Office.AsyncResultStatus.Succeeded) {
         setTimeout(() => result.value.close(), 3000);
       }
@@ -113,7 +115,7 @@ async function analyzeDocument(event: Office.AddinCommands.Event) {
 async function highlightRisks(risks: Array<{ location?: string; severity: string }>) {
   if (!risks || risks.length === 0) return;
 
-  await Word.run(async (context) => {
+  await Word.run(async (context: Word.RequestContext) => {
     for (const risk of risks) {
       if (risk.location) {
         const searchResults = context.document.body.search(risk.location.substring(0, 100), {
@@ -148,7 +150,7 @@ async function highlightRisks(risks: Array<{ location?: string; severity: string
  * Insert clause at current selection
  */
 async function insertClauseAtSelection(clauseText: string) {
-  await Word.run(async (context) => {
+  await Word.run(async (context: Word.RequestContext) => {
     const selection = context.document.getSelection();
     selection.insertText(clauseText, Word.InsertLocation.replace);
     await context.sync();
@@ -159,9 +161,9 @@ async function insertClauseAtSelection(clauseText: string) {
  * Clear all highlights from document
  */
 async function clearHighlights() {
-  await Word.run(async (context) => {
+  await Word.run(async (context: Word.RequestContext) => {
     const body = context.document.body;
-    body.font.highlightColor = null;
+    body.font.highlightColor = 'NoHighlight';
     await context.sync();
   });
 }

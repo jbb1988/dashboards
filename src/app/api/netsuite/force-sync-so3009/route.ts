@@ -18,13 +18,12 @@ export async function POST() {
         t.status,
         t.memo,
         t.entity AS customer_id,
-        e.companyname AS customer_name,
+        BUILTIN.DF(t.entity) AS customer_name,
         t.subtotal,
         t.discounttotal,
         t.taxtotal,
         t.total
       FROM Transaction t
-      LEFT JOIN Entity e ON e.id = t.entity
       WHERE t.id = 341203
     `;
 

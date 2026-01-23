@@ -649,6 +649,212 @@ export const guideIndex: GuideEntry[] = [
     path: '/guides/insights#roi-tracking'
   },
 
+  // Word Add-in Guide
+  {
+    id: 'word-addin-overview',
+    category: 'word-addin',
+    title: 'Word Add-in Overview',
+    content: `The MARS Word Add-in brings contract review directly into Microsoft Word. No more copy/paste workflows—analyze contracts, identify risks, and insert approved clauses without leaving Word.
+
+    Key Features:
+    - One-Click Analysis: Analyze entire document with AI-powered risk identification
+    - Clause Library Integration: Insert pre-approved clauses directly at cursor
+    - Playbook Comparison: Compare documents against MARS standard agreements
+    - Microsoft OAuth: Secure authentication with your Microsoft account
+
+    Getting Started:
+    1. Open Word and look for "MARS Contracts" in the Home ribbon
+    2. Click "Review Panel" to open the taskpane
+    3. Sign in with your Microsoft account
+    4. Open a contract document and click "Analyze Document"`,
+    keywords: ['word', 'add-in', 'addin', 'microsoft', 'ribbon', 'analyze', 'clauses', 'office'],
+    path: '/guides/word-addin#overview'
+  },
+  {
+    id: 'word-addin-analyze',
+    category: 'word-addin',
+    title: 'Analyzing Documents in Word',
+    content: `The Analyze tab identifies risks and suggests approved replacement language from your Clause Library.
+
+    How Analysis Works:
+    1. Click "Analyze Document" to scan the entire contract
+    2. AI identifies problematic clauses and maps them to risk categories
+    3. Each risk shows: severity level (High/Medium/Low), problematic text, and matched Clause Library clause
+
+    Risk Categories Detected:
+    - Limitation of Liability, Indemnification, Intellectual Property
+    - Confidentiality, Termination, Warranty, Payment Terms
+    - Insurance, Compliance, Dispute Resolution, Force Majeure
+    - Assignment, Notices, Governing Law
+
+    Results Display:
+    - Red (HIGH): Material risk requiring immediate attention
+    - Yellow (MEDIUM): Important but negotiable items
+    - Blue (LOW): Minor concerns or standard language`,
+    keywords: ['analyze', 'analysis', 'risks', 'categories', 'AI', 'scan', 'document'],
+    path: '/guides/word-addin#analyze'
+  },
+  {
+    id: 'word-addin-fix-it',
+    category: 'word-addin',
+    title: 'Fix It: Smart Clause Replacement',
+    content: `When a risk is identified and matched to your Clause Library, you get three "Fix It" options representing MARS's negotiating positions:
+
+    Three-Tier Position System:
+    - Primary (Green): Most favorable position for MARS. Use this first in negotiations.
+    - Fallback (Yellow): Middle-ground position. Use when customer pushes back on primary.
+    - Last Resort (Orange): Minimum acceptable position. Use only when necessary to close the deal.
+
+    How to Use Fix It:
+    1. Review the identified risk and problematic text
+    2. See the matched MARS approved clause below
+    3. Click "Primary" to insert the most favorable language
+    4. If needed, use Fallback or Last Resort for subsequent negotiations
+
+    What Happens:
+    - The problematic text is found in the document
+    - It's replaced with your chosen clause position
+    - The replacement is highlighted in green
+    - Usage is tracked in Clause Library analytics
+
+    Pro Tip: Always start with Primary position. Only move to Fallback when the customer explicitly objects.`,
+    keywords: ['fix it', 'replace', 'primary', 'fallback', 'last resort', 'position', 'clause', 'negotiate'],
+    path: '/guides/word-addin#fix-it'
+  },
+  {
+    id: 'word-addin-playbooks-tab',
+    category: 'word-addin',
+    title: 'Playbooks Tab: Compare to Standards',
+    content: `The Playbooks tab lets you compare any document against MARS standard agreements to identify deviations.
+
+    Available Playbooks:
+    - MARS NDA: Standard non-disclosure agreement
+    - MARS MSA: Master services agreement template
+    - MARS EULA: End-user license agreement
+    - MARS Warranty T&C: Warranty terms and conditions
+
+    How to Compare:
+    1. Switch to the "Playbooks" tab in the add-in
+    2. Select a playbook from the dropdown
+    3. Click "Compare to This Playbook"
+    4. AI analyzes both documents and identifies deviations
+
+    Results Show:
+    - Deviation Score (0-100): Higher = more deviation from MARS standard
+    - Summary: Overview of major differences
+    - Detailed Deviations: Section-by-section comparison with:
+      - Section name
+      - Severity (High/Medium/Low)
+      - What their document says vs. MARS standard
+      - Recommendation for how to address
+
+    Use Case: When reviewing a customer's contract, compare it to your MARS MSA to quickly identify terms that differ from your standard positions.`,
+    keywords: ['playbooks', 'compare', 'standard', 'deviation', 'NDA', 'MSA', 'EULA', 'warranty'],
+    path: '/guides/word-addin#playbooks'
+  },
+  {
+    id: 'word-addin-clauses-tab',
+    category: 'word-addin',
+    title: 'Clauses Tab: Browse & Insert',
+    content: `The Clauses tab provides direct access to your Clause Library for manual clause insertion.
+
+    Browsing Clauses:
+    - Search by keyword or clause name
+    - Filter by category (Liability, Indemnification, IP, etc.)
+    - Filter by risk level (Low, Medium, High)
+
+    Inserting a Clause:
+    1. Find the clause you want to insert
+    2. Click on it to expand and see all three positions
+    3. Choose Primary, Fallback, or Last Resort
+    4. Click "Insert at Cursor"
+    5. The clause is inserted at your cursor position in Word
+
+    Clause Details Shown:
+    - Name and category
+    - Risk level indicator
+    - Description of what the clause covers
+    - Full text of each position tier
+
+    This is useful when you want to proactively add standard language, not just replace problematic text.`,
+    keywords: ['clauses', 'browse', 'insert', 'library', 'search', 'filter', 'cursor'],
+    path: '/guides/word-addin#clauses-tab'
+  },
+  {
+    id: 'clause-library-overview',
+    category: 'clauses',
+    title: 'Clause Library Overview',
+    content: `The Clause Library is your centralized repository of pre-approved contract language. It enables consistency across all contracts and provides negotiating flexibility with three-tier positions.
+
+    Key Features:
+    - 15 Standard Categories: Liability, Indemnification, IP, Confidentiality, Termination, Warranty, Payment, Insurance, Compliance, Dispute Resolution, Force Majeure, Assignment, Notices, Governing Law, General
+    - Three-Tier Positions: Primary (favorable), Fallback (middle ground), Last Resort (minimum acceptable)
+    - Risk Classification: Each clause tagged as Low, Medium, or High risk
+    - Usage Analytics: Track which clauses are used most frequently
+
+    Accessing the Library:
+    1. Click "Clause Library" in the sidebar (under Contracts section)
+    2. Browse by category or use search
+    3. Click any clause to view full details and edit`,
+    keywords: ['clause', 'library', 'approved', 'language', 'categories', 'repository', 'centralized'],
+    path: '/guides/clauses#overview'
+  },
+  {
+    id: 'clause-library-positions',
+    category: 'clauses',
+    title: 'Three-Tier Position System',
+    content: `Every clause in the library can have up to three position tiers, representing MARS's negotiating strategy:
+
+    Primary Position (Green):
+    - Most favorable language for MARS
+    - Use as your starting point in negotiations
+    - Example: "Company's liability shall not exceed fees paid in the prior 12 months"
+
+    Fallback Position (Yellow):
+    - Middle-ground compromise language
+    - Use when customer pushes back on primary
+    - Example: "Company's liability shall not exceed fees paid in the prior 24 months"
+
+    Last Resort Position (Orange):
+    - Minimum acceptable language
+    - Use only when necessary to close the deal
+    - Example: "Company's liability shall not exceed 2x fees paid in the prior 12 months"
+
+    Strategy: Always start negotiations with Primary. Move to Fallback only when necessary. Reserve Last Resort for deal-critical situations.`,
+    keywords: ['position', 'tier', 'primary', 'fallback', 'last resort', 'negotiate', 'strategy'],
+    path: '/guides/clauses#positions'
+  },
+  {
+    id: 'clause-library-import',
+    category: 'clauses',
+    title: 'Bulk Import from Training Contracts',
+    content: `Populate your Clause Library by importing clauses from historical contracts using AI extraction.
+
+    Training Data Location:
+    Store executed contracts in your designated training folder. The import script processes PDF files and extracts reusable clauses.
+
+    Import Script:
+    Run: npm run import-clauses
+
+    What Happens:
+    1. Script scans all PDF files in the training folder
+    2. AI extracts legal clauses from each contract (typically 8-20 per contract)
+    3. Clauses are categorized automatically
+    4. Similar clauses are consolidated into three-tier positions
+    5. Results are imported to the Clause Library database
+
+    Scalability Features:
+    - Parallel processing (3 concurrent)
+    - Resumable via checkpoint file
+    - Chunked database inserts
+    - Retry logic for API failures
+
+    After Import:
+    Review the imported clauses in the Clause Library. Edit positions and descriptions as needed. Mark low-quality extractions as inactive.`,
+    keywords: ['import', 'bulk', 'training', 'extract', 'AI', 'PDF', 'historical', 'contracts'],
+    path: '/guides/clauses#import'
+  },
+
   // Distributors Guide
   {
     id: 'distributors-overview',
@@ -793,9 +999,11 @@ export function getContextForPage(pathname: string): string {
     '/bundles': ['bundles', 'documents', 'tasks'],
     '/review': ['review'],
     '/playbooks': ['review'],
+    '/clauses': ['clauses', 'word-addin'],
+    '/word-addin': ['word-addin', 'clauses'],
     '/insights': ['insights'],
     '/distributors': ['distributors'],
-    '/guides': ['pipeline', 'documents', 'tasks', 'bundles', 'review', 'insights', 'distributors'],
+    '/guides': ['pipeline', 'documents', 'tasks', 'bundles', 'review', 'insights', 'distributors', 'clauses', 'word-addin'],
   };
 
   // Find matching categories for the current page
@@ -834,6 +1042,8 @@ export function getGuidesForPage(pathname: string): GuideEntry[] {
     '/bundles': ['bundles'],
     '/review': ['review'],
     '/playbooks': ['review'],
+    '/clauses': ['clauses', 'word-addin'],
+    '/word-addin': ['word-addin', 'clauses'],
     '/insights': ['insights'],
     '/distributors': ['distributors'],
   };

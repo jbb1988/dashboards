@@ -314,6 +314,35 @@ For public distribution:
 
 ---
 
+## Features Overview
+
+### Analyze Tab - Smart Risk Detection
+The Analyze tab provides AI-powered contract analysis with automatic Clause Library matching:
+
+1. **One-Click Analysis**: Scans entire document for legal risks
+2. **Risk Categorization**: Maps risks to 15 categories (Liability, Indemnification, IP, etc.)
+3. **Clause Library Matching**: Automatically finds matching approved clauses
+4. **Three-Tier Fix It Buttons**:
+   - **Primary** (Green): Most favorable MARS position
+   - **Fallback** (Yellow): Middle-ground compromise
+   - **Last Resort** (Orange): Minimum acceptable position
+
+### Clauses Tab - Browse & Insert
+Direct access to your Clause Library:
+- Search clauses by keyword
+- Filter by category and risk level
+- Insert any clause at cursor position
+- View all three position tiers
+
+### Playbooks Tab - Compare to Standards
+Compare any document against MARS standard agreements:
+- Select from available playbooks (NDA, MSA, EULA, Warranty T&C)
+- AI identifies deviations from MARS standard
+- Shows deviation score (0-100)
+- Lists section-by-section differences with recommendations
+
+---
+
 ## Architecture Overview
 
 ```
@@ -321,24 +350,24 @@ For public distribution:
 │                    Microsoft Word                            │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │              MARS Word Add-in (TaskPane)              │    │
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────────────────┐  │    │
-│  │  │ Analyze │  │ Clauses │  │ Insert at Cursor    │  │    │
-│  │  └────┬────┘  └────┬────┘  └──────────┬──────────┘  │    │
-│  └───────┼────────────┼──────────────────┼─────────────┘    │
-└──────────┼────────────┼──────────────────┼──────────────────┘
-           │            │                  │
-           ▼            ▼                  ▼
+│  │  ┌─────────┐  ┌─────────┐  ┌───────────┐            │    │
+│  │  │ Analyze │  │ Clauses │  │ Playbooks │            │    │
+│  │  └────┬────┘  └────┬────┘  └─────┬─────┘            │    │
+│  └───────┼────────────┼─────────────┼──────────────────┘    │
+└──────────┼────────────┼─────────────┼───────────────────────┘
+           │            │             │
+           ▼            ▼             ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                      MARS API Server                          │
 │  ┌────────────────┐  ┌────────────────┐  ┌───────────────┐  │
 │  │ /word-addin/   │  │ /word-addin/   │  │ /word-addin/  │  │
-│  │ analyze        │  │ clauses        │  │ auth          │  │
+│  │ analyze        │  │ clauses        │  │ playbooks     │  │
 │  └───────┬────────┘  └───────┬────────┘  └───────┬───────┘  │
 │          │                   │                   │           │
 │          ▼                   ▼                   ▼           │
 │  ┌───────────────┐   ┌─────────────┐   ┌─────────────────┐  │
-│  │ OpenRouter AI │   │  Supabase   │   │    Azure AD     │  │
-│  │ (Claude)      │   │  Database   │   │    OAuth 2.0    │  │
+│  │ OpenRouter AI │   │  Supabase   │   │ Playbook Store  │  │
+│  │ + Clause Lib  │   │  Database   │   │ + AI Compare    │  │
 │  └───────────────┘   └─────────────┘   └─────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
