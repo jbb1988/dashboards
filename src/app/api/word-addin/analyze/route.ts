@@ -12,6 +12,19 @@ interface Risk {
   description: string;
   suggestion: string;
   location?: string;
+  clause_category?: string; // Maps to clause_categories.name
+  matched_clause?: MatchedClause | null;
+}
+
+interface MatchedClause {
+  id: string;
+  name: string;
+  category: string;
+  category_id: string;
+  risk_level: string;
+  primary_text: string;
+  fallback_text: string | null;
+  last_resort_text: string | null;
 }
 
 interface ClauseSuggestion {
@@ -66,8 +79,11 @@ export async function POST(request: NextRequest) {
     // Get relevant clause suggestions from library
     const clauseSuggestions = await getClauseSuggestions(analysisResult.identified_clause_types);
 
-    // Log the analysis (non-critical, ignore errors)
+    // Match each risk to a Clause Library entry based on clause_category
     const admin = getSupabaseAdmin();
+    const risksWithMatchedClauses = await matchRisksToClauses(admin, analysisResult.risks);
+
+    // Log the analysis (non-critical, ignore errors)
     try {
       await admin.from('word_addin_analyses').insert({
         user_email: user.email,
@@ -83,7 +99,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       overall_risk_score: analysisResult.overall_risk_score,
       risk_level: analysisResult.risk_level,
-      risks: analysisResult.risks,
+      risks: risksWithMatchedClauses,
       clause_suggestions: clauseSuggestions,
       summary: analysisResult.summary,
     });
@@ -128,21 +144,27 @@ Provide your analysis in the following JSON format:
       "severity": "<high|medium|low>",
       "title": "<brief title>",
       "description": "<explanation of the risk>",
-      "suggestion": "<recommended alternative language or action>",
-      "location": "<short excerpt from document where issue is found, max 50 chars>"
+      "location": "<EXACT text from the document that is problematic - copy it VERBATIM so it can be found and replaced>",
+      "suggestion": "<the EXACT replacement text that should replace the problematic text - write complete clause language ready to insert>",
+      "clause_category": "<MUST be one of: Limitation of Liability, Indemnification, Intellectual Property, Confidentiality, Termination, Warranty, Payment Terms, Insurance, Compliance, Dispute Resolution, Force Majeure, Assignment, Notices, Governing Law, General>"
     }
   ]
 }
 
+CRITICAL: For each risk:
+- "location" must be the EXACT problematic text copied verbatim from the document (not a summary)
+- "suggestion" must be the COMPLETE replacement clause text ready to insert (not advice, but actual contract language)
+- "clause_category" must map to one of the MARS Clause Library categories so we can suggest pre-approved language
+
 Focus on:
-1. Unlimited liability exposure
-2. Broad indemnification requirements
-3. Unfavorable termination terms
-4. IP ownership issues
-5. Payment terms and penalties
-6. Missing or weak confidentiality protections
-7. Warranty disclaimers
-8. Governing law and jurisdiction
+1. Unlimited liability exposure (clause_category: "Limitation of Liability")
+2. Broad indemnification requirements (clause_category: "Indemnification")
+3. Unfavorable termination terms (clause_category: "Termination")
+4. IP ownership issues (clause_category: "Intellectual Property")
+5. Payment terms and penalties (clause_category: "Payment Terms")
+6. Missing or weak confidentiality protections (clause_category: "Confidentiality")
+7. Warranty disclaimers (clause_category: "Warranty")
+8. Governing law and jurisdiction (clause_category: "Governing Law" or "Dispute Resolution")
 
 Return ONLY valid JSON, no additional text.`;
 
@@ -286,6 +308,106 @@ function basicAnalysis(documentText: string): {
     summary: `Document analyzed with ${risks.length} potential issues identified. ${riskLevel === 'high' ? 'Significant risks require attention before signing.' : riskLevel === 'medium' ? 'Some concerns should be reviewed.' : 'Document appears relatively standard.'}`,
     identified_clause_types: ['general'],
   };
+}
+
+// Match risks to Clause Library entries based on clause_category
+async function matchRisksToClauses(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  risks: Risk[]
+): Promise<Risk[]> {
+  try {
+    // Get all unique clause categories from risks
+    const categories = [...new Set(risks.map(r => r.clause_category).filter(Boolean))];
+
+    if (categories.length === 0) {
+      return risks;
+    }
+
+    // Get category IDs by name (case-insensitive match)
+    const { data: categoryData } = await admin
+      .from('clause_categories')
+      .select('id, name');
+
+    if (!categoryData || categoryData.length === 0) {
+      return risks;
+    }
+
+    // Build category name to ID map (case-insensitive)
+    const categoryNameToId = new Map<string, string>();
+    categoryData.forEach(cat => {
+      categoryNameToId.set(cat.name.toLowerCase(), cat.id);
+    });
+
+    // Get all clauses for matching categories
+    const categoryIds = categories
+      .map(c => categoryNameToId.get(c?.toLowerCase() || ''))
+      .filter(Boolean) as string[];
+
+    if (categoryIds.length === 0) {
+      return risks;
+    }
+
+    const { data: clauses } = await admin
+      .from('clause_library')
+      .select(`
+        id,
+        name,
+        category_id,
+        risk_level,
+        primary_text,
+        fallback_text,
+        last_resort_text,
+        usage_count
+      `)
+      .in('category_id', categoryIds)
+      .eq('is_active', true)
+      .order('usage_count', { ascending: false });
+
+    if (!clauses || clauses.length === 0) {
+      return risks;
+    }
+
+    // Build category ID to name map
+    const categoryIdToName = new Map<string, string>();
+    categoryData.forEach(cat => {
+      categoryIdToName.set(cat.id, cat.name);
+    });
+
+    // Match each risk to the best clause
+    return risks.map(risk => {
+      if (!risk.clause_category) {
+        return risk;
+      }
+
+      const categoryId = categoryNameToId.get(risk.clause_category.toLowerCase());
+      if (!categoryId) {
+        return risk;
+      }
+
+      // Find the best clause for this category (highest usage count)
+      const matchingClause = clauses.find(c => c.category_id === categoryId);
+      if (!matchingClause) {
+        return risk;
+      }
+
+      return {
+        ...risk,
+        matched_clause: {
+          id: matchingClause.id,
+          name: matchingClause.name,
+          category: categoryIdToName.get(matchingClause.category_id) || 'Unknown',
+          category_id: matchingClause.category_id,
+          risk_level: matchingClause.risk_level || 'medium',
+          primary_text: matchingClause.primary_text,
+          fallback_text: matchingClause.fallback_text,
+          last_resort_text: matchingClause.last_resort_text,
+        },
+      };
+    });
+  } catch (error) {
+    console.error('Failed to match risks to clauses:', error);
+    return risks;
+  }
 }
 
 // Get clause suggestions from library

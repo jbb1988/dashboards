@@ -88,27 +88,25 @@
           throw new Error(data.error || 'Authentication failed');
         }
 
-        // Save to localStorage directly (shared with taskpane)
-        localStorage.setItem('mars_addin_token', data.token);
-        localStorage.setItem('mars_addin_user', JSON.stringify(data.user));
-
         // Show success
         spinnerEl.style.display = 'none';
         statusEl.textContent = 'Success!';
         statusEl.className = 'success';
         messageEl.textContent = 'Welcome, ' + data.user.name + '. Closing...';
 
-        // Send message to parent
+        // Send token to taskpane via Office dialog API
+        // IMPORTANT: Do NOT use localStorage here - it's not shared with the taskpane
+        // The taskpane will receive this message and save to its own localStorage
         sendMessage({
           type: 'auth_success',
           token: data.token,
           user: data.user
         });
 
-        // Close after delay
+        // Close after short delay to ensure message is sent
         setTimeout(function() {
           window.close();
-        }, 1500);
+        }, 500);
 
       } catch (err) {
         spinnerEl.style.display = 'none';

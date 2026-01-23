@@ -153,7 +153,7 @@
       color: #a5b4fc;
       margin-bottom: 8px;
     }
-    .risk-actions { display: flex; gap: 8px; }
+    .risk-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn-small {
       padding: 6px 12px;
       font-size: 12px;
@@ -168,6 +168,60 @@
     .btn-highlight {
       background: #374151;
       color: #e5e7eb;
+    }
+    .btn-primary-pos {
+      background: #059669;
+      color: white;
+    }
+    .btn-fallback-pos {
+      background: #d97706;
+      color: white;
+    }
+    .btn-lastresort-pos {
+      background: #dc2626;
+      color: white;
+    }
+    .matched-clause {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 10px;
+      margin: 8px 0;
+    }
+    .matched-clause-header {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .matched-clause-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #4ade80;
+      margin-bottom: 4px;
+    }
+    .matched-clause-text {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.4;
+      max-height: 60px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .position-btns {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .position-btn {
+      flex: 1;
+      padding: 8px 6px;
+      font-size: 11px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
     }
     .spinner {
       width: 20px;
@@ -246,6 +300,7 @@
       <div class="tabs">
         <button class="tab active" onclick="showTab('analyze', this)">Analyze</button>
         <button class="tab" onclick="showTab('clauses', this)">Clauses</button>
+        <button class="tab" onclick="showTab('playbooks', this)">Playbooks</button>
       </div>
 
       <!-- Analyze Tab -->
@@ -267,6 +322,23 @@
           Load Clause Library
         </button>
         <div id="clausesList" style="margin-top: 16px;"></div>
+      </div>
+
+      <!-- Playbooks Tab -->
+      <div id="playbooksTab" class="hidden">
+        <p style="font-size: 13px; color: #94a3b8; margin-bottom: 12px;">
+          Compare your document against MARS standard agreements to identify deviations.
+        </p>
+        <div id="playbookSelect" style="margin-bottom: 12px;">
+          <select id="playbookDropdown" class="playbook-select" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #374151; background: #242937; color: white; font-size: 13px;">
+            <option value="">Select a playbook...</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="compareBtn" onclick="compareToPlaybook()" disabled>
+          Compare to Playbook
+        </button>
+        <div id="compareError" class="error hidden" style="margin-top: 12px;"></div>
+        <div id="compareResults" class="hidden" style="margin-top: 16px;"></div>
       </div>
     </div>
   </div>
@@ -319,9 +391,10 @@
             }
           });
 
-          // Also listen for dialog closed event and check localStorage
+          // Also listen for dialog closed event
           dialog.addEventHandler(Office.EventType.DialogEventReceived, function(args) {
-            // Dialog was closed - check if we got logged in via localStorage
+            // Dialog was closed - the messageParent should have sent the token already
+            // This is a fallback check in case the dialog closes unexpectedly
             setTimeout(checkAuth, 500);
           });
         }
@@ -362,12 +435,17 @@
       document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
       btn.classList.add('active');
 
+      document.getElementById('analyzeTab').classList.add('hidden');
+      document.getElementById('clausesTab').classList.add('hidden');
+      document.getElementById('playbooksTab').classList.add('hidden');
+
       if (tab === 'analyze') {
         document.getElementById('analyzeTab').classList.remove('hidden');
-        document.getElementById('clausesTab').classList.add('hidden');
-      } else {
-        document.getElementById('analyzeTab').classList.add('hidden');
+      } else if (tab === 'clauses') {
         document.getElementById('clausesTab').classList.remove('hidden');
+      } else if (tab === 'playbooks') {
+        document.getElementById('playbooksTab').classList.remove('hidden');
+        loadPlaybooks(); // Auto-load playbooks when tab is selected
       }
     }
 
@@ -443,30 +521,130 @@
 
       if (result.risks && result.risks.length > 0) {
         html += '<div class="risks-title">Issues Found (' + result.risks.length + ')</div>';
-        result.risks.forEach(function(risk) {
+        result.risks.forEach(function(risk, index) {
           html += '<div class="risk-item">' +
             '<div class="risk-header">' +
             '<span class="risk-badge ' + risk.severity + '">' + risk.severity + '</span>' +
             '<span class="risk-title">' + risk.title + '</span>' +
             '</div>' +
             '<div class="risk-desc">' + risk.description + '</div>';
-          if (risk.suggestion) {
-            var escapedSuggestion = risk.suggestion.replace(/'/g, "\\'").replace(/\n/g, '\\n');
+
+          // Show matched clause from MARS Clause Library if available
+          if (risk.matched_clause) {
+            var clause = risk.matched_clause;
+            html += '<div class="matched-clause">' +
+              '<div class="matched-clause-header">MARS Approved Clause: ' + clause.category + '</div>' +
+              '<div class="matched-clause-name">' + clause.name + '</div>' +
+              '<div class="matched-clause-text">' + clause.primary_text.substring(0, 150) + (clause.primary_text.length > 150 ? '...' : '') + '</div>';
+
+            // Position buttons - only show if we have the problematic text location
+            if (risk.location) {
+              var escapedOriginal = escapeForJs(risk.location);
+              var escapedPrimary = escapeForJs(clause.primary_text);
+              var clauseId = clause.id;
+
+              html += '<div class="position-btns">' +
+                '<button class="position-btn btn-primary-pos" onclick="applyClauseFix(\'' + escapedOriginal + '\', \'' + escapedPrimary + '\', \'' + clauseId + '\', \'primary\')">Primary</button>';
+
+              if (clause.fallback_text) {
+                var escapedFallback = escapeForJs(clause.fallback_text);
+                html += '<button class="position-btn btn-fallback-pos" onclick="applyClauseFix(\'' + escapedOriginal + '\', \'' + escapedFallback + '\', \'' + clauseId + '\', \'fallback\')">Fallback</button>';
+              }
+
+              if (clause.last_resort_text) {
+                var escapedLastResort = escapeForJs(clause.last_resort_text);
+                html += '<button class="position-btn btn-lastresort-pos" onclick="applyClauseFix(\'' + escapedOriginal + '\', \'' + escapedLastResort + '\', \'' + clauseId + '\', \'last_resort\')">Last Resort</button>';
+              }
+
+              html += '</div>';
+            }
+
+            html += '</div>';
+          } else if (risk.suggestion && risk.location) {
+            // Fallback to AI suggestion if no matched clause
+            var escapedOriginal = escapeForJs(risk.location);
+            var escapedReplacement = escapeForJs(risk.suggestion);
+            html += '<div class="risk-suggestion"><strong>AI Suggestion:</strong> ' + risk.suggestion + '</div>' +
+              '<div class="risk-actions">' +
+              '<button class="btn-small btn-insert" onclick="replaceText(\'' + escapedOriginal + '\', \'' + escapedReplacement + '\')" style="background:#059669;">Fix It</button>' +
+              '<button class="btn-small btn-highlight" onclick="highlightText(\'' + escapedOriginal + '\')">Find</button>' +
+              '</div>';
+          } else if (risk.suggestion) {
+            var escapedSuggestion = escapeForJs(risk.suggestion);
             html += '<div class="risk-suggestion">Suggestion: ' + risk.suggestion + '</div>' +
               '<div class="risk-actions">' +
-              '<button class="btn-small btn-insert" onclick="insertText(\'' + escapedSuggestion + '\')">Insert</button>';
-            if (risk.location) {
-              var escapedLocation = risk.location.replace(/'/g, "\\'");
-              html += '<button class="btn-small btn-highlight" onclick="highlightText(\'' + escapedLocation + '\')">Find</button>';
-            }
-            html += '</div>';
+              '<button class="btn-small btn-insert" onclick="insertText(\'' + escapedSuggestion + '\')">Insert at Cursor</button>' +
+              '</div>';
           }
+
+          // Find button for all risks with location
+          if (risk.location && !risk.matched_clause) {
+            // Already handled above
+          } else if (risk.location && risk.matched_clause) {
+            html += '<div class="risk-actions" style="margin-top:8px;">' +
+              '<button class="btn-small btn-highlight" onclick="highlightText(\'' + escapeForJs(risk.location) + '\')">Find in Document</button>' +
+              '</div>';
+          }
+
           html += '</div>';
         });
       }
 
       resultsDiv.innerHTML = html;
       resultsDiv.classList.remove('hidden');
+    }
+
+    // Helper to escape strings for use in onclick handlers
+    function escapeForJs(str) {
+      if (!str) return '';
+      return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+    }
+
+    // Apply a clause fix from the Clause Library and track usage
+    function applyClauseFix(originalText, newText, clauseId, position) {
+      Word.run(function(context) {
+        var searchResults = context.document.body.search(originalText, {
+          matchCase: false,
+          matchWholeWord: false
+        });
+        searchResults.load('items');
+        return context.sync().then(function() {
+          if (searchResults.items.length > 0) {
+            searchResults.items[0].insertText(newText, Word.InsertLocation.replace);
+            // Highlight based on position
+            var highlightColor = position === 'primary' ? '#86EFAC' :
+                                 position === 'fallback' ? '#FCD34D' : '#FCA5A5';
+            searchResults.items[0].font.highlightColor = highlightColor;
+            return context.sync().then(function() {
+              // Track clause usage
+              trackClauseUsage(clauseId, position);
+            });
+          } else {
+            showError('Could not find the text to replace. Try selecting it manually.');
+          }
+        });
+      }).catch(function(err) {
+        showError('Failed to replace text: ' + err.message);
+      });
+    }
+
+    // Track clause usage for analytics
+    function trackClauseUsage(clauseId, position) {
+      var token = localStorage.getItem('mars_addin_token');
+      fetch(API_BASE + '/api/word-addin/clauses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+          clause_id: clauseId,
+          position_used: position,
+          document_name: 'Word Document'
+        })
+      }).catch(function(err) {
+        console.log('Failed to track clause usage:', err);
+      });
     }
 
     // Insert text at cursor
@@ -477,6 +655,31 @@
         return context.sync();
       }).catch(function(err) {
         showError('Failed to insert text');
+      });
+    }
+
+    // Find and replace problematic text with suggested fix
+    function replaceText(originalText, newText) {
+      Word.run(function(context) {
+        // Search for the original problematic text
+        var searchResults = context.document.body.search(originalText, {
+          matchCase: false,
+          matchWholeWord: false
+        });
+        searchResults.load('items');
+        return context.sync().then(function() {
+          if (searchResults.items.length > 0) {
+            // Replace the first occurrence
+            searchResults.items[0].insertText(newText, Word.InsertLocation.replace);
+            // Highlight it briefly to show what changed
+            searchResults.items[0].font.highlightColor = '#86EFAC';
+            return context.sync();
+          } else {
+            showError('Could not find the text to replace. Try selecting it manually.');
+          }
+        });
+      }).catch(function(err) {
+        showError('Failed to replace text: ' + err.message);
       });
     }
 
@@ -535,6 +738,157 @@
     // Show error
     function showError(message) {
       var errorDiv = document.getElementById('error');
+      errorDiv.textContent = message;
+      errorDiv.classList.remove('hidden');
+    }
+
+    // Load playbooks for dropdown
+    var playbooksLoaded = false;
+    function loadPlaybooks() {
+      if (playbooksLoaded) return;
+
+      var dropdown = document.getElementById('playbookDropdown');
+      var token = localStorage.getItem('mars_addin_token');
+
+      fetch(API_BASE + '/api/word-addin/playbooks', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      }).then(function(response) {
+        return response.json();
+      }).then(function(data) {
+        if (!data.playbooks || data.playbooks.length === 0) {
+          dropdown.innerHTML = '<option value="">No playbooks available</option>';
+          return;
+        }
+
+        var html = '<option value="">Select a playbook...</option>';
+        data.playbooks.forEach(function(playbook) {
+          html += '<option value="' + playbook.id + '">' + playbook.name + '</option>';
+        });
+        dropdown.innerHTML = html;
+        playbooksLoaded = true;
+
+        // Enable compare button when selection changes
+        dropdown.onchange = function() {
+          document.getElementById('compareBtn').disabled = !this.value;
+        };
+      }).catch(function(err) {
+        dropdown.innerHTML = '<option value="">Failed to load playbooks</option>';
+        console.error('Failed to load playbooks:', err);
+      });
+    }
+
+    // Compare document to selected playbook
+    function compareToPlaybook() {
+      var dropdown = document.getElementById('playbookDropdown');
+      var playbookId = dropdown.value;
+
+      if (!playbookId) {
+        showCompareError('Please select a playbook first');
+        return;
+      }
+
+      var btn = document.getElementById('compareBtn');
+      var resultsDiv = document.getElementById('compareResults');
+      var errorDiv = document.getElementById('compareError');
+
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Comparing...';
+      errorDiv.classList.add('hidden');
+      resultsDiv.classList.add('hidden');
+
+      getDocumentText().then(function(text) {
+        if (!text || text.trim().length < 100) {
+          throw new Error('Document is too short to compare (minimum 100 characters)');
+        }
+
+        var token = localStorage.getItem('mars_addin_token');
+        return fetch(API_BASE + '/api/word-addin/compare', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            document_text: text,
+            playbook_id: playbookId
+          })
+        });
+      }).then(function(response) {
+        if (!response.ok) {
+          return response.json().then(function(err) {
+            throw new Error(err.error || 'Comparison failed');
+          });
+        }
+        return response.json();
+      }).then(function(result) {
+        displayCompareResults(result);
+      }).catch(function(err) {
+        showCompareError(err.message);
+      }).finally(function() {
+        btn.disabled = false;
+        btn.innerHTML = 'Compare to Playbook';
+      });
+    }
+
+    // Display comparison results
+    function displayCompareResults(result) {
+      var resultsDiv = document.getElementById('compareResults');
+
+      var scoreClass = result.deviation_score >= 70 ? 'score-high' :
+                       result.deviation_score >= 40 ? 'score-medium' : 'score-low';
+
+      var html = '<div class="score-card">' +
+        '<div class="score-circle ' + scoreClass + '">' + Math.round(result.deviation_score) + '</div>' +
+        '<div class="score-info">' +
+        '<h3>Deviation Score</h3>' +
+        '<p>vs ' + result.playbook_name + '</p>' +
+        '</div></div>' +
+        '<div class="summary">' + result.summary + '</div>';
+
+      if (result.deviations && result.deviations.length > 0) {
+        html += '<div class="risks-title">Deviations Found (' + result.deviations.length + ')</div>';
+        result.deviations.forEach(function(deviation) {
+          html += '<div class="risk-item">' +
+            '<div class="risk-header">' +
+            '<span class="risk-badge ' + deviation.severity + '">' + deviation.severity + '</span>' +
+            '<span class="risk-title">' + deviation.section + '</span>' +
+            '</div>' +
+            '<div class="deviation-comparison">' +
+            '<div style="margin-bottom: 8px;">' +
+            '<div style="font-size: 11px; color: #f87171; text-transform: uppercase; margin-bottom: 4px;">Their Language:</div>' +
+            '<div style="font-size: 12px; color: #fca5a5; background: #451a1a; padding: 8px; border-radius: 4px;">' + deviation.their_language + '</div>' +
+            '</div>' +
+            '<div style="margin-bottom: 8px;">' +
+            '<div style="font-size: 11px; color: #4ade80; text-transform: uppercase; margin-bottom: 4px;">MARS Standard:</div>' +
+            '<div style="font-size: 12px; color: #86efac; background: #14532d; padding: 8px; border-radius: 4px;">' + deviation.mars_standard + '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div class="risk-desc">' + deviation.explanation + '</div>' +
+            '<div class="risk-suggestion"><strong>Recommendation:</strong> ' + deviation.recommendation + '</div>';
+
+          // Add button to find their language in document
+          if (deviation.their_language && deviation.their_language.length > 10) {
+            var escapedText = escapeForJs(deviation.their_language.substring(0, 50));
+            html += '<div class="risk-actions">' +
+              '<button class="btn-small btn-highlight" onclick="highlightText(\'' + escapedText + '\')">Find in Document</button>' +
+              '</div>';
+          }
+
+          html += '</div>';
+        });
+      } else {
+        html += '<div style="text-align: center; padding: 20px; color: #4ade80;">' +
+          '<p>No significant deviations found from MARS standard.</p>' +
+          '</div>';
+      }
+
+      resultsDiv.innerHTML = html;
+      resultsDiv.classList.remove('hidden');
+    }
+
+    // Show compare error
+    function showCompareError(message) {
+      var errorDiv = document.getElementById('compareError');
       errorDiv.textContent = message;
       errorDiv.classList.remove('hidden');
     }
