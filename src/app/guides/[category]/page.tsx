@@ -954,6 +954,147 @@ const guideContent: Record<string, GuideData> = {
           </div>
         ),
       },
+      {
+        id: 'risk-scoring',
+        title: 'Risk Scoring',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Every AI-suggested redline is automatically classified by risk level to help you prioritize your review:
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-red-500/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-bold">HIGH</span>
+                </div>
+                <p className="text-[#64748B] text-sm">
+                  Critical changes requiring immediate attention: liability, indemnification, IP/work product, termination for cause, insurance requirements.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-yellow-500/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">MEDIUM</span>
+                </div>
+                <p className="text-[#64748B] text-sm">
+                  Important but negotiable: payment terms, warranties, confidentiality periods, audit rights, dispute resolution.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-green-500/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-bold">LOW</span>
+                </div>
+                <p className="text-[#64748B] text-sm">
+                  Minor changes: formatting, word choices, clarifications, notice periods, standard boilerplate.
+                </p>
+              </div>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04] mt-4">
+              <h4 className="text-white font-medium mb-2">Risk Summary Banner</h4>
+              <p className="text-[#64748B] text-sm">
+                At the top of the review, you'll see a summary showing the count of High, Medium, and Low risk items. This gives you an instant overview of the contract's risk profile before diving into details.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'approval-workflow',
+        title: 'Approval Workflow',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              After AI analysis, send contracts for approval with tracking and notifications:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Sending for Approval</h4>
+              <ol className="space-y-2 text-sm list-decimal list-inside text-[#8FA3BF]">
+                <li>Complete your AI review and make any adjustments</li>
+                <li>Click <strong className="text-white">"Send for Approval"</strong> button</li>
+                <li>Enter the approver's email address</li>
+                <li>Optionally add CC recipients (stakeholders who should be notified)</li>
+                <li>Click Send - approver receives email with secure link</li>
+              </ol>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#8B5CF6]/20">
+                <h4 className="text-[#8B5CF6] font-medium mb-2">Approver Access</h4>
+                <p className="text-[#64748B] text-sm">
+                  Approvers can view the full redlined contract, add comments, make edits, and approve or reject. All actions are logged.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#38BDF8]/20">
+                <h4 className="text-[#38BDF8] font-medium mb-2">CC Recipients</h4>
+                <p className="text-[#64748B] text-sm">
+                  CC'd parties receive a notification email with a read-only link. They can view the contract and comments but cannot approve or reject.
+                </p>
+              </div>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04] mt-4">
+              <h4 className="text-white font-medium mb-2">Activity Log</h4>
+              <p className="text-[#64748B] text-sm mb-3">
+                Every action is tracked in the activity log, including:
+              </p>
+              <ul className="space-y-1 text-sm text-[#8FA3BF]">
+                <li>• When approval request was sent</li>
+                <li>• When approver viewed the contract</li>
+                <li>• When CC recipients viewed the contract</li>
+                <li>• Comments and annotations added</li>
+                <li>• Final approval or rejection with timestamp</li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'playbooks',
+        title: 'Playbooks & Standard Agreements',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Playbooks store MARS's own standard agreements with version history. Use them as a baseline when reviewing counterparty contracts.
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Creating a Playbook</h4>
+              <ol className="space-y-2 text-sm list-decimal list-inside text-[#8FA3BF]">
+                <li>Go to <strong className="text-white">Playbooks</strong> in the sidebar</li>
+                <li>Click <strong className="text-white">"New Playbook"</strong></li>
+                <li>Enter name (e.g., "MARS NDA") and optional description</li>
+                <li>Upload PDF/Word file or paste the agreement text</li>
+                <li>Text is automatically extracted for AI comparison</li>
+              </ol>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#22C55E]/20">
+                <h4 className="text-[#22C55E] font-medium mb-2">Version History</h4>
+                <p className="text-[#64748B] text-sm">
+                  Each time you update a playbook, a new version is created. Track who made changes and when, with change notes for context.
+                </p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-[#8B5CF6]/20">
+                <h4 className="text-[#8B5CF6] font-medium mb-2">File Storage</h4>
+                <p className="text-[#64748B] text-sm">
+                  Original PDF and Word documents are stored for download. The extracted text is used for AI comparison against incoming contracts.
+                </p>
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-[#22C55E]/10 to-[#38BDF8]/10 rounded-lg p-4 border border-white/[0.06] mt-4">
+              <h4 className="text-white font-medium mb-2">Compare Against Playbook</h4>
+              <p className="text-[#8FA3BF] text-sm">
+                When reviewing a counterparty contract, select a playbook from the dropdown. The AI will compare the incoming contract against your standard terms and highlight deviations—showing where the counterparty's version is more or less favorable than your standard position.
+              </p>
+            </div>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04] mt-4">
+              <h4 className="text-white font-medium mb-2">Recommended Playbooks</h4>
+              <ul className="space-y-1 text-sm text-[#8FA3BF]">
+                <li>• MARS Warranty General Terms & Conditions</li>
+                <li>• MARS MCC Maintenance and Services Agreement</li>
+                <li>• MARS M3 EULA</li>
+                <li>• MARS NDA</li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
     ],
   },
   insights: {
