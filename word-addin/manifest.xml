@@ -13,13 +13,13 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="MARS Contract Review"/>
   <Description DefaultValue="Review contracts, analyze risks, and insert approved clauses directly in Microsoft Word."/>
-  <IconUrl DefaultValue="https://mars-contracts.vercel.app/word-addin/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://mars-contracts.vercel.app/word-addin/assets/icon-64.png"/>
-  <SupportUrl DefaultValue="https://mars-contracts.vercel.app/support"/>
+  <IconUrl DefaultValue="https://mars-dashboards.vercel.app/word-addin/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://mars-dashboards.vercel.app/word-addin/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="https://mars-dashboards.vercel.app/support"/>
 
   <!-- Domains that will be allowed -->
   <AppDomains>
-    <AppDomain>https://mars-contracts.vercel.app</AppDomain>
+    <AppDomain>https://mars-dashboards.vercel.app</AppDomain>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
   </AppDomains>
 
@@ -37,7 +37,7 @@
 
   <!-- Default Settings -->
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://mars-contracts.vercel.app/word-addin/taskpane.html"/>
+    <SourceLocation DefaultValue="https://mars-dashboards.vercel.app/word-addin/taskpane.html"/>
   </DefaultSettings>
 
   <!-- Permissions -->
@@ -106,13 +106,13 @@
     <!-- Resources -->
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://mars-contracts.vercel.app/word-addin/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://mars-contracts.vercel.app/word-addin/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://mars-contracts.vercel.app/word-addin/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://mars-dashboards.vercel.app/word-addin/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://mars-dashboards.vercel.app/word-addin/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://mars-dashboards.vercel.app/word-addin/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="MARS.Taskpane.Url" DefaultValue="https://mars-contracts.vercel.app/word-addin/taskpane.html"/>
-        <bt:Url id="Contoso.FunctionFile.Url" DefaultValue="https://mars-contracts.vercel.app/word-addin/commands.html"/>
+        <bt:Url id="MARS.Taskpane.Url" DefaultValue="https://mars-dashboards.vercel.app/word-addin/taskpane.html"/>
+        <bt:Url id="Contoso.FunctionFile.Url" DefaultValue="https://mars-dashboards.vercel.app/word-addin/commands.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="MARS.Group.Label" DefaultValue="MARS Contracts"/>
