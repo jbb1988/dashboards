@@ -118,6 +118,16 @@ interface User {
   name: string;
 }
 
+// Contract from Salesforce for linking
+interface Contract {
+  id: string;
+  name: string;
+  salesforceId?: string;
+  contractType?: string[];
+  value?: number;
+  status?: string;
+}
+
 // Office.js types are loaded from @types/office-js
 // Office.js library is loaded from CDN in HTML
 declare const Office: typeof globalThis.Office;
@@ -218,6 +228,13 @@ export default function App() {
   // Track if all changes have been inserted
   const [allChangesInserted, setAllChangesInserted] = useState(false);
 
+  // Contract linking state
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [selectedContract, setSelectedContract] = useState<string>('');
+  const [contractSearch, setContractSearch] = useState('');
+  const [showContractDropdown, setShowContractDropdown] = useState(false);
+  const [isLoadingContracts, setIsLoadingContracts] = useState(false);
+
   // Initialize Office.js
   useEffect(() => {
     Office.onReady(() => {
@@ -245,6 +262,32 @@ export default function App() {
       console.error('Auth check failed:', err);
     }
   };
+
+  // Fetch contracts for linking
+  const fetchContracts = async () => {
+    setIsLoadingContracts(true);
+    try {
+      const token = localStorage.getItem('mars_token');
+      const response = await fetch(`${API_BASE}/api/contracts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setContracts(data.contracts || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch contracts:', err);
+    } finally {
+      setIsLoadingContracts(false);
+    }
+  };
+
+  // Load contracts when user logs in
+  useEffect(() => {
+    if (user) {
+      fetchContracts();
+    }
+  }, [user]);
 
   // Handle login
   const handleLogin = async () => {
@@ -342,6 +385,7 @@ export default function App() {
         body: JSON.stringify({
           text: documentText,
           provisionName: documentName,
+          contractId: selectedContract || undefined,
         }),
       });
 
@@ -1212,6 +1256,85 @@ export default function App() {
         <div style={styles.content}>
           {activeTab === 'analyze' && (
             <div style={styles.analyzeTab}>
+              {/* Contract Linking Section */}
+              <div style={styles.contractSection}>
+                <Text size={200} weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
+                  Link to Contract (Optional)
+                </Text>
+                <div style={styles.contractDropdownContainer}>
+                  <input
+                    type="text"
+                    value={contractSearch}
+                    onChange={(e) => {
+                      setContractSearch(e.target.value);
+                      setShowContractDropdown(true);
+                    }}
+                    onFocus={() => setShowContractDropdown(true)}
+                    placeholder={isLoadingContracts ? 'Loading contracts...' : 'Search contracts...'}
+                    disabled={isLoadingContracts}
+                    style={styles.contractInput}
+                  />
+                  {selectedContract && (
+                    <button
+                      onClick={() => {
+                        setSelectedContract('');
+                        setContractSearch('');
+                      }}
+                      style={styles.clearButton}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {/* Contract Dropdown */}
+                {showContractDropdown && contracts.length > 0 && (
+                  <div style={styles.contractDropdown}>
+                    {contracts
+                      .filter(c =>
+                        c.name.toLowerCase().includes(contractSearch.toLowerCase()) ||
+                        c.contractType?.some(t => t.toLowerCase().includes(contractSearch.toLowerCase()))
+                      )
+                      .slice(0, 10)
+                      .map((contract) => (
+                        <button
+                          key={contract.id}
+                          onClick={() => {
+                            setSelectedContract(contract.id);
+                            setContractSearch(contract.name);
+                            setShowContractDropdown(false);
+                          }}
+                          style={{
+                            ...styles.contractOption,
+                            backgroundColor: selectedContract === contract.id ? '#38BDF8' + '20' : 'transparent',
+                          }}
+                        >
+                          <Text size={200} weight="semibold" style={{ display: 'block' }}>
+                            {contract.name}
+                          </Text>
+                          <Text size={100} style={{ color: '#A0A0A0' }}>
+                            {contract.contractType?.join(', ') || 'No Type'}
+                            {contract.value ? ` • $${contract.value.toLocaleString()}` : ''}
+                          </Text>
+                        </button>
+                      ))}
+                    {contracts.filter(c =>
+                      c.name.toLowerCase().includes(contractSearch.toLowerCase())
+                    ).length === 0 && (
+                      <Text size={200} style={{ padding: 12, color: '#A0A0A0', textAlign: 'center', display: 'block' }}>
+                        No contracts found
+                      </Text>
+                    )}
+                  </div>
+                )}
+                {selectedContract && (
+                  <div style={styles.selectedContractBadge}>
+                    <Badge appearance="outline" color="brand">
+                      Linked: {contracts.find(c => c.id === selectedContract)?.name || 'Contract'}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
               {/* Analyze Button */}
               <Button
                 appearance="primary"
@@ -1650,5 +1773,61 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 12,
     backgroundColor: '#2D2D2D',
     borderRadius: 8,
+  },
+  contractSection: {
+    marginBottom: 16,
+    position: 'relative',
+  },
+  contractDropdownContainer: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  contractInput: {
+    width: '100%',
+    padding: '10px 32px 10px 12px',
+    backgroundColor: '#1F1F1F',
+    border: '1px solid #404040',
+    borderRadius: 6,
+    color: '#FFFFFF',
+    fontSize: 13,
+    outline: 'none',
+  },
+  clearButton: {
+    position: 'absolute',
+    right: 8,
+    background: 'none',
+    border: 'none',
+    color: '#A0A0A0',
+    cursor: 'pointer',
+    fontSize: 14,
+    padding: 4,
+  },
+  contractDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    backgroundColor: '#2D2D2D',
+    border: '1px solid #404040',
+    borderRadius: 6,
+    maxHeight: 200,
+    overflowY: 'auto',
+    zIndex: 100,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+  },
+  contractOption: {
+    width: '100%',
+    textAlign: 'left',
+    padding: '10px 12px',
+    border: 'none',
+    borderBottom: '1px solid #404040',
+    background: 'none',
+    cursor: 'pointer',
+    display: 'block',
+  },
+  selectedContractBadge: {
+    marginTop: 8,
   },
 };
