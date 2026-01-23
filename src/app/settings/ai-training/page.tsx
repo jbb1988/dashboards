@@ -249,7 +249,7 @@ export default function AITrainingPage() {
                   title="Neutral"
                   value={feedbackSummary.neutral}
                   subtitle="Acceptable"
-                  icon={KPIIcons.minus}
+                  icon={KPIIcons.clock}
                   color="#F59E0B"
                   delay={0.4}
                 />
