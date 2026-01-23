@@ -81,12 +81,36 @@ interface PreviewState {
   clauseType: 'primary' | 'fallback' | 'last_resort' | 'suggestion';
 }
 
+// Legacy interface - kept for compatibility with clause library
 interface AnalysisResult {
   overall_risk_score: number;
   risk_level: string;
   risks: RiskItem[];
   clause_suggestions: ClauseSuggestion[];
   summary: string;
+}
+
+// New interface matching dashboard API response
+interface DashboardSection {
+  sectionNumber: string;
+  sectionTitle: string;
+  riskLevel: 'high' | 'medium' | 'low';
+  originalText: string;
+  revisedText: string;
+  rationale: string;
+}
+
+interface DashboardAnalysisResult {
+  redlinedText: string;
+  originalText: string;
+  modifiedText: string;
+  summary: string[];
+  sections: DashboardSection[];
+  hasVisibleChanges: boolean;
+  riskScores: {
+    summary: { high: number; medium: number; low: number };
+    sections: { sectionTitle: string; riskLevel: string }[];
+  };
 }
 
 interface User {
@@ -178,7 +202,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<string>('analyze');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<DashboardAnalysisResult | null>(null);
   const [clauses, setClauses] = useState<ClauseSuggestion[]>([]);
   const [isLoadingClauses, setIsLoadingClauses] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,8 +212,11 @@ export default function App() {
   const [previewState, setPreviewState] = useState<PreviewState | null>(null);
   const [isApplyingChange, setIsApplyingChange] = useState(false);
 
-  // Track which fixes have been applied (by risk id)
-  const [appliedFixes, setAppliedFixes] = useState<Set<string>>(new Set());
+  // Track which sections have been applied (by section title)
+  const [appliedSections, setAppliedSections] = useState<Set<string>>(new Set());
+
+  // Track if all changes have been inserted
+  const [allChangesInserted, setAllChangesInserted] = useState(false);
 
   // Initialize Office.js
   useEffect(() => {
@@ -280,7 +307,7 @@ export default function App() {
     });
   }, []);
 
-  // Analyze document
+  // Analyze document using dashboard API
   const analyzeDocument = async () => {
     if (!user) {
       setError('Please log in first');
@@ -289,7 +316,8 @@ export default function App() {
 
     setIsAnalyzing(true);
     setError(null);
-    setAppliedFixes(new Set()); // Clear applied fixes on new analysis
+    setAppliedSections(new Set()); // Clear applied sections on new analysis
+    setAllChangesInserted(false);
 
     try {
       const [documentText, documentName] = await Promise.all([
@@ -304,30 +332,182 @@ export default function App() {
       }
 
       const token = localStorage.getItem('mars_token');
-      const response = await fetch(`${API_BASE}/api/word-addin/analyze`, {
+      // Use same API as dashboard for consistent results
+      const response = await fetch(`${API_BASE}/api/contracts/review`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          document_text: documentText,
-          document_name: documentName,
+          text: documentText,
+          provisionName: documentName,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Analysis failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Analysis failed');
       }
 
-      const result = await response.json();
+      const result: DashboardAnalysisResult = await response.json();
       setAnalysisResult(result);
+
+      if (result.sections.length === 0) {
+        setSuccessMessage('No material risks found in this contract.');
+        setTimeout(() => setSuccessMessage(null), 5000);
+      }
     } catch (err) {
-      setError('Failed to analyze document. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to analyze document. Please try again.');
       console.error('Analysis error:', err);
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Insert all section changes into Word document with track-changes styling
+  const insertAllChanges = async () => {
+    if (!analysisResult || analysisResult.sections.length === 0) {
+      setError('No changes to insert');
+      return;
+    }
+
+    setIsApplyingChange(true);
+    setError(null);
+    let appliedCount = 0;
+    const newApplied = new Set(appliedSections);
+
+    try {
+      await Word.run(async (context) => {
+        for (const section of analysisResult.sections) {
+          if (!section.originalText || !section.revisedText) continue;
+          if (appliedSections.has(section.sectionTitle)) continue; // Skip already applied
+
+          // Find original text in document
+          const matches = await cascadingSearch(section.originalText, context);
+
+          if (matches.length > 0) {
+            const range = matches[0].range;
+
+            // Apply strikethrough to original (red)
+            range.font.strikeThrough = true;
+            range.font.color = '#DC2626';
+
+            // Insert revised text after (green, underlined)
+            const newRange = range.insertText(' ' + section.revisedText, Word.InsertLocation.after);
+            newRange.font.strikeThrough = false;
+            newRange.font.underline = Word.UnderlineType.single;
+            newRange.font.color = '#16A34A';
+
+            newApplied.add(section.sectionTitle);
+            appliedCount++;
+          }
+        }
+        await context.sync();
+      });
+
+      setAppliedSections(newApplied);
+      setAllChangesInserted(true);
+
+      if (appliedCount > 0) {
+        setSuccessMessage(`Inserted ${appliedCount} changes into document`);
+        setTimeout(() => setSuccessMessage(null), 5000);
+      } else {
+        setError('Could not find any matching text in the document');
+      }
+    } catch (err) {
+      console.error('Insert all changes error:', err);
+      setError('Failed to insert changes. Please try again.');
+    } finally {
+      setIsApplyingChange(false);
+    }
+  };
+
+  // Insert a single section change into Word document
+  const insertSingleSection = async (section: DashboardSection) => {
+    if (!section.originalText || !section.revisedText) {
+      setError('No text available for this section');
+      return;
+    }
+
+    if (appliedSections.has(section.sectionTitle)) {
+      setError('This change has already been applied');
+      return;
+    }
+
+    setIsApplyingChange(true);
+    setError(null);
+
+    try {
+      await Word.run(async (context) => {
+        // Find original text in document
+        const matches = await cascadingSearch(section.originalText, context);
+
+        if (matches.length > 0) {
+          const range = matches[0].range;
+
+          // Apply strikethrough to original (red)
+          range.font.strikeThrough = true;
+          range.font.color = '#DC2626';
+
+          // Insert revised text after (green, underlined)
+          const newRange = range.insertText(' ' + section.revisedText, Word.InsertLocation.after);
+          newRange.font.strikeThrough = false;
+          newRange.font.underline = Word.UnderlineType.single;
+          newRange.font.color = '#16A34A';
+
+          // Select the new range to show user where change was made
+          newRange.select();
+
+          await context.sync();
+
+          setAppliedSections(prev => new Set(prev).add(section.sectionTitle));
+          setSuccessMessage(`Applied change to: ${section.sectionTitle}`);
+          setTimeout(() => setSuccessMessage(null), 3000);
+        } else {
+          setError(`Could not find "${section.sectionTitle}" text in document. It may have been modified.`);
+        }
+      });
+    } catch (err) {
+      console.error('Insert section error:', err);
+      setError('Failed to apply change. Please try again.');
+    } finally {
+      setIsApplyingChange(false);
+    }
+  };
+
+  // Highlight a section in the document
+  const highlightSection = async (section: DashboardSection) => {
+    if (!section.originalText) {
+      setError('No text location for this section');
+      return;
+    }
+
+    try {
+      await Word.run(async (context) => {
+        const matches = await cascadingSearch(section.originalText, context);
+
+        if (matches.length > 0) {
+          const range = matches[0].range;
+          range.font.highlightColor = '#FFE066';
+          range.select();
+          await context.sync();
+        } else {
+          setError('Could not find the text in the document');
+        }
+      });
+    } catch (err) {
+      console.error('Highlight error:', err);
+      setError('Failed to highlight text');
+    }
+  };
+
+  // Get risk color for badges
+  const getRiskColor = (riskLevel: string): 'danger' | 'warning' | 'success' => {
+    const level = riskLevel.toLowerCase();
+    if (level === 'high') return 'danger';
+    if (level === 'medium') return 'warning';
+    return 'success';
   };
 
   // Load clause library
@@ -739,14 +919,8 @@ export default function App() {
         // Apply the change with track changes
         await applyWithTrackChanges(selectedMatch.range, previewState.newText, context);
 
-        // Track usage in API (fire and forget)
-        const riskItem = analysisResult?.risks.find(r => r.id === previewState.riskId);
-        if (riskItem?.matched_clause) {
-          trackClauseUsage(riskItem.matched_clause.id, previewState.clauseType);
-        }
-
-        // Mark this fix as applied
-        setAppliedFixes(prev => new Set(prev).add(previewState.riskId));
+        // Mark this section/risk as applied
+        setAppliedSections(prev => new Set(prev).add(previewState.riskId));
 
         setPreviewState(null);
         setSuccessMessage('Change applied successfully with track changes!');
@@ -1049,187 +1223,109 @@ export default function App() {
                 {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
               </Button>
 
-              {/* Analysis Results */}
+              {/* Analysis Results - Dashboard Style */}
               {analysisResult && (
                 <div style={styles.results}>
-                  {/* Risk Score */}
-                  <Card style={styles.scoreCard}>
-                    <div style={styles.scoreContent}>
-                      <div style={getScoreCircleStyle(analysisResult.risk_level)}>
-                        <Text size={700} weight="bold">
-                          {Math.round(analysisResult.overall_risk_score)}
-                        </Text>
-                      </div>
-                      <div>
-                        <Text weight="semibold">Risk Score</Text>
-                        <Text size={200} style={{ color: '#A0A0A0' }}>
-                          {analysisResult.risk_level} risk
-                        </Text>
-                      </div>
-                    </div>
-                  </Card>
+                  {/* Risk Summary Bar */}
+                  <div style={styles.riskSummaryBar}>
+                    <Badge appearance="filled" color="danger" style={styles.riskBadgeLarge}>
+                      {analysisResult.riskScores.summary.high} High
+                    </Badge>
+                    <Badge appearance="filled" color="warning" style={styles.riskBadgeLarge}>
+                      {analysisResult.riskScores.summary.medium} Medium
+                    </Badge>
+                    <Badge appearance="filled" color="success" style={styles.riskBadgeLarge}>
+                      {analysisResult.riskScores.summary.low} Low
+                    </Badge>
+                  </div>
 
-                  {/* Summary */}
-                  <Card style={styles.summaryCard}>
-                    <Text size={200} style={{ color: '#A0A0A0' }}>
-                      {analysisResult.summary}
-                    </Text>
-                  </Card>
-
-                  {/* Risks */}
-                  {analysisResult.risks.length > 0 && (
-                    <div>
-                      <Text weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
-                        Issues Found ({analysisResult.risks.length})
-                      </Text>
-                      <Accordion collapsible>
-                        {analysisResult.risks.map((risk) => (
-                          <AccordionItem key={risk.id} value={risk.id}>
-                            <AccordionHeader>
-                              <div style={styles.riskHeader}>
-                                {appliedFixes.has(risk.id) ? (
-                                  <Badge appearance="filled" color="success" icon={<CheckmarkCircle24Filled />}>
-                                    Fixed
-                                  </Badge>
-                                ) : (
-                                  getRiskBadge(risk.severity)
-                                )}
-                                <Text size={200} style={appliedFixes.has(risk.id) ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>
-                                  {risk.title}
-                                </Text>
-                              </div>
-                            </AccordionHeader>
-                            <AccordionPanel>
-                              <div style={styles.riskContent}>
-                                <Text size={200}>{risk.description}</Text>
-
-                                {/* Location Info */}
-                                {risk.location && (
-                                  <div style={styles.locationBox}>
-                                    <Text size={200} weight="semibold" style={{ color: '#FBBF24' }}>
-                                      Problematic Text:
-                                    </Text>
-                                    <Text size={200} style={{ fontStyle: 'italic', color: '#D1D5DB' }}>
-                                      "{risk.location.substring(0, 150)}{risk.location.length > 150 ? '...' : ''}"
-                                    </Text>
-                                  </div>
-                                )}
-
-                                {/* Matched Clause Library Options */}
-                                {risk.matched_clause && (
-                                  <div style={styles.fixItSection}>
-                                    <Text size={200} weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
-                                      Fix with Clause Library: {risk.matched_clause.name}
-                                    </Text>
-
-                                    <div style={styles.fixItButtons}>
-                                      <Button
-                                        size="small"
-                                        appearance="primary"
-                                        onClick={() => initiateFixIt(risk, 'primary')}
-                                        disabled={isApplyingChange || appliedFixes.has(risk.id)}
-                                        style={{ backgroundColor: appliedFixes.has(risk.id) ? '#4B5563' : '#16A34A' }}
-                                      >
-                                        {appliedFixes.has(risk.id) ? 'Applied' : 'Fix It: Primary'}
-                                      </Button>
-
-                                      {risk.matched_clause.fallback_text && !appliedFixes.has(risk.id) && (
-                                        <Button
-                                          size="small"
-                                          appearance="outline"
-                                          onClick={() => initiateFixIt(risk, 'fallback')}
-                                          disabled={isApplyingChange}
-                                        >
-                                          Fix It: Fallback
-                                        </Button>
-                                      )}
-
-                                      {risk.matched_clause.last_resort_text && !appliedFixes.has(risk.id) && (
-                                        <Button
-                                          size="small"
-                                          appearance="subtle"
-                                          onClick={() => initiateFixIt(risk, 'last_resort')}
-                                          disabled={isApplyingChange}
-                                        >
-                                          Fix It: Last Resort
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* AI Suggestion (if no matched clause or as alternative) */}
-                                {risk.suggestion && (
-                                  <div style={styles.suggestion}>
-                                    <Text size={200} weight="semibold">
-                                      {risk.matched_clause ? 'Alternative - AI Suggestion:' : 'AI Suggestion:'}
-                                    </Text>
-                                    <Text size={200}>{risk.suggestion.substring(0, 200)}
-                                      {risk.suggestion.length > 200 ? '...' : ''}</Text>
-                                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                                      {risk.location && !appliedFixes.has(risk.id) && (
-                                        <Button
-                                          size="small"
-                                          appearance="outline"
-                                          onClick={() => initiateFixIt(risk, 'suggestion')}
-                                          disabled={isApplyingChange}
-                                        >
-                                          Fix with Suggestion
-                                        </Button>
-                                      )}
-                                      <Button
-                                        size="small"
-                                        appearance="subtle"
-                                        onClick={() => insertClause(risk.suggestion)}
-                                      >
-                                        Insert at Cursor
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Highlight Button */}
-                                {risk.location && (
-                                  <Button
-                                    size="small"
-                                    appearance="outline"
-                                    onClick={() => highlightRisk(risk.location!)}
-                                    style={{ marginTop: 8 }}
-                                  >
-                                    Highlight in Document
-                                  </Button>
-                                )}
-                              </div>
-                            </AccordionPanel>
-                          </AccordionItem>
-                        ))}
-                      </Accordion>
-                    </div>
+                  {/* Insert All Changes Button */}
+                  {analysisResult.sections.length > 0 && (
+                    <Button
+                      appearance="primary"
+                      onClick={insertAllChanges}
+                      disabled={isApplyingChange || allChangesInserted}
+                      style={{ width: '100%', marginTop: 8 }}
+                      icon={allChangesInserted ? <CheckmarkCircle24Filled /> : undefined}
+                    >
+                      {isApplyingChange ? 'Inserting...' : allChangesInserted ? 'All Changes Inserted' : 'Insert All Changes into Document'}
+                    </Button>
                   )}
 
-                  {/* Clause Suggestions */}
-                  {analysisResult.clause_suggestions.length > 0 && (
-                    <div>
-                      <Text weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
-                        Recommended Clauses
+                  {/* Sections List */}
+                  {analysisResult.sections.length > 0 && (
+                    <div style={styles.sectionList}>
+                      <Text weight="semibold" style={{ marginBottom: 12, display: 'block' }}>
+                        Sections Updated ({analysisResult.sections.length})
                       </Text>
-                      {analysisResult.clause_suggestions.map((clause) => (
-                        <Card key={clause.id} style={styles.clauseCard}>
-                          <CardHeader
-                            header={<Text weight="semibold">{clause.name}</Text>}
-                            description={<Text size={200}>{clause.category}</Text>}
-                            action={
-                              <Button
-                                size="small"
-                                onClick={() => insertClause(clause.primary_text)}
-                              >
-                                Insert
-                              </Button>
-                            }
-                          />
+                      {analysisResult.sections.map((section, index) => (
+                        <Card key={`${section.sectionNumber}-${index}`} style={styles.sectionCard}>
+                          <div style={styles.sectionHeader}>
+                            <Badge
+                              appearance="filled"
+                              color={getRiskColor(section.riskLevel)}
+                            >
+                              {section.riskLevel.toUpperCase()}
+                            </Badge>
+                            <Text weight="semibold" size={300}>
+                              {section.sectionTitle || `Section ${section.sectionNumber}`}
+                            </Text>
+                            {appliedSections.has(section.sectionTitle) && (
+                              <CheckmarkCircle24Filled style={{ color: '#4ADE80', marginLeft: 'auto' }} />
+                            )}
+                          </div>
+                          <Text size={200} style={{ color: '#A0A0A0', marginTop: 8 }}>
+                            {section.rationale}
+                          </Text>
+                          <div style={styles.sectionActions}>
+                            <Button
+                              size="small"
+                              appearance={appliedSections.has(section.sectionTitle) ? 'outline' : 'primary'}
+                              onClick={() => insertSingleSection(section)}
+                              disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
+                            >
+                              {appliedSections.has(section.sectionTitle) ? 'Applied' : 'Apply This Change'}
+                            </Button>
+                            <Button
+                              size="small"
+                              appearance="subtle"
+                              onClick={() => highlightSection(section)}
+                            >
+                              Find in Doc
+                            </Button>
+                          </div>
                         </Card>
                       ))}
                     </div>
+                  )}
+
+                  {/* Summary List */}
+                  {analysisResult.summary.length > 0 && (
+                    <div style={styles.summaryList}>
+                      <Text weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
+                        Summary of Changes:
+                      </Text>
+                      {analysisResult.summary.map((item, idx) => (
+                        <Text key={idx} size={200} style={{ display: 'block', marginBottom: 4, color: '#D1D5DB' }}>
+                          • {item}
+                        </Text>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No changes found */}
+                  {analysisResult.sections.length === 0 && (
+                    <Card style={styles.summaryCard}>
+                      <div style={{ textAlign: 'center', padding: 16 }}>
+                        <CheckmarkCircle24Filled style={{ color: '#4ADE80', fontSize: 32 }} />
+                        <Text size={300} weight="semibold" style={{ display: 'block', marginTop: 8 }}>
+                          No Material Risks Found
+                        </Text>
+                        <Text size={200} style={{ color: '#A0A0A0' }}>
+                          This contract appears to be favorable or already aligned with MARS positions.
+                        </Text>
+                      </div>
+                    </Card>
                   )}
                 </div>
               )}
@@ -1513,5 +1609,46 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 8,
     flexWrap: 'wrap',
+  },
+  riskSummaryBar: {
+    display: 'flex',
+    justifyContent: 'space-around',
+    padding: '12px 8px',
+    backgroundColor: '#2D2D2D',
+    borderRadius: 8,
+    gap: 8,
+  },
+  riskBadgeLarge: {
+    padding: '8px 16px',
+    fontSize: 14,
+    fontWeight: 600,
+  },
+  sectionList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    marginTop: 16,
+  },
+  sectionCard: {
+    backgroundColor: '#2D2D2D',
+    padding: 12,
+    borderRadius: 8,
+  },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  sectionActions: {
+    display: 'flex',
+    gap: 8,
+    marginTop: 12,
+  },
+  summaryList: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#2D2D2D',
+    borderRadius: 8,
   },
 };
