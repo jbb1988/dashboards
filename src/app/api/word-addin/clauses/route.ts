@@ -4,12 +4,17 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'mars-word-addin-secret';
 
-// Verify token helper
+// Verify token helper (allows test mode)
 function verifyToken(request: NextRequest): { email: string; name: string } | null {
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace('Bearer ', '');
 
   if (!token) return null;
+
+  // Allow test mode token
+  if (token === 'test-mode-token') {
+    return { email: 'test@mars.com', name: 'Test User' };
+  }
 
   try {
     return jwt.verify(token, JWT_SECRET) as { email: string; name: string };

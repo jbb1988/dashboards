@@ -234,6 +234,9 @@
       <button class="btn btn-secondary" onclick="refreshAuth()" style="margin-top: 12px;">
         Already signed in? Click to refresh
       </button>
+      <button class="btn btn-secondary" onclick="testMode()" style="margin-top: 8px; background: #065f46;">
+        Skip Login (Test Mode)
+      </button>
     </div>
 
     <!-- Main View -->
@@ -337,6 +340,14 @@
       } else {
         showError('Debug: ' + debugInfo + '. Try signing in again.');
       }
+    }
+
+    // Test mode - skip auth for testing
+    function testMode() {
+      currentUser = { email: 'test@mars.com', name: 'Test User' };
+      localStorage.setItem('mars_addin_token', 'test-mode-token');
+      localStorage.setItem('mars_addin_user', JSON.stringify(currentUser));
+      showMainView();
     }
 
     // Show main view after login
