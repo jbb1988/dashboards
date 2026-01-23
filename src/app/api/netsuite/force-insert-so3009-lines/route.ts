@@ -34,9 +34,11 @@ export async function POST() {
         tl.costestimate,
         tl.location AS location_id,
         tl.isclosed,
-        BUILTIN.DF(tl.account) AS account_number
+        a.acctnumber AS account_number,
+        a.acctname AS account_name
       FROM transactionline tl
       LEFT JOIN item i ON i.id = tl.item
+      LEFT JOIN account a ON a.id = tl.account
       WHERE tl.transaction = 341203
         AND tl.mainline = 'F'
         AND tl.item IS NOT NULL
@@ -81,6 +83,7 @@ export async function POST() {
             location_id: line.location_id?.toString(),
             is_closed: line.isclosed === 'T',
             account_number: line.account_number,
+            account_name: line.account_name,
             updated_at: new Date().toISOString(),
           });
 
