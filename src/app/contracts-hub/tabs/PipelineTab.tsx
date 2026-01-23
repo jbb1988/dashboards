@@ -46,7 +46,7 @@ export default function PipelineTab() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/contracts/salesforce');
+        const response = await fetch('/api/salesforce');
         if (!response.ok) throw new Error('Failed to fetch contracts');
         const result = await response.json();
         setData(result);
