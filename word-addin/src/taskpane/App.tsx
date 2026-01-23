@@ -357,16 +357,23 @@ export default function App() {
     setError(null);
 
     try {
+      console.log('Attempting login to:', `${API_BASE}/api/word-addin/auth/dev`);
       const response = await fetch(`${API_BASE}/api/word-addin/auth/dev`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail }),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Login response error:', response.status, errorText);
+        throw new Error(`Server error (${response.status})`);
+      }
+
       const data = await response.json();
 
-      if (!response.ok || data.error) {
-        throw new Error(data.error || 'Authentication failed');
+      if (data.error) {
+        throw new Error(data.error);
       }
 
       localStorage.setItem('mars_token', data.token);
@@ -374,7 +381,14 @@ export default function App() {
       setShowQuickLogin(false);
       setLoginEmail('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      console.error('Login error:', err);
+      const message = err instanceof Error ? err.message : 'Login failed';
+      // Check for network errors
+      if (message.includes('fetch') || message.includes('network') || message.includes('Failed to fetch')) {
+        setError('Cannot connect to server. Please check your internet connection.');
+      } else {
+        setError(message);
+      }
     } finally {
       setIsLoggingIn(false);
     }
