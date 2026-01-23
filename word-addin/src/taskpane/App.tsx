@@ -290,6 +290,17 @@ export default function App() {
     }
   }, [user]);
 
+  // Close contract dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (contractDropdownRef.current && !contractDropdownRef.current.contains(event.target as Node)) {
+        setShowContractDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Handle login
   const handleLogin = async () => {
     try {
@@ -1258,7 +1269,7 @@ export default function App() {
           {activeTab === 'analyze' && (
             <div style={styles.analyzeTab}>
               {/* Contract Linking Section */}
-              <div style={styles.contractSection}>
+              <div style={styles.contractSection} ref={contractDropdownRef}>
                 <Text size={200} weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
                   Link to Contract (Optional)
                 </Text>

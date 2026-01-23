@@ -18,6 +18,7 @@
     .container {
       text-align: center;
       padding: 40px;
+      max-width: 320px;
     }
     .logo {
       width: 64px;
@@ -47,7 +48,9 @@
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 12px;
+      width: 100%;
       padding: 12px 24px;
       background: #0078D4;
       color: white;
@@ -57,9 +60,14 @@
       font-weight: 500;
       cursor: pointer;
       transition: background 0.2s;
+      box-sizing: border-box;
     }
     .btn:hover {
       background: #106EBE;
+    }
+    .btn:disabled {
+      background: #4B5563;
+      cursor: not-allowed;
     }
     .btn svg {
       width: 20px;
@@ -88,6 +96,55 @@
       margin-top: 16px;
       font-size: 14px;
     }
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 24px 0;
+      color: #6B7280;
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #374151;
+    }
+    .divider span {
+      padding: 0 12px;
+    }
+    .email-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .email-input {
+      width: 100%;
+      padding: 12px 16px;
+      background: #374151;
+      border: 1px solid #4B5563;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .email-input:focus {
+      outline: none;
+      border-color: #0078D4;
+    }
+    .email-input::placeholder {
+      color: #9CA3AF;
+    }
+    .btn-secondary {
+      background: #374151;
+    }
+    .btn-secondary:hover {
+      background: #4B5563;
+    }
+    .success {
+      color: #4ADE80;
+      margin-top: 16px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -98,8 +155,27 @@
       </svg>
     </div>
     <h1>MARS Contract Review</h1>
-    <p>Sign in with your Microsoft account to continue</p>
-    <button class="btn" id="signInBtn" onclick="signIn()">
+    <p>Sign in to analyze contracts</p>
+
+    <!-- Email Login Form -->
+    <div class="email-form">
+      <input
+        type="email"
+        id="emailInput"
+        class="email-input"
+        placeholder="Enter your email address"
+        autocomplete="email"
+      />
+      <button class="btn" id="emailSignInBtn" onclick="signInWithEmail()">
+        <span class="spinner"></span>
+        <span class="btn-text">Sign In</span>
+      </button>
+    </div>
+
+    <div class="divider"><span>or</span></div>
+
+    <!-- Microsoft OAuth Button -->
+    <button class="btn btn-secondary" id="msSignInBtn" onclick="signInWithMicrosoft()">
       <span class="spinner"></span>
       <span class="btn-text">
         <svg viewBox="0 0 23 23">
@@ -111,17 +187,75 @@
         Sign in with Microsoft
       </span>
     </button>
+
     <div class="error" id="error"></div>
+    <div class="success" id="success"></div>
   </div>
 
   <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
   <script>
-    const CLIENT_ID = 'YOUR_AZURE_AD_CLIENT_ID'; // Replace with actual client ID
+    // Detect API base URL
+    const API_BASE = window.location.hostname === 'localhost'
+      ? 'http://localhost:3000'
+      : 'https://mars-contracts.vercel.app';
+
+    const CLIENT_ID = 'YOUR_AZURE_AD_CLIENT_ID'; // Replace with actual client ID for Microsoft auth
     const REDIRECT_URI = window.location.origin + '/word-addin/auth-callback.html';
     const SCOPES = 'openid profile email';
 
-    function signIn() {
-      const btn = document.getElementById('signInBtn');
+    // Email-based sign in (works without Azure AD)
+    async function signInWithEmail() {
+      const email = document.getElementById('emailInput').value.trim();
+      if (!email || !email.includes('@')) {
+        document.getElementById('error').textContent = 'Please enter a valid email address';
+        return;
+      }
+
+      const btn = document.getElementById('emailSignInBtn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+      document.getElementById('error').textContent = '';
+
+      try {
+        const response = await fetch(API_BASE + '/api/word-addin/auth/dev', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          throw new Error(data.error || 'Authentication failed');
+        }
+
+        // Send token back to parent window (Office add-in)
+        if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(JSON.stringify({
+            type: 'auth_success',
+            token: data.token,
+            user: data.user
+          }));
+        } else {
+          // Fallback for testing outside Office
+          document.getElementById('success').textContent = 'Signed in as ' + data.user.email;
+          console.log('Auth success:', data);
+        }
+      } catch (err) {
+        document.getElementById('error').textContent = err.message;
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+
+    // Microsoft OAuth sign in
+    function signInWithMicrosoft() {
+      if (CLIENT_ID === 'YOUR_AZURE_AD_CLIENT_ID') {
+        document.getElementById('error').textContent = 'Microsoft sign-in not configured. Please use email sign-in.';
+        return;
+      }
+
+      const btn = document.getElementById('msSignInBtn');
       btn.classList.add('loading');
 
       const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
@@ -134,6 +268,13 @@
       window.location.href = authUrl;
     }
 
+    // Handle Enter key in email input
+    document.getElementById('emailInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        signInWithEmail();
+      }
+    });
+
     // Check if returning from OAuth
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -145,9 +286,9 @@
 
     if (code) {
       // Exchange code for token
-      document.getElementById('signInBtn').classList.add('loading');
+      document.getElementById('msSignInBtn').classList.add('loading');
 
-      fetch('/api/word-addin/auth', {
+      fetch(API_BASE + '/api/word-addin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
@@ -158,7 +299,7 @@
           throw new Error(data.error);
         }
         // Send token back to parent
-        if (Office && Office.context && Office.context.ui) {
+        if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
           Office.context.ui.messageParent(JSON.stringify({
             type: 'auth_success',
             token: data.token,
@@ -168,13 +309,7 @@
       })
       .catch(err => {
         document.getElementById('error').textContent = 'Authentication failed: ' + err.message;
-        document.getElementById('signInBtn').classList.remove('loading');
-        if (Office && Office.context && Office.context.ui) {
-          Office.context.ui.messageParent(JSON.stringify({
-            type: 'auth_error',
-            error: err.message
-          }));
-        }
+        document.getElementById('msSignInBtn').classList.remove('loading');
       });
     }
   </script>
