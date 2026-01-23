@@ -301,10 +301,15 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle login
+  // Quick login state for fallback
+  const [showQuickLogin, setShowQuickLogin] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Handle login - try Office dialog first, fallback to inline login
   const handleLogin = async () => {
     try {
-      // Open dialog for OAuth flow
+      // Try to open Office dialog
       const dialogUrl = `${API_BASE}/word-addin/auth.html`;
       Office.context.ui.displayDialogAsync(
         dialogUrl,
@@ -327,11 +332,51 @@ export default function App() {
                 }
               }
             );
+          } else {
+            // Dialog failed to open, show inline login
+            console.error('Dialog failed:', result.error);
+            setShowQuickLogin(true);
           }
         }
       );
     } catch (err) {
-      setError('Failed to open login dialog');
+      console.error('Login error:', err);
+      // Fallback to inline login
+      setShowQuickLogin(true);
+    }
+  };
+
+  // Handle quick email login (fallback)
+  const handleQuickLogin = async () => {
+    if (!loginEmail || !loginEmail.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/word-addin/auth/dev`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Authentication failed');
+      }
+
+      localStorage.setItem('mars_token', data.token);
+      setUser(data.user);
+      setShowQuickLogin(false);
+      setLoginEmail('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -1109,14 +1154,68 @@ export default function App() {
             <Text size={300} style={{ color: '#A0A0A0', textAlign: 'center' }}>
               Sign in to analyze contracts and access the clause library
             </Text>
-            <Button
-              appearance="primary"
-              icon={<Person24Regular />}
-              onClick={handleLogin}
-              style={{ marginTop: 16 }}
-            >
-              Sign in with Microsoft
-            </Button>
+
+            {!showQuickLogin ? (
+              <>
+                <Button
+                  appearance="primary"
+                  icon={<Person24Regular />}
+                  onClick={handleLogin}
+                  style={{ marginTop: 16, width: '100%' }}
+                >
+                  Sign in with Microsoft
+                </Button>
+                <Button
+                  appearance="subtle"
+                  onClick={() => setShowQuickLogin(true)}
+                  style={{ marginTop: 8 }}
+                >
+                  Use email instead
+                </Button>
+              </>
+            ) : (
+              <div style={{ marginTop: 16, width: '100%' }}>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleQuickLogin()}
+                  placeholder="Enter your email"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: '#374151',
+                    border: '1px solid #4B5563',
+                    borderRadius: 6,
+                    color: 'white',
+                    fontSize: 14,
+                    marginBottom: 12,
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <Button
+                  appearance="primary"
+                  onClick={handleQuickLogin}
+                  disabled={isLoggingIn}
+                  style={{ width: '100%' }}
+                >
+                  {isLoggingIn ? 'Signing in...' : 'Sign In'}
+                </Button>
+                <Button
+                  appearance="subtle"
+                  onClick={() => setShowQuickLogin(false)}
+                  style={{ marginTop: 8 }}
+                >
+                  Back
+                </Button>
+              </div>
+            )}
+
+            {error && (
+              <Text size={200} style={{ color: '#F87171', marginTop: 12 }}>
+                {error}
+              </Text>
+            )}
           </div>
         </div>
       </FluentProvider>
