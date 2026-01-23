@@ -34,48 +34,49 @@ async function searchRealData(query: string): Promise<{
   try {
     const searchTerm = `%${query.toLowerCase()}%`;
 
-    // Search contracts
-    const { data: contracts } = await supabase
-      .from('salesforce_contracts')
-      .select('id, salesforce_id, name, status, amount, close_date, account_name')
-      .or(`name.ilike.${searchTerm},account_name.ilike.${searchTerm}`)
+    // Search contracts (using same table as GlobalSearch)
+    const { data: contracts, error: contractError } = await supabase
+      .from('contracts')
+      .select('id, name, status, value, close_date, account_name, opportunity_name')
+      .or(`name.ilike.${searchTerm},account_name.ilike.${searchTerm},opportunity_name.ilike.${searchTerm}`)
       .limit(5);
 
-    if (contracts) {
+    if (!contractError && contracts) {
       results.contracts = contracts.map(c => ({
         id: c.id,
         type: 'contract',
-        title: c.name,
-        subtitle: c.account_name,
-        value: c.amount,
+        title: c.account_name || c.name,
+        subtitle: c.opportunity_name,
+        value: c.value,
         status: c.status,
       }));
     }
 
-    // Search documents
-    const { data: documents } = await supabase
-      .from('contract_documents')
-      .select('id, file_name, document_type, contract_id, uploaded_at')
-      .ilike('file_name', searchTerm)
+    // Search documents (using same table as GlobalSearch)
+    const { data: documents, error: docError } = await supabase
+      .from('documents')
+      .select('id, file_name, document_type, account_name, status')
+      .or(`file_name.ilike.${searchTerm},account_name.ilike.${searchTerm}`)
+      .eq('is_current_version', true)
       .limit(5);
 
-    if (documents) {
+    if (!docError && documents) {
       results.documents = documents.map(d => ({
         id: d.id,
         type: 'document',
         title: d.file_name,
-        subtitle: d.document_type,
+        subtitle: `${d.account_name || 'Unknown'} - ${d.document_type || 'Document'}`,
       }));
     }
 
-    // Search tasks
-    const { data: tasks } = await supabase
-      .from('contract_tasks')
-      .select('id, title, status, due_date, priority')
-      .ilike('title', searchTerm)
+    // Search tasks (using same table as GlobalSearch)
+    const { data: tasks, error: taskError } = await supabase
+      .from('tasks')
+      .select('id, title, status, due_date, description')
+      .or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`)
       .limit(5);
 
-    if (tasks) {
+    if (!taskError && tasks) {
       results.tasks = tasks.map(t => ({
         id: t.id,
         type: 'task',
