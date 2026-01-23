@@ -420,7 +420,7 @@ export default function ObligationsPage() {
               {viewMode === 'calendar' ? (
                 <ObligationCalendar
                   obligations={filteredObligations}
-                  onSelectObligation={setSelectedObligation}
+                  onSelectObligation={(obligation) => setSelectedObligation(obligation)}
                   onSelectDate={(date) => console.log('Selected date:', date)}
                 />
               ) : (
