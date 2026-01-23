@@ -17,9 +17,9 @@ interface Clause {
   primary_text: string;
   fallback_text: string | null;
   last_resort_text: string | null;
-  position_type: 'favorable' | 'neutral' | 'fallback';
-  risk_level: 'low' | 'medium' | 'high';
-  tags: string[];
+  position_type?: 'favorable' | 'neutral' | 'fallback';
+  risk_level?: 'low' | 'medium' | 'high';
+  tags?: string[];
 }
 
 interface ClauseEditorProps {

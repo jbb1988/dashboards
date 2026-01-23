@@ -569,7 +569,8 @@ export default function App() {
   // ============================================
 
   /**
-   * Applies a text replacement with track changes visualization
+   * Applies a text replacement with track changes
+   * Uses actual text replacement so subsequent searches work correctly
    */
   const applyWithTrackChanges = async (
     range: Word.Range,
@@ -577,27 +578,31 @@ export default function App() {
     context: Word.RequestContext
   ): Promise<void> => {
     // Try to enable track changes if supported (WordApi 1.4+)
+    let trackChangesEnabled = false;
     try {
-      // Check if track changes is supported
       if (Office.context.requirements.isSetSupported('WordApi', '1.4')) {
         (context.document as unknown as { changeTrackingMode: string }).changeTrackingMode = 'TrackAll';
         await context.sync();
+        trackChangesEnabled = true;
+        console.log('Native Track Changes enabled');
       }
     } catch (err) {
-      console.log('Track changes mode not available, using visual simulation', err);
+      console.log('Track changes mode not available:', err);
     }
 
-    // Visual simulation of track changes (works on all versions)
-    // Step 1: Style the old text as struck through (red)
-    range.font.strikeThrough = true;
-    range.font.color = '#DC2626';
-    await context.sync();
+    // Actually REPLACE the text (not just insert after)
+    // This ensures subsequent searches don't find the old text
+    const newRange = range.insertText(newText, Word.InsertLocation.replace);
 
-    // Step 2: Insert new text after with underline (green)
-    const newRange = range.insertText(' ' + newText, Word.InsertLocation.after);
-    newRange.font.underline = Word.UnderlineType.single;
-    newRange.font.color = '#16A34A';
-    newRange.font.strikeThrough = false;
+    // If track changes is not natively supported, apply visual highlighting
+    // to indicate this is new/changed text (green with underline)
+    if (!trackChangesEnabled) {
+      newRange.font.underline = Word.UnderlineType.single;
+      newRange.font.color = '#16A34A'; // Green to indicate new text
+    }
+
+    // Select the new text so user can see where the change was made
+    newRange.select();
     await context.sync();
   };
 
