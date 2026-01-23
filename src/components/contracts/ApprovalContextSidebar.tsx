@@ -80,6 +80,40 @@ function getDocumentTypeColor(type: string) {
   }
 }
 
+// Document type display order
+const DOCUMENT_TYPE_ORDER = [
+  // Required documents
+  'Original Contract',
+  'MARS Redlines',
+  'Final Agreement',
+  'Executed Contract',
+  // Optional documents
+  'Client Response - MARS STD WTC',
+  'Client Response - MARS MCC TC',
+  'Client Response - MARS EULA',
+  'Client Response', // Fallback for generic client response
+  'Purchase Order',
+  'Amendment',
+  'Other',
+];
+
+function sortDocumentsByType(documents: Document[]): Document[] {
+  return [...documents].sort((a, b) => {
+    const aIndex = DOCUMENT_TYPE_ORDER.findIndex(type =>
+      a.documentType === type || a.documentType.startsWith(type)
+    );
+    const bIndex = DOCUMENT_TYPE_ORDER.findIndex(type =>
+      b.documentType === type || b.documentType.startsWith(type)
+    );
+
+    // If not found in order list, put at end
+    const aOrder = aIndex === -1 ? DOCUMENT_TYPE_ORDER.length : aIndex;
+    const bOrder = bIndex === -1 ? DOCUMENT_TYPE_ORDER.length : bIndex;
+
+    return aOrder - bOrder;
+  });
+}
+
 function getActionIcon(action: ActivityLogEntry['action']) {
   switch (action) {
     case 'submitted':
@@ -284,7 +318,7 @@ export default function ApprovalContextSidebar({
               {activeTab === 'documents' && (
                 <div className="space-y-2">
                   {documents.length > 0 ? (
-                    documents.map((doc, idx) => (
+                    sortDocumentsByType(documents).map((doc, idx) => (
                       <motion.div
                         key={doc.id}
                         initial={{ opacity: 0, x: 10 }}
