@@ -129,7 +129,7 @@ async function analyzeWithAI(documentText: string): Promise<{
     return basicAnalysis(documentText);
   }
 
-  const prompt = `You are a contract risk analyst. Analyze this contract document and identify potential risks and issues.
+  const prompt = `You are a contract risk analyst for MARS. Analyze this contract document and identify potential risks and issues.
 
 Document:
 ${documentText.substring(0, 15000)}
@@ -155,13 +155,27 @@ Provide your analysis in the following JSON format:
   ]
 }
 
-CRITICAL: For each risk:
-- "location" must be the EXACT problematic text copied VERBATIM from the document (not a summary or paraphrase)
-  - Include the exact punctuation, quotes (whether smart or straight), and spacing from the document
-  - Copy the complete clause or sentence, not just a few words
-- "context_before" and "context_after" help locate the exact position in documents with similar clauses
-- "suggestion" must be the COMPLETE replacement clause text ready to insert (not advice, but actual contract language)
-- "clause_category" must map to one of the MARS Clause Library categories so we can suggest pre-approved language
+CRITICAL RULES - FOLLOW EXACTLY:
+
+1. LOCATION RULES:
+   - "location" must be the EXACT problematic text copied VERBATIM from the document (not a summary or paraphrase)
+   - Include the exact punctuation, quotes (whether smart or straight), and spacing from the document
+   - Copy the complete clause or sentence, not just a few words
+
+2. CONTEXT RULES:
+   - "context_before" and "context_after" help locate the exact position in documents with similar clauses
+
+3. SUGGESTION RULES - MOST IMPORTANT:
+   - "suggestion" must be the COMPLETE replacement clause text ready to insert (not advice, but actual contract language)
+   - NEVER include customer names, company names, or party names from OTHER contracts
+   - NEVER copy language from historical contracts that includes specific customer identifiers
+   - Use GENERIC placeholders like "the Customer", "the Contractor", "the Receiving Party", "the Disclosing Party" etc.
+   - If the current document uses specific party names (e.g., "Fairfax Water"), you may use those SAME names in your suggestion
+   - NEVER insert names like "American Water", "Seattle Public Utilities", or any other customer/company name that does NOT appear in THIS document
+   - Your suggestions should be GENERIC template language that works for ANY customer
+
+4. CLAUSE CATEGORY RULES:
+   - "clause_category" must map to one of the MARS Clause Library categories so we can suggest pre-approved language
 
 Focus on:
 1. Unlimited liability exposure (clause_category: "Limitation of Liability")

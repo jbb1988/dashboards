@@ -229,11 +229,11 @@ export default function ClausesTab() {
                   <span
                     className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium"
                     style={{
-                      backgroundColor: `${riskColors[clause.risk_level]}20`,
-                      color: riskColors[clause.risk_level],
+                      backgroundColor: `${riskColors[clause.risk_level || 'low']}20`,
+                      color: riskColors[clause.risk_level || 'low'],
                     }}
                   >
-                    {clause.risk_level}
+                    {clause.risk_level || 'low'}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-[#64748B] text-sm tabular-nums">
