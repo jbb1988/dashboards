@@ -26,12 +26,15 @@ export async function POST() {
         COALESCE(i.itemid, BUILTIN.DF(tl.item)) AS item_name,
         COALESCE(i.displayname, BUILTIN.DF(tl.item)) AS item_description,
         tl.itemtype AS item_type,
+        tl.class AS class_id,
+        BUILTIN.DF(tl.class) AS class_name,
         tl.quantity,
         tl.rate,
         tl.amount,
         tl.costestimate,
         tl.location AS location_id,
-        tl.isclosed
+        tl.isclosed,
+        BUILTIN.DF(tl.account) AS account_number
       FROM transactionline tl
       LEFT JOIN item i ON i.id = tl.item
       WHERE tl.transaction = 341203
@@ -69,12 +72,15 @@ export async function POST() {
             item_name: line.item_name,
             item_description: line.item_description,
             item_type: line.item_type,
+            class_id: line.class_id?.toString(),
+            class_name: line.class_name,
             quantity: parseFloat(line.quantity) || null,
             rate: parseFloat(line.rate) || null,
             amount: parseFloat(line.amount) || null,
             cost_estimate: parseFloat(line.costestimate) || null,
             location_id: line.location_id?.toString(),
             is_closed: line.isclosed === 'T',
+            account_number: line.account_number,
             updated_at: new Date().toISOString(),
           });
 
