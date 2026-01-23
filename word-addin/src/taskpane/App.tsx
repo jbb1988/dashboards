@@ -265,6 +265,21 @@ export default function App() {
     });
   }, []);
 
+  // Get document name from Word
+  const getDocumentName = useCallback(async (): Promise<string> => {
+    return new Promise((resolve) => {
+      Word.run(async (context) => {
+        const properties = context.document.properties;
+        properties.load('title');
+        await context.sync();
+        // Use title if available, otherwise default
+        resolve(properties.title || 'Untitled Document');
+      }).catch(() => {
+        resolve('Word Document');
+      });
+    });
+  }, []);
+
   // Analyze document
   const analyzeDocument = async () => {
     if (!user) {
@@ -277,7 +292,10 @@ export default function App() {
     setAppliedFixes(new Set()); // Clear applied fixes on new analysis
 
     try {
-      const documentText = await getDocumentText();
+      const [documentText, documentName] = await Promise.all([
+        getDocumentText(),
+        getDocumentName(),
+      ]);
 
       if (!documentText || documentText.trim().length < 100) {
         setError('Document appears to be empty or too short to analyze');
@@ -292,7 +310,10 @@ export default function App() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ document_text: documentText }),
+        body: JSON.stringify({
+          document_text: documentText,
+          document_name: documentName,
+        }),
       });
 
       if (!response.ok) {

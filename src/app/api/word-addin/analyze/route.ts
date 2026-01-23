@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { document_text } = body;
+    const { document_text, document_name } = body;
 
     if (!document_text || document_text.trim().length < 100) {
       return NextResponse.json(
@@ -85,7 +85,42 @@ export async function POST(request: NextRequest) {
     const admin = getSupabaseAdmin();
     const risksWithMatchedClauses = await matchRisksToClauses(admin, analysisResult.risks);
 
-    // Log the analysis (non-critical, ignore errors)
+    // Save full analysis to contract_reviews for history
+    let reviewId: string | null = null;
+    try {
+      // Format risks as a redlined summary
+      const redlinedText = risksWithMatchedClauses.map(risk =>
+        `[${risk.severity.toUpperCase()}] ${risk.title}\n` +
+        `Location: ${risk.location || 'N/A'}\n` +
+        `Issue: ${risk.description}\n` +
+        `Suggestion: ${risk.suggestion}\n` +
+        (risk.matched_clause ? `Matched Clause: ${risk.matched_clause.name}` : '')
+      ).join('\n\n---\n\n');
+
+      const { data: review } = await admin.from('contract_reviews').insert({
+        contract_name: document_name || 'Word Add-in Analysis',
+        provision_name: `AI Risk Analysis - ${new Date().toLocaleDateString()}`,
+        original_text: document_text.substring(0, 50000), // Limit to 50k chars
+        redlined_text: redlinedText || 'No issues found',
+        summary: {
+          overall_risk_score: analysisResult.overall_risk_score,
+          risk_level: analysisResult.risk_level,
+          risk_count: risksWithMatchedClauses.length,
+          risks: risksWithMatchedClauses,
+          clause_suggestions: clauseSuggestions,
+          analyzed_by: user.email,
+          analyzed_at: new Date().toISOString(),
+        },
+        status: 'draft',
+      }).select('id').single();
+
+      reviewId = review?.id || null;
+    } catch (err) {
+      console.error('Failed to save analysis to history:', err);
+      // Non-critical, continue
+    }
+
+    // Also log basic stats (non-critical)
     try {
       await admin.from('word_addin_analyses').insert({
         user_email: user.email,
@@ -104,6 +139,7 @@ export async function POST(request: NextRequest) {
       risks: risksWithMatchedClauses,
       clause_suggestions: clauseSuggestions,
       summary: analysisResult.summary,
+      review_id: reviewId, // Return the review ID so user can reference it
     });
   } catch (error) {
     console.error('Analysis error:', error);
