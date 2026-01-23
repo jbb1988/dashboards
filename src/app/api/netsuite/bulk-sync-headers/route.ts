@@ -10,6 +10,12 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
+export async function GET() {
+  return NextResponse.json({
+    message: 'Use POST with ?type=SalesOrd|WorkOrd|both&startDate=YYYY-MM-DD'
+  });
+}
+
 export async function POST(request: Request) {
   const url = new URL(request.url);
   const type = url.searchParams.get('type') || 'both'; // 'SalesOrd', 'WorkOrd', or 'both'
