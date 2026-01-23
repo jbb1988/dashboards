@@ -163,6 +163,7 @@ export default function GlobalSearch() {
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(true)}
+        title="Search contracts, documents, and tasks"
         className="flex items-center gap-2.5 px-4 py-2 bg-[#0B1220]/80 border border-white/[0.06] rounded-xl text-[#64748B] hover:text-white hover:border-white/[0.12] hover:bg-[#111827] transition-all group"
       >
         <svg className="w-4 h-4 text-[#64748B] group-hover:text-[#38BDF8] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -110,8 +110,8 @@ export default function AIChat({ onBack }: AIChatProps) {
   const suggestedQuestions = [
     'How do I create a contract bundle?',
     'What are the pipeline stages?',
-    'How does AI redlining work?',
-    'How do I send a contract for approval?',
+    'Find contracts in Review stage',
+    'Show me recent documents',
   ];
 
   return (

@@ -11,6 +11,7 @@ export default function HelpButton({ onClick }: HelpButtonProps) {
   return (
     <motion.button
       onClick={onClick}
+      title="Help & AI Assistant - Search guides or find contracts"
       className="fixed bottom-6 right-6 z-50"
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
