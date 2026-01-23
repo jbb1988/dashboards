@@ -34,16 +34,26 @@ export default function ClauseEditor({ clause, categories, onSave, onClose }: Cl
   const [activeTab, setActiveTab] = useState<'primary' | 'fallback' | 'last_resort'>('primary');
   const [tagInput, setTagInput] = useState('');
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    category_id: string;
+    primary_text: string;
+    fallback_text: string;
+    last_resort_text: string;
+    position_type: 'favorable' | 'neutral' | 'fallback';
+    risk_level: 'low' | 'medium' | 'high';
+    tags: string[];
+  }>({
     name: '',
     description: '',
     category_id: '',
     primary_text: '',
     fallback_text: '',
     last_resort_text: '',
-    position_type: 'favorable' as const,
-    risk_level: 'medium' as const,
-    tags: [] as string[],
+    position_type: 'favorable',
+    risk_level: 'medium',
+    tags: [],
   });
 
   useEffect(() => {
