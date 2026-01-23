@@ -44,7 +44,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [showVersionPanel, setShowVersionPanel] = useState(true);
   const [showNewVersionModal, setShowNewVersionModal] = useState(false);
-  const [newVersion, setNewVersion] = useState({ content: '', changeNotes: '' });
+  const [newVersion, setNewVersion] = useState({ content: '', changeNotes: '', versionNumber: '' });
   const [creating, setCreating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -92,6 +92,9 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
         formData.append('file', selectedFile);
         formData.append('changeNotes', newVersion.changeNotes.trim() || '');
         formData.append('createdBy', 'admin@mars.com'); // TODO: Get from session
+        if (newVersion.versionNumber.trim()) {
+          formData.append('versionNumber', newVersion.versionNumber.trim());
+        }
 
         const response = await fetch(`/api/playbooks/${resolvedParams.id}/upload`, {
           method: 'POST',
@@ -111,6 +114,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
             content: newVersion.content.trim(),
             changeNotes: newVersion.changeNotes.trim() || null,
             createdBy: 'admin@mars.com',
+            versionNumber: newVersion.versionNumber.trim() || null,
           }),
         });
 
@@ -121,7 +125,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
       }
 
       setShowNewVersionModal(false);
-      setNewVersion({ content: '', changeNotes: '' });
+      setNewVersion({ content: '', changeNotes: '', versionNumber: '' });
       setSelectedFile(null);
       setUploadMode('file');
       fetchPlaybook();
@@ -310,7 +314,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
-                    setNewVersion({ content: currentVersionContent, changeNotes: '' });
+                    setNewVersion({ content: currentVersionContent, changeNotes: '', versionNumber: '' });
                     setSelectedFile(null);
                     setUploadMode('file');
                     setUploadError(null);
@@ -417,7 +421,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
               initial={{ x: 320, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 320, opacity: 0 }}
-              className="fixed right-0 top-[60px] bottom-0 w-80 bg-[#151F2E] border-l border-white/10 overflow-y-auto"
+              className="fixed right-0 top-[73px] bottom-0 w-80 bg-[#151F2E] border-l border-white/10 overflow-y-auto"
             >
               <div className="p-4 border-b border-white/10">
                 <h3 className="text-sm font-semibold text-white">Version History</h3>
@@ -540,17 +544,32 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
-                  Change Notes
-                </label>
-                <input
-                  type="text"
-                  value={newVersion.changeNotes}
-                  onChange={(e) => setNewVersion(prev => ({ ...prev, changeNotes: e.target.value }))}
-                  placeholder="What changed in this version?"
-                  className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#8B5CF6]"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
+                    Version Number
+                  </label>
+                  <input
+                    type="text"
+                    value={newVersion.versionNumber}
+                    onChange={(e) => setNewVersion(prev => ({ ...prev, versionNumber: e.target.value }))}
+                    placeholder={`Auto: v${(playbook?.current_version || 0) + 1}`}
+                    className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#8B5CF6]"
+                  />
+                  <p className="text-xs text-[#64748B] mt-1">Leave blank to auto-increment, or enter custom (e.g., 5.2)</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
+                    Change Notes
+                  </label>
+                  <input
+                    type="text"
+                    value={newVersion.changeNotes}
+                    onChange={(e) => setNewVersion(prev => ({ ...prev, changeNotes: e.target.value }))}
+                    placeholder="What changed in this version?"
+                    className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#8B5CF6]"
+                  />
+                </div>
               </div>
 
               {uploadMode === 'file' ? (
@@ -639,7 +658,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
               <button
                 onClick={() => {
                   setShowNewVersionModal(false);
-                  setNewVersion({ content: '', changeNotes: '' });
+                  setNewVersion({ content: '', changeNotes: '', versionNumber: '' });
                   setSelectedFile(null);
                   setUploadError(null);
                 }}

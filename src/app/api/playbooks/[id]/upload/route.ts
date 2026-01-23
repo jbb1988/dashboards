@@ -304,6 +304,7 @@ export async function POST(
     const file = formData.get('file') as File | null;
     const changeNotes = formData.get('changeNotes') as string | null;
     const createdBy = formData.get('createdBy') as string | null;
+    const customVersionNumber = formData.get('versionNumber') as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -377,7 +378,10 @@ export async function POST(
       );
     }
 
-    const newVersion = (playbook.current_version || 0) + 1;
+    // Use custom version number if provided, otherwise auto-increment
+    const newVersion = customVersionNumber?.trim()
+      ? parseFloat(customVersionNumber.trim())
+      : (playbook.current_version || 0) + 1;
 
     // Upload original file to Supabase Storage
     const storagePath = `playbooks/${playbookId}/v${newVersion}/${file.name}`;

@@ -50,7 +50,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { content, changeNotes, createdBy } = body;
+    const { content, changeNotes, createdBy, versionNumber } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -82,7 +82,10 @@ export async function POST(
       );
     }
 
-    const newVersion = (playbook.current_version || 0) + 1;
+    // Use custom version number if provided, otherwise auto-increment
+    const newVersion = versionNumber?.toString().trim()
+      ? parseFloat(versionNumber.toString().trim())
+      : (playbook.current_version || 0) + 1;
 
     // Create the new version
     const { data: version, error: versionError } = await admin
