@@ -5,8 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import SmartDocumentsTab from '@/components/SmartDocumentsTab';
 import CommandPalette, { getDefaultCommands } from './components/CommandPalette';
-import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { StageProgressCompact } from './components/StageProgressDots';
 import TaskBadge from './components/TaskBadge';
 import TasksTabSupabase from './components/TasksTabSupabase';
@@ -1014,7 +1012,6 @@ export default function ContractsDashboard() {
   const [salesforceStatus, setSalesforceStatus] = useState<'connected' | 'needs_auth' | 'not_configured'>('connected');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [helpOverlayOpen, setHelpOverlayOpen] = useState(false);
   const [selectedContractIndex, setSelectedContractIndex] = useState(0);
   const [taskStats, setTaskStats] = useState<{ pending: number; overdue: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1653,24 +1650,6 @@ export default function ContractsDashboard() {
     },
   }), [data, handleRefresh]);
 
-  // Keyboard shortcuts
-  useKeyboardShortcuts(
-    [
-      { key: 't', description: 'Create task', action: () => setActiveTab('tasks') },
-      { key: '/', description: 'Focus search', action: () => searchInputRef.current?.focus() },
-      { key: 'f', description: 'Toggle filters', action: () => setFilterPanelOpen(p => !p) },
-      { key: 'r', description: 'Refresh', action: () => fetchData() },
-      { key: 'p', sequence: ['g', 'p'], description: 'Go to Pipeline', action: () => setActiveTab('pipeline') },
-      { key: 't', sequence: ['g', 't'], description: 'Go to Tasks', action: () => setActiveTab('tasks') },
-      { key: 'd', sequence: ['g', 'd'], description: 'Go to Documents', action: () => setActiveTab('documents') },
-    ],
-    {
-      enabled: !commandPaletteOpen && !helpOverlayOpen,
-      onCommandPalette: () => setCommandPaletteOpen(true),
-      onHelp: () => setHelpOverlayOpen(true)
-    }
-  );
-
   // Get unique statuses for filter dropdown - use VALID_STATUSES to ensure all stages appear in correct order
   const statuses = useMemo(() => {
     return VALID_STATUSES;
@@ -2136,12 +2115,6 @@ export default function ContractsDashboard() {
           setActiveTab('pipeline');
         }}
         placeholder="Type a command or search contracts..."
-      />
-
-      {/* Keyboard Shortcuts Help Overlay */}
-      <KeyboardShortcutsHelp
-        isOpen={helpOverlayOpen}
-        onClose={() => setHelpOverlayOpen(false)}
       />
 
       {/* Conflict Resolution Modal */}

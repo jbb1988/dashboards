@@ -133,36 +133,6 @@ const guideContent: Record<string, GuideData> = {
           </div>
         ),
       },
-      {
-        id: 'shortcuts',
-        title: 'Keyboard Shortcuts',
-        content: (
-          <div className="space-y-4">
-            <p className="text-[#8FA3BF]">
-              Navigate the pipeline faster with keyboard shortcuts:
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { key: 'Cmd+K', action: 'Command Palette / Search' },
-                { key: 'J', action: 'Move down in list' },
-                { key: 'K', action: 'Move up in list' },
-                { key: 'Enter', action: 'Select/Open contract' },
-                { key: '/', action: 'Focus search' },
-                { key: 'T', action: 'Create new task' },
-                { key: '?', action: 'Show shortcuts help' },
-                { key: 'G then P', action: 'Go to Pipeline' },
-              ].map((shortcut) => (
-                <div key={shortcut.key} className="flex items-center gap-3 p-3 bg-[#0B1220] rounded-lg">
-                  <kbd className="px-2 py-1 bg-[#1E293B] border border-white/[0.1] rounded text-sm text-white font-mono min-w-[80px] text-center">
-                    {shortcut.key}
-                  </kbd>
-                  <span className="text-[#8FA3BF] text-sm">{shortcut.action}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ),
-      },
     ],
   },
   documents: {

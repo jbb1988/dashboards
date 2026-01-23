@@ -31,7 +31,6 @@ const guideCategories: GuideCategory[] = [
       'Filtering & Search',
       'Date Management',
       'Salesforce Integration',
-      'Keyboard Shortcuts',
       'KPI Cards & Metrics',
     ],
     href: '/guides/pipeline',
@@ -156,9 +155,9 @@ const guideCategories: GuideCategory[] = [
 
 const quickStartItems = [
   {
-    title: 'Keyboard Shortcuts',
-    description: 'Navigate faster with Cmd+K command palette, J/K navigation, and more',
-    icon: '⌨️',
+    title: 'Command Palette',
+    description: 'Press Cmd+K to quickly search contracts, run commands, and navigate',
+    icon: '🔍',
   },
   {
     title: 'Pipeline Stages',
@@ -213,6 +212,54 @@ export default function GuidesPage() {
             <p className="text-xl text-[#8FA3BF] max-w-2xl mx-auto">
               Everything you need to master contract management. From pipeline tracking to document completeness, learn how to work smarter with MARS.
             </p>
+          </motion.div>
+
+          {/* Quick Links - Getting Started & FAQ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="grid grid-cols-2 gap-4 mb-12"
+          >
+            <Link
+              href="/guides/getting-started"
+              className="group flex items-center gap-4 p-5 bg-gradient-to-r from-[#22C55E]/10 to-transparent rounded-2xl border border-[#22C55E]/20 hover:border-[#22C55E]/40 transition-all"
+            >
+              <div className="w-12 h-12 rounded-xl bg-[#22C55E]/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white group-hover:text-[#22C55E] transition-colors">
+                  Getting Started
+                </h3>
+                <p className="text-sm text-[#64748B]">5-minute overview for new users</p>
+              </div>
+              <svg className="w-5 h-5 text-[#64748B] group-hover:text-[#22C55E] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+
+            <Link
+              href="/guides/faq"
+              className="group flex items-center gap-4 p-5 bg-gradient-to-r from-[#8B5CF6]/10 to-transparent rounded-2xl border border-[#8B5CF6]/20 hover:border-[#8B5CF6]/40 transition-all"
+            >
+              <div className="w-12 h-12 rounded-xl bg-[#8B5CF6]/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-[#8B5CF6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white group-hover:text-[#8B5CF6] transition-colors">
+                  FAQ
+                </h3>
+                <p className="text-sm text-[#64748B]">Quick answers to common questions</p>
+              </div>
+              <svg className="w-5 h-5 text-[#64748B] group-hover:text-[#8B5CF6] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
           </motion.div>
 
           {/* Guide Categories Grid */}
@@ -317,35 +364,6 @@ export default function GuidesPage() {
                     <p className="text-sm text-[#64748B]">{item.description}</p>
                   </div>
                 </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Keyboard Shortcuts Reference */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="mt-8 bg-gradient-to-r from-[#38BDF8]/10 to-[#8B5CF6]/10 rounded-2xl border border-white/[0.06] p-8"
-          >
-            <h3 className="text-lg font-semibold text-white mb-4">Keyboard Shortcuts</h3>
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { key: 'Cmd+K', action: 'Command Palette / Search' },
-                { key: 'J / K', action: 'Navigate Up/Down' },
-                { key: 'Enter', action: 'Select Item' },
-                { key: 'Escape', action: 'Close/Cancel' },
-                { key: '/', action: 'Focus Search' },
-                { key: 'T', action: 'New Task' },
-                { key: '?', action: 'Show Shortcuts' },
-                { key: 'G then P', action: 'Go to Pipeline' },
-              ].map((shortcut) => (
-                <div key={shortcut.key} className="flex items-center gap-2">
-                  <kbd className="px-2 py-1 bg-[#0B1220] border border-white/[0.1] rounded text-xs text-white font-mono">
-                    {shortcut.key}
-                  </kbd>
-                  <span className="text-sm text-[#8FA3BF]">{shortcut.action}</span>
-                </div>
               ))}
             </div>
           </motion.div>
