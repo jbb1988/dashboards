@@ -50,8 +50,8 @@ export const guideIndex: GuideEntry[] = [
     - Budgeted: Show only forecasted deals
     - Probability: Filter by close probability
     - Search: Full-text search on contract names
-    Pro tip: Use Cmd+K to open the command palette for quick filtering and searching.`,
-    keywords: ['filter', 'search', 'status', 'year', 'contract type', 'budgeted', 'probability', 'find', 'Cmd+K'],
+    Pro tip: Click any KPI card at the top of the dashboard to quickly filter contracts by that metric.`,
+    keywords: ['filter', 'search', 'status', 'year', 'contract type', 'budgeted', 'probability', 'find', 'KPI'],
     path: '/guides/pipeline#filters'
   },
   {

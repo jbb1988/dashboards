@@ -69,7 +69,7 @@ const guideCategories: GuideCategory[] = [
       'Task Views (List, Board, By Contract)',
       'Due Dates & Priorities',
       'Quick Filters',
-      'Command Palette (Cmd+K)',
+      'Task Completion Tracking',
     ],
     href: '/guides/tasks',
   },

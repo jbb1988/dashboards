@@ -107,7 +107,7 @@ const guideContent: Record<string, GuideData> = {
               </ul>
             </div>
             <p className="text-[#64748B] text-sm">
-              Pro tip: Use <kbd className="px-1.5 py-0.5 bg-[#1E293B] rounded text-xs">Cmd+K</kbd> to open the command palette for quick filtering.
+              Pro tip: Click any KPI card at the top of the dashboard to quickly filter contracts by that metric.
             </p>
           </div>
         ),

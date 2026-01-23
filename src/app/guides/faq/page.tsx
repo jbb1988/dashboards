@@ -26,7 +26,7 @@ const faqs: FAQ[] = [
   {
     category: 'Pipeline',
     question: 'How do I filter contracts by multiple criteria?',
-    answer: 'Use the filter panel (click the filter icon or press F) to combine filters like status, year, contract type, and probability. You can also click KPI cards to quickly filter by that metric, or use Cmd+K to search.',
+    answer: 'Use the filter panel (click the filter icon) to combine filters like status, year, contract type, and probability. You can also click KPI cards to quickly filter by that metric, or use the search bar at the top.',
     link: { href: '/guides/pipeline#filters', text: 'Learn about filtering' },
   },
   {
