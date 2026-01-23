@@ -497,3 +497,363 @@ export async function sendCCNotificationEmail(
     return { success: false, error: err instanceof Error ? err.message : 'Failed to send email' };
   }
 }
+
+/**
+ * Send approval decision confirmation email to the submitter
+ */
+export async function sendApprovalDecisionEmail({
+  submitterEmail,
+  contractName,
+  decision,
+  approverEmail,
+  feedback,
+  reviewUrl,
+}: {
+  submitterEmail: string;
+  contractName: string;
+  decision: 'approved' | 'rejected';
+  approverEmail: string;
+  feedback?: string;
+  reviewUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const statusColor = decision === 'approved' ? '#22c55e' : '#ef4444';
+  const statusText = decision === 'approved' ? 'Approved' : 'Rejected';
+  const statusEmoji = decision === 'approved' ? '✅' : '❌';
+  const headerGradient = decision === 'approved'
+    ? 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)'
+    : 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)';
+
+  try {
+    const resend = getResendClient();
+    const { data, error } = await resend.emails.send({
+      from: `${FROM_NAME} Legal <${FROM_EMAIL}>`,
+      to: [submitterEmail],
+      subject: `Contract ${statusText}: ${contractName}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contract ${statusText}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0B1220;">
+  <div style="max-width: 600px; margin: 40px auto; background-color: #151F2E; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; overflow: hidden;">
+
+    <!-- Header -->
+    <div style="background: ${headerGradient}; padding: 32px; text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">${statusEmoji}</div>
+      <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
+        Contract ${statusText}
+      </h1>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 32px;">
+
+      <!-- Contract Info -->
+      <div style="background-color: #0B1220; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h2 style="margin: 0 0 12px 0; color: white; font-size: 18px; font-weight: 600;">
+          ${contractName}
+        </h2>
+        <p style="margin: 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">Decision by:</strong> ${approverEmail}
+        </p>
+        <p style="margin: 8px 0 0 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">Date:</strong> ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </p>
+      </div>
+
+      <!-- Status Badge -->
+      <div style="text-align: center; margin-bottom: 24px;">
+        <span style="display: inline-block; padding: 8px 24px; background-color: ${statusColor}20; color: ${statusColor}; font-size: 14px; font-weight: 600; border-radius: 20px; border: 1px solid ${statusColor}40;">
+          ${statusText.toUpperCase()}
+        </span>
+      </div>
+
+      ${feedback ? `
+      <!-- Feedback -->
+      <div style="margin-bottom: 24px;">
+        <h3 style="margin: 0 0 12px 0; color: white; font-size: 16px; font-weight: 600;">
+          Reviewer Feedback
+        </h3>
+        <div style="background-color: #0B1220; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px;">
+          <p style="margin: 0; color: #8FA3BF; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">
+            ${feedback}
+          </p>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${reviewUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #38BDF8 0%, #0189CB 100%); color: white; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);">
+          View Full Review
+        </a>
+      </div>
+
+      ${decision === 'rejected' ? `
+      <!-- Next Steps for Rejection -->
+      <div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 16px; margin-top: 24px;">
+        <p style="margin: 0; color: #FCA5A5; font-size: 14px;">
+          <strong>Next Steps:</strong> Please review the feedback above and make the necessary changes before resubmitting for approval.
+        </p>
+      </div>
+      ` : `
+      <!-- Next Steps for Approval -->
+      <div style="background-color: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 16px; margin-top: 24px;">
+        <p style="margin: 0; color: #86EFAC; font-size: 14px;">
+          <strong>Next Steps:</strong> This contract has been approved and is ready for the next stage in your workflow.
+        </p>
+      </div>
+      `}
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #0B1220; padding: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
+      <p style="margin: 0; color: #64748B; font-size: 12px;">
+        <span style="color: #0189CB; font-weight: 600;">MARS</span> Company Confidential • Executive Dashboards
+      </p>
+      <p style="margin: 8px 0 0 0; color: #64748B; font-size: 11px;">
+        This is an automated notification from the contract review system.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('Approval decision email send error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('Approval decision email sent:', data?.id);
+    return { success: true };
+  } catch (err) {
+    console.error('Approval decision email send exception:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to send email' };
+  }
+}
+
+/**
+ * Send @mention notification email
+ */
+export async function sendMentionNotificationEmail({
+  mentionedEmail,
+  mentionerName,
+  contractName,
+  commentPreview,
+  viewUrl,
+}: {
+  mentionedEmail: string;
+  mentionerName: string;
+  contractName: string;
+  commentPreview: string;
+  viewUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResendClient();
+    const { data, error } = await resend.emails.send({
+      from: `${FROM_NAME} Legal <${FROM_EMAIL}>`,
+      to: [mentionedEmail],
+      subject: `You were mentioned in ${contractName}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You were mentioned</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0B1220;">
+  <div style="max-width: 600px; margin: 40px auto; background-color: #151F2E; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; overflow: hidden;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); padding: 32px; text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">💬</div>
+      <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
+        You Were Mentioned
+      </h1>
+      <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
+        ${mentionerName} mentioned you in a contract discussion
+      </p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 32px;">
+
+      <!-- Contract Info -->
+      <div style="background-color: #0B1220; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h2 style="margin: 0 0 12px 0; color: white; font-size: 18px; font-weight: 600;">
+          ${contractName}
+        </h2>
+        <p style="margin: 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">From:</strong> ${mentionerName}
+        </p>
+      </div>
+
+      <!-- Comment Preview -->
+      <div style="margin-bottom: 24px;">
+        <h3 style="margin: 0 0 12px 0; color: white; font-size: 16px; font-weight: 600;">
+          Comment
+        </h3>
+        <div style="background-color: #0B1220; border-left: 3px solid #8B5CF6; padding: 16px; border-radius: 0 8px 8px 0;">
+          <p style="margin: 0; color: #8FA3BF; font-size: 14px; line-height: 1.6;">
+            "${commentPreview}${commentPreview.length >= 100 ? '...' : ''}"
+          </p>
+        </div>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${viewUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); color: white; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">
+          View Discussion
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #0B1220; padding: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
+      <p style="margin: 0; color: #64748B; font-size: 12px;">
+        <span style="color: #0189CB; font-weight: 600;">MARS</span> Company Confidential • Executive Dashboards
+      </p>
+      <p style="margin: 8px 0 0 0; color: #64748B; font-size: 11px;">
+        You received this email because someone mentioned you in a contract review.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('Mention notification email send error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('Mention notification email sent:', data?.id);
+    return { success: true };
+  } catch (err) {
+    console.error('Mention notification email send exception:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to send email' };
+  }
+}
+
+/**
+ * Send approval reminder email
+ */
+export async function sendApprovalReminderEmail({
+  approverEmail,
+  contractName,
+  submittedBy,
+  daysPending,
+  approvalUrl,
+}: {
+  approverEmail: string;
+  contractName: string;
+  submittedBy: string;
+  daysPending: number;
+  approvalUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const urgencyColor = daysPending > 5 ? '#EF4444' : daysPending > 3 ? '#F59E0B' : '#8B5CF6';
+  const urgencyText = daysPending > 5 ? 'Urgent' : daysPending > 3 ? 'High Priority' : 'Reminder';
+
+  try {
+    const resend = getResendClient();
+    const { data, error } = await resend.emails.send({
+      from: `${FROM_NAME} Legal <${FROM_EMAIL}>`,
+      to: [approverEmail],
+      subject: `${urgencyText}: Contract awaiting approval - ${contractName}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Approval Reminder</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0B1220;">
+  <div style="max-width: 600px; margin: 40px auto; background-color: #151F2E; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; overflow: hidden;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, ${urgencyColor} 0%, ${urgencyColor}CC 100%); padding: 32px; text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">⏰</div>
+      <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
+        Approval Reminder
+      </h1>
+      <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
+        A contract has been waiting ${daysPending} days for your review
+      </p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 32px;">
+
+      <!-- Urgency Badge -->
+      <div style="text-align: center; margin-bottom: 24px;">
+        <span style="display: inline-block; padding: 8px 24px; background-color: ${urgencyColor}20; color: ${urgencyColor}; font-size: 14px; font-weight: 600; border-radius: 20px; border: 1px solid ${urgencyColor}40;">
+          ${daysPending} DAYS PENDING
+        </span>
+      </div>
+
+      <!-- Contract Info -->
+      <div style="background-color: #0B1220; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h2 style="margin: 0 0 12px 0; color: white; font-size: 18px; font-weight: 600;">
+          ${contractName}
+        </h2>
+        <p style="margin: 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">Submitted by:</strong> ${submittedBy}
+        </p>
+        <p style="margin: 8px 0 0 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">Waiting since:</strong> ${daysPending} days
+        </p>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${approvalUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); color: white; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);">
+          Review & Approve Now
+        </a>
+      </div>
+
+      <!-- Info Note -->
+      <div style="background-color: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 16px; margin-top: 24px;">
+        <p style="margin: 0; color: #7DD3FC; font-size: 13px;">
+          📋 This is an automated reminder. You will continue to receive reminders until the contract is approved or rejected.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #0B1220; padding: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
+      <p style="margin: 0; color: #64748B; font-size: 12px;">
+        <span style="color: #0189CB; font-weight: 600;">MARS</span> Company Confidential • Executive Dashboards
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('Approval reminder email send error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('Approval reminder email sent:', data?.id);
+    return { success: true };
+  } catch (err) {
+    console.error('Approval reminder email send exception:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to send email' };
+  }
+}

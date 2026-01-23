@@ -13,6 +13,7 @@ import {
   Highlighter,
 } from 'lucide-react';
 import { ActivityLogEntry } from './ActivityLog';
+import MentionInput, { highlightMentions } from '@/components/ui/MentionInput';
 
 type TabType = 'summary' | 'activity' | 'documents' | 'annotations' | 'discussion';
 
@@ -429,7 +430,7 @@ export default function ApprovalContextSidebar({
                             </div>
                           </div>
                           <p className="text-sm text-[#8FA3BF] whitespace-pre-wrap">
-                            {comment.comment}
+                            {highlightMentions(comment.comment)}
                           </p>
                         </motion.div>
                       ))
@@ -441,38 +442,15 @@ export default function ApprovalContextSidebar({
                   {/* Add comment input */}
                   {canAddComments && onAddDiscussionComment && (
                     <div className="border-t border-white/10 pt-3">
-                      <div className="flex gap-2">
-                        <textarea
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="Add a comment..."
-                          className="flex-1 px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50 resize-none"
-                          rows={2}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey && newComment.trim()) {
-                              e.preventDefault();
-                              onAddDiscussionComment(newComment.trim());
-                              setNewComment('');
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-[10px] text-[#64748B]">Press Enter to send</span>
-                        <button
-                          onClick={() => {
-                            if (newComment.trim()) {
-                              onAddDiscussionComment(newComment.trim());
-                              setNewComment('');
-                            }
-                          }}
-                          disabled={!newComment.trim()}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-[#38BDF8] text-white text-xs font-medium rounded hover:bg-[#38BDF8]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Send className="w-3 h-3" />
-                          Send
-                        </button>
-                      </div>
+                      <MentionInput
+                        value={newComment}
+                        onChange={setNewComment}
+                        onSubmit={(text) => {
+                          onAddDiscussionComment(text);
+                          setNewComment('');
+                        }}
+                        placeholder="Add a comment... Use @ to mention"
+                      />
                     </div>
                   )}
                 </div>

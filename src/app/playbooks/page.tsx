@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import {
   DashboardBackground,
@@ -158,6 +159,21 @@ export default function PlaybooksPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaybook, setNewPlaybook] = useState({ name: '', description: '', content: '' });
   const [creating, setCreating] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Get current user from session
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserEmail(user?.email || '');
+    };
+    getUser();
+  }, []);
 
   useEffect(() => {
     fetchPlaybooks();
@@ -187,7 +203,7 @@ export default function PlaybooksPage() {
           name: newPlaybook.name.trim(),
           description: newPlaybook.description.trim() || null,
           content: newPlaybook.content.trim() || null,
-          createdBy: 'admin@mars.com', // TODO: Get from session
+          createdBy: userEmail || null,
         }),
       });
 
@@ -204,6 +220,12 @@ export default function PlaybooksPage() {
   }
 
   const withContent = playbooks.filter(p => p.current_version > 0).length;
+
+  // Filter playbooks by search query
+  const filteredPlaybooks = playbooks.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-[#0F1722] relative overflow-hidden">
@@ -295,6 +317,37 @@ export default function PlaybooksPage() {
                 />
               </div>
 
+              {/* Search Input */}
+              <div className="mb-4">
+                <div className="relative max-w-md">
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search playbooks..."
+                    className="w-full pl-10 pr-4 py-2 bg-[#151F2E] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#8B5CF6]/50"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-white"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className={`rounded-xl ${tokens.bg.card} border ${tokens.border.subtle} overflow-hidden`}>
                 <div className="grid grid-cols-4 gap-4 px-5 py-3 text-xs font-semibold text-[#64748B] uppercase tracking-wider border-b border-white/5 sticky top-0 z-10 bg-[#151F2E] shadow-[0_1px_0_rgba(255,255,255,0.05)]">
                   <div>Playbook</div>
@@ -304,14 +357,20 @@ export default function PlaybooksPage() {
                 </div>
 
                 <div className="max-h-[500px] overflow-y-auto">
-                  {playbooks.map((playbook, index) => (
-                    <PlaybookRow
-                      key={playbook.id}
-                      playbook={playbook}
-                      index={index}
-                      onClick={() => router.push(`/playbooks/${playbook.id}`)}
-                    />
-                  ))}
+                  {filteredPlaybooks.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-[#64748B] text-sm">
+                      {searchQuery ? 'No playbooks match your search' : 'No playbooks yet'}
+                    </div>
+                  ) : (
+                    filteredPlaybooks.map((playbook, index) => (
+                      <PlaybookRow
+                        key={playbook.id}
+                        playbook={playbook}
+                        index={index}
+                        onClick={() => router.push(`/playbooks/${playbook.id}`)}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
             </div>

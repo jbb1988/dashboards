@@ -3,12 +3,14 @@
 import { useState, useEffect, use, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import {
   DashboardBackground,
   backgroundPresets,
   tokens,
 } from '@/components/mars-ui';
+import VersionDiffViewer from '@/components/playbooks/VersionDiffViewer';
 
 interface Playbook {
   id: string;
@@ -54,6 +56,24 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [userEmail, setUserEmail] = useState<string>('');
+
+  // Version diff state
+  const [showDiffModal, setShowDiffModal] = useState(false);
+  const [diffVersions, setDiffVersions] = useState<{ from: number; to: number } | null>(null);
+
+  // Get current user from session
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserEmail(user?.email || '');
+    };
+    getUser();
+  }, []);
 
   useEffect(() => {
     fetchPlaybook();
@@ -91,7 +111,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append('changeNotes', newVersion.changeNotes.trim() || '');
-        formData.append('createdBy', 'admin@mars.com'); // TODO: Get from session
+        formData.append('createdBy', userEmail || '');
         if (newVersion.versionNumber.trim()) {
           formData.append('versionNumber', newVersion.versionNumber.trim());
         }
@@ -113,7 +133,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
           body: JSON.stringify({
             content: newVersion.content.trim(),
             changeNotes: newVersion.changeNotes.trim() || null,
-            createdBy: 'admin@mars.com',
+            createdBy: userEmail || null,
             versionNumber: newVersion.versionNumber.trim() || null,
           }),
         });
@@ -490,6 +510,25 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
                           </svg>
                         </button>
                       )}
+
+                      {/* Compare button - show when this version differs from selected */}
+                      {selectedVersion !== null && selectedVersion !== version.version && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const fromV = Math.min(selectedVersion, version.version);
+                            const toV = Math.max(selectedVersion, version.version);
+                            setDiffVersions({ from: fromV, to: toV });
+                            setShowDiffModal(true);
+                          }}
+                          className="mt-2 w-full flex items-center justify-center gap-2 text-xs px-2 py-1.5 rounded bg-[#8B5CF6]/10 text-[#A78BFA] hover:bg-[#8B5CF6]/20 transition-colors"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          Compare with v{selectedVersion}
+                        </button>
+                      )}
                     </motion.div>
                   ))
                 )}
@@ -707,6 +746,19 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Version Diff Modal */}
+      {showDiffModal && diffVersions && (
+        <VersionDiffViewer
+          playbookId={resolvedParams.id}
+          fromVersion={diffVersions.from}
+          toVersion={diffVersions.to}
+          onClose={() => {
+            setShowDiffModal(false);
+            setDiffVersions(null);
+          }}
+        />
       )}
     </div>
   );

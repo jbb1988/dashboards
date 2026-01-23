@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
+import { createBrowserClient } from '@supabase/ssr';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 import ApprovalsQueue from '@/components/contracts/ApprovalsQueue';
@@ -157,6 +158,7 @@ function ContractReviewPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<'review' | 'history' | 'approvals'>('review');
   const [history, setHistory] = useState<ReviewHistory[]>([]);
+  const [historySearch, setHistorySearch] = useState('');
   const [activeTab, setActiveTab] = useState<'paste' | 'upload' | 'compare'>('paste');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [extractedText, setExtractedText] = useState<string | null>(null);
@@ -203,6 +205,29 @@ function ContractReviewPageContent() {
   const [saveModalSearch, setSaveModalSearch] = useState('');
   const [isSavingComparison, setIsSavingComparison] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  // User session state
+  const [userEmail, setUserEmail] = useState<string>('');
+
+  // Filter history by search query
+  const filteredHistory = history.filter(h =>
+    !historySearch ||
+    h.contractName?.toLowerCase().includes(historySearch.toLowerCase()) ||
+    h.provisionName?.toLowerCase().includes(historySearch.toLowerCase())
+  );
+
+  // Get current user from session
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserEmail(user?.email || '');
+    };
+    getUser();
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -505,9 +530,6 @@ function ContractReviewPageContent() {
 
     setIsSendingApproval(true);
     try {
-      // Get user email from session or use a default
-      const userEmail = 'legal@example.com'; // TODO: Get from session
-
       let reviewId = lastReviewId;
 
       // If no review exists yet, create one first
@@ -2716,9 +2738,38 @@ function ContractReviewPageContent() {
           >
             <h2 className="text-lg font-semibold text-white mb-4">Review History</h2>
 
-              {history.length > 0 ? (
+            {/* Search Input */}
+            <div className="relative mb-4">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Search by contract or provision name..."
+                className="w-full pl-10 pr-10 py-2 bg-[#151F2E] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
+              />
+              {historySearch && (
+                <button
+                  onClick={() => setHistorySearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-white"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+              {filteredHistory.length > 0 ? (
                 <div className="space-y-2">
-                  {history.map((item) => (
+                  {filteredHistory.map((item) => (
                     <div
                       key={item.id}
                       onClick={() => handleLoadHistoryItem(item)}
@@ -2756,7 +2807,17 @@ function ContractReviewPageContent() {
                   ))}
                 </div>
               ) : (
-                <p className="text-[#475569] text-center py-8">No review history yet</p>
+                <div className="text-center py-8 text-[#8FA3BF]">
+                  <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-lg">
+                    {historySearch ? 'No reviews match your search' : 'No review history yet'}
+                  </p>
+                  <p className="text-sm mt-1">
+                    {historySearch ? 'Try a different search term' : 'Reviews will appear here after analysis'}
+                  </p>
+                </div>
               )}
           </motion.div>
         )}

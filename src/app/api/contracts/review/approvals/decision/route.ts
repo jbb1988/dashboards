@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { sendApprovalDecisionEmail } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     // Fetch review by token
     const { data: review, error: fetchError } = await admin
       .from('contract_reviews')
-      .select('id, approval_status, token_expires_at, activity_log')
+      .select('id, approval_status, token_expires_at, activity_log, submitted_by_email, contract_name')
       .eq('approval_token', token)
       .single();
 
@@ -123,7 +124,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Optional enhancement - send confirmation email to submitter
+    // Send confirmation email to submitter
+    if (review.submitted_by_email) {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mars-dashboards.vercel.app';
+      try {
+        await sendApprovalDecisionEmail({
+          submitterEmail: review.submitted_by_email,
+          contractName: review.contract_name || 'Contract',
+          decision: decision === 'approve' ? 'approved' : 'rejected',
+          approverEmail,
+          feedback: feedback || undefined,
+          reviewUrl: `${baseUrl}/contracts/review?id=${review.id}`,
+        });
+      } catch (emailError) {
+        // Log but don't fail the request if email fails
+        console.error('Failed to send confirmation email:', emailError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

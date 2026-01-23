@@ -33,6 +33,7 @@ export default function ApprovalsQueue() {
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0 });
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchApprovals();
@@ -86,8 +87,49 @@ export default function ApprovalsQueue() {
     );
   }
 
+  // Filter approvals by search query
+  const filteredApprovals = approvals.filter(a => {
+    const matchesSearch = !searchQuery ||
+      a.contractName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.submittedBy?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.provisionName?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
+  });
+
   return (
     <div className="space-y-6">
+      {/* Search and Filter Bar */}
+      <div className="flex gap-4 items-center">
+        {/* Search Input */}
+        <div className="relative flex-1 max-w-md">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search approvals..."
+            className="w-full pl-10 pr-4 py-2 bg-[#151F2E] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-white"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Filter Buttons */}
       <div className="flex gap-2">
         <button
@@ -134,7 +176,7 @@ export default function ApprovalsQueue() {
 
       {/* Approvals List */}
       <div className="space-y-3">
-        {approvals.map((approval) => (
+        {filteredApprovals.map((approval) => (
           <motion.div
             key={approval.reviewId}
             initial={{ opacity: 0, y: 20 }}
@@ -250,7 +292,7 @@ export default function ApprovalsQueue() {
         ))}
 
         {/* Empty State */}
-        {approvals.length === 0 && (
+        {filteredApprovals.length === 0 && (
           <div className="text-center py-12 text-[#8FA3BF]">
             <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -260,8 +302,12 @@ export default function ApprovalsQueue() {
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <p className="text-lg">No {filter !== 'all' ? filter : ''} approvals</p>
-            <p className="text-sm mt-1">Approval requests will appear here</p>
+            <p className="text-lg">
+              {searchQuery ? 'No approvals match your search' : `No ${filter !== 'all' ? filter : ''} approvals`}
+            </p>
+            <p className="text-sm mt-1">
+              {searchQuery ? 'Try a different search term' : 'Approval requests will appear here'}
+            </p>
           </div>
         )}
       </div>

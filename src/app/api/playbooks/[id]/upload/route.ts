@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getAuthenticatedUser } from '@/lib/apiAuth';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -291,6 +292,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id: playbookId } = await params;
 
     if (!playbookId) {

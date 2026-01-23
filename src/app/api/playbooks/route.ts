@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getAuthenticatedUser } from '@/lib/apiAuth';
 
 // GET: List all playbooks
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const admin = getSupabaseAdmin();
 
     const { data: playbooks, error } = await admin
@@ -32,6 +38,11 @@ export async function GET() {
 // POST: Create a new playbook
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { name, description, content, createdBy } = body;
 

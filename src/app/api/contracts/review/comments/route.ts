@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { sendMentionNotificationEmail } from '@/lib/email';
 
 // GET: Fetch comments for a review (by review_id, token, or cc_token)
 export async function GET(request: NextRequest) {
@@ -170,7 +171,12 @@ export async function POST(request: NextRequest) {
       actualReviewId = review.id;
     }
 
-    // Insert the comment
+    // Parse @mentions (email format: @email@domain.com)
+    const mentionPattern = /@([\w.+-]+@[\w.-]+\.\w+)/g;
+    const mentionedEmails = [...comment.matchAll(mentionPattern)].map(m => m[1]);
+    const uniqueMentionedEmails = [...new Set(mentionedEmails)];
+
+    // Insert the comment with mentions
     const { data: newComment, error } = await admin
       .from('approval_comments')
       .insert({
@@ -178,6 +184,7 @@ export async function POST(request: NextRequest) {
         author_email: authorEmail.trim(),
         author_name: authorName?.trim() || null,
         comment: comment.trim(),
+        mentioned_emails: uniqueMentionedEmails.length > 0 ? uniqueMentionedEmails : null,
       })
       .select()
       .single();
@@ -188,6 +195,38 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to add comment' },
         { status: 500 }
       );
+    }
+
+    // Send notification to each mentioned user
+    if (uniqueMentionedEmails.length > 0) {
+      // Get review info for the email
+      const { data: reviewInfo } = await admin
+        .from('contract_reviews')
+        .select('contract_name, approval_token, cc_token')
+        .eq('id', actualReviewId)
+        .single();
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mars-dashboards.vercel.app';
+      const viewUrl = reviewInfo?.approval_token
+        ? `${baseUrl}/contracts/review/approve/${reviewInfo.approval_token}`
+        : reviewInfo?.cc_token
+        ? `${baseUrl}/contracts/review/cc/${reviewInfo.cc_token}`
+        : `${baseUrl}/contracts/review?id=${actualReviewId}`;
+
+      for (const email of uniqueMentionedEmails) {
+        try {
+          await sendMentionNotificationEmail({
+            mentionedEmail: email,
+            mentionerName: authorName?.trim() || authorEmail.trim(),
+            contractName: reviewInfo?.contract_name || 'Contract Review',
+            commentPreview: comment.slice(0, 100),
+            viewUrl,
+          });
+        } catch (emailError) {
+          // Log but don't fail the comment if email fails
+          console.error(`Failed to send mention notification to ${email}:`, emailError);
+        }
+      }
     }
 
     return NextResponse.json({
