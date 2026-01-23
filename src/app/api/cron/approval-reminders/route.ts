@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const { data: pendingReviews, error: fetchError } = await admin
       .from('contract_reviews')
-      .select('id, contract_name, submitted_by_email, submitted_at, approval_token, reminder_sent_at, reminder_count')
+      .select('id, contract_name, submitted_by_email, submitted_at, created_at, approval_token, reminder_sent_at, reminder_count')
       .eq('approval_status', 'pending')
       .lt('created_at', twoDaysAgo.toISOString())
       .or(`reminder_sent_at.is.null,reminder_sent_at.lt.${oneDayAgo.toISOString()}`);
