@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         .from('documents')
         .select('*')
         .or(`file_name.ilike.${searchTerm},account_name.ilike.${searchTerm},opportunity_name.ilike.${searchTerm},notes.ilike.${searchTerm}`)
-        .eq('is_current_version', true)
+        .order('uploaded_at', { ascending: false })
         .limit(limit);
 
       if (!error && documents) {
