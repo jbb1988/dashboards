@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import DiffMatchPatch from 'diff-match-patch';
 import {
   FluentProvider,
   webDarkTheme,
@@ -205,6 +206,29 @@ function extractContext(fullText: string, matchStart: number, matchEnd: number, 
   if (end < fullText.length) context += '...';
 
   return context;
+}
+
+// ============================================
+// WORD-LEVEL DIFF ENGINE
+// ============================================
+
+interface TextChange {
+  type: 'equal' | 'delete' | 'insert';
+  text: string;
+}
+
+/**
+ * Compares two texts and returns word-level changes using diff-match-patch
+ */
+function computeWordLevelDiff(original: string, revised: string): TextChange[] {
+  const dmp = new DiffMatchPatch();
+  const diffs = dmp.diff_main(original, revised);
+  dmp.diff_cleanupSemantic(diffs);
+
+  return diffs.map(([op, text]) => ({
+    type: op === -1 ? 'delete' : op === 1 ? 'insert' : 'equal',
+    text,
+  }));
 }
 
 export default function App() {
