@@ -329,12 +329,13 @@
     function refreshAuth() {
       var token = localStorage.getItem('mars_addin_token');
       var user = localStorage.getItem('mars_addin_user');
-      alert('Token found: ' + (token ? 'Yes (' + token.substring(0,20) + '...)' : 'No') + '\nUser found: ' + (user ? 'Yes' : 'No'));
+      var debugInfo = 'Token: ' + (token ? 'Yes (' + token.substring(0,15) + '...)' : 'No') + ' | User: ' + (user ? 'Yes' : 'No');
+      console.log('refreshAuth:', debugInfo);
       if (token && user) {
         currentUser = JSON.parse(user);
         showMainView();
       } else {
-        showError('Not signed in. Token not found in storage.');
+        showError('Debug: ' + debugInfo + '. Try signing in again.');
       }
     }
 
