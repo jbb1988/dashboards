@@ -128,15 +128,13 @@ export default function AIChat({ onBack }: AIChatProps) {
           Back to Help
         </button>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#38BDF8] to-[#8B5CF6] flex items-center justify-center">
-            <Image
-              src="/drop-white.png"
-              alt="MARS AI"
-              width={24}
-              height={24}
-              className="drop-shadow-sm"
-            />
-          </div>
+          <Image
+            src="/drop-white.png"
+            alt="MARS AI"
+            width={40}
+            height={40}
+            className="drop-shadow-lg"
+          />
           <div>
             <h3 className="text-white font-semibold">MARS AI Assistant</h3>
             <p className="text-[#64748B] text-xs">Powered by guide content</p>
