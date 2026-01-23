@@ -10,6 +10,8 @@ import {
   Redo2,
   Download,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 
 interface EditorToolbarProps {
@@ -17,6 +19,8 @@ interface EditorToolbarProps {
   onAddComment: (comment: string) => void;
   onDownload?: () => void;
   showDownload?: boolean;
+  zoomLevel?: number;
+  onZoomChange?: (zoom: number) => void;
 }
 
 export default function EditorToolbar({
@@ -24,10 +28,34 @@ export default function EditorToolbar({
   onAddComment,
   onDownload,
   showDownload = false,
+  zoomLevel = 100,
+  onZoomChange,
 }: EditorToolbarProps) {
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState('');
   const commentInputRef = useRef<HTMLInputElement>(null);
+
+  const MIN_ZOOM = 50;
+  const MAX_ZOOM = 200;
+  const ZOOM_STEP = 10;
+
+  const handleZoomIn = () => {
+    if (onZoomChange && zoomLevel < MAX_ZOOM) {
+      onZoomChange(Math.min(zoomLevel + ZOOM_STEP, MAX_ZOOM));
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (onZoomChange && zoomLevel > MIN_ZOOM) {
+      onZoomChange(Math.max(zoomLevel - ZOOM_STEP, MIN_ZOOM));
+    }
+  };
+
+  const handleZoomReset = () => {
+    if (onZoomChange) {
+      onZoomChange(100);
+    }
+  };
 
   useEffect(() => {
     if (showCommentInput && commentInputRef.current) {
@@ -138,6 +166,38 @@ export default function EditorToolbar({
             title="Download redlined document"
           >
             <Download className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Zoom Controls */}
+      {onZoomChange && (
+        <div className="flex items-center gap-1 pl-2 pr-2 border-r border-white/10">
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= MIN_ZOOM}
+            className={`${buttonBase} ${inactiveClass} disabled:opacity-30 disabled:cursor-not-allowed`}
+            title="Zoom out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomReset}
+            className="px-2 py-1 text-xs font-medium text-[#8FA3BF] hover:text-white transition-colors min-w-[48px] text-center"
+            title="Reset zoom to 100%"
+          >
+            {zoomLevel}%
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= MAX_ZOOM}
+            className={`${buttonBase} ${inactiveClass} disabled:opacity-30 disabled:cursor-not-allowed`}
+            title="Zoom in"
+          >
+            <ZoomIn className="w-4 h-4" />
           </button>
         </div>
       )}

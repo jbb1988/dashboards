@@ -170,6 +170,7 @@ export default function RedlineEditor({
   contractName = 'Contract',
 }: RedlineEditorProps) {
   const [comments, setComments] = useState<Comment[]>([]);
+  const [zoomLevel, setZoomLevel] = useState(100);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const contentToUse = approverEditedContent || formatRedlinesToHTML(initialContent);
@@ -283,6 +284,8 @@ export default function RedlineEditor({
             onAddComment={handleAddComment}
             onDownload={handleDownload}
             showDownload={hasContent}
+            zoomLevel={zoomLevel}
+            onZoomChange={setZoomLevel}
           />
         </div>
       )}
@@ -291,13 +294,52 @@ export default function RedlineEditor({
       <div
         className={`bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''}`}
         onClick={handleEditorClick}
+        style={{
+          fontSize: `${zoomLevel}%`,
+          transformOrigin: 'top left',
+        }}
       >
         <EditorContent editor={editor} />
       </div>
 
-      {/* Read-only download button */}
+      {/* Read-only toolbar with zoom and download */}
       {readOnly && hasContent && (
-        <div className="sticky bottom-0 bg-[#0B1220] border-t border-white/10 px-4 py-2 flex justify-end">
+        <div className="sticky bottom-0 bg-[#0B1220] border-t border-white/10 px-4 py-2 flex items-center justify-between">
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}
+              disabled={zoomLevel <= 50}
+              className="p-1.5 rounded bg-white/5 text-[#8FA3BF] hover:bg-white/10 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Zoom out"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoomLevel(100)}
+              className="px-2 py-1 text-xs font-medium text-[#8FA3BF] hover:text-white transition-colors min-w-[48px] text-center"
+              title="Reset zoom to 100%"
+            >
+              {zoomLevel}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}
+              disabled={zoomLevel >= 200}
+              className="p-1.5 rounded bg-white/5 text-[#8FA3BF] hover:bg-white/10 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Zoom in"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Download Button */}
           <button
             type="button"
             onClick={handleDownload}
