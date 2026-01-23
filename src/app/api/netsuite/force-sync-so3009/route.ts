@@ -11,20 +11,21 @@ export async function POST() {
     // Step 1: Fetch SO header from NetSuite
     const headerQuery = `
       SELECT
-        t.id AS netsuite_id,
-        t.tranid,
-        t.trandate,
-        t.postingperiod,
-        t.status,
-        t.memo,
-        t.entity AS customer_id,
-        BUILTIN.DF(t.entity) AS customer_name,
-        t.subtotal,
-        t.discounttotal,
-        t.taxtotal,
-        t.total
-      FROM Transaction t
-      WHERE t.id = 341203
+        so.id AS netsuite_id,
+        so.tranid,
+        so.trandate,
+        BUILTIN.DF(so.postingperiod) AS posting_period,
+        so.status,
+        so.memo,
+        so.entity AS customer_id,
+        BUILTIN.DF(so.entity) AS customer_name,
+        so.subtotal,
+        so.discounttotal,
+        so.taxtotal,
+        so.total
+      FROM transaction so
+      WHERE so.type = 'SalesOrd'
+        AND so.id = 341203
     `;
 
     const headerResponse = await netsuiteRequest<{ items: any[] }>(
@@ -54,7 +55,7 @@ export async function POST() {
           so_number: soData.tranid,
           tranid: soData.tranid,
           so_date: soData.trandate,
-          posting_period: soData.postingperiod?.toString(),
+          posting_period: soData.posting_period,
           status: soData.status,
           memo: soData.memo,
           customer_id: soData.customer_id?.toString(),
@@ -96,11 +97,9 @@ export async function POST() {
         tl.amount,
         tl.costestimate,
         tl.isclosed,
-        BUILTIN.DF(tl.account) AS account_number,
-        a.accountname AS account_name
-      FROM TransactionLine tl
-      LEFT JOIN Item i ON i.id = tl.item
-      LEFT JOIN Account a ON a.id = tl.account
+        BUILTIN.DF(tl.account) AS account_number
+      FROM transactionline tl
+      LEFT JOIN item i ON i.id = tl.item
       WHERE tl.transaction = 341203
         AND tl.mainline = 'F'
         AND tl.item IS NOT NULL
@@ -143,7 +142,6 @@ export async function POST() {
               cost_estimate: parseFloat(line.costestimate) || null,
               is_closed: line.isclosed === 'T',
               account_number: line.account_number,
-              account_name: line.account_name,
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'sales_order_id,netsuite_line_id' }
