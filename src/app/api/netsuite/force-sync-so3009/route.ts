@@ -19,8 +19,6 @@ export async function POST() {
         so.memo,
         so.entity AS customer_id,
         BUILTIN.DF(so.entity) AS customer_name,
-        so.subtotal,
-        so.discounttotal,
         so.taxtotal,
         so.total
       FROM transaction so
@@ -60,8 +58,6 @@ export async function POST() {
           memo: soData.memo,
           customer_id: soData.customer_id?.toString(),
           customer_name: soData.customer_name,
-          subtotal: soData.subtotal || 0,
-          discount_total: soData.discounttotal || 0,
           tax_total: soData.taxtotal || 0,
           total_amount: soData.total || 0,
           synced_at: new Date().toISOString(),
