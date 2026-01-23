@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
@@ -28,6 +28,10 @@ interface PlaybookVersion {
   change_notes: string | null;
   created_by: string | null;
   created_at: string;
+  file_name: string | null;
+  file_path: string | null;
+  file_type: string | null;
+  file_size: number | null;
 }
 
 export default function PlaybookDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -43,6 +47,13 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
   const [newVersion, setNewVersion] = useState({ content: '', changeNotes: '' });
   const [creating, setCreating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // File upload state
+  const [uploadMode, setUploadMode] = useState<'file' | 'paste'>('file');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchPlaybook();
@@ -68,27 +79,55 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
   }
 
   async function handleCreateVersion() {
-    if (!newVersion.content.trim()) return;
+    if (uploadMode === 'paste' && !newVersion.content.trim()) return;
+    if (uploadMode === 'file' && !selectedFile) return;
 
     setCreating(true);
-    try {
-      const response = await fetch(`/api/playbooks/${resolvedParams.id}/versions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: newVersion.content.trim(),
-          changeNotes: newVersion.changeNotes.trim() || null,
-          createdBy: 'admin@mars.com', // TODO: Get from session
-        }),
-      });
+    setUploadError(null);
 
-      if (response.ok) {
-        setShowNewVersionModal(false);
-        setNewVersion({ content: '', changeNotes: '' });
-        fetchPlaybook();
+    try {
+      if (uploadMode === 'file' && selectedFile) {
+        // Upload file
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('changeNotes', newVersion.changeNotes.trim() || '');
+        formData.append('createdBy', 'admin@mars.com'); // TODO: Get from session
+
+        const response = await fetch(`/api/playbooks/${resolvedParams.id}/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+      } else {
+        // Paste text
+        const response = await fetch(`/api/playbooks/${resolvedParams.id}/versions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: newVersion.content.trim(),
+            changeNotes: newVersion.changeNotes.trim() || null,
+            createdBy: 'admin@mars.com',
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to create version');
+        }
       }
+
+      setShowNewVersionModal(false);
+      setNewVersion({ content: '', changeNotes: '' });
+      setSelectedFile(null);
+      setUploadMode('file');
+      fetchPlaybook();
     } catch (error) {
       console.error('Failed to create version:', error);
+      setUploadError(error instanceof Error ? error.message : 'Failed to create version');
     } finally {
       setCreating(false);
     }
@@ -105,6 +144,95 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
       }
     } catch (error) {
       console.error('Failed to delete playbook:', error);
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      validateAndSetFile(file);
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      validateAndSetFile(file);
+    }
+  }
+
+  function validateAndSetFile(file: File) {
+    const validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
+    const fileName = file.name.toLowerCase();
+    const isValid = validExtensions.some(ext => fileName.endsWith(ext));
+
+    if (!isValid) {
+      setUploadError('Please upload a PDF, Word (.docx/.doc), or text file');
+      return;
+    }
+
+    setUploadError(null);
+    setSelectedFile(file);
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function getFileIcon(fileType: string | null) {
+    switch (fileType) {
+      case 'pdf':
+        return (
+          <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM9.5 17.5h-1v-3h1a1.5 1.5 0 0 1 0 3zm5-1h-.5v1h-1v-4h1.5a1.5 1.5 0 0 1 0 3zm4-2h-2v1h1.5v1H16.5v1h-1v-4h2.5v1zM14 9V3.5L19.5 9H14z" />
+          </svg>
+        );
+      case 'docx':
+      case 'doc':
+        return (
+          <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM15.2 18H14l-1-3.3-1 3.3H10.8L9 13h1.3l.9 3.4 1-3.4h1.1l1 3.4.9-3.4H16l-1.8 5zM14 9V3.5L19.5 9H14z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        );
+    }
+  }
+
+  async function downloadVersion(versionId: string, fileName: string) {
+    try {
+      const response = await fetch(`/api/playbooks/${resolvedParams.id}/download?versionId=${versionId}`);
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
     }
   }
 
@@ -183,6 +311,9 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     setNewVersion({ content: currentVersionContent, changeNotes: '' });
+                    setSelectedFile(null);
+                    setUploadMode('file');
+                    setUploadError(null);
                     setShowNewVersionModal(true);
                   }}
                   className="px-4 py-2 rounded-lg bg-[#8B5CF6] text-sm text-white font-medium hover:bg-[#7C3AED] transition-colors flex items-center gap-2"
@@ -229,6 +360,18 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
                     <span className="text-sm text-[#64748B]">
                       by {selectedVersionData.created_by}
                     </span>
+                  )}
+                  {selectedVersionData.file_name && (
+                    <button
+                      onClick={() => downloadVersion(selectedVersionData.id, selectedVersionData.file_name!)}
+                      className="flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-white/5 text-[#8FA3BF] hover:text-white hover:bg-white/10 transition-colors"
+                    >
+                      {getFileIcon(selectedVersionData.file_type)}
+                      <span>{selectedVersionData.file_name}</span>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </button>
                   )}
                 </div>
                 {selectedVersionData.change_notes && (
@@ -286,40 +429,64 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
                   <p className="text-sm text-[#64748B] text-center py-8">No versions yet</p>
                 ) : (
                   versions.map((version) => (
-                    <motion.button
+                    <motion.div
                       key={version.id}
-                      onClick={() => setSelectedVersion(version.version)}
                       className={`w-full text-left p-3 rounded-lg transition-colors ${
                         selectedVersion === version.version
                           ? 'bg-[#8B5CF6]/20 border border-[#8B5CF6]/30'
                           : 'bg-[#0B1220] border border-white/5 hover:border-white/10'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-sm font-medium ${
-                          selectedVersion === version.version ? 'text-[#A78BFA]' : 'text-white'
-                        }`}>
-                          Version {version.version}
-                        </span>
-                        {version.version === playbook.current_version && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
-                            Current
+                      <button
+                        onClick={() => setSelectedVersion(version.version)}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-sm font-medium ${
+                            selectedVersion === version.version ? 'text-[#A78BFA]' : 'text-white'
+                          }`}>
+                            Version {version.version}
                           </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#8FA3BF]">
-                        {new Date(version.created_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </p>
-                      {version.change_notes && (
-                        <p className="text-xs text-[#64748B] mt-1 truncate">
-                          {version.change_notes}
+                          {version.version === playbook.current_version && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
+                              Current
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#8FA3BF]">
+                          {new Date(version.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
                         </p>
+                        {version.change_notes && (
+                          <p className="text-xs text-[#64748B] mt-1 truncate">
+                            {version.change_notes}
+                          </p>
+                        )}
+                      </button>
+
+                      {/* File download button */}
+                      {version.file_name && version.file_path && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadVersion(version.id, version.file_name!);
+                          }}
+                          className="mt-2 w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-white/5 text-[#8FA3BF] hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                          {getFileIcon(version.file_type)}
+                          <span className="truncate flex-1 text-left">{version.file_name}</span>
+                          {version.file_size && (
+                            <span className="text-[#64748B]">{formatFileSize(version.file_size)}</span>
+                          )}
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
                       )}
-                    </motion.button>
+                    </motion.div>
                   ))
                 )}
               </div>
@@ -338,6 +505,40 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
           >
             <h3 className="text-lg font-bold text-white mb-4">Create New Version</h3>
 
+            {/* Upload Mode Toggle */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setUploadMode('file')}
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  uploadMode === 'file'
+                    ? 'bg-[#8B5CF6] text-white'
+                    : 'bg-white/5 text-[#8FA3BF] hover:text-white'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload File
+                </div>
+              </button>
+              <button
+                onClick={() => setUploadMode('paste')}
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  uploadMode === 'paste'
+                    ? 'bg-[#8B5CF6] text-white'
+                    : 'bg-white/5 text-[#8FA3BF] hover:text-white'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  Paste Text
+                </div>
+              </button>
+            </div>
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
@@ -352,18 +553,86 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
-                  Content <span className="text-red-400">*</span>
-                </label>
-                <textarea
-                  value={newVersion.content}
-                  onChange={(e) => setNewVersion(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Full agreement text..."
-                  rows={20}
-                  className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#8B5CF6] resize-none font-mono"
-                />
-              </div>
+              {uploadMode === 'file' ? (
+                <div>
+                  <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
+                    Upload Agreement File <span className="text-red-400">*</span>
+                  </label>
+
+                  {/* Drag & Drop Zone */}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                      isDragging
+                        ? 'border-[#8B5CF6] bg-[#8B5CF6]/10'
+                        : selectedFile
+                        ? 'border-green-500/50 bg-green-500/5'
+                        : 'border-white/20 hover:border-white/40 bg-[#0B1220]'
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.doc,.txt"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+
+                    {selectedFile ? (
+                      <div className="flex items-center justify-center gap-3">
+                        {getFileIcon(selectedFile.name.split('.').pop() || null)}
+                        <div className="text-left">
+                          <p className="text-sm text-white font-medium">{selectedFile.name}</p>
+                          <p className="text-xs text-[#8FA3BF]">{formatFileSize(selectedFile.size)}</p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedFile(null);
+                          }}
+                          className="p-1 rounded hover:bg-white/10 text-[#8FA3BF] hover:text-white"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <svg className="w-10 h-10 text-[#64748B] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-sm text-[#8FA3BF]">
+                          Drag & drop your file here, or <span className="text-[#8B5CF6]">browse</span>
+                        </p>
+                        <p className="text-xs text-[#64748B] mt-1">
+                          Supports PDF, Word (.docx, .doc), and text files
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  {uploadError && (
+                    <p className="mt-2 text-sm text-red-400">{uploadError}</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
+                    Content <span className="text-red-400">*</span>
+                  </label>
+                  <textarea
+                    value={newVersion.content}
+                    onChange={(e) => setNewVersion(prev => ({ ...prev, content: e.target.value }))}
+                    placeholder="Full agreement text..."
+                    rows={20}
+                    className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#8B5CF6] resize-none font-mono"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -371,6 +640,8 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
                 onClick={() => {
                   setShowNewVersionModal(false);
                   setNewVersion({ content: '', changeNotes: '' });
+                  setSelectedFile(null);
+                  setUploadError(null);
                 }}
                 className="flex-1 px-4 py-2 text-sm bg-white/5 text-[#8FA3BF] rounded-lg hover:bg-white/10 transition-colors"
               >
@@ -378,7 +649,7 @@ export default function PlaybookDetailPage({ params }: { params: Promise<{ id: s
               </button>
               <button
                 onClick={handleCreateVersion}
-                disabled={creating || !newVersion.content.trim()}
+                disabled={creating || (uploadMode === 'paste' && !newVersion.content.trim()) || (uploadMode === 'file' && !selectedFile)}
                 className="flex-1 px-4 py-2 text-sm font-medium bg-[#8B5CF6] text-white rounded-lg hover:bg-[#7C3AED] transition-colors disabled:opacity-50"
               >
                 {creating ? 'Creating...' : 'Create Version'}
