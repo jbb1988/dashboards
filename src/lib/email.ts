@@ -323,10 +323,10 @@ export async function sendApprovalRequestEmail(
         </p>
       </div>
 
-      <!-- AI Summary -->
+      <!-- Contract Summary -->
       <div style="margin-bottom: 24px;">
         <h3 style="margin: 0 0 12px 0; color: white; font-size: 16px; font-weight: 600;">
-          AI Analysis Summary
+          Contract Summary
         </h3>
         <div style="background-color: #0B1220; border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 16px;">
           <ul style="margin: 0; padding-left: 20px; color: #8FA3BF; font-size: 14px; line-height: 1.8;">
@@ -443,10 +443,10 @@ export async function sendCCNotificationEmail(
         </p>
       </div>
 
-      <!-- AI Summary -->
+      <!-- Contract Summary -->
       <div style="margin-bottom: 24px;">
         <h3 style="margin: 0 0 12px 0; color: white; font-size: 16px; font-weight: 600;">
-          AI Analysis Summary
+          Contract Summary
         </h3>
         <div style="background-color: #0B1220; border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 16px;">
           <ul style="margin: 0; padding-left: 20px; color: #8FA3BF; font-size: 14px; line-height: 1.8;">
