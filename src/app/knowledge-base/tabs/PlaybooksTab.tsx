@@ -4,27 +4,16 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { KPICard, KPIIcons, tokens } from '@/components/mars-ui';
+import { tokens } from '@/components/mars-ui';
 
 interface Playbook {
   id: string;
   name: string;
   description: string | null;
-  contract_type: string;
-  counterparty_type: string | null;
-  risk_tolerance: 'conservative' | 'moderate' | 'aggressive';
-  is_default: boolean;
-  usage_count: number;
+  current_version: number;
   created_at: string;
   updated_at: string;
-  rules_count?: number;
 }
-
-const riskColors = {
-  conservative: '#22C55E',
-  moderate: '#F59E0B',
-  aggressive: '#EF4444',
-};
 
 export default function PlaybooksTab() {
   const router = useRouter();
@@ -44,18 +33,13 @@ export default function PlaybooksTab() {
   const loadPlaybooks = async () => {
     try {
       const { data, error } = await supabase
-        .from('negotiation_playbooks')
-        .select('*, rules:playbook_rules(count)')
-        .eq('is_active', true)
-        .order('is_default', { ascending: false })
-        .order('usage_count', { ascending: false });
+        .from('playbooks')
+        .select('*')
+        .order('name', { ascending: true });
 
       if (error) throw error;
 
-      setPlaybooks(data?.map(p => ({
-        ...p,
-        rules_count: p.rules?.[0]?.count || 0,
-      })) || []);
+      setPlaybooks(data || []);
     } catch (err) {
       console.error('Failed to load playbooks:', err);
     } finally {
@@ -111,11 +95,9 @@ export default function PlaybooksTab() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
               </div>
-              {playbook.is_default && (
-                <span className="px-2 py-1 bg-[#38BDF8]/20 text-[#38BDF8] text-xs rounded-full">
-                  Default
-                </span>
-              )}
+              <span className="px-2 py-1 bg-[#38BDF8]/20 text-[#38BDF8] text-xs rounded-full">
+                v{playbook.current_version}
+              </span>
             </div>
 
             <h3 className="text-white font-medium mb-2 group-hover:text-[#38BDF8] transition-colors">
@@ -128,18 +110,8 @@ export default function PlaybooksTab() {
               </p>
             )}
 
-            <div className="flex items-center gap-3 text-xs">
-              <span
-                className="px-2 py-1 rounded"
-                style={{
-                  backgroundColor: `${riskColors[playbook.risk_tolerance]}20`,
-                  color: riskColors[playbook.risk_tolerance],
-                }}
-              >
-                {playbook.risk_tolerance}
-              </span>
-              <span className="text-[#64748B]">{playbook.rules_count} rules</span>
-              <span className="text-[#64748B]">{playbook.usage_count} uses</span>
+            <div className="flex items-center gap-3 text-xs text-[#64748B]">
+              <span>Updated {new Date(playbook.updated_at).toLocaleDateString()}</span>
             </div>
           </motion.div>
         ))}
