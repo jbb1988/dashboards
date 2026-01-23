@@ -1,6 +1,7 @@
 /**
  * BULK sync ALL SO/WO headers in ONE query - FAST
  * Instead of querying one record at a time, this uses paginated SuiteQL
+ * Updated: 2026-01-23
  */
 
 import { NextResponse } from 'next/server';
