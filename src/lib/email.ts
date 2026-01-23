@@ -298,11 +298,12 @@ export async function sendApprovalRequestEmail(
 
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #38BDF8 0%, #0189CB 100%); padding: 32px; text-align: center;">
+      <img src="https://mars-dashboards.vercel.app/mars-logo-horizontal.png" alt="MARS" width="160" style="display: block; margin: 0 auto 24px; max-width: 160px; height: auto;">
       <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
         Contract Approval Request
       </h1>
       <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
-        AI-analyzed contract awaiting your review
+        Contract awaiting your review
       </p>
     </div>
 
