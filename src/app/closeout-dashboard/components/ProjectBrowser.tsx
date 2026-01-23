@@ -14,6 +14,7 @@ interface ProjectSummary {
   name: string;
   years: number[];
   latestYear: number;
+  latestMonth: number | null;
   projectType: string;
   recentRevenue: number;
   recentGPM: number;
@@ -149,6 +150,13 @@ export default function ProjectBrowser({ onSelectProject }: ProjectBrowserProps)
       return `$${(value / 1000).toFixed(0)}K`;
     }
     return `$${value.toFixed(0)}`;
+  };
+
+  const formatMonth = (month: number | null, year: number) => {
+    if (!month) return `${year}`;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${monthNames[month - 1]} ${year}`;
   };
 
   const getVarianceColor = (variance: number) => {
@@ -321,11 +329,11 @@ export default function ProjectBrowser({ onSelectProject }: ProjectBrowserProps)
                             <h4 className="font-semibold text-gray-200 group-hover:text-white transition-colors truncate">
                               {project.name}
                             </h4>
-                            {project.projectType && (
-                              <span className="text-xs text-gray-500">
-                                {project.projectType}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              {project.projectType && <span>{project.projectType}</span>}
+                              {project.projectType && <span>•</span>}
+                              <span>{formatMonth(project.latestMonth, project.latestYear)}</span>
+                            </div>
                           </div>
                         </div>
 

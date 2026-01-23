@@ -443,6 +443,262 @@ export function getStatusLabel(status: string): string {
   }
 }
 
+// ============================================================================
+// ENVELOPE CREATION FUNCTIONS (for e-signature integration)
+// ============================================================================
+
+export interface CreateEnvelopeOptions {
+  emailSubject: string;
+  emailBody?: string;
+  webhookUrl?: string;
+  carbonCopies?: Array<{ email: string; name: string }>;
+  sendImmediately?: boolean;
+}
+
+export interface Signer {
+  email: string;
+  name: string;
+  order?: number;
+}
+
+export interface DocumentInput {
+  content: string; // Base64 encoded
+  name: string;
+  extension: string;
+}
+
+interface EnvelopeDefinition {
+  emailSubject: string;
+  emailBlurb?: string;
+  documents: Array<{
+    documentBase64: string;
+    name: string;
+    fileExtension: string;
+    documentId: string;
+  }>;
+  recipients: {
+    signers: Array<{
+      email: string;
+      name: string;
+      recipientId: string;
+      routingOrder: number;
+      tabs?: {
+        signHereTabs?: Array<{
+          documentId: string;
+          pageNumber: string;
+          xPosition: string;
+          yPosition: string;
+        }>;
+        dateSignedTabs?: Array<{
+          documentId: string;
+          pageNumber: string;
+          xPosition: string;
+          yPosition: string;
+        }>;
+      };
+    }>;
+    carbonCopies?: Array<{
+      email: string;
+      name: string;
+      recipientId: string;
+      routingOrder: number;
+    }>;
+  };
+  status: 'created' | 'sent';
+  eventNotification?: {
+    url: string;
+    loggingEnabled: boolean;
+    requireAcknowledgment: boolean;
+    envelopeEvents: Array<{ envelopeEventStatusCode: string }>;
+    recipientEvents: Array<{ recipientEventStatusCode: string }>;
+  };
+}
+
+export interface EnvelopeCreateResponse {
+  envelopeId: string;
+  status: string;
+  statusDateTime: string;
+  uri: string;
+}
+
+/**
+ * Create and send an envelope for signing
+ */
+export async function createEnvelope(
+  documents: DocumentInput[],
+  signers: Signer[],
+  options: CreateEnvelopeOptions
+): Promise<EnvelopeCreateResponse> {
+  const accountId = process.env.DOCUSIGN_ACCOUNT_ID;
+  if (!accountId) {
+    throw new Error('DOCUSIGN_ACCOUNT_ID not configured');
+  }
+
+  const envelopeDefinition: EnvelopeDefinition = {
+    emailSubject: options.emailSubject,
+    emailBlurb: options.emailBody,
+    documents: documents.map((doc, index) => ({
+      documentBase64: doc.content,
+      name: doc.name,
+      fileExtension: doc.extension,
+      documentId: String(index + 1),
+    })),
+    recipients: {
+      signers: signers.map((signer, index) => ({
+        email: signer.email,
+        name: signer.name,
+        recipientId: String(index + 1),
+        routingOrder: signer.order || index + 1,
+        tabs: {
+          signHereTabs: [
+            {
+              documentId: '1',
+              pageNumber: '1',
+              xPosition: '200',
+              yPosition: '700',
+            },
+          ],
+          dateSignedTabs: [
+            {
+              documentId: '1',
+              pageNumber: '1',
+              xPosition: '200',
+              yPosition: '750',
+            },
+          ],
+        },
+      })),
+      carbonCopies: options.carbonCopies?.map((cc, index) => ({
+        email: cc.email,
+        name: cc.name,
+        recipientId: String(signers.length + index + 1),
+        routingOrder: Math.max(...signers.map(s => s.order || 0)) + 1,
+      })),
+    },
+    status: options.sendImmediately !== false ? 'sent' : 'created',
+  };
+
+  // Add webhook notification if URL provided
+  if (options.webhookUrl) {
+    envelopeDefinition.eventNotification = {
+      url: options.webhookUrl,
+      loggingEnabled: true,
+      requireAcknowledgment: true,
+      envelopeEvents: [
+        { envelopeEventStatusCode: 'sent' },
+        { envelopeEventStatusCode: 'delivered' },
+        { envelopeEventStatusCode: 'completed' },
+        { envelopeEventStatusCode: 'declined' },
+        { envelopeEventStatusCode: 'voided' },
+      ],
+      recipientEvents: [
+        { recipientEventStatusCode: 'Sent' },
+        { recipientEventStatusCode: 'Delivered' },
+        { recipientEventStatusCode: 'Completed' },
+        { recipientEventStatusCode: 'Declined' },
+      ],
+    };
+  }
+
+  const url = `${DOCUSIGN_BASE_URL}/restapi/v2.1/accounts/${accountId}/envelopes`;
+  const token = await getAccessToken();
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(envelopeDefinition),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`DocuSign create envelope error (${response.status}): ${error}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Void an envelope
+ */
+export async function voidEnvelope(envelopeId: string, reason: string): Promise<void> {
+  const accountId = process.env.DOCUSIGN_ACCOUNT_ID;
+  if (!accountId) {
+    throw new Error('DOCUSIGN_ACCOUNT_ID not configured');
+  }
+
+  const url = `${DOCUSIGN_BASE_URL}/restapi/v2.1/accounts/${accountId}/envelopes/${envelopeId}`;
+  const token = await getAccessToken();
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      status: 'voided',
+      voidedReason: reason,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`DocuSign void envelope error (${response.status}): ${error}`);
+  }
+}
+
+/**
+ * Resend envelope to recipients
+ */
+export async function resendEnvelope(envelopeId: string): Promise<void> {
+  const accountId = process.env.DOCUSIGN_ACCOUNT_ID;
+  if (!accountId) {
+    throw new Error('DOCUSIGN_ACCOUNT_ID not configured');
+  }
+
+  const url = `${DOCUSIGN_BASE_URL}/restapi/v2.1/accounts/${accountId}/envelopes/${envelopeId}?resend_envelope=true`;
+  const token = await getAccessToken();
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`DocuSign resend envelope error (${response.status}): ${error}`);
+  }
+}
+
+/**
+ * Verify webhook signature (HMAC-SHA256)
+ */
+export function verifyWebhookSignature(
+  payload: string,
+  signature: string,
+  hmacKey: string
+): boolean {
+  const crypto = require('crypto');
+  const hmac = crypto.createHmac('sha256', hmacKey);
+  hmac.update(payload);
+  const computedSignature = hmac.digest('base64');
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(computedSignature)
+  );
+}
+
+// ============================================================================
+// STATS FUNCTIONS
+// ============================================================================
+
 // Calculate envelope stats
 export function calculateEnvelopeStats(envelopes: DocuSignEnvelope[]): {
   total: number;

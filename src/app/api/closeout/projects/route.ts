@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 interface ProjectData {
   project_name: string;
   project_year: number;
+  project_month: number | null;
   project_type: string;
   actual_revenue: number;
   actual_gp_pct: number;
@@ -21,6 +22,7 @@ interface ProjectSummary {
   name: string;
   years: number[];
   latestYear: number;
+  latestMonth: number | null;
   projectType: string;
   recentRevenue: number;
   recentGPM: number;
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
     // Get project data with financial information (2025 and later only)
     let query = supabase
       .from('closeout_projects')
-      .select('project_name, project_year, project_type, actual_revenue, actual_gp_pct, variance')
+      .select('project_name, project_year, project_month, project_type, actual_revenue, actual_gp_pct, variance')
       .gte('project_year', 2025) // Only include 2025 and later
       .order('project_name', { ascending: true })
       .order('project_year', { ascending: false });
@@ -94,6 +96,7 @@ export async function GET(request: Request) {
         name,
         years,
         latestYear: mostRecent.project_year,
+        latestMonth: mostRecent.project_month || null,
         projectType: mostRecent.project_type || '',
         recentRevenue,
         recentGPM,
@@ -139,6 +142,7 @@ export async function GET(request: Request) {
         name,
         years,
         latestYear: mostRecent.project_year,
+        latestMonth: mostRecent.project_month || null,
         projectType: mostRecent.project_type || '',
         recentRevenue,
         recentGPM,
