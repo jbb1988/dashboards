@@ -351,6 +351,13 @@ async function importToDatabase(clauses: ConsolidatedClause[]): Promise<number> 
     }
   );
   const categories = await catResponse.json();
+
+  // Ensure categories is an array
+  if (!Array.isArray(categories)) {
+    console.error('Failed to fetch categories:', categories);
+    throw new Error('Could not load clause categories from database');
+  }
+
   const categoryMap = new Map(categories.map((c: any) => [c.name.toLowerCase(), c.id]));
 
   // Prepare records
