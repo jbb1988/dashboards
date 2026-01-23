@@ -100,13 +100,14 @@ function KnowledgeBaseContent() {
   const sidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
-    <DashboardBackground preset={backgroundPresets.subtle}>
+    <>
+      <DashboardBackground {...backgroundPresets.admin} />
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
       <motion.main
         animate={{ marginLeft: sidebarWidth }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="min-h-screen"
+        className="min-h-screen relative z-10"
       >
         <div className="p-6">
           {/* Header */}
@@ -158,7 +159,7 @@ function KnowledgeBaseContent() {
           </AnimatePresence>
         </div>
       </motion.main>
-    </DashboardBackground>
+    </>
   );
 }
 

@@ -19,6 +19,7 @@ interface Obligation {
   assigned_to: string | null;
   ai_extracted: boolean;
   ai_confidence: number | null;
+  extraction_review_status: string;
   created_at: string;
 }
 
@@ -132,28 +133,32 @@ export default function ObligationsTab() {
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
         <KPICard
-          label="Overdue"
+          title="Overdue"
           value={summary.overdue}
-          icon={<KPIIcons.warning />}
-          accentColor="#EF4444"
+          subtitle="obligations"
+          icon={KPIIcons.warning}
+          color="#EF4444"
         />
         <KPICard
-          label="Due Soon"
+          title="Due Soon"
           value={summary.due}
-          icon={<KPIIcons.clock />}
-          accentColor="#F59E0B"
+          subtitle="obligations"
+          icon={KPIIcons.clock}
+          color="#F59E0B"
         />
         <KPICard
-          label="Upcoming (7d)"
+          title="Upcoming (7d)"
           value={summary.upcoming}
-          icon={<KPIIcons.calendar />}
-          accentColor="#38BDF8"
+          subtitle="obligations"
+          icon={KPIIcons.calendar}
+          color="#38BDF8"
         />
         <KPICard
-          label="Pending"
+          title="Pending"
           value={summary.pending}
-          icon={<KPIIcons.tasks />}
-          accentColor="#64748B"
+          subtitle="obligations"
+          icon={KPIIcons.clipboard}
+          color="#64748B"
         />
       </div>
 
@@ -291,7 +296,11 @@ export default function ObligationsTab() {
 
       {/* Calendar View */}
       {view === 'calendar' && (
-        <ObligationCalendar obligations={obligations} onStatusChange={updateStatus} />
+        <ObligationCalendar
+          obligations={obligations}
+          onSelectObligation={(obl) => console.log('Selected obligation:', obl.id)}
+          onSelectDate={(date) => console.log('Selected date:', date)}
+        />
       )}
     </div>
   );

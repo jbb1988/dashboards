@@ -117,13 +117,14 @@ function ContractsHubContent() {
   const sidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
-    <DashboardBackground preset={backgroundPresets.subtle}>
+    <>
+      <DashboardBackground {...backgroundPresets.contracts} />
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
       <motion.main
         animate={{ marginLeft: sidebarWidth }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="min-h-screen"
+        className="min-h-screen relative z-10"
       >
         <div className="p-6">
           {/* Header */}
@@ -176,7 +177,7 @@ function ContractsHubContent() {
           </AnimatePresence>
         </div>
       </motion.main>
-    </DashboardBackground>
+    </>
   );
 }
 

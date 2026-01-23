@@ -3,30 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { KPICard, AnimatedCounter, tokens } from '@/components/mars-ui';
-import ContractDetailDrawer from '@/components/contracts/ContractDetailDrawer';
-
-interface Contract {
-  id: string;
-  salesforceId?: string;
-  name: string;
-  opportunityName?: string;
-  value: number;
-  status: string;
-  statusGroup: string;
-  salesStage?: string;
-  contractType: string[];
-  daysInStage: number;
-  closeDate: string | null;
-  contractDate: string | null;
-  progress: number;
-  isOverdue: boolean;
-  nextTask: string;
-  salesRep?: string;
-  probability?: number;
-  salesforceUrl?: string;
-  isRenewal?: boolean;
-  budgeted?: boolean;
-}
+import ContractDetailDrawer, { Contract } from '@/components/contracts/ContractDetailDrawer';
 
 interface KPIs {
   totalPipeline: number;
@@ -116,28 +93,28 @@ export default function PipelineTab() {
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
         <KPICard
-          label="Total Pipeline"
-          value={<AnimatedCounter value={data?.kpis.totalPipeline || 0} format="currency" />}
+          title="Total Pipeline"
+          value={<AnimatedCounter value={data?.kpis.totalPipeline || 0} prefix="$" />}
           subtitle={`${data?.kpis.totalCount || 0} contracts`}
-          accentColor="#38BDF8"
+          color="#38BDF8"
         />
         <KPICard
-          label="Overdue"
-          value={<AnimatedCounter value={data?.kpis.overdueValue || 0} format="currency" />}
+          title="Overdue"
+          value={<AnimatedCounter value={data?.kpis.overdueValue || 0} prefix="$" />}
           subtitle={`${data?.kpis.overdueCount || 0} contracts`}
-          accentColor="#EF4444"
+          color="#EF4444"
         />
         <KPICard
-          label="Due in 30 Days"
-          value={<AnimatedCounter value={data?.kpis.dueNext30Value || 0} format="currency" />}
+          title="Due in 30 Days"
+          value={<AnimatedCounter value={data?.kpis.dueNext30Value || 0} prefix="$" />}
           subtitle={`${data?.kpis.dueNext30Count || 0} contracts`}
-          accentColor="#F59E0B"
+          color="#F59E0B"
         />
         <KPICard
-          label="Average Value"
-          value={<AnimatedCounter value={data?.kpis.totalCount ? data.kpis.totalPipeline / data.kpis.totalCount : 0} format="currency" />}
+          title="Average Value"
+          value={<AnimatedCounter value={data?.kpis.totalCount ? data.kpis.totalPipeline / data.kpis.totalCount : 0} prefix="$" />}
           subtitle="per contract"
-          accentColor="#22C55E"
+          color="#22C55E"
         />
       </div>
 

@@ -242,37 +242,33 @@ export default function GenerateTab() {
           <TemplateIntakeForm
             template={selectedTemplate}
             onSubmit={handleFormSubmit}
-            isSubmitting={isGenerating}
+            onBack={handleBack}
           />
         </div>
       )}
 
       {/* Step: Preview */}
       {step === 'preview' && generatedContract && selectedTemplate && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Generated Contract</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={handleBack}
-                className="px-4 py-2 text-[#64748B] hover:text-white text-sm transition-colors"
-              >
-                ← Edit Details
-              </button>
-              <button
-                onClick={handleStartOver}
-                className="px-4 py-2 text-[#64748B] hover:text-white text-sm transition-colors"
-              >
-                Start Over
-              </button>
-            </div>
-          </div>
-
-          <GeneratedPreview
-            contract={generatedContract}
-            templateName={selectedTemplate.name}
-          />
-        </div>
+        <GeneratedPreview
+          generation={generatedContract}
+          templateName={selectedTemplate.name}
+          onEdit={handleBack}
+          onSubmitForApproval={async () => {
+            // Submit for approval logic
+            console.log('Submitting for approval:', generatedContract.id);
+          }}
+          onDownload={() => {
+            // Download logic
+            const blob = new Blob([generatedContract.content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${selectedTemplate.name.toLowerCase().replace(/\s+/g, '-')}-contract.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          onStartOver={handleStartOver}
+        />
       )}
     </div>
   );

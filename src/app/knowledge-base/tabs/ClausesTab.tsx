@@ -128,29 +128,32 @@ export default function ClausesTab() {
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
         <KPICard
-          label="Total Clauses"
+          title="Total Clauses"
           value={clauses.length}
-          icon={<KPIIcons.document />}
-          accentColor="#38BDF8"
+          subtitle="in library"
+          icon={KPIIcons.document}
+          color="#38BDF8"
         />
         <KPICard
-          label="Categories"
+          title="Categories"
           value={categories.length}
-          icon={<KPIIcons.folder />}
-          accentColor="#A855F7"
+          subtitle="defined"
+          icon={KPIIcons.folder}
+          color="#A855F7"
         />
         <KPICard
-          label="High Risk"
+          title="High Risk"
           value={clauses.filter(c => c.risk_level === 'high').length}
-          icon={<KPIIcons.warning />}
-          accentColor="#EF4444"
+          subtitle="clauses"
+          icon={KPIIcons.warning}
+          color="#EF4444"
         />
         <KPICard
-          label="Most Used"
+          title="Most Used"
           value={clauses[0]?.usage_count || 0}
           subtitle={clauses[0]?.name?.substring(0, 20) || '-'}
-          icon={<KPIIcons.trending />}
-          accentColor="#22C55E"
+          icon={KPIIcons.trending}
+          color="#22C55E"
         />
       </div>
 

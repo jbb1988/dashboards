@@ -111,28 +111,32 @@ export default function AITrainingTab() {
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
         <KPICard
-          label="Feedback Items"
+          title="Feedback Items"
           value={feedback.length || '-'}
-          icon={<KPIIcons.chat />}
-          accentColor="#A855F7"
+          subtitle="collected"
+          icon={KPIIcons.document}
+          color="#A855F7"
         />
         <KPICard
-          label="Positive Ratings"
+          title="Positive Ratings"
           value={feedback.filter(f => f.rating === 'positive').length || '-'}
-          icon={<KPIIcons.check />}
-          accentColor="#22C55E"
+          subtitle="feedback"
+          icon={KPIIcons.checkCircle}
+          color="#22C55E"
         />
         <KPICard
-          label="Terminology"
+          title="Terminology"
           value={terminology.length || '-'}
-          icon={<KPIIcons.document />}
-          accentColor="#38BDF8"
+          subtitle="terms defined"
+          icon={KPIIcons.document}
+          color="#38BDF8"
         />
         <KPICard
-          label="Training Examples"
+          title="Training Examples"
           value={examples.length || '-'}
-          icon={<KPIIcons.brain />}
-          accentColor="#F59E0B"
+          subtitle="examples"
+          icon={KPIIcons.clipboard}
+          color="#F59E0B"
         />
       </div>
 
