@@ -68,7 +68,7 @@ interface SearchMatch {
   text: string;
   context: string;
   confidence: number;
-  matchType: 'exact' | 'normalized' | 'wildcard' | 'fuzzy';
+  matchType: 'exact' | 'normalized' | 'wildcard' | 'fuzzy' | 'truncated';
 }
 
 interface PreviewState {
@@ -339,26 +339,25 @@ export default function App() {
     }
   };
 
-  // Highlight text in document
+  // Highlight text in document (uses cascading search for reliability)
   const highlightRisk = async (location: string) => {
     try {
       await Word.run(async (context) => {
-        const searchResults = context.document.body.search(location, {
-          matchCase: false,
-          matchWholeWord: false,
-        });
-        searchResults.load('items');
-        await context.sync();
+        // Use cascading search to find the text reliably
+        const matches = await cascadingSearch(location, context);
 
-        if (searchResults.items.length > 0) {
-          const range = searchResults.items[0];
+        if (matches.length > 0) {
+          const range = matches[0].range;
           range.font.highlightColor = '#FFE066';
           range.select();
           await context.sync();
+        } else {
+          setError('Could not find the text in the document. It may have been modified.');
         }
       });
     } catch (err) {
       console.error('Highlight error:', err);
+      setError('Failed to highlight text in document.');
     }
   };
 
@@ -366,8 +365,27 @@ export default function App() {
   // CASCADING SEARCH STRATEGY
   // ============================================
 
+  // Word API has a 255 character limit for search strings
+  const MAX_SEARCH_LENGTH = 200;
+
+  /**
+   * Truncates search text to Word API limit, trying to break at word boundary
+   */
+  const truncateSearchText = (text: string, maxLen: number = MAX_SEARCH_LENGTH): string => {
+    if (text.length <= maxLen) return text;
+
+    // Try to break at a word boundary
+    const truncated = text.substring(0, maxLen);
+    const lastSpace = truncated.lastIndexOf(' ');
+    if (lastSpace > maxLen * 0.7) {
+      return truncated.substring(0, lastSpace);
+    }
+    return truncated;
+  };
+
   /**
    * Performs a cascading search with multiple fallback strategies
+   * Handles long search strings by truncating and then validating matches
    */
   const cascadingSearch = async (
     searchText: string,
@@ -375,10 +393,17 @@ export default function App() {
   ): Promise<SearchMatch[]> => {
     const matches: SearchMatch[] = [];
     const body = context.document.body;
+    const fullSearchText = searchText;
+    const isLongSearch = searchText.length > MAX_SEARCH_LENGTH;
 
-    // Tier 1: Exact match with Office.js options
+    // Truncate for Word API if needed
+    const truncatedSearch = truncateSearchText(normalizeText(searchText));
+    console.log(`Search text length: ${searchText.length}, truncated to: ${truncatedSearch.length}`);
+
+    // Tier 1: Search with truncated text (or full if short enough)
     try {
-      const exactResults = body.search(searchText, {
+      const searchQuery = isLongSearch ? truncatedSearch : searchText;
+      const exactResults = body.search(searchQuery, {
         matchCase: false,
         matchWholeWord: false,
       });
@@ -392,55 +417,73 @@ export default function App() {
         paragraph.load('text');
         await context.sync();
 
+        // For long searches, calculate similarity to validate match
+        let confidence = 100;
+        if (isLongSearch) {
+          confidence = calculateSimilarity(paragraph.text, fullSearchText);
+          // Skip low-confidence matches for long searches
+          if (confidence < 40) continue;
+        }
+
         matches.push({
           range,
           text: range.text,
           context: paragraph.text.substring(0, 200),
-          confidence: 100,
-          matchType: 'exact',
+          confidence,
+          matchType: isLongSearch ? 'truncated' : 'exact',
         });
       }
 
-      if (matches.length > 0) return matches;
+      if (matches.length > 0) {
+        matches.sort((a, b) => b.confidence - a.confidence);
+        return matches;
+      }
     } catch (err) {
-      console.log('Exact search failed, trying normalized...', err);
+      console.log('Exact/truncated search failed, trying normalized...', err);
     }
 
-    // Tier 2: Normalized text search (search for normalized version)
-    const normalizedSearch = normalizeText(searchText);
-    if (normalizedSearch !== searchText) {
-      try {
-        const normResults = body.search(normalizedSearch, {
-          matchCase: false,
-          matchWholeWord: false,
-        });
-        normResults.load('items');
+    // Tier 2: Normalized text search
+    const normalizedSearch = truncateSearchText(normalizeText(searchText));
+    try {
+      const normResults = body.search(normalizedSearch, {
+        matchCase: false,
+        matchWholeWord: false,
+      });
+      normResults.load('items');
+      await context.sync();
+
+      for (const range of normResults.items) {
+        range.load('text');
+        const paragraph = range.paragraphs.getFirst();
+        paragraph.load('text');
         await context.sync();
 
-        for (const range of normResults.items) {
-          range.load('text');
-          const paragraph = range.paragraphs.getFirst();
-          paragraph.load('text');
-          await context.sync();
-
-          matches.push({
-            range,
-            text: range.text,
-            context: paragraph.text.substring(0, 200),
-            confidence: 95,
-            matchType: 'normalized',
-          });
+        let confidence = 95;
+        if (isLongSearch) {
+          confidence = calculateSimilarity(paragraph.text, fullSearchText);
+          if (confidence < 40) continue;
         }
 
-        if (matches.length > 0) return matches;
-      } catch (err) {
-        console.log('Normalized search failed, trying wildcard...', err);
+        matches.push({
+          range,
+          text: range.text,
+          context: paragraph.text.substring(0, 200),
+          confidence,
+          matchType: 'normalized',
+        });
       }
+
+      if (matches.length > 0) {
+        matches.sort((a, b) => b.confidence - a.confidence);
+        return matches;
+      }
+    } catch (err) {
+      console.log('Normalized search failed, trying wildcard...', err);
     }
 
-    // Tier 3: Wildcard pattern search (first few words with wildcards)
+    // Tier 3: Wildcard pattern search (first few significant words)
     const wildcardPattern = createWildcardPattern(searchText);
-    if (wildcardPattern && wildcardPattern.includes('*')) {
+    if (wildcardPattern && wildcardPattern.includes('*') && wildcardPattern.length <= MAX_SEARCH_LENGTH) {
       try {
         const wildcardResults = body.search(wildcardPattern, {
           matchCase: false,
@@ -455,8 +498,8 @@ export default function App() {
           paragraph.load('text');
           await context.sync();
 
-          const similarity = calculateSimilarity(range.text, searchText);
-          if (similarity >= 50) {
+          const similarity = calculateSimilarity(paragraph.text, fullSearchText);
+          if (similarity >= 30) {
             matches.push({
               range,
               text: range.text,
@@ -468,7 +511,6 @@ export default function App() {
         }
 
         if (matches.length > 0) {
-          // Sort by confidence
           matches.sort((a, b) => b.confidence - a.confidence);
           return matches;
         }
@@ -479,7 +521,9 @@ export default function App() {
 
     // Tier 4: Fuzzy/partial match (search for first significant phrase)
     const words = normalizeText(searchText).split(/\s+/);
-    const firstPhrase = words.slice(0, 4).join(' ');
+    // Take more words for better matching, but keep under limit
+    const phraseWords = words.slice(0, Math.min(8, words.length));
+    const firstPhrase = truncateSearchText(phraseWords.join(' '), 100);
     if (firstPhrase.length >= 10) {
       try {
         const fuzzyResults = body.search(firstPhrase, {
@@ -496,11 +540,15 @@ export default function App() {
           paragraph.load('text');
           await context.sync();
 
+          // Calculate actual similarity for fuzzy matches
+          const similarity = calculateSimilarity(paragraph.text, fullSearchText);
+          if (similarity < 25) continue; // Skip very low matches
+
           matches.push({
             range,
             text: range.text,
             context: paragraph.text.substring(0, 200),
-            confidence: 70,
+            confidence: Math.max(similarity, 50), // At least 50% for fuzzy matches that pass threshold
             matchType: 'fuzzy',
           });
         }
