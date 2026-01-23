@@ -298,7 +298,7 @@ export async function sendApprovalRequestEmail(
 
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #38BDF8 0%, #0189CB 100%); padding: 32px; text-align: center;">
-      <img src="https://mars-dashboards.vercel.app/mars-logo-horizontal.png" alt="MARS" width="160" style="display: block; margin: 0 auto 24px; max-width: 160px; height: auto;">
+      <div style="font-size: 28px; font-weight: bold; color: white; margin-bottom: 24px; letter-spacing: 2px;">MARS</div>
       <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
         Contract Approval Request
       </h1>
