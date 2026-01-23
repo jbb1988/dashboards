@@ -147,11 +147,19 @@ export async function POST(request: NextRequest) {
     try {
       await admin.rpc('increment_clause_usage', { clause_uuid: clause_id });
     } catch {
-      // Fallback if function doesn't exist
-      await admin
+      // Fallback if function doesn't exist - get current count and increment
+      const { data: clause } = await admin
         .from('clause_library')
-        .update({ usage_count: admin.sql`usage_count + 1` })
-        .eq('id', clause_id);
+        .select('usage_count')
+        .eq('id', clause_id)
+        .single();
+
+      if (clause) {
+        await admin
+          .from('clause_library')
+          .update({ usage_count: (clause.usage_count || 0) + 1 })
+          .eq('id', clause_id);
+      }
     }
 
     return NextResponse.json({ success: true });
