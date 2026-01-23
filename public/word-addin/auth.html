@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MARS - Sign In</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #1F1F1F;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      text-align: center;
+      padding: 40px;
+    }
+    .logo {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #0078D4, #00BCF2);
+      border-radius: 12px;
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo svg {
+      width: 32px;
+      height: 32px;
+      fill: white;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    p {
+      margin: 0 0 24px;
+      color: #A0A0A0;
+      font-size: 14px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      background: #0078D4;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: #106EBE;
+    }
+    .btn svg {
+      width: 20px;
+      height: 20px;
+    }
+    .spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    .loading .spinner {
+      display: block;
+    }
+    .loading .btn-text {
+      display: none;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .error {
+      color: #F87171;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    </div>
+    <h1>MARS Contract Review</h1>
+    <p>Sign in with your Microsoft account to continue</p>
+    <button class="btn" id="signInBtn" onclick="signIn()">
+      <span class="spinner"></span>
+      <span class="btn-text">
+        <svg viewBox="0 0 23 23">
+          <path fill="#f3f3f3" d="M0 0h11v11H0z"/>
+          <path fill="#f35325" d="M12 0h11v11H12z"/>
+          <path fill="#81bc06" d="M0 12h11v11H0z"/>
+          <path fill="#05a6f0" d="M12 12h11v11H12z"/>
+        </svg>
+        Sign in with Microsoft
+      </span>
+    </button>
+    <div class="error" id="error"></div>
+  </div>
+
+  <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+  <script>
+    const CLIENT_ID = 'YOUR_AZURE_AD_CLIENT_ID'; // Replace with actual client ID
+    const REDIRECT_URI = window.location.origin + '/word-addin/auth-callback.html';
+    const SCOPES = 'openid profile email';
+
+    function signIn() {
+      const btn = document.getElementById('signInBtn');
+      btn.classList.add('loading');
+
+      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
+        `client_id=${CLIENT_ID}` +
+        `&response_type=code` +
+        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+        `&scope=${encodeURIComponent(SCOPES)}` +
+        `&response_mode=query`;
+
+      window.location.href = authUrl;
+    }
+
+    // Check if returning from OAuth
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const error = urlParams.get('error');
+
+    if (error) {
+      document.getElementById('error').textContent = 'Authentication failed: ' + (urlParams.get('error_description') || error);
+    }
+
+    if (code) {
+      // Exchange code for token
+      document.getElementById('signInBtn').classList.add('loading');
+
+      fetch('/api/word-addin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        // Send token back to parent
+        if (Office && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(JSON.stringify({
+            type: 'auth_success',
+            token: data.token,
+            user: data.user
+          }));
+        }
+      })
+      .catch(err => {
+        document.getElementById('error').textContent = 'Authentication failed: ' + err.message;
+        document.getElementById('signInBtn').classList.remove('loading');
+        if (Office && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(JSON.stringify({
+            type: 'auth_error',
+            error: err.message
+          }));
+        }
+      });
+    }
+  </script>
+</body>
+</html>
