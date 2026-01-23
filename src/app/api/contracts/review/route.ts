@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { text, contractId, provisionName, model = 'sonnet', playbookContent } = body;
+    const { text, contractId, provisionName, model, playbookContent } = body;
 
     console.log('Request received:');
     console.log('- Text length:', text?.length || 0);
