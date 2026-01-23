@@ -225,7 +225,7 @@ export default function AITrainingPage() {
                   title="Total Feedback"
                   value={feedbackSummary.total}
                   subtitle="All time"
-                  icon={KPIIcons.chart}
+                  icon={KPIIcons.trending}
                   color="#8B5CF6"
                   delay={0.1}
                 />
