@@ -292,14 +292,18 @@ export default function RedlineEditor({
 
       {/* Editor content */}
       <div
-        className={`bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''}`}
+        className={`bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''} overflow-x-auto`}
         onClick={handleEditorClick}
-        style={{
-          fontSize: `${zoomLevel}%`,
-          transformOrigin: 'top left',
-        }}
       >
-        <EditorContent editor={editor} />
+        <div
+          style={{
+            transform: `scale(${zoomLevel / 100})`,
+            transformOrigin: 'top left',
+            width: `${10000 / zoomLevel}%`,
+          }}
+        >
+          <EditorContent editor={editor} />
+        </div>
       </div>
 
       {/* Read-only toolbar with zoom and download */}
