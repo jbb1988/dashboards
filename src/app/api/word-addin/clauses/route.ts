@@ -144,13 +144,15 @@ export async function POST(request: NextRequest) {
     });
 
     // Increment usage count (trigger should handle this, but backup)
-    await admin.rpc('increment_clause_usage', { clause_uuid: clause_id }).catch(() => {
+    try {
+      await admin.rpc('increment_clause_usage', { clause_uuid: clause_id });
+    } catch {
       // Fallback if function doesn't exist
-      admin
+      await admin
         .from('clause_library')
         .update({ usage_count: admin.sql`usage_count + 1` })
         .eq('id', clause_id);
-    });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
