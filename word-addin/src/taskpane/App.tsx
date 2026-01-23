@@ -134,7 +134,7 @@ declare const Office: typeof globalThis.Office;
 declare const Word: typeof globalThis.Word;
 
 const API_BASE = process.env.NODE_ENV === 'production'
-  ? 'https://mars-contracts.vercel.app'
+  ? 'https://mars-dashboards.vercel.app'
   : 'http://localhost:3000';
 
 // ============================================
