@@ -332,8 +332,14 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
       // Try to extract JSON from the response - find the outermost { }
       let jsonStr = stdout.trim();
 
-      // Strip markdown code blocks if present
-      jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+      // Strip markdown code blocks if present (multiple patterns)
+      jsonStr = jsonStr
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
 
       // Find JSON object boundaries - look for the structure we expect
       const firstBrace = jsonStr.indexOf('{');
@@ -342,14 +348,82 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
       if (firstBrace !== -1 && lastBrace > firstBrace) {
         jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
 
-        // Try to parse
+        // Try multiple parsing strategies
+        let parseSuccess = false;
+        const parseErrors: string[] = [];
+
+        // Strategy 1: Direct parse
         try {
           result = JSON.parse(jsonStr);
-        } catch {
-          // If direct parse fails, try to fix common issues
-          // Sometimes there are unescaped newlines in strings
-          jsonStr = jsonStr.replace(/[\r\n]+/g, '\\n');
-          result = JSON.parse(jsonStr);
+          parseSuccess = true;
+        } catch (e) {
+          parseErrors.push(`Direct: ${e instanceof Error ? e.message : 'unknown'}`);
+        }
+
+        // Strategy 2: Fix control characters in strings
+        if (!parseSuccess) {
+          try {
+            // Replace literal newlines/tabs inside strings with escaped versions
+            // This regex finds strings and escapes control chars within them
+            const fixedJson = jsonStr
+              .replace(/\t/g, '\\t')
+              .replace(/\r/g, '\\r')
+              .replace(/\n/g, '\\n');
+            result = JSON.parse(fixedJson);
+            parseSuccess = true;
+          } catch (e) {
+            parseErrors.push(`ControlChars: ${e instanceof Error ? e.message : 'unknown'}`);
+          }
+        }
+
+        // Strategy 3: Use a more lenient approach - try to extract key fields manually
+        if (!parseSuccess) {
+          try {
+            // Try to extract sections array
+            const sectionsMatch = jsonStr.match(/"sections"\s*:\s*\[([\s\S]*?)\](?=\s*[,}])/);
+            const summaryMatch = jsonStr.match(/"summary"\s*:\s*\[([\s\S]*?)\](?=\s*[,}])/);
+
+            if (sectionsMatch || summaryMatch) {
+              result = {
+                sections: [],
+                summary: []
+              };
+
+              // If we found sections, try to parse them
+              if (sectionsMatch) {
+                try {
+                  const sectionsStr = `[${sectionsMatch[1]}]`;
+                  result.sections = JSON.parse(sectionsStr);
+                } catch {
+                  // Try with newline escaping
+                  const sectionsStr = `[${sectionsMatch[1].replace(/\n/g, '\\n')}]`;
+                  result.sections = JSON.parse(sectionsStr);
+                }
+              }
+
+              // If we found summary, try to parse it
+              if (summaryMatch) {
+                try {
+                  const summaryStr = `[${summaryMatch[1]}]`;
+                  result.summary = JSON.parse(summaryStr);
+                } catch {
+                  const summaryStr = `[${summaryMatch[1].replace(/\n/g, '\\n')}]`;
+                  result.summary = JSON.parse(summaryStr);
+                }
+              }
+
+              parseSuccess = true;
+              console.log('Used fallback extraction for sections/summary');
+            }
+          } catch (e) {
+            parseErrors.push(`Fallback: ${e instanceof Error ? e.message : 'unknown'}`);
+          }
+        }
+
+        if (!parseSuccess) {
+          console.error('All JSON parse strategies failed:', parseErrors);
+          console.log('JSON preview:', jsonStr.substring(0, 1000));
+          throw new Error('Could not parse JSON response');
         }
 
         console.log('Successfully parsed JSON response');
@@ -367,7 +441,7 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
 
       // If JSON parsing fails, return error with more context
       return NextResponse.json(
-        { error: 'AI did not return valid JSON. Try selecting "Quick" mode or try again.' },
+        { error: 'AI analysis failed to return structured data. Please try again.' },
         { status: 500 }
       );
     }
