@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { sendApprovalRequestEmail } from '@/lib/email';
+import { sendApprovalRequestEmail, sendCCNotificationEmail } from '@/lib/email';
 import { randomUUID } from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { reviewId, contractName, submittedBy, summaryPreview, reviewerNotes } = body;
+    const { reviewId, contractName, submittedBy, summaryPreview, reviewerNotes, ccEmails } = body;
 
     // Validate required fields
     if (!reviewId || !contractName || !submittedBy) {
@@ -35,6 +35,9 @@ export async function POST(request: NextRequest) {
     // Generate secure approval token
     const approvalToken = randomUUID();
 
+    // Generate CC token for read-only access
+    const ccToken = randomUUID();
+
     // Set token expiration to 7 days from now
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -49,6 +52,18 @@ export async function POST(request: NextRequest) {
       },
     ];
 
+    // Parse and validate CC emails
+    const validCCEmails: string[] = [];
+    if (ccEmails && typeof ccEmails === 'string') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const emails = ccEmails.split(',').map((e: string) => e.trim()).filter((e: string) => e);
+      for (const email of emails) {
+        if (emailRegex.test(email)) {
+          validCCEmails.push(email.toLowerCase());
+        }
+      }
+    }
+
     // Update contract_reviews with approval data
     const { error: updateError } = await admin
       .from('contract_reviews')
@@ -62,6 +77,8 @@ export async function POST(request: NextRequest) {
         updated_at: submittedAt,
         activity_log: activityLog,
         reviewer_notes: reviewerNotes || null,
+        cc_emails: validCCEmails.length > 0 ? validCCEmails : null,
+        cc_token: validCCEmails.length > 0 ? ccToken : null,
       })
       .eq('id', reviewId);
 
@@ -142,13 +159,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Send CC notification emails
+    let ccEmailsSent = 0;
+    let ccEmailsFailed = 0;
+    if (validCCEmails.length > 0) {
+      const ccEmailResults = await Promise.allSettled(
+        validCCEmails.map(email =>
+          sendCCNotificationEmail(
+            email,
+            contractName,
+            submittedBy,
+            summary,
+            ccToken
+          )
+        )
+      );
+
+      ccEmailsSent = ccEmailResults.filter(
+        result => result.status === 'fulfilled' && result.value.success
+      ).length;
+
+      ccEmailsFailed = validCCEmails.length - ccEmailsSent;
+
+      // Add CC recipients to activity log
+      if (ccEmailsSent > 0) {
+        await admin
+          .from('contract_reviews')
+          .update({
+            activity_log: [
+              ...activityLog,
+              {
+                action: 'cc_sent',
+                by: submittedBy,
+                at: new Date().toISOString(),
+                recipients: validCCEmails,
+              },
+            ],
+          })
+          .eq('id', reviewId);
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Approval request sent to ${successCount} admin(s)`,
+      message: `Approval request sent to ${successCount} admin(s)${ccEmailsSent > 0 ? ` and CC'd ${ccEmailsSent} recipient(s)` : ''}`,
       reviewId,
       approvalToken, // For testing/debugging
       emailsSent: successCount,
       emailsFailed: failures.length,
+      ccEmailsSent,
+      ccEmailsFailed,
     });
 
   } catch (error) {

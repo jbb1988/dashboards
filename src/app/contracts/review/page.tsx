@@ -17,12 +17,25 @@ interface Contract {
   contractType: string[];
 }
 
+interface RiskScores {
+  summary: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+  sections: Array<{
+    sectionTitle: string;
+    riskLevel: 'high' | 'medium' | 'low';
+  }>;
+}
+
 interface ReviewResult {
   redlinedText: string;
   originalText: string;
   modifiedText: string;
   summary: string[];
   timestamp: string;
+  riskScores?: RiskScores;
 }
 
 interface ReviewHistory {
@@ -202,11 +215,41 @@ function ContractReviewPageContent() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch contracts and history on mount
+  // Fetch contracts, history, and playbooks on mount
   useEffect(() => {
     fetchContracts();
     fetchHistory();
+    fetchPlaybooks();
   }, []);
+
+  async function fetchPlaybooks() {
+    try {
+      const response = await fetch('/api/playbooks');
+      if (response.ok) {
+        const data = await response.json();
+        setPlaybooks(data.playbooks || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch playbooks:', err);
+    }
+  }
+
+  async function fetchPlaybookContent(playbookId: string) {
+    if (!playbookId) {
+      setPlaybookContent('');
+      return;
+    }
+    try {
+      const response = await fetch(`/api/playbooks/${playbookId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPlaybookContent(data.playbook?.content || '');
+      }
+    } catch (err) {
+      console.error('Failed to fetch playbook content:', err);
+      setPlaybookContent('');
+    }
+  }
 
   // Handle reviewId from URL query params (from "View Full Review" button)
   useEffect(() => {
@@ -292,6 +335,7 @@ function ContractReviewPageContent() {
           contractId: selectedContract || undefined,
           provisionName: provisionName || undefined,
           model: selectedModel,
+          playbookContent: playbookContent || undefined,
         }),
       });
 
@@ -441,6 +485,17 @@ function ContractReviewPageContent() {
   const [isSendingApproval, setIsSendingApproval] = useState(false);
   const [lastReviewId, setLastReviewId] = useState<string | null>(null);
   const [reviewerNotes, setReviewerNotes] = useState('');
+  const [ccEmails, setCcEmails] = useState('');
+
+  // State for playbook comparison
+  interface PlaybookOption {
+    id: string;
+    name: string;
+    current_version: number;
+  }
+  const [playbooks, setPlaybooks] = useState<PlaybookOption[]>([]);
+  const [selectedPlaybook, setSelectedPlaybook] = useState<string>('');
+  const [playbookContent, setPlaybookContent] = useState<string>('');
 
   async function handleSendForApproval() {
     if (!result || !selectedContract || !provisionName.trim()) {
@@ -469,6 +524,7 @@ function ContractReviewPageContent() {
             redlined_text: result.redlinedText,
             modified_text: result.modifiedText || '',
             summary: result.summary,
+            risk_scores: result.riskScores || null,
             status: 'draft',
           }),
         });
@@ -492,13 +548,15 @@ function ContractReviewPageContent() {
           submittedBy: userEmail,
           summaryPreview: result.summary.slice(0, 5),
           reviewerNotes: reviewerNotes.trim() || null,
+          ccEmails: ccEmails.trim() || null,
         }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        alert(`Approval request sent to ${data.emailsSent} admin(s)!`);
+        const ccMsg = data.ccEmailsSent > 0 ? ` and CC'd ${data.ccEmailsSent} recipient(s)` : '';
+        alert(`Approval request sent to ${data.emailsSent} admin(s)${ccMsg}!`);
         // Refresh history to show new status
         await fetchHistory();
       } else {
@@ -1206,6 +1264,36 @@ function ContractReviewPageContent() {
               </div>
             </div>
 
+            {/* Playbook Comparison */}
+            {playbooks.length > 0 && (
+              <div className="mb-4 p-3 bg-[#8B5CF6]/10 border border-[#8B5CF6]/20 rounded-lg">
+                <label className="flex items-center gap-2 text-[#A78BFA] text-sm font-medium mb-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  Compare Against Playbook (Optional)
+                </label>
+                <select
+                  value={selectedPlaybook}
+                  onChange={(e) => {
+                    setSelectedPlaybook(e.target.value);
+                    fetchPlaybookContent(e.target.value);
+                  }}
+                  className="w-full bg-[#0B1220] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/50"
+                >
+                  <option value="">-- No playbook comparison --</option>
+                  {playbooks.map((pb) => (
+                    <option key={pb.id} value={pb.id}>
+                      {pb.name} (v{pb.current_version})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-[#64748B] mt-1">
+                  AI will highlight deviations from your standard terms
+                </p>
+              </div>
+            )}
+
             {/* Tab Navigation */}
             <div className="flex gap-2 mb-4">
               <button
@@ -1632,6 +1720,38 @@ function ContractReviewPageContent() {
                   </div>
                 </div>
 
+                {/* Risk Score Summary */}
+                {result.riskScores && (result.riskScores.summary.high > 0 || result.riskScores.summary.medium > 0 || result.riskScores.summary.low > 0) && (
+                  <div className="p-4 rounded-lg bg-[#0B1220] border border-white/10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-5 h-5 text-[#F59E0B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span className="text-white font-medium">Risk Assessment</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {result.riskScores.summary.high > 0 && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-full">
+                          <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                          <span className="text-red-400 text-sm font-medium">{result.riskScores.summary.high} High Risk</span>
+                        </div>
+                      )}
+                      {result.riskScores.summary.medium > 0 && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 border border-yellow-500/30 rounded-full">
+                          <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                          <span className="text-yellow-400 text-sm font-medium">{result.riskScores.summary.medium} Medium</span>
+                        </div>
+                      )}
+                      {result.riskScores.summary.low > 0 && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 border border-green-500/30 rounded-full">
+                          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                          <span className="text-green-400 text-sm font-medium">{result.riskScores.summary.low} Low</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* View Comparison Button - PRIMARY ACTION */}
                 <button
                   onClick={handleViewAnalysisComparison}
@@ -1692,9 +1812,32 @@ function ContractReviewPageContent() {
                         const provision = match ? match[1] : null;
                         const text = match ? match[2] : item;
 
+                        // Find risk level for this provision
+                        let riskLevel: 'high' | 'medium' | 'low' | null = null;
+                        if (provision && result.riskScores?.sections) {
+                          const section = result.riskScores.sections.find(
+                            s => s.sectionTitle.toLowerCase().includes(provision.toLowerCase()) ||
+                                 provision.toLowerCase().includes(s.sectionTitle.toLowerCase())
+                          );
+                          if (section) {
+                            riskLevel = section.riskLevel;
+                          }
+                        }
+
                         return (
                           <li key={idx} className="flex items-start gap-2 text-sm text-[#CBD5E1]">
-                            <span className="text-[#38BDF8] mt-1">•</span>
+                            {/* Risk Badge */}
+                            {riskLevel ? (
+                              <span className={`mt-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                                riskLevel === 'high' ? 'bg-red-500/20 text-red-400' :
+                                riskLevel === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                                'bg-green-500/20 text-green-400'
+                              }`}>
+                                {riskLevel === 'high' ? 'HIGH' : riskLevel === 'medium' ? 'MED' : 'LOW'}
+                              </span>
+                            ) : (
+                              <span className="text-[#38BDF8] mt-1">•</span>
+                            )}
                             <span>
                               {provision && (
                                 <span className="text-[#F59E0B] font-medium">[{provision}]</span>
@@ -1801,6 +1944,26 @@ function ContractReviewPageContent() {
                   />
                   <p className="text-[10px] text-[#64748B] mt-1">
                     These notes will be visible to the approver in the Summary section
+                  </p>
+                </div>
+
+                {/* CC Others Section */}
+                <div className="mt-4 p-4 bg-[#0B1220] border border-[#8B5CF6]/30 rounded-lg">
+                  <label className="flex items-center gap-2 text-[#A78BFA] text-sm font-medium mb-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    CC Others (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={ccEmails}
+                    onChange={(e) => setCcEmails(e.target.value)}
+                    placeholder="email1@example.com, email2@example.com"
+                    className="w-full px-3 py-2 bg-[#151F2E] border border-white/10 rounded-lg text-white text-sm placeholder-[#64748B] focus:outline-none focus:border-[#8B5CF6]/50"
+                  />
+                  <p className="text-[10px] text-[#64748B] mt-1">
+                    CC'd parties receive notification emails and can view (read-only) but cannot approve/reject
                   </p>
                 </div>
 

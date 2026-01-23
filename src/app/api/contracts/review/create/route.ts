@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
       redlined_text,
       modified_text,
       summary,
+      risk_scores,
       status = 'draft',
     } = body;
 
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
         redlined_text,
         modified_text: modified_text || null,
         summary: summary || [],
+        risk_scores: risk_scores || null,
         status,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

@@ -377,3 +377,123 @@ export async function sendApprovalRequestEmail(
     return { success: false, error: err instanceof Error ? err.message : 'Failed to send email' };
   }
 }
+
+/**
+ * Send CC notification email (read-only access)
+ * CC'd parties can view the contract and comments but cannot approve/reject
+ */
+export async function sendCCNotificationEmail(
+  ccEmail: string,
+  contractName: string,
+  submittedBy: string,
+  summaryPreview: string[],
+  ccToken: string
+): Promise<{ success: boolean; error?: string }> {
+  const viewUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mars-dashboards.vercel.app'}/contracts/review/cc/${ccToken}`;
+
+  try {
+    const resend = getResendClient();
+    const { data, error } = await resend.emails.send({
+      from: `${FROM_NAME} Legal <${FROM_EMAIL}>`,
+      to: [ccEmail],
+      subject: `FYI: Contract Review - ${contractName}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contract Review Notification</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0B1220;">
+  <div style="max-width: 600px; margin: 40px auto; background-color: #151F2E; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; overflow: hidden;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); padding: 32px; text-align: center;">
+      <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
+        Contract Review Notification
+      </h1>
+      <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
+        You have been copied on this contract review
+      </p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 32px;">
+
+      <!-- Contract Info -->
+      <div style="background-color: #0B1220; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <h2 style="margin: 0 0 12px 0; color: white; font-size: 18px; font-weight: 600;">
+          ${contractName}
+        </h2>
+        <p style="margin: 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">Submitted by:</strong> ${submittedBy}
+        </p>
+        <p style="margin: 8px 0 0 0; color: #8FA3BF; font-size: 14px;">
+          <strong style="color: white;">Date:</strong> ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+        </p>
+      </div>
+
+      <!-- CC Notice -->
+      <div style="background-color: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <p style="margin: 0; color: #A78BFA; font-size: 14px;">
+          <strong>📋 You are CC'd on this review</strong><br>
+          <span style="color: #8FA3BF; font-size: 13px;">You can view the contract and comments, but approval/rejection is handled by the assigned reviewer.</span>
+        </p>
+      </div>
+
+      <!-- AI Summary -->
+      <div style="margin-bottom: 24px;">
+        <h3 style="margin: 0 0 12px 0; color: white; font-size: 16px; font-weight: 600;">
+          AI Analysis Summary
+        </h3>
+        <div style="background-color: #0B1220; border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; padding: 16px;">
+          <ul style="margin: 0; padding-left: 20px; color: #8FA3BF; font-size: 14px; line-height: 1.8;">
+            ${summaryPreview.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+          ${summaryPreview.length >= 5 ? '<p style="margin: 12px 0 0 0; color: #38BDF8; font-size: 13px;">+ More changes in full review</p>' : ''}
+        </div>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${viewUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); color: white; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">
+          View Contract Review
+        </a>
+      </div>
+
+      <!-- Link Expiry Notice -->
+      <p style="margin: 24px 0 0 0; padding: 16px; background-color: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; color: #8FA3BF; font-size: 13px; text-align: center;">
+        ⏱️ This link expires in 7 days
+      </p>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #0B1220; padding: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
+      <p style="margin: 0; color: #64748B; font-size: 12px;">
+        <span style="color: #0189CB; font-weight: 600;">MARS</span> Company Confidential • Executive Dashboards
+      </p>
+      <p style="margin: 8px 0 0 0; color: #64748B; font-size: 11px;">
+        If you didn't expect this email, please contact your legal team.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+      `,
+    });
+
+    if (error) {
+      console.error('CC notification email send error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('CC notification email sent:', data?.id);
+    return { success: true };
+  } catch (err) {
+    console.error('CC notification email send exception:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to send email' };
+  }
+}

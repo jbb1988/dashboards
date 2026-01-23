@@ -131,6 +131,7 @@ OUTPUT FORMAT:
       "sectionNumber": "6",
       "sectionTitle": "Indemnification",
       "materiality": "high",
+      "riskLevel": "high",
       "originalText": "Copy the EXACT text from the contract that needs changing - must match character-for-character so we can find it",
       "revisedText": "The clean revised text WITHOUT any markdown formatting - plain text only",
       "rationale": "One sentence explaining why this change protects MARS"
@@ -147,6 +148,11 @@ MATERIALITY LEVELS:
 - "high" = Must negotiate or walk away (unlimited liability, one-sided indemnity, IP ownership)
 - "medium" = Should negotiate (audit scope, termination notice, dispute resolution)
 - "low" = Nice to have but not dealbreaker
+
+RISK LEVELS (for riskLevel field):
+- "high" (Red) = Changes to liability, indemnification, IP/work product, termination for cause, insurance requirements
+- "medium" (Yellow) = Changes to payment terms, warranties, confidentiality periods, audit rights, dispute resolution
+- "low" (Green) = Formatting changes, word choices, minor clarifications, notice periods, standard boilerplate
 
 CRITICAL RULES:
 - Only flag sections that are MATERIALLY unfavorable - skip standard government boilerplate
@@ -166,13 +172,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { text, contractId, provisionName, model = 'sonnet' } = body;
+    const { text, contractId, provisionName, model = 'sonnet', playbookContent } = body;
 
     console.log('Request received:');
     console.log('- Text length:', text?.length || 0);
     console.log('- Contract ID:', contractId || 'none');
     console.log('- Provision:', provisionName || 'none');
     console.log('- Model:', model);
+    console.log('- Playbook comparison:', playbookContent ? `${playbookContent.length} chars` : 'none');
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return NextResponse.json(
@@ -198,7 +205,24 @@ export async function POST(request: NextRequest) {
     const hasSmartQuotesAfter = /[\u201C\u201D\u2018\u2019]/.test(normalizedInput);
     console.log(`[NORMALIZATION] Input had smart quotes: ${hasSmartQuotes}, After normalization: ${hasSmartQuotesAfter}`);
 
-    const fullPrompt = MARS_CONTRACT_PROMPT + normalizedInput;
+    // Build the full prompt - optionally include playbook comparison
+    let fullPrompt = MARS_CONTRACT_PROMPT + normalizedInput;
+
+    if (playbookContent && typeof playbookContent === 'string' && playbookContent.trim().length > 0) {
+      const normalizedPlaybook = normalizeToASCII(playbookContent);
+      const playbookComparisonPrompt = `
+
+PLAYBOOK COMPARISON:
+The following is MARS's standard agreement template (playbook). Compare the contract above against this playbook and highlight any deviations from MARS's standard terms. Prioritize flagging clauses where the counterparty's version is LESS favorable than MARS's standard position.
+
+MARS PLAYBOOK:
+${normalizedPlaybook}
+
+When analyzing, note in the rationale if a change brings the contract CLOSER to MARS standard terms (good) or FURTHER from them (concerning).`;
+
+      fullPrompt = MARS_CONTRACT_PROMPT + normalizedInput + playbookComparisonPrompt;
+      console.log('Added playbook comparison to prompt');
+    }
 
     // Call OpenRouter API - use model ID directly from frontend
     const openRouterModel = model || DEFAULT_MODEL;
@@ -426,6 +450,29 @@ export async function POST(request: NextRequest) {
       console.warn(`Length difference: ${modifiedText.length - normalizedInput.length} chars`);
     }
 
+    // Calculate risk scores summary
+    const riskScores = {
+      summary: {
+        high: 0,
+        medium: 0,
+        low: 0,
+      },
+      sections: sections.map((s: { sectionTitle?: string; sectionNumber?: string; riskLevel?: string; materiality?: string }) => ({
+        sectionTitle: s.sectionTitle || s.sectionNumber || 'Unknown',
+        riskLevel: (s.riskLevel || s.materiality || 'medium').toLowerCase() as 'high' | 'medium' | 'low',
+      })),
+    };
+
+    // Count risk levels
+    for (const section of sections) {
+      const risk = (section.riskLevel || section.materiality || 'medium').toLowerCase();
+      if (risk === 'high') riskScores.summary.high++;
+      else if (risk === 'medium') riskScores.summary.medium++;
+      else riskScores.summary.low++;
+    }
+
+    console.log(`Risk scores: ${riskScores.summary.high} high, ${riskScores.summary.medium} medium, ${riskScores.summary.low} low`);
+
     return NextResponse.json({
       redlinedText,
       originalText: normalizedInput,  // Normalized for ORIGINAL-PLAIN.docx
@@ -433,6 +480,7 @@ export async function POST(request: NextRequest) {
       summary: result.summary,
       sections, // NEW: Structured section-by-section analysis
       hasVisibleChanges, // NEW: Flag to indicate if diff found changes
+      riskScores, // NEW: Risk scoring for each section
       contractId,
       provisionName,
     });

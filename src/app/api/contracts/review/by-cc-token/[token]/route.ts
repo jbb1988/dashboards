@@ -17,16 +17,16 @@ export async function GET(
 
     const admin = getSupabaseAdmin();
 
-    // Fetch review by approval token
+    // Fetch review by CC token
     const { data: review, error } = await admin
       .from('contract_reviews')
       .select('*')
-      .eq('approval_token', token)
+      .eq('cc_token', token)
       .single();
 
     if (error || !review) {
       return NextResponse.json(
-        { error: 'Invalid approval link. The token may be incorrect.' },
+        { error: 'Invalid link. The token may be incorrect.' },
         { status: 404 }
       );
     }
@@ -35,45 +35,40 @@ export async function GET(
     if (review.token_expires_at) {
       const expiresAt = new Date(review.token_expires_at);
       if (expiresAt < new Date()) {
-        // Mark as expired in database
-        await admin
-          .from('contract_reviews')
-          .update({ approval_status: 'expired', updated_at: new Date().toISOString() })
-          .eq('id', review.id);
-
         return NextResponse.json(
-          { error: 'This approval link has expired. Please request a new approval.' },
+          { error: 'This link has expired.' },
           { status: 410 } // Gone
         );
       }
     }
 
-    // Log view activity when approval is accessed (only once - first view)
-    if (review.approval_status === 'pending') {
-      const currentLog = review.activity_log || [];
-      // Only log first view (no existing 'viewed' entries)
-      const hasBeenViewed = currentLog.some(
-        (entry: { action: string }) => entry.action === 'viewed'
-      );
+    // Get viewer email from query param for tracking
+    const viewerEmail = request.nextUrl.searchParams.get('viewer');
 
-      if (!hasBeenViewed) {
-        const viewEntry = {
-          action: 'viewed',
-          by: 'Approver',
-          at: new Date().toISOString(),
-        };
+    // Log CC view activity
+    const currentLog = review.activity_log || [];
+    const ccViewedBy = review.cc_viewed_by || [];
 
-        await admin
-          .from('contract_reviews')
-          .update({
-            activity_log: [...currentLog, viewEntry],
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', review.id);
+    // Track this viewer if email provided and not already tracked
+    if (viewerEmail && !ccViewedBy.includes(viewerEmail.toLowerCase())) {
+      const viewEntry = {
+        action: 'cc_viewed',
+        by: viewerEmail,
+        at: new Date().toISOString(),
+      };
 
-        // Update local review object for response
-        review.activity_log = [...currentLog, viewEntry];
-      }
+      await admin
+        .from('contract_reviews')
+        .update({
+          activity_log: [...currentLog, viewEntry],
+          cc_viewed_at: review.cc_viewed_at || new Date().toISOString(),
+          cc_viewed_by: [...ccViewedBy, viewerEmail.toLowerCase()],
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', review.id);
+
+      // Update local review object for response
+      review.activity_log = [...currentLog, viewEntry];
     }
 
     // Fetch related documents (by contract_id or salesforce_id)
@@ -88,14 +83,12 @@ export async function GET(
     }> = [];
 
     if (review.contract_id) {
-      // Try contract_id first (UUID), then salesforce_id (Salesforce ID string)
       let { data: docs } = await admin
         .from('documents')
         .select('id, file_name, file_url, document_type, uploaded_at, file_mime_type, converted_pdf_url')
         .eq('salesforce_id', review.contract_id)
         .order('uploaded_at', { ascending: false });
 
-      // If no docs found by salesforce_id, try contract_id (for UUID references)
       if (!docs || docs.length === 0) {
         const result = await admin
           .from('documents')
@@ -115,7 +108,7 @@ export async function GET(
       .eq('review_id', review.id)
       .order('created_at', { ascending: true });
 
-    // Return review data with documents and comments
+    // Return review data with documents and comments (read-only view)
     return NextResponse.json({
       id: review.id,
       contractId: review.contract_id,
@@ -148,10 +141,12 @@ export async function GET(
         comment: c.comment,
         createdAt: c.created_at,
       })),
+      // Indicate this is a CC view (read-only)
+      isCCView: true,
     });
 
   } catch (error) {
-    console.error('Error fetching review by token:', error);
+    console.error('Error fetching review by CC token:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

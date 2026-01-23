@@ -2,6 +2,18 @@
 
 import { motion } from 'framer-motion';
 
+interface RiskScores {
+  summary: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+  sections: Array<{
+    sectionTitle: string;
+    riskLevel: 'high' | 'medium' | 'low';
+  }>;
+}
+
 interface ApprovalHeaderProps {
   contractName: string;
   provisionName: string;
@@ -15,6 +27,7 @@ interface ApprovalHeaderProps {
   submitting: boolean;
   hasEdits: boolean;
   readOnly: boolean;
+  riskScores?: RiskScores | null;
 }
 
 function formatDate(dateString: string) {
@@ -38,6 +51,7 @@ export default function ApprovalHeader({
   submitting,
   hasEdits,
   readOnly,
+  riskScores,
 }: ApprovalHeaderProps) {
   const getStatusBadge = () => {
     switch (status) {
@@ -79,6 +93,26 @@ export default function ApprovalHeader({
           <span className="px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
             Edited
           </span>
+        )}
+        {/* Risk Score Badges */}
+        {riskScores && (riskScores.summary.high > 0 || riskScores.summary.medium > 0 || riskScores.summary.low > 0) && (
+          <div className="hidden lg:flex items-center gap-1.5">
+            {riskScores.summary.high > 0 && (
+              <span className="px-2 py-1 text-xs font-medium rounded bg-red-500/20 text-red-400 border border-red-500/30">
+                {riskScores.summary.high} High
+              </span>
+            )}
+            {riskScores.summary.medium > 0 && (
+              <span className="px-2 py-1 text-xs font-medium rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                {riskScores.summary.medium} Med
+              </span>
+            )}
+            {riskScores.summary.low > 0 && (
+              <span className="px-2 py-1 text-xs font-medium rounded bg-green-500/20 text-green-400 border border-green-500/30">
+                {riskScores.summary.low} Low
+              </span>
+            )}
+          </div>
         )}
       </div>
 

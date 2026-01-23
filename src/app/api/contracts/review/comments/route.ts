@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-// GET: Fetch comments for a review (by review_id or token)
+// GET: Fetch comments for a review (by review_id, token, or cc_token)
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const reviewId = searchParams.get('reviewId');
     const token = searchParams.get('token');
+    const ccToken = searchParams.get('cc_token');
 
-    if (!reviewId && !token) {
+    if (!reviewId && !token && !ccToken) {
       return NextResponse.json(
-        { error: 'Either reviewId or token is required' },
+        { error: 'Either reviewId, token, or cc_token is required' },
         { status: 400 }
       );
     }
@@ -29,6 +30,23 @@ export async function GET(request: NextRequest) {
       if (reviewError || !review) {
         return NextResponse.json(
           { error: 'Invalid token' },
+          { status: 404 }
+        );
+      }
+      actualReviewId = review.id;
+    }
+
+    // If cc_token provided, look up the review by cc_token
+    if (ccToken && !reviewId && !token) {
+      const { data: review, error: reviewError } = await admin
+        .from('contract_reviews')
+        .select('id')
+        .eq('cc_token', ccToken)
+        .single();
+
+      if (reviewError || !review) {
+        return NextResponse.json(
+          { error: 'Invalid CC token' },
           { status: 404 }
         );
       }
@@ -68,7 +86,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { reviewId, token, authorEmail, authorName, comment } = body;
+    const { reviewId, token, cc_token, authorEmail, authorName, comment } = body;
 
     if (!comment?.trim()) {
       return NextResponse.json(
@@ -84,9 +102,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!reviewId && !token) {
+    if (!reviewId && !token && !cc_token) {
       return NextResponse.json(
-        { error: 'Either reviewId or token is required' },
+        { error: 'Either reviewId, token, or cc_token is required' },
         { status: 400 }
       );
     }
@@ -115,6 +133,35 @@ export async function POST(request: NextRequest) {
         if (expiresAt < new Date()) {
           return NextResponse.json(
             { error: 'This approval link has expired' },
+            { status: 410 }
+          );
+        }
+      }
+
+      actualReviewId = review.id;
+    }
+
+    // If cc_token provided, look up the review by cc_token
+    if (cc_token && !reviewId && !token) {
+      const { data: review, error: reviewError } = await admin
+        .from('contract_reviews')
+        .select('id, token_expires_at')
+        .eq('cc_token', cc_token)
+        .single();
+
+      if (reviewError || !review) {
+        return NextResponse.json(
+          { error: 'Invalid CC token' },
+          { status: 404 }
+        );
+      }
+
+      // Check if token has expired
+      if (review.token_expires_at) {
+        const expiresAt = new Date(review.token_expires_at);
+        if (expiresAt < new Date()) {
+          return NextResponse.json(
+            { error: 'This link has expired' },
             { status: 410 }
           );
         }
