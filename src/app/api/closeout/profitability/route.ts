@@ -254,11 +254,6 @@ export async function GET(request: Request) {
     const actualRevenue = excelProjects.reduce((sum, p) => sum + (p.actual_revenue || 0), 0);
     const actualCost = excelProjects.reduce((sum, p) => sum + (p.actual_cost || 0), 0);
 
-    // Get list of project_types from filtered projects (to filter SO line items)
-    const allowedProjectTypes = new Set(
-      excelProjects.map(p => p.project_type).filter(Boolean)
-    );
-
     // STEP 2: Get all work orders for this project
     const { data: excelWOs } = await supabase
       .from('closeout_work_orders')
@@ -380,6 +375,17 @@ export async function GET(request: Request) {
       }
     }
 
+    // Collect item IDs from filtered work orders - these are the ONLY items we should count in SOs
+    // This ensures we only sum SO revenue for items that are actually part of this engagement (month)
+    const workOrderItemIds = new Set<string>();
+    for (const wo of workOrders) {
+      for (const line of wo.lineItems) {
+        if (line.itemId) {
+          workOrderItemIds.add(line.itemId);
+        }
+      }
+    }
+
     // STEP 4: Fetch Sales Orders with enhanced line items (including account info)
     const salesOrders: LinkedSalesOrder[] = [];
 
@@ -461,9 +467,10 @@ export async function GET(request: Request) {
             };
           })
           .filter(line => {
-            // Only include line items for project_types in this filtered engagement
-            // This prevents summing Feb + June line items when filtering to just June
-            return allowedProjectTypes.size === 0 || allowedProjectTypes.has(line.productType);
+            // CRITICAL: Only include SO line items that match items in the filtered Work Orders
+            // This ensures we only count revenue for items actually part of this engagement (month)
+            // Example: June WO has MCC service items → only count those MCC items in SO, not Feb items
+            return workOrderItemIds.size === 0 || workOrderItemIds.has(line.itemId);
           });
 
           // Group lines by product type
@@ -556,14 +563,9 @@ export async function GET(request: Request) {
       ? workOrders.reduce((sum, wo) => sum + (wo.totals.totalActualCost || 0), 0)
       : netsuiteCostEstimate;
 
-    // CRITICAL: When filtering by month, use Excel actualRevenue for KPIs
-    // Why? SO line items don't have month info - can't distinguish which MCC items are June vs other months
-    // NetSuite revenue would include ALL MCC items across all months in that SO
-    const displayRevenue = month ? actualRevenue : netsuiteRevenue;
-
     const effectiveCost = woActualCosts.length > 0 ? netsuiteActualCost : netsuiteCostEstimate;
-    const grossProfit = displayRevenue - effectiveCost;
-    const grossMarginPct = displayRevenue > 0 ? (grossProfit / displayRevenue) * 100 : 0;
+    const grossProfit = netsuiteRevenue - effectiveCost;
+    const grossMarginPct = netsuiteRevenue > 0 ? (grossProfit / netsuiteRevenue) * 100 : 0;
     const cpi = actualCost > 0 ? budgetCost / actualCost : 1;
 
     // STEP 6: Get sync status
@@ -590,7 +592,7 @@ export async function GET(request: Request) {
         customerName: salesOrders[0]?.customerName || null,
       },
       kpis: {
-        revenue: displayRevenue,
+        revenue: netsuiteRevenue,
         cost: effectiveCost,
         grossProfit,
         grossMarginPct,
