@@ -28,7 +28,7 @@ interface ProjectSummary {
 }
 
 interface ProjectBrowserProps {
-  onSelectProject: (project: string, year?: number) => void;
+  onSelectProject: (project: string, year?: number, month?: number, type?: string) => void;
 }
 
 type TabType = 'recent' | 'all' | 'mcc' | 'at-risk' | 'high-value';
@@ -317,7 +317,12 @@ export default function ProjectBrowser({ onSelectProject }: ProjectBrowserProps)
                     {yearProjects.map(project => (
                       <div
                         key={`${project.name}-${year}`}
-                        onClick={() => onSelectProject(project.name, year)}
+                        onClick={() => onSelectProject(
+                          project.name,
+                          year,
+                          project.latestMonth || undefined,
+                          project.projectType || undefined
+                        )}
                         className="flex items-center justify-between p-3 bg-gray-800/30 hover:bg-gray-700/50 rounded-lg cursor-pointer transition-colors group"
                       >
                         {/* Left: Status + Name */}
@@ -328,26 +333,17 @@ export default function ProjectBrowser({ onSelectProject }: ProjectBrowserProps)
                             isRecent={project.isRecent && !project.isAtRisk && !project.isHighValue}
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-semibold text-gray-200 group-hover:text-white transition-colors truncate">
-                                {project.name}
-                              </h4>
-                              {project.multipleEngagements && (
-                                <span
-                                  className="px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[10px] font-medium rounded-full whitespace-nowrap"
-                                  title={`${project.engagementCount} separate engagements - use Month/Type filters to view individually`}
-                                >
-                                  {project.engagementCount}x
+                            <h4 className="font-semibold text-gray-200 group-hover:text-white transition-colors truncate">
+                              {project.name}
+                            </h4>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              {project.projectType && (
+                                <span className="px-2 py-0.5 bg-gray-700/50 rounded text-gray-300 font-medium">
+                                  {project.projectType}
                                 </span>
                               )}
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              {project.projectType && <span>{project.projectType}</span>}
-                              {project.projectType && <span>•</span>}
-                              <span>{formatMonth(project.latestMonth, project.latestYear)}</span>
-                              {project.multipleEngagements && (
-                                <span className="text-blue-400">• Multiple entries</span>
-                              )}
+                              <span>•</span>
+                              <span className="font-medium text-gray-400">{formatMonth(project.latestMonth, project.latestYear)}</span>
                             </div>
                           </div>
                         </div>

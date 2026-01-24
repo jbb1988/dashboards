@@ -317,14 +317,24 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     setData(null);
   };
 
-  const handleBrowserSelection = (project: string, selectedYear?: number) => {
+  const handleBrowserSelection = (
+    project: string,
+    selectedYear?: number,
+    selectedMonth?: number,
+    selectedType?: string
+  ) => {
     setSearchInput(project);
     setProjectName(project);
     setYear(selectedYear || '');
-    setMonth('');
-    setProjectType('');
+    setMonth(selectedMonth || '');
+    setProjectType(selectedType || '');
     setShowBrowser(false);
-    fetchData(project, selectedYear || '', '', '');
+    fetchData(
+      project,
+      selectedYear || '',
+      selectedMonth || '',
+      selectedType || ''
+    );
   };
 
   const handleRefresh = async () => {

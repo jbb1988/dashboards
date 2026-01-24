@@ -67,54 +67,35 @@ export async function GET(request: Request) {
       }, { status: 500 });
     }
 
-    // Group by project name and calculate summary metrics
-    const projectMap = new Map<string, ProjectData[]>();
-
-    for (const row of projects || []) {
-      if (!row.project_name) continue;
-
-      if (!projectMap.has(row.project_name)) {
-        projectMap.set(row.project_name, []);
-      }
-      projectMap.get(row.project_name)!.push(row as ProjectData);
-    }
-
     // Get current year for recent projects filter
     const currentYear = new Date().getFullYear();
 
-    // Convert to enhanced project summaries
-    let projectList: ProjectSummary[] = Array.from(projectMap.entries()).map(([name, yearData]) => {
-      // Sort by year descending to get most recent first
-      const sortedData = yearData.sort((a, b) => b.project_year - a.project_year);
-      const mostRecent = sortedData[0];
-      // Deduplicate years using Set
-      const years = Array.from(new Set(sortedData.map(d => d.project_year))).sort((a, b) => b - a);
+    // Treat each engagement as a separate project - DO NOT AGGREGATE
+    // Each row in closeout_projects represents a distinct project/engagement
+    let projectList: ProjectSummary[] = (projects || [])
+      .filter(row => row.project_name) // Filter out null names
+      .map((row) => {
+        const revenue = row.actual_revenue || 0;
+        const gpm = row.actual_gp_pct || 0;
+        const variance = row.variance || 0;
 
-      const recentRevenue = mostRecent.actual_revenue || 0;
-      const recentGPM = mostRecent.actual_gp_pct || 0;
-      const recentVariance = mostRecent.variance || 0;
-
-      // Check if project has multiple engagements (different month/type combinations)
-      const engagementCount = yearData.length;
-      const multipleEngagements = engagementCount > 1;
-
-      return {
-        name,
-        years,
-        latestYear: mostRecent.project_year,
-        latestMonth: mostRecent.project_month || null,
-        projectType: mostRecent.project_type || '',
-        recentRevenue,
-        recentGPM,
-        recentVariance,
-        isAtRisk: recentGPM < 50 || recentVariance < -10000,
-        isHighValue: recentRevenue > 500000,
-        isRecent: mostRecent.project_year >= 2024 && mostRecent.project_year <= currentYear,
-        hasData: recentRevenue > 0,
-        multipleEngagements,
-        engagementCount,
-      };
-    });
+        return {
+          name: row.project_name,
+          years: [row.project_year], // Single year since this is one engagement
+          latestYear: row.project_year,
+          latestMonth: row.project_month || null,
+          projectType: row.project_type || '',
+          recentRevenue: revenue,
+          recentGPM: gpm,
+          recentVariance: variance,
+          isAtRisk: gpm < 50 || variance < -10000,
+          isHighValue: revenue > 500000,
+          isRecent: row.project_year >= 2024 && row.project_year <= currentYear,
+          hasData: revenue > 0,
+          multipleEngagements: false, // No longer applicable - each is separate
+          engagementCount: 1, // Each entry is exactly one engagement
+        };
+      });
 
     // Apply category filter
     if (category) {
@@ -137,47 +118,43 @@ export async function GET(request: Request) {
       }
     }
 
-    // Calculate stats (before filtering to get all counts)
-    const allProjects = Array.from(projectMap.entries()).map(([name, yearData]) => {
-      const sortedData = yearData.sort((a, b) => b.project_year - a.project_year);
-      const mostRecent = sortedData[0];
-      const years = Array.from(new Set(sortedData.map(d => d.project_year))).sort((a, b) => b - a);
-      const recentRevenue = mostRecent.actual_revenue || 0;
-      const recentGPM = mostRecent.actual_gp_pct || 0;
-      const recentVariance = mostRecent.variance || 0;
+    // Calculate stats from all projects (before category filtering)
+    // Note: Each entry in projectList is a separate engagement/project
+    const allProjects = (projects || [])
+      .filter(row => row.project_name)
+      .map((row) => {
+        const revenue = row.actual_revenue || 0;
+        const gpm = row.actual_gp_pct || 0;
+        const variance = row.variance || 0;
 
-      // Check if project has multiple engagements (different month/type combinations)
-      const engagementCount = yearData.length;
-      const multipleEngagements = engagementCount > 1;
-
-      return {
-        name,
-        years,
-        latestYear: mostRecent.project_year,
-        latestMonth: mostRecent.project_month || null,
-        projectType: mostRecent.project_type || '',
-        recentRevenue,
-        recentGPM,
-        recentVariance,
-        isAtRisk: recentGPM < 50 || recentVariance < -10000,
-        isHighValue: recentRevenue > 500000,
-        isRecent: mostRecent.project_year >= 2024 && mostRecent.project_year <= currentYear,
-        hasData: recentRevenue > 0,
-        multipleEngagements,
-        engagementCount,
-      };
-    });
+        return {
+          name: row.project_name,
+          years: [row.project_year],
+          latestYear: row.project_year,
+          latestMonth: row.project_month || null,
+          projectType: row.project_type || '',
+          recentRevenue: revenue,
+          recentGPM: gpm,
+          recentVariance: variance,
+          isAtRisk: gpm < 50 || variance < -10000,
+          isHighValue: revenue > 500000,
+          isRecent: row.project_year >= 2024 && row.project_year <= currentYear,
+          hasData: revenue > 0,
+          multipleEngagements: false,
+          engagementCount: 1,
+        };
+      });
 
     const stats = {
-      totalProjects: projectMap.size,
+      totalProjects: allProjects.length,
       recentCount: allProjects.filter(p => p.isRecent).length,
       atRiskCount: allProjects.filter(p => p.isAtRisk).length,
       highValueCount: allProjects.filter(p => p.isHighValue).length,
       mccCount: allProjects.filter(p => p.projectType === 'MCC').length,
-      yearRange: {
-        min: Math.min(...allProjects.map(p => Math.min(...p.years))),
-        max: Math.max(...allProjects.map(p => Math.max(...p.years))),
-      },
+      yearRange: allProjects.length > 0 ? {
+        min: Math.min(...allProjects.map(p => p.latestYear)),
+        max: Math.max(...allProjects.map(p => p.latestYear)),
+      } : { min: 0, max: 0 },
     };
 
     // Legacy format support for backward compatibility
