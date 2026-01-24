@@ -185,6 +185,14 @@ CRITICAL RULES:
 - Keep changes surgical and minimal - only change what's necessary
 - PRESERVE ALL SPECIAL CHARACTERS exactly as they appear: § (section symbol), ¶ (paragraph symbol), © ® ™, and all legal citation formats
 
+CRITICAL - COMPLETE TEXT REPLACEMENT:
+- The "originalText" MUST include the COMPLETE sentence(s) or paragraph(s) being modified
+- DO NOT stop mid-sentence - include text up to a natural sentence boundary (period, or section break)
+- If a clause spans multiple sentences, include ALL sentences that will be affected by your revision
+- The "revisedText" must be a COMPLETE replacement - it should read as a standalone, grammatically correct paragraph
+- NEVER leave dangling text - if original says "The Contractor covenants... employees (collectively 'FW')" then include the ENTIRE phrase through to its natural end
+- CHECK: After replacement, would the document flow grammatically? If not, expand originalText to include more context
+
 === SELF-CHECK BEFORE OUTPUTTING ===
 Before returning your response, verify for EACH section:
 1. Does the revisedText BENEFIT MARS (the Contractor)? If it benefits the Client more, reconsider.

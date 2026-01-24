@@ -180,12 +180,14 @@ function getSearchablePhrase(text: string, maxLen: number = 200): string {
 }
 
 /**
- * Finds the full range of originalText in the document using bookend search.
+ * Finds the full range of originalText in the document using a robust search strategy.
  * Works even for text longer than Word's 255-char search limit.
- * Uses expandTo to combine start and end ranges into the full target range.
  *
- * IMPROVED: Added validation to detect and handle range mismatch issues
- * that can cause duplicate text after replacement.
+ * STRATEGY:
+ * 1. For short text (<200 chars): Direct search
+ * 2. For long text: Find start, then search for end phrase AFTER start position
+ * 3. CRITICAL: Validate that found range matches expected text before returning
+ * 4. If validation fails, try expanding to paragraph boundaries
  */
 async function findFullRange(
   context: Word.RequestContext,
@@ -193,6 +195,8 @@ async function findFullRange(
 ): Promise<Word.Range | null> {
   const normalized = normalizeText(originalText);
   const expectedLength = normalized.length;
+
+  console.log(`findFullRange: searching for text of length ${expectedLength}`);
 
   // For short text, search directly
   if (normalized.length <= 200) {
@@ -202,46 +206,27 @@ async function findFullRange(
     });
     results.load('items');
     await context.sync();
-    return results.items.length > 0 ? results.items[0] : null;
-  }
-
-  // For long text, use bookend search
-  // IMPORTANT: Ensure start and end phrases don't overlap
-  // For text between 200-300 chars, use smaller bookends to avoid overlap
-  const bookendSize = normalized.length < 300 ? Math.floor(normalized.length / 3) : 150;
-  const startPhrase = normalized.substring(0, bookendSize);
-  const endPhrase = normalized.slice(-bookendSize);
-
-  // Check for overlap (if text is too short for bookend approach)
-  const overlapCheck = normalized.length - bookendSize * 2;
-  if (overlapCheck < 0) {
-    console.log('Bookend search: text too short for bookend approach, using direct search');
-    // Try direct search with truncated text
-    const truncatedSearch = normalized.substring(0, 200);
-    const results = context.document.body.search(truncatedSearch, {
-      matchCase: false,
-      matchWholeWord: false,
-    });
-    results.load('items');
-    await context.sync();
     if (results.items.length > 0) {
-      // Expand to paragraph to capture full text
-      const paragraph = results.items[0].paragraphs.getFirst();
-      paragraph.load('text');
-      await context.sync();
-      // If paragraph contains our text, return it
-      if (normalizeText(paragraph.text).includes(normalized)) {
-        return results.items[0];
-      }
+      console.log('findFullRange: found via direct search');
+      return results.items[0];
     }
-    return results.items.length > 0 ? results.items[0] : null;
+    console.log('findFullRange: direct search failed');
+    return null;
   }
 
-  console.log(`Bookend search - bookend size: ${bookendSize}`);
-  console.log('Bookend search - start phrase:', startPhrase.substring(0, 50) + '...');
-  console.log('Bookend search - end phrase:', '...' + endPhrase.slice(-50));
+  // For long text, use improved bookend search
+  // Use first 150 chars to find start position
+  const startPhrase = normalized.substring(0, 150);
+  // Use last 100 chars for end (smaller to be more precise)
+  const endPhrase = normalized.slice(-100);
+  // Also grab a unique phrase from the middle for validation
+  const middleStart = Math.floor(normalized.length / 2) - 50;
+  const middlePhrase = normalized.substring(middleStart, middleStart + 80);
 
-  // Search for start
+  console.log('findFullRange: start phrase:', startPhrase.substring(0, 40) + '...');
+  console.log('findFullRange: end phrase:', '...' + endPhrase.slice(-40));
+
+  // Step 1: Find start position
   const startResults = context.document.body.search(startPhrase, {
     matchCase: false,
     matchWholeWord: false,
@@ -250,11 +235,24 @@ async function findFullRange(
   await context.sync();
 
   if (startResults.items.length === 0) {
-    console.log('Bookend search: start phrase not found');
-    return null;
+    console.log('findFullRange: start phrase not found, trying shorter phrase');
+    // Try with shorter start phrase
+    const shorterStart = normalized.substring(0, 80);
+    const shortResults = context.document.body.search(shorterStart, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    shortResults.load('items');
+    await context.sync();
+    if (shortResults.items.length === 0) {
+      console.log('findFullRange: could not find start position');
+      return null;
+    }
   }
 
-  // Search for end
+  const startRange = startResults.items[0];
+
+  // Step 2: Find end position - search from start range forward
   const endResults = context.document.body.search(endPhrase, {
     matchCase: false,
     matchWholeWord: false,
@@ -263,82 +261,136 @@ async function findFullRange(
   await context.sync();
 
   if (endResults.items.length === 0) {
-    console.log('Bookend search: end phrase not found');
+    console.log('findFullRange: end phrase not found');
     return null;
   }
 
-  // Find the correct end range (must come after start)
-  const startRange = startResults.items[0];
-  let endRange: Word.Range | null = null;
+  // Find the end range that comes AFTER our start range
+  let bestEndRange: Word.Range | null = null;
+  let bestDistance = Infinity;
 
   for (const candidate of endResults.items) {
     const comparison = startRange.compareLocationWith(candidate);
     await context.sync();
-    // We want endRange to be after or adjacent to startRange
-    if (comparison.value === 'Before' || comparison.value === 'AdjacentBefore') {
-      endRange = candidate;
-      break;
+
+    // End must be after or overlapping with start
+    if (comparison.value === 'Before' || comparison.value === 'AdjacentBefore' || comparison.value === 'Contains') {
+      // Calculate approximate distance based on expected text length
+      // We want the end range that would give us closest to expected length
+      const testRange = startRange.expandToOrNullObject(candidate);
+      await context.sync();
+
+      if (!testRange.isNullObject) {
+        testRange.load('text');
+        await context.sync();
+
+        const testLength = testRange.text.length;
+        const distance = Math.abs(testLength - expectedLength);
+
+        console.log(`findFullRange: candidate end gives length ${testLength}, distance from expected: ${distance}`);
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestEndRange = candidate;
+        }
+
+        // If we found an exact or very close match, use it
+        if (distance < expectedLength * 0.05) {
+          console.log('findFullRange: found close match, using this end range');
+          break;
+        }
+      }
     }
   }
 
-  if (!endRange) {
-    // Fallback: use first end result if comparison failed
-    console.log('Bookend search: using first end result as fallback');
-    endRange = endResults.items[0];
+  if (!bestEndRange) {
+    console.log('findFullRange: no valid end range found after start');
+    return null;
   }
 
-  // Expand startRange to include endRange
-  const fullRange = startRange.expandToOrNullObject(endRange);
+  // Step 3: Create the full range
+  const fullRange = startRange.expandToOrNullObject(bestEndRange);
   await context.sync();
 
   if (fullRange.isNullObject) {
-    console.log('Bookend search: expandTo failed, using startRange only');
-    return startRange;
+    console.log('findFullRange: expandTo failed');
+    return null;
   }
 
-  // VALIDATION: Load and check the found range text length
+  // Step 4: CRITICAL VALIDATION - check that found text matches expected
   fullRange.load('text');
   await context.sync();
 
-  const foundLength = fullRange.text.length;
-  const lengthDifference = Math.abs(foundLength - expectedLength) / expectedLength;
+  const foundText = fullRange.text;
+  const foundNormalized = normalizeText(foundText);
+  const foundLength = foundNormalized.length;
+  const lengthDiff = Math.abs(foundLength - expectedLength) / expectedLength;
 
-  console.log(`Bookend search: found range length ${foundLength}, expected ${expectedLength}, diff ${(lengthDifference * 100).toFixed(1)}%`);
+  console.log(`findFullRange: found length ${foundLength}, expected ${expectedLength}, diff ${(lengthDiff * 100).toFixed(1)}%`);
 
-  // If length mismatch is > 15%, try alternative approach
-  if (lengthDifference > 0.15) {
-    console.log('Bookend search: significant length mismatch, trying cascading search fallback');
+  // Check if found text ends correctly (this catches the orphan text problem)
+  const expectedEnding = normalized.slice(-50);
+  const foundEnding = foundNormalized.slice(-50);
+  const endingsMatch = foundEnding === expectedEnding || foundNormalized.endsWith(expectedEnding);
 
-    // Alternative: Use a longer start phrase and find the full text manually
-    const longerStart = normalized.substring(0, Math.min(200, normalized.length));
-    const altResults = context.document.body.search(longerStart, {
-      matchCase: false,
-      matchWholeWord: false,
-    });
-    altResults.load('items');
-    await context.sync();
+  console.log(`findFullRange: expected ending: "${expectedEnding.slice(-30)}"`);
+  console.log(`findFullRange: found ending: "${foundEnding.slice(-30)}"`);
+  console.log(`findFullRange: endings match: ${endingsMatch}`);
 
-    if (altResults.items.length > 0) {
-      // Get the paragraph containing this text
-      const altRange = altResults.items[0];
-      const paragraph = altRange.paragraphs.getFirst();
-      paragraph.load('text');
-      await context.sync();
+  // Also check if found text contains the middle phrase (validates we have the right section)
+  const hasMiddle = foundNormalized.includes(middlePhrase) || foundNormalized.includes(normalizeText(middlePhrase));
 
-      // Check if this paragraph's text contains our full normalized text
-      const paragraphNormalized = normalizeText(paragraph.text);
-      if (paragraphNormalized.includes(normalized)) {
-        // The range we found might be good enough - return the original
-        // but log a warning for debugging
-        console.log('Bookend search: paragraph contains full text, using original range');
-      }
-    }
-
-    // If still problematic, return what we have with a warning
-    console.warn('Bookend search: range may be incorrect, proceeding with best match');
+  if (endingsMatch && hasMiddle && lengthDiff < 0.20) {
+    console.log('findFullRange: validation passed');
+    return fullRange;
   }
 
-  console.log('Bookend search: successfully found full range');
+  // Validation failed - try to fix by extending to paragraph boundaries
+  console.log('findFullRange: validation failed, attempting paragraph extension');
+
+  // Get all paragraphs that our range touches
+  const paragraphs = fullRange.paragraphs;
+  paragraphs.load('items');
+  await context.sync();
+
+  if (paragraphs.items.length > 0) {
+    // Try extending to include full paragraphs
+    const firstPara = paragraphs.items[0];
+    const lastPara = paragraphs.items[paragraphs.items.length - 1];
+
+    // Get the range spanning from first to last paragraph
+    const extendedRange = firstPara.getRange('Whole').expandToOrNullObject(lastPara.getRange('Whole'));
+    await context.sync();
+
+    if (!extendedRange.isNullObject) {
+      extendedRange.load('text');
+      await context.sync();
+
+      const extendedNormalized = normalizeText(extendedRange.text);
+
+      // Check if extended range contains our expected text
+      if (extendedNormalized.includes(normalized)) {
+        console.log('findFullRange: extended range contains expected text');
+        // We need to return just the portion that matches, not the whole paragraph
+        // Since we can't easily trim, return the original range with a warning
+        console.warn('findFullRange: using original range despite mismatch - manual review recommended');
+        return fullRange;
+      }
+    }
+  }
+
+  // Last resort: return what we have but log strong warning
+  console.error('findFullRange: CRITICAL - range may not match expected text, replacement may leave orphan text');
+  console.error(`findFullRange: Expected ending: "${expectedEnding}"`);
+  console.error(`findFullRange: Found ending: "${foundEnding}"`);
+
+  // Return null to prevent incorrect replacement
+  // This is safer than replacing with wrong range and leaving orphan text
+  if (!endingsMatch) {
+    console.error('findFullRange: refusing to return mismatched range');
+    return null;
+  }
+
   return fullRange;
 }
 
