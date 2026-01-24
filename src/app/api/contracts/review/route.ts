@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import DiffMatchPatch from 'diff-match-patch';
+import { getClauseContextForPrompt } from '@/lib/clauseRetrieval';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 
@@ -119,6 +120,29 @@ MARS STANDARD NEGOTIATING POSITIONS:
 - Audit Rights: Reasonable notice, limited frequency (annually), scope limited to records related to the agreement
 - Disputes: Preserve right to legal remedies, no unilateral final decisions by client
 
+=== MANDATORY FLAGS - ALWAYS IDENTIFY THESE ISSUES ===
+You MUST flag and revise ALL of the following, regardless of how the contract is worded:
+
+1. NO LIMITATION OF LIABILITY CLAUSE
+   - If the contract lacks any limitation of liability, ADD ONE
+   - Suggest: "Contractor's aggregate liability under this Agreement shall not exceed the total fees paid under this Agreement. In no event shall Contractor be liable for indirect, incidental, consequential, punitive, or special damages."
+
+2. UNLIMITED OR UNCAPPED LIABILITY
+   - Any clause that makes MARS liable without limit → Suggest cap at contract value
+   - Any clause exposing MARS to consequential/indirect damages → Add exclusion
+
+3. BROAD OR ONE-SIDED INDEMNIFICATION
+   - If MARS must indemnify but Client does not → Make mutual
+   - If indemnification is not proportionate to fault → Add "to the extent caused by" language
+   - If contract is with MUNICIPALITY/GOVERNMENT: They legally CANNOT indemnify, so MARS MUST have a liability cap
+
+4. FULL IP/WORK PRODUCT TRANSFER WITHOUT CARVE-OUTS
+   - Any clause transferring all IP to Client → Add pre-existing IP carve-out
+   - Suggested language: "Notwithstanding the foregoing, Contractor retains all rights to its pre-existing intellectual property, including tools, methodologies, templates, and know-how developed prior to or independently of this Agreement."
+
+5. TERMINATION WITHOUT PAYMENT PROTECTION
+   - If Client can terminate without paying for work performed → Add wind-down payment provision
+
 YOUR TASK:
 1. Identify ONLY sections with MATERIAL risks to MARS (skip boilerplate that's not negotiable)
 2. For each material section, provide the EXACT ORIGINAL text and your REVISED text
@@ -160,6 +184,13 @@ CRITICAL RULES:
 - The "revisedText" must be PLAIN TEXT with NO markdown (no ** or ~~ or any formatting)
 - Keep changes surgical and minimal - only change what's necessary
 - PRESERVE ALL SPECIAL CHARACTERS exactly as they appear: § (section symbol), ¶ (paragraph symbol), © ® ™, and all legal citation formats
+
+=== SELF-CHECK BEFORE OUTPUTTING ===
+Before returning your response, verify for EACH section:
+1. Does the revisedText BENEFIT MARS (the Contractor)? If it benefits the Client more, reconsider.
+2. Does the revision LIMIT MARS's liability or exposure? If it increases liability, reconsider.
+3. Does the revision PROTECT MARS's IP and pre-existing work? If it gives more away, reconsider.
+4. For government/municipality contracts: Is there a liability cap? There MUST be one since they cannot indemnify.
 
 IMPORTANT: Your response must be ONLY a JSON object. No explanations, no markdown, no text before or after. Start your response with { and end with }
 
@@ -205,8 +236,22 @@ export async function POST(request: NextRequest) {
     const hasSmartQuotesAfter = /[\u201C\u201D\u2018\u2019]/.test(normalizedInput);
     console.log(`[NORMALIZATION] Input had smart quotes: ${hasSmartQuotes}, After normalization: ${hasSmartQuotesAfter}`);
 
-    // Build the full prompt - optionally include playbook comparison
-    let fullPrompt = MARS_CONTRACT_PROMPT + normalizedInput;
+    // Fetch approved clauses for RAG (Retrieval Augmented Generation)
+    // This provides the AI with concrete examples of MARS's approved language
+    let clauseContext = '';
+    try {
+      clauseContext = await getClauseContextForPrompt(false); // false = only critical categories
+      if (clauseContext) {
+        console.log(`RAG: Injecting ${clauseContext.length} chars of approved clause context`);
+      } else {
+        console.log('RAG: No approved clauses found in database');
+      }
+    } catch (ragError) {
+      console.error('RAG: Error fetching clause context (continuing without):', ragError);
+    }
+
+    // Build the full prompt - include clause context (RAG) and optionally playbook comparison
+    let fullPrompt = MARS_CONTRACT_PROMPT + clauseContext + normalizedInput;
 
     if (playbookContent && typeof playbookContent === 'string' && playbookContent.trim().length > 0) {
       const normalizedPlaybook = normalizeToASCII(playbookContent);
@@ -220,7 +265,7 @@ ${normalizedPlaybook}
 
 When analyzing, note in the rationale if a change brings the contract CLOSER to MARS standard terms (good) or FURTHER from them (concerning).`;
 
-      fullPrompt = MARS_CONTRACT_PROMPT + normalizedInput + playbookComparisonPrompt;
+      fullPrompt = MARS_CONTRACT_PROMPT + clauseContext + normalizedInput + playbookComparisonPrompt;
       console.log('Added playbook comparison to prompt');
     }
 

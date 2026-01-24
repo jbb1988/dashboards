@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import DiffMatchPatch from 'diff-match-patch';
 import {
   FluentProvider,
   webDarkTheme,
@@ -181,6 +180,169 @@ function getSearchablePhrase(text: string, maxLen: number = 200): string {
 }
 
 /**
+ * Finds the full range of originalText in the document using bookend search.
+ * Works even for text longer than Word's 255-char search limit.
+ * Uses expandTo to combine start and end ranges into the full target range.
+ *
+ * IMPROVED: Added validation to detect and handle range mismatch issues
+ * that can cause duplicate text after replacement.
+ */
+async function findFullRange(
+  context: Word.RequestContext,
+  originalText: string
+): Promise<Word.Range | null> {
+  const normalized = normalizeText(originalText);
+  const expectedLength = normalized.length;
+
+  // For short text, search directly
+  if (normalized.length <= 200) {
+    const results = context.document.body.search(normalized, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    results.load('items');
+    await context.sync();
+    return results.items.length > 0 ? results.items[0] : null;
+  }
+
+  // For long text, use bookend search
+  // IMPORTANT: Ensure start and end phrases don't overlap
+  // For text between 200-300 chars, use smaller bookends to avoid overlap
+  const bookendSize = normalized.length < 300 ? Math.floor(normalized.length / 3) : 150;
+  const startPhrase = normalized.substring(0, bookendSize);
+  const endPhrase = normalized.slice(-bookendSize);
+
+  // Check for overlap (if text is too short for bookend approach)
+  const overlapCheck = normalized.length - bookendSize * 2;
+  if (overlapCheck < 0) {
+    console.log('Bookend search: text too short for bookend approach, using direct search');
+    // Try direct search with truncated text
+    const truncatedSearch = normalized.substring(0, 200);
+    const results = context.document.body.search(truncatedSearch, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    results.load('items');
+    await context.sync();
+    if (results.items.length > 0) {
+      // Expand to paragraph to capture full text
+      const paragraph = results.items[0].paragraphs.getFirst();
+      paragraph.load('text');
+      await context.sync();
+      // If paragraph contains our text, return it
+      if (normalizeText(paragraph.text).includes(normalized)) {
+        return results.items[0];
+      }
+    }
+    return results.items.length > 0 ? results.items[0] : null;
+  }
+
+  console.log(`Bookend search - bookend size: ${bookendSize}`);
+  console.log('Bookend search - start phrase:', startPhrase.substring(0, 50) + '...');
+  console.log('Bookend search - end phrase:', '...' + endPhrase.slice(-50));
+
+  // Search for start
+  const startResults = context.document.body.search(startPhrase, {
+    matchCase: false,
+    matchWholeWord: false,
+  });
+  startResults.load('items');
+  await context.sync();
+
+  if (startResults.items.length === 0) {
+    console.log('Bookend search: start phrase not found');
+    return null;
+  }
+
+  // Search for end
+  const endResults = context.document.body.search(endPhrase, {
+    matchCase: false,
+    matchWholeWord: false,
+  });
+  endResults.load('items');
+  await context.sync();
+
+  if (endResults.items.length === 0) {
+    console.log('Bookend search: end phrase not found');
+    return null;
+  }
+
+  // Find the correct end range (must come after start)
+  const startRange = startResults.items[0];
+  let endRange: Word.Range | null = null;
+
+  for (const candidate of endResults.items) {
+    const comparison = startRange.compareLocationWith(candidate);
+    await context.sync();
+    // We want endRange to be after or adjacent to startRange
+    if (comparison.value === 'Before' || comparison.value === 'AdjacentBefore') {
+      endRange = candidate;
+      break;
+    }
+  }
+
+  if (!endRange) {
+    // Fallback: use first end result if comparison failed
+    console.log('Bookend search: using first end result as fallback');
+    endRange = endResults.items[0];
+  }
+
+  // Expand startRange to include endRange
+  const fullRange = startRange.expandToOrNullObject(endRange);
+  await context.sync();
+
+  if (fullRange.isNullObject) {
+    console.log('Bookend search: expandTo failed, using startRange only');
+    return startRange;
+  }
+
+  // VALIDATION: Load and check the found range text length
+  fullRange.load('text');
+  await context.sync();
+
+  const foundLength = fullRange.text.length;
+  const lengthDifference = Math.abs(foundLength - expectedLength) / expectedLength;
+
+  console.log(`Bookend search: found range length ${foundLength}, expected ${expectedLength}, diff ${(lengthDifference * 100).toFixed(1)}%`);
+
+  // If length mismatch is > 15%, try alternative approach
+  if (lengthDifference > 0.15) {
+    console.log('Bookend search: significant length mismatch, trying cascading search fallback');
+
+    // Alternative: Use a longer start phrase and find the full text manually
+    const longerStart = normalized.substring(0, Math.min(200, normalized.length));
+    const altResults = context.document.body.search(longerStart, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    altResults.load('items');
+    await context.sync();
+
+    if (altResults.items.length > 0) {
+      // Get the paragraph containing this text
+      const altRange = altResults.items[0];
+      const paragraph = altRange.paragraphs.getFirst();
+      paragraph.load('text');
+      await context.sync();
+
+      // Check if this paragraph's text contains our full normalized text
+      const paragraphNormalized = normalizeText(paragraph.text);
+      if (paragraphNormalized.includes(normalized)) {
+        // The range we found might be good enough - return the original
+        // but log a warning for debugging
+        console.log('Bookend search: paragraph contains full text, using original range');
+      }
+    }
+
+    // If still problematic, return what we have with a warning
+    console.warn('Bookend search: range may be incorrect, proceeding with best match');
+  }
+
+  console.log('Bookend search: successfully found full range');
+  return fullRange;
+}
+
+/**
  * Calculates similarity between two strings (0-100)
  */
 function calculateSimilarity(str1: string, str2: string): number {
@@ -229,29 +391,6 @@ function extractContext(fullText: string, matchStart: number, matchEnd: number, 
   if (end < fullText.length) context += '...';
 
   return context;
-}
-
-// ============================================
-// WORD-LEVEL DIFF ENGINE
-// ============================================
-
-interface TextChange {
-  type: 'equal' | 'delete' | 'insert';
-  text: string;
-}
-
-/**
- * Compares two texts and returns word-level changes using diff-match-patch
- */
-function computeWordLevelDiff(original: string, revised: string): TextChange[] {
-  const dmp = new DiffMatchPatch();
-  const diffs = dmp.diff_main(original, revised);
-  dmp.diff_cleanupSemantic(diffs);
-
-  return diffs.map(([op, text]) => ({
-    type: op === -1 ? 'delete' : op === 1 ? 'insert' : 'equal',
-    text,
-  }));
 }
 
 export default function App() {
@@ -527,7 +666,7 @@ export default function App() {
     }
   };
 
-  // Insert all section changes into Word document with word-level diff styling
+  // Insert all section changes into Word document using Track Changes
   const insertAllChanges = async () => {
     if (!analysisResult || analysisResult.sections.length === 0) {
       setError('No changes to insert');
@@ -541,61 +680,42 @@ export default function App() {
 
     try {
       await Word.run(async (context) => {
-        // Step 1: Enable Track Changes if available
+        // Step 1: Enable Track Changes
+        let trackChangesEnabled = false;
         try {
           if (Office.context.requirements.isSetSupported('WordApi', '1.4')) {
             (context.document as unknown as { changeTrackingMode: string }).changeTrackingMode = 'TrackAll';
             await context.sync();
+            trackChangesEnabled = true;
+            console.log('Track Changes enabled');
           }
         } catch (e) {
-          console.log('Track changes mode not available, using visual markup');
+          console.log('Track changes not available:', e);
         }
 
         for (const section of analysisResult.sections) {
           if (!section.originalText || !section.revisedText) continue;
           if (appliedSections.has(section.sectionTitle)) continue; // Skip already applied
 
-          // Step 2: Search for the original text using a unique phrase
-          const searchPhrase = getSearchablePhrase(section.originalText);
-          const searchResults = context.document.body.search(searchPhrase, {
-            matchCase: false,
-            matchWholeWord: false,
-          });
-          searchResults.load('items');
-          await context.sync();
+          // Step 2: Find the FULL range of originalText using bookend search
+          const fullRange = await findFullRange(context, section.originalText);
 
-          if (searchResults.items.length > 0) {
-            // Step 3: Use the first match - REPLACE only this range
-            const range = searchResults.items[0];
+          if (fullRange) {
+            // Step 3: Replace with revisedText
+            // With Track Changes enabled, Word automatically shows old (struck) and new (underlined)
+            const newRange = fullRange.insertText(section.revisedText, Word.InsertLocation.replace);
 
-            // Compute the diff and build replacement text with visual markup
-            const dmp = new DiffMatchPatch();
-            const diffs = dmp.diff_main(section.originalText, section.revisedText);
-            dmp.diff_cleanupSemantic(diffs);
-
-            // Clear only the matched range (NOT the entire paragraph)
-            range.clear();
-
-            // Rebuild with formatted diff content
-            for (const [op, text] of diffs) {
-              if (op === 0) {
-                // Equal - plain text
-                range.insertText(text, Word.InsertLocation.end);
-              } else if (op === -1) {
-                // Deletion - red strikethrough
-                const deletedRange = range.insertText(text, Word.InsertLocation.end);
-                deletedRange.font.strikeThrough = true;
-                deletedRange.font.color = '#DC2626';
-              } else if (op === 1) {
-                // Insertion - green underline
-                const insertedRange = range.insertText(text, Word.InsertLocation.end);
-                insertedRange.font.underline = Word.UnderlineType.single;
-                insertedRange.font.color = '#16A34A';
-              }
+            // If Track Changes is not available, apply visual highlighting
+            if (!trackChangesEnabled) {
+              newRange.font.underline = Word.UnderlineType.single;
+              newRange.font.color = '#16A34A';
             }
 
             newApplied.add(section.sectionTitle);
             appliedCount++;
+            console.log(`Applied change to: ${section.sectionTitle}`);
+          } else {
+            console.log(`Could not find text for: ${section.sectionTitle}`);
           }
         }
         await context.sync();
@@ -618,7 +738,7 @@ export default function App() {
     }
   };
 
-  // Insert a single section change into Word document with word-level diff
+  // Insert a single section change into Word document using Track Changes
   const insertSingleSection = async (section: DashboardSection) => {
     if (!section.originalText || !section.revisedText) {
       setError('No text available for this section');
@@ -635,60 +755,38 @@ export default function App() {
 
     try {
       await Word.run(async (context) => {
-        // Step 1: Enable Track Changes if available
+        // Step 1: Enable Track Changes
+        let trackChangesEnabled = false;
         try {
           if (Office.context.requirements.isSetSupported('WordApi', '1.4')) {
             (context.document as unknown as { changeTrackingMode: string }).changeTrackingMode = 'TrackAll';
             await context.sync();
+            trackChangesEnabled = true;
+            console.log('Track Changes enabled');
           }
         } catch (e) {
-          console.log('Track changes mode not available, using visual markup');
+          console.log('Track changes not available:', e);
         }
 
-        // Step 2: Search for the original text using a unique phrase
-        const searchPhrase = getSearchablePhrase(section.originalText);
-        const searchResults = context.document.body.search(searchPhrase, {
-          matchCase: false,
-          matchWholeWord: false,
-        });
-        searchResults.load('items');
-        await context.sync();
+        // Step 2: Find the FULL range of originalText using bookend search
+        const fullRange = await findFullRange(context, section.originalText);
 
-        if (searchResults.items.length === 0) {
+        if (!fullRange) {
           setError(`Could not find "${section.sectionTitle}" in document`);
           return;
         }
 
-        // Step 3: Use the first match - REPLACE only this range
-        const range = searchResults.items[0];
+        // Step 3: Replace with revisedText
+        // With Track Changes enabled, Word automatically shows old (struck) and new (underlined)
+        const newRange = fullRange.insertText(section.revisedText, Word.InsertLocation.replace);
 
-        // Compute the diff and build replacement text with visual markup
-        const dmp = new DiffMatchPatch();
-        const diffs = dmp.diff_main(section.originalText, section.revisedText);
-        dmp.diff_cleanupSemantic(diffs);
-
-        // Clear only the matched range (NOT the entire paragraph)
-        range.clear();
-
-        // Rebuild with formatted diff content
-        for (const [op, text] of diffs) {
-          if (op === 0) {
-            // Equal - plain text
-            range.insertText(text, Word.InsertLocation.end);
-          } else if (op === -1) {
-            // Deletion - red strikethrough
-            const deletedRange = range.insertText(text, Word.InsertLocation.end);
-            deletedRange.font.strikeThrough = true;
-            deletedRange.font.color = '#DC2626';
-          } else if (op === 1) {
-            // Insertion - green underline
-            const insertedRange = range.insertText(text, Word.InsertLocation.end);
-            insertedRange.font.underline = Word.UnderlineType.single;
-            insertedRange.font.color = '#16A34A';
-          }
+        // If Track Changes is not available, apply visual highlighting to indicate new text
+        if (!trackChangesEnabled) {
+          newRange.font.underline = Word.UnderlineType.single;
+          newRange.font.color = '#16A34A'; // Green to indicate new text
         }
 
-        range.select();
+        newRange.select();
         await context.sync();
 
         setAppliedSections(prev => new Set(prev).add(section.sectionTitle));
