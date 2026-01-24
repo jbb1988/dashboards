@@ -778,17 +778,24 @@ async function insertNewSection(
   allParagraphs.load('items');
   await context.sync();
 
-  // Look for the next section heading (numbered paragraph or all caps heading)
+  // Look for the next TOP-LEVEL section heading only
+  // Must be: "22. TITLE" or "ARTICLE 5" format - NOT subsections like "(a)" or "(1)"
   let insertionPoint: Word.Range | null = null;
-  const sectionPattern = /^\s*(\d+\.|\([a-z]\)|\([0-9]+\)|ARTICLE\s+\d+)/i;
+  // Match: "22." followed by space and uppercase word, OR "ARTICLE" followed by number
+  const sectionPattern = /^\s*(\d+\.\s+[A-Z]|ARTICLE\s+\d+)/;
 
   for (let i = 0; i < Math.min(allParagraphs.items.length, 50); i++) {
     const para = allParagraphs.items[i];
     para.load('text');
     await context.sync();
 
-    // Check if this looks like a new section heading
-    if (sectionPattern.test(para.text) && para.text.trim().length > 5) {
+    const trimmedText = para.text.trim();
+
+    // Skip empty paragraphs
+    if (trimmedText.length < 3) continue;
+
+    // Check if this looks like a new TOP-LEVEL section heading
+    if (sectionPattern.test(para.text)) {
       // This is the next section - insert before it
       insertionPoint = para.getRange('Start');
       console.log(`insertNewSection: found next section at: "${para.text.substring(0, 40)}..."`);
