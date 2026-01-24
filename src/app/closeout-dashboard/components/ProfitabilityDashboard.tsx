@@ -314,9 +314,9 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     setProjectName(project.name);
     setYear(project.latestYear);
     setMonth(project.latestMonth || '');
-    setProjectType(project.projectType);
+    setProjectType(''); // Don't filter by type - we need ALL types for this month
     setIsDropdownOpen(false);
-    fetchData(project.name, project.latestYear, project.latestMonth || '', project.projectType);
+    fetchData(project.name, project.latestYear, project.latestMonth || '', ''); // Empty type = fetch all types for this month
   };
 
   const clearSelection = () => {
