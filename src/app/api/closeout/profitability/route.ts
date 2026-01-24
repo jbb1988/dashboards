@@ -556,9 +556,14 @@ export async function GET(request: Request) {
       ? workOrders.reduce((sum, wo) => sum + (wo.totals.totalActualCost || 0), 0)
       : netsuiteCostEstimate;
 
+    // CRITICAL: When filtering by month, use Excel actualRevenue for KPIs
+    // Why? SO line items don't have month info - can't distinguish which MCC items are June vs other months
+    // NetSuite revenue would include ALL MCC items across all months in that SO
+    const displayRevenue = month ? actualRevenue : netsuiteRevenue;
+
     const effectiveCost = woActualCosts.length > 0 ? netsuiteActualCost : netsuiteCostEstimate;
-    const grossProfit = netsuiteRevenue - effectiveCost;
-    const grossMarginPct = netsuiteRevenue > 0 ? (grossProfit / netsuiteRevenue) * 100 : 0;
+    const grossProfit = displayRevenue - effectiveCost;
+    const grossMarginPct = displayRevenue > 0 ? (grossProfit / displayRevenue) * 100 : 0;
     const cpi = actualCost > 0 ? budgetCost / actualCost : 1;
 
     // STEP 6: Get sync status
@@ -585,7 +590,7 @@ export async function GET(request: Request) {
         customerName: salesOrders[0]?.customerName || null,
       },
       kpis: {
-        revenue: netsuiteRevenue,
+        revenue: displayRevenue,
         cost: effectiveCost,
         grossProfit,
         grossMarginPct,
