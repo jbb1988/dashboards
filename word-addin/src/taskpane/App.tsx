@@ -745,32 +745,71 @@ export default function App() {
           console.log('Track changes not available:', e);
         }
 
+        // CRITICAL: Find ALL ranges FIRST, before any modifications
+        // This prevents position shifts from breaking subsequent searches
+        const rangesToApply: Array<{
+          section: typeof analysisResult.sections[0];
+          range: Word.Range;
+        }> = [];
+
         for (const section of analysisResult.sections) {
           if (!section.originalText || !section.revisedText) continue;
-          if (appliedSections.has(section.sectionTitle)) continue; // Skip already applied
+          if (appliedSections.has(section.sectionTitle)) continue;
 
-          // Step 2: Find the FULL range of originalText using bookend search
           const fullRange = await findFullRange(context, section.originalText);
-
           if (fullRange) {
-            // Step 3: Replace with revisedText
-            // With Track Changes enabled, Word automatically shows old (struck) and new (underlined)
-            const newRange = fullRange.insertText(section.revisedText, Word.InsertLocation.replace);
-
-            // If Track Changes is not available, apply visual highlighting
-            if (!trackChangesEnabled) {
-              newRange.font.underline = Word.UnderlineType.single;
-              newRange.font.color = '#16A34A';
-            }
-
-            newApplied.add(section.sectionTitle);
-            appliedCount++;
-            console.log(`Applied change to: ${section.sectionTitle}`);
+            // Get the range's position for sorting (we'll apply bottom-up)
+            fullRange.load('text');
+            rangesToApply.push({ section, range: fullRange });
+            console.log(`Found range for: ${section.sectionTitle}`);
           } else {
             console.log(`Could not find text for: ${section.sectionTitle}`);
           }
         }
+
         await context.sync();
+
+        // Step 2: Sort ranges by position (find document position)
+        // We need to compare ranges to determine which comes first
+        // Apply in REVERSE order (bottom to top) so edits don't shift positions
+        const sortedRanges: typeof rangesToApply = [];
+        for (const item of rangesToApply) {
+          // Find insertion position by comparing with existing items
+          let insertIndex = sortedRanges.length;
+          for (let i = 0; i < sortedRanges.length; i++) {
+            const comparison = item.range.compareLocationWith(sortedRanges[i].range);
+            await context.sync();
+            // If this item comes BEFORE sortedRanges[i], insert at position i
+            if (comparison.value === 'Before' || comparison.value === 'AdjacentBefore') {
+              insertIndex = i;
+              break;
+            }
+          }
+          sortedRanges.splice(insertIndex, 0, item);
+        }
+
+        // Reverse to apply bottom-up (later positions first)
+        sortedRanges.reverse();
+
+        console.log(`Applying ${sortedRanges.length} changes in reverse document order`);
+
+        // Step 3: Apply changes in reverse order
+        for (const { section, range } of sortedRanges) {
+          // Replace with revisedText
+          const newRange = range.insertText(section.revisedText, Word.InsertLocation.replace);
+
+          // If Track Changes is not available, apply visual highlighting
+          if (!trackChangesEnabled) {
+            newRange.font.underline = Word.UnderlineType.single;
+            newRange.font.color = '#16A34A';
+          }
+
+          newApplied.add(section.sectionTitle);
+          appliedCount++;
+          console.log(`Applied change to: ${section.sectionTitle}`);
+
+          await context.sync();
+        }
       });
 
       setAppliedSections(newApplied);
