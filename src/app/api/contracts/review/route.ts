@@ -773,9 +773,14 @@ export async function POST(request: NextRequest) {
 
     // BUILD modifiedText by applying anchor-based edits
     // This uses anchor_start and anchor_end to find the exact block to replace
+    // IMPORTANT: We track positions in BOTH normalized and original text
+    // so the Word add-in gets the original (non-normalized) text to search for
     let modifiedText = normalizedInput;
     let appliedChanges = 0;
     let failedChanges: string[] = [];
+
+    // Keep original (non-normalized) text for Word add-in
+    const originalText = text; // This is the original input before normalization
 
     for (const edit of result.edits) {
       if (!edit.anchor_start || !edit.anchor_end || !edit.new_text) {
@@ -784,12 +789,12 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Normalize anchors and new_text
+      // Normalize anchors for finding in normalized text
       const anchorStart = normalizeToASCII(edit.anchor_start);
       const anchorEnd = normalizeToASCII(edit.anchor_end);
       const newText = normalizeToASCII(edit.new_text);
 
-      // Find positions of anchors
+      // Find positions in NORMALIZED text (for applying changes)
       const startPos = modifiedText.indexOf(anchorStart);
       if (startPos === -1) {
         console.warn(`Could not find anchor_start for ${edit.section}: "${anchorStart.substring(0, 50)}..."`);
@@ -808,18 +813,50 @@ export async function POST(request: NextRequest) {
 
       const endPos = startPos + endPosRelative + anchorEnd.length;
 
-      // Extract the block being replaced (for logging and legacy sections)
-      const originalBlock = modifiedText.substring(startPos, endPos);
+      // Extract the block being replaced from NORMALIZED text (for diff generation)
+      const normalizedBlock = modifiedText.substring(startPos, endPos);
 
-      // Apply the replacement
+      // CRITICAL: Find the same block in the ORIGINAL text for Word add-in
+      // The Word add-in needs the original text (with smart quotes etc.) to find it in Word
+      let originalBlockForWord = normalizedBlock; // fallback to normalized
+
+      // Try to find anchor_start in the original text
+      // Use case-insensitive search and try both normalized and original anchor
+      const origAnchorStart = edit.anchor_start; // AI might have used original quotes
+      let origStartPos = originalText.indexOf(origAnchorStart);
+      if (origStartPos === -1) {
+        // Try with normalized anchor (in case original has smart quotes that don't match)
+        origStartPos = originalText.indexOf(anchorStart);
+      }
+
+      if (origStartPos !== -1) {
+        // Find anchor_end in original text after the start
+        const origSearchAfterStart = originalText.substring(origStartPos);
+        let origEndPosRelative = origSearchAfterStart.indexOf(edit.anchor_end);
+        if (origEndPosRelative === -1) {
+          origEndPosRelative = origSearchAfterStart.indexOf(anchorEnd);
+        }
+
+        if (origEndPosRelative !== -1) {
+          const origEndPos = origStartPos + origEndPosRelative + (edit.anchor_end.length || anchorEnd.length);
+          originalBlockForWord = originalText.substring(origStartPos, origEndPos);
+          console.log(`Found original block for Word add-in (${originalBlockForWord.length} chars)`);
+        } else {
+          console.warn(`Could not find anchor_end in original text for ${edit.section}, using normalized`);
+        }
+      } else {
+        console.warn(`Could not find anchor_start in original text for ${edit.section}, using normalized`);
+      }
+
+      // Apply the replacement to normalized text (for diff generation)
       modifiedText = modifiedText.substring(0, startPos) + newText + modifiedText.substring(endPos);
       appliedChanges++;
-      console.log(`Applied anchor-based edit to ${edit.section} (replaced ${originalBlock.length} chars with ${newText.length} chars)`);
+      console.log(`Applied anchor-based edit to ${edit.section} (replaced ${normalizedBlock.length} chars with ${newText.length} chars)`);
 
-      // Update legacy section with the original text we found
+      // Update legacy section with the ORIGINAL text (for Word add-in to find)
       const legacySection = sections.find(s => s.sectionTitle === edit.section);
       if (legacySection) {
-        legacySection.originalText = originalBlock;
+        legacySection.originalText = originalBlockForWord;
       }
     }
 
