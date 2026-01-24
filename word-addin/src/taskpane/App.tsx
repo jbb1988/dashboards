@@ -68,7 +68,7 @@ interface SearchMatch {
   text: string;
   context: string;
   confidence: number;
-  matchType: 'exact' | 'normalized' | 'wildcard' | 'fuzzy' | 'truncated';
+  matchType: 'exact' | 'normalized' | 'wildcard' | 'fuzzy' | 'truncated' | 'section_heading';
 }
 
 interface PreviewState {
@@ -79,6 +79,7 @@ interface PreviewState {
   selectedMatchIndex: number;
   riskId: string;
   clauseType: 'primary' | 'fallback' | 'last_resort' | 'suggestion';
+  sectionTitle?: string;
 }
 
 // Legacy interface - kept for compatibility with clause library
@@ -964,7 +965,7 @@ export default function App() {
 
     try {
       await Word.run(async (context) => {
-        const matches = await cascadingSearch(section.originalText, context);
+        const matches = await cascadingSearch(section.originalText, context, section.sectionTitle);
 
         if (matches.length > 0) {
           const range = matches[0].range;
@@ -1070,19 +1071,83 @@ export default function App() {
   /**
    * Performs a cascading search with multiple fallback strategies
    * Handles long search strings by truncating and then validating matches
+   * Now tries section heading search first for better accuracy
    */
   const cascadingSearch = async (
     searchText: string,
-    context: Word.RequestContext
+    context: Word.RequestContext,
+    sectionTitle?: string
   ): Promise<SearchMatch[]> => {
     const matches: SearchMatch[] = [];
     const body = context.document.body;
     const fullSearchText = searchText;
+    const normalized = normalizeText(searchText);
     const isLongSearch = searchText.length > MAX_SEARCH_LENGTH;
 
+    console.log(`cascadingSearch: text length ${searchText.length}, section: ${sectionTitle || 'unknown'}`);
+
+    // STRATEGY 0: Try section heading search first (most reliable for long sections)
+    if (sectionTitle && sectionTitle.length > 3 && isLongSearch) {
+      console.log(`cascadingSearch: trying section heading search for "${sectionTitle}"`);
+
+      const headingResults = body.search(sectionTitle, {
+        matchCase: false,
+        matchWholeWord: false,
+      });
+      headingResults.load('items');
+      await context.sync();
+
+      if (headingResults.items.length > 0) {
+        console.log(`cascadingSearch: found ${headingResults.items.length} heading matches`);
+
+        for (const headingRange of headingResults.items) {
+          // Get the range from heading forward, then search for the end phrase
+          const endPhrase = normalized.slice(-80);
+          const afterHeading = headingRange.getRange('After');
+          const searchInSection = afterHeading.search(endPhrase, {
+            matchCase: false,
+            matchWholeWord: false,
+          });
+          searchInSection.load('items');
+          await context.sync();
+
+          if (searchInSection.items.length > 0) {
+            // Expand from heading to the end phrase
+            const fullRange = headingRange.expandToOrNullObject(searchInSection.items[0]);
+            await context.sync();
+
+            if (!fullRange.isNullObject) {
+              fullRange.load('text');
+              await context.sync();
+
+              const foundLength = normalizeText(fullRange.text).length;
+              const expectedLength = normalized.length;
+              const lengthDiff = Math.abs(foundLength - expectedLength) / expectedLength;
+
+              console.log(`cascadingSearch: heading-based range has ${foundLength} chars, expected ${expectedLength}, diff ${(lengthDiff * 100).toFixed(1)}%`);
+
+              // Accept if within 30% of expected length
+              if (lengthDiff < 0.30) {
+                console.log('cascadingSearch: SUCCESS via section heading search');
+                matches.push({
+                  range: fullRange,
+                  text: fullRange.text,
+                  context: fullRange.text.substring(0, 200),
+                  confidence: 98,
+                  matchType: 'section_heading',
+                });
+                return matches;
+              }
+            }
+          }
+        }
+        console.log('cascadingSearch: heading search found matches but could not expand to full section');
+      }
+    }
+
     // Truncate for Word API if needed
-    const truncatedSearch = truncateSearchText(normalizeText(searchText));
-    console.log(`Search text length: ${searchText.length}, truncated to: ${truncatedSearch.length}`);
+    const truncatedSearch = truncateSearchText(normalized);
+    console.log(`cascadingSearch: falling back to truncated search, truncated to: ${truncatedSearch.length}`);
 
     // Tier 1: Search with truncated text (or full if short enough)
     try {
@@ -1330,7 +1395,8 @@ export default function App() {
 
     try {
       await Word.run(async (context) => {
-        const matches = await cascadingSearch(originalText, context);
+        // Pass risk.type as section title to enable section heading search
+        const matches = await cascadingSearch(originalText, context, risk.type);
 
         if (matches.length === 0) {
           setError(
@@ -1348,7 +1414,7 @@ export default function App() {
         }
         await context.sync();
 
-        // Set up preview state
+        // Set up preview state - include sectionTitle for confirmChange
         setPreviewState({
           isOpen: true,
           originalText,
@@ -1357,6 +1423,7 @@ export default function App() {
           selectedMatchIndex: 0,
           riskId: risk.id,
           clauseType,
+          sectionTitle: risk.type,
         });
 
         setIsApplyingChange(false);
@@ -1378,8 +1445,8 @@ export default function App() {
 
     try {
       await Word.run(async (context) => {
-        // Re-search to get fresh range reference
-        const matches = await cascadingSearch(previewState.originalText, context);
+        // Re-search to get fresh range reference (pass sectionTitle for better search)
+        const matches = await cascadingSearch(previewState.originalText, context, previewState.sectionTitle);
 
         if (matches.length === 0 || matches.length <= previewState.selectedMatchIndex) {
           setError('Could not find the text. Document may have changed.');
@@ -1422,7 +1489,7 @@ export default function App() {
     try {
       await Word.run(async (context) => {
         // Re-search to clear highlights
-        const matches = await cascadingSearch(previewState.originalText, context);
+        const matches = await cascadingSearch(previewState.originalText, context, previewState.sectionTitle);
         for (const match of matches) {
           match.range.font.highlightColor = 'None';
         }
@@ -1443,7 +1510,7 @@ export default function App() {
 
     try {
       await Word.run(async (context) => {
-        const matches = await cascadingSearch(previewState.originalText, context);
+        const matches = await cascadingSearch(previewState.originalText, context, previewState.sectionTitle);
 
         // Update highlights
         for (let i = 0; i < matches.length; i++) {
