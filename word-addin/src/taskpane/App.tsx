@@ -138,9 +138,18 @@ interface ClauseSuggestion {
   id: string;
   name: string;
   category: string;
+  category_id?: string;
   risk_level: string;
   primary_text: string;
   fallback_text?: string;
+  last_resort_text?: string;
+  tags?: string[];
+  usage_count?: number;
+}
+
+interface ClauseCategory {
+  id: string;
+  name: string;
 }
 
 interface SearchMatch {
@@ -718,70 +727,25 @@ async function applyChangesToSection(
  * @param trackChangesEnabled Whether Track Changes is enabled
  * @returns Object with success status and error message if failed
  */
-async function insertNewSection(
+/**
+ * Insert a new section at the current cursor position.
+ * User-controlled placement is 100% reliable - no auto-detection needed.
+ */
+async function insertNewSectionAtCursor(
   context: Word.RequestContext,
-  afterHeading: string,
   newSectionContent: string,
   trackChangesEnabled: boolean
 ): Promise<{ success: boolean; error?: string }> {
-  console.log(`insertNewSection: inserting after "${afterHeading}"`);
+  console.log('insertNewSectionAtCursor: inserting at cursor position');
 
-  // Extract section number from heading (e.g., "21" from "21. INDEMNIFICATION")
-  const sectionNumMatch = afterHeading.match(/^(\d+)\./);
-  let currentSectionNum = 0;
+  // Get current selection/cursor position
+  const selection = context.document.getSelection();
 
-  if (sectionNumMatch) {
-    currentSectionNum = parseInt(sectionNumMatch[1], 10);
-    console.log(`insertNewSection: current section number is ${currentSectionNum}`);
-  }
-
-  // Strategy: Find the NEXT section number directly (e.g., "22." after "21.")
-  // This is more reliable than parsing paragraphs
-  let insertionPoint: Word.Range | null = null;
-
-  if (currentSectionNum > 0) {
-    // Try to find the next few section numbers (22., 23., 24., etc.)
-    for (let nextNum = currentSectionNum + 1; nextNum <= currentSectionNum + 10; nextNum++) {
-      const searchPattern = `${nextNum}.`;
-      console.log(`insertNewSection: searching for next section "${searchPattern}"`);
-
-      const results = context.document.body.search(searchPattern, {
-        matchCase: false,
-        matchWholeWord: false,
-      });
-      results.load('items');
-      await context.sync();
-
-      if (results.items.length > 0) {
-        // Found the next section - get its paragraph and insert before it
-        const nextSectionRange = results.items[0];
-        const nextParagraph = nextSectionRange.paragraphs.getFirst();
-        nextParagraph.load('text');
-        await context.sync();
-
-        console.log(`insertNewSection: found next section "${nextNum}." in: "${nextParagraph.text.substring(0, 50)}..."`);
-
-        // Insert BEFORE this paragraph
-        insertionPoint = nextParagraph.getRange('Start');
-        break;
-      }
-    }
-  }
-
-  // Fallback: If no next section found, try to find the current section and go to end of document
-  if (!insertionPoint) {
-    console.log(`insertNewSection: no next section found, inserting at end of document body`);
-
-    // Get the end of the document body
-    const body = context.document.body;
-    insertionPoint = body.getRange('End');
-  }
-
-  // Insert the new section with proper formatting
+  // Insert the new section at cursor with formatting
   const insertText = '\n\n' + newSectionContent + '\n\n';
-  const newRange = insertionPoint.insertText(insertText, Word.InsertLocation.before);
+  const newRange = selection.insertText(insertText, Word.InsertLocation.after);
 
-  // Style the new content
+  // Style the new content if track changes not enabled
   if (!trackChangesEnabled) {
     newRange.font.underline = Word.UnderlineType.single;
     newRange.font.color = '#16A34A';
@@ -790,7 +754,7 @@ async function insertNewSection(
   newRange.select();
   await context.sync();
 
-  console.log(`insertNewSection: successfully inserted new section`);
+  console.log('insertNewSectionAtCursor: successfully inserted new section');
   return { success: true };
 }
 
@@ -855,6 +819,20 @@ export default function App() {
   const [isLoadingClauses, setIsLoadingClauses] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Analysis depth toggle - controls what risk levels AI surfaces
+  const [riskLevelFilter, setRiskLevelFilter] = useState<'high' | 'medium' | 'all'>('high');
+
+  // Clauses tab filters
+  const [clauseCategories, setClauseCategories] = useState<ClauseCategory[]>([]);
+  const [selectedClauseCategory, setSelectedClauseCategory] = useState<string>('');
+  const [clauseSearch, setClauseSearch] = useState('');
+  const [expandedClauseId, setExpandedClauseId] = useState<string | null>(null);
+
+  // Save to History state
+  const [originalDocumentText, setOriginalDocumentText] = useState<string>('');
+  const [isSavingToHistory, setIsSavingToHistory] = useState(false);
+  const [savedToHistory, setSavedToHistory] = useState(false);
 
   // Preview and match selection state
   const [previewState, setPreviewState] = useState<PreviewState | null>(null);
@@ -1066,6 +1044,76 @@ export default function App() {
     });
   }, []);
 
+  // Save current document state to history
+  // This captures the ACTUAL document with only the changes the user inserted
+  const saveToHistory = async () => {
+    if (!user) {
+      setError('Please log in first');
+      return;
+    }
+
+    if (!analysisResult) {
+      setError('No analysis to save');
+      return;
+    }
+
+    setIsSavingToHistory(true);
+    setError(null);
+
+    try {
+      // Read the CURRENT Word document text (with user's applied changes)
+      const currentDocumentText = await getDocumentText();
+      const documentName = await getDocumentName();
+
+      // Get linked contract info
+      const selectedContractData = contracts.find(c => c.id === selectedContract);
+      const historyProvisionName = selectedContractData?.name || documentName;
+
+      // Generate a simple diff summary based on what sections were applied
+      const appliedSummary = analysisResult.sections
+        .filter(s => appliedSections.has(s.sectionTitle))
+        .map(s => `[${s.sectionTitle}] ${s.rationale || 'Modified'}`);
+
+      // If no changes were applied, note that
+      const summary = appliedSummary.length > 0
+        ? appliedSummary
+        : ['No changes applied - document reviewed but unchanged'];
+
+      const token = localStorage.getItem('mars_token');
+      const response = await fetch(`${API_BASE}/api/contracts/review/history`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          contractId: selectedContract || undefined,
+          contractName: selectedContractData?.name || undefined,
+          provisionName: historyProvisionName,
+          originalText: originalDocumentText, // The document BEFORE any changes
+          redlinedText: currentDocumentText,  // The document AFTER user's changes (we'll use this as the "modified" view)
+          modifiedText: currentDocumentText,  // Current state of the document
+          summary: summary,
+          status: 'draft',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save to history');
+      }
+
+      setSavedToHistory(true);
+      setSuccessMessage(`Saved to history: ${historyProvisionName}`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save to history');
+      console.error('Save to history error:', err);
+    } finally {
+      setIsSavingToHistory(false);
+    }
+  };
+
   // Analyze document using dashboard API
   const analyzeDocument = async () => {
     if (!user) {
@@ -1077,6 +1125,7 @@ export default function App() {
     setError(null);
     setAppliedSections(new Set()); // Clear applied sections on new analysis
     setAllChangesInserted(false);
+    setSavedToHistory(false); // Reset history save state for new analysis
 
     try {
       const [documentText, documentName] = await Promise.all([
@@ -1102,6 +1151,7 @@ export default function App() {
           text: documentText,
           provisionName: documentName,
           contractId: selectedContract || undefined,
+          riskLevel: riskLevelFilter, // Pass risk level filter to control analysis depth
         }),
       });
 
@@ -1112,6 +1162,9 @@ export default function App() {
 
       const result: DashboardAnalysisResult = await response.json();
       setAnalysisResult(result);
+
+      // Store the original document text for later comparison when saving to history
+      setOriginalDocumentText(documentText);
 
       if (result.sections.length === 0) {
         setSuccessMessage('No material risks found in this contract.');
@@ -1271,6 +1324,10 @@ export default function App() {
     let appliedCount = 0;
     const newApplied = new Set(appliedSections);
     const failedSections: string[] = [];
+    // Count new sections that require cursor placement (skipped in bulk apply)
+    const newSectionsCount = analysisResult.sections.filter(
+      s => s.isNewSection && !appliedSections.has(s.sectionTitle)
+    ).length;
 
     try {
       await Word.run(async (context) => {
@@ -1357,32 +1414,10 @@ export default function App() {
           }
         }
 
-        // Step 5: Handle new sections (insertions) - apply last
-        const newSectionsToInsert = analysisResult.sections.filter(
-          s => s.isNewSection && !appliedSections.has(s.sectionTitle)
-        );
-
-        for (const section of newSectionsToInsert) {
-          if (!section.insertAfter || !section.revisedText) {
-            console.warn(`New section ${section.sectionTitle} missing insertAfter or content`);
-            continue;
-          }
-
-          const result = await insertNewSection(
-            context,
-            section.insertAfter,
-            section.revisedText,
-            trackChangesEnabled
-          );
-
-          if (result.success) {
-            newApplied.add(section.sectionTitle);
-            appliedCount++;
-            console.log(`Inserted new section: ${section.sectionTitle}`);
-          } else {
-            failedSections.push(section.sectionTitle);
-            console.error(`Failed to insert ${section.sectionTitle}: ${result.error}`);
-          }
+        // Step 5: Note - New sections are skipped in bulk apply
+        // They require cursor placement (user positions cursor, then clicks "Insert at Cursor")
+        if (newSectionsCount > 0) {
+          console.log(`Skipping ${newSectionsCount} new sections - these require cursor placement`);
         }
       });
 
@@ -1390,10 +1425,16 @@ export default function App() {
       setAllChangesInserted(failedSections.length === 0);
 
       if (appliedCount > 0) {
-        const message = failedSections.length > 0
+        let message = failedSections.length > 0
           ? `Applied ${appliedCount} changes. Failed: ${failedSections.join(', ')}`
           : `Applied ${appliedCount} changes successfully`;
+        if (newSectionsCount > 0) {
+          message += `. ${newSectionsCount} new section${newSectionsCount > 1 ? 's' : ''} require cursor placement.`;
+        }
         setSuccessMessage(message);
+        setTimeout(() => setSuccessMessage(null), 5000);
+      } else if (newSectionsCount > 0) {
+        setSuccessMessage(`No modifications to apply. ${newSectionsCount} new section${newSectionsCount > 1 ? 's' : ''} require cursor placement.`);
         setTimeout(() => setSuccessMessage(null), 5000);
       } else {
         setError('Could not apply any changes. The document text may have changed.');
@@ -1411,8 +1452,8 @@ export default function App() {
   const insertSingleSection = async (section: DashboardSection) => {
     // Check if this is a new section to insert
     if (section.isNewSection) {
-      if (!section.insertAfter || !section.revisedText) {
-        setError('Missing insert location or content for new section');
+      if (!section.revisedText) {
+        setError('Missing content for new section');
         return;
       }
     } else if (!section.changes && (!section.originalText || !section.revisedText)) {
@@ -1445,16 +1486,15 @@ export default function App() {
 
         // Step 2: Handle based on section type
         if (section.isNewSection) {
-          // Insert new section
-          const result = await insertNewSection(
+          // Insert new section at cursor position (user-controlled placement)
+          const result = await insertNewSectionAtCursor(
             context,
-            section.insertAfter!,
             section.revisedText,
             trackChangesEnabled
           );
 
           if (!result.success) {
-            setError(result.error || `Could not find location to insert after "${section.insertAfter}"`);
+            setError(result.error || 'Failed to insert section at cursor');
             return;
           }
         } else if (section.fromSelection && section.originalSelectedText && section.changes && section.changes.length > 0) {
@@ -1603,18 +1643,27 @@ export default function App() {
     return 'success';
   };
 
-  // Load clause library
-  const loadClauses = async () => {
+  // Load clause library with optional filters
+  const loadClauses = async (category?: string, search?: string) => {
     setIsLoadingClauses(true);
     try {
       const token = localStorage.getItem('mars_token');
-      const response = await fetch(`${API_BASE}/api/word-addin/clauses`, {
+      const params = new URLSearchParams();
+      if (category) params.append('category', category);
+      if (search) params.append('search', search);
+
+      const url = `${API_BASE}/api/word-addin/clauses${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.ok) {
         const data = await response.json();
         setClauses(data.clauses || []);
+        // Set categories if available (only on first load)
+        if (data.categories && clauseCategories.length === 0) {
+          setClauseCategories(data.categories);
+        }
       }
     } catch (err) {
       console.error('Failed to load clauses:', err);
@@ -2113,7 +2162,22 @@ export default function App() {
     const value = data.value as string;
     setActiveTab(value);
     if (value === 'clauses' && clauses.length === 0) {
-      loadClauses();
+      loadClauses(selectedClauseCategory, clauseSearch);
+    }
+  };
+
+  // Handle clause category filter change
+  const handleClauseCategoryChange = (categoryId: string) => {
+    setSelectedClauseCategory(categoryId);
+    loadClauses(categoryId, clauseSearch);
+  };
+
+  // Handle clause search
+  const handleClauseSearch = (searchTerm: string) => {
+    setClauseSearch(searchTerm);
+    // Debounce the search
+    if (searchTerm.length >= 2 || searchTerm.length === 0) {
+      loadClauses(selectedClauseCategory, searchTerm);
     }
   };
 
@@ -2525,6 +2589,29 @@ export default function App() {
 
               {/* Analyze Controls - Flat, Microsoft-native */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Analysis Depth Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Text size={200} style={{ color: '#808080', whiteSpace: 'nowrap' }}>Depth:</Text>
+                  <select
+                    value={riskLevelFilter}
+                    onChange={(e) => setRiskLevelFilter(e.target.value as 'high' | 'medium' | 'all')}
+                    disabled={isAnalyzing}
+                    style={{
+                      flex: 1,
+                      padding: '4px 8px',
+                      backgroundColor: '#2d2d2d',
+                      border: '1px solid #404040',
+                      color: '#cccccc',
+                      fontSize: 12,
+                      cursor: isAnalyzing ? 'default' : 'pointer',
+                    }}
+                  >
+                    <option value="high">High Risk Only</option>
+                    <option value="medium">Include Medium Risk</option>
+                    <option value="all">All Risks (Most Thorough)</option>
+                  </select>
+                </div>
+
                 {/* Button Row - Primary action emphasized */}
                 <div style={styles.analyzeButtons}>
                   {/* Primary action - subtle emphasis */}
@@ -2628,6 +2715,33 @@ export default function App() {
                   {allChangesInserted && (
                     <span style={{ fontSize: 12, color: '#6a9955', padding: '8px 0', display: 'block' }}>
                       ✓ All changes inserted
+                    </span>
+                  )}
+
+                  {/* Save to History Button - appears after any changes are inserted */}
+                  {appliedSections.size > 0 && !savedToHistory && (
+                    <button
+                      onClick={saveToHistory}
+                      disabled={isSavingToHistory}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        marginTop: 8,
+                        backgroundColor: isSavingToHistory ? 'transparent' : 'rgba(34, 197, 94, 0.08)',
+                        border: '1px solid rgba(34, 197, 94, 0.25)',
+                        color: isSavingToHistory ? '#666666' : '#22c55e',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: isSavingToHistory ? 'default' : 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {isSavingToHistory ? 'Saving to History...' : 'Save to History (for Approval Workflow)'}
+                    </button>
+                  )}
+                  {savedToHistory && (
+                    <span style={{ fontSize: 12, color: '#6a9955', padding: '8px 0', display: 'block' }}>
+                      ✓ Saved to dashboard history
                     </span>
                   )}
 
@@ -2750,7 +2864,7 @@ export default function App() {
                         New Sections ({analysisResult.sections.filter(s => s.isNewSection).length})
                       </span>
                       <span style={{ fontSize: 11, color: '#666666', display: 'block', marginBottom: 12 }}>
-                        These will be added to your contract
+                        Position your cursor where you want to insert, then click the button
                       </span>
                       {analysisResult.sections.filter(s => s.isNewSection).map((section, index) => (
                         <div key={`new-${index}`} style={styles.sectionCard}>
@@ -2777,12 +2891,6 @@ export default function App() {
                           <div style={{ fontSize: 12, color: '#9d9d9d', marginTop: 6, lineHeight: 1.5 }}>
                             {section.rationale}
                           </div>
-
-                          {section.insertAfter && (
-                            <div style={{ fontSize: 11, color: '#808080', marginTop: 4 }}>
-                              Insert after: <span style={{ color: '#569cd6' }}>{section.insertAfter}</span>
-                            </div>
-                          )}
 
                           {/* Full content preview - scrollable */}
                           {section.revisedText && !appliedSections.has(section.sectionTitle) && (
@@ -2832,7 +2940,7 @@ export default function App() {
                                 padding: 0,
                               }}
                             >
-                              {appliedSections.has(section.sectionTitle) ? 'Inserted' : 'Insert Section'}
+                              {appliedSections.has(section.sectionTitle) ? 'Inserted' : 'Insert at Cursor'}
                             </button>
                             {/* Secondary action */}
                             <button
@@ -2891,14 +2999,57 @@ export default function App() {
 
           {activeTab === 'clauses' && (
             <div style={styles.clausesTab}>
-              <Button
-                appearance="subtle"
-                icon={<ArrowSync24Regular />}
-                onClick={loadClauses}
-                disabled={isLoadingClauses}
-              >
-                Refresh
-              </Button>
+              {/* Filters Row */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                {/* Category Filter */}
+                <select
+                  value={selectedClauseCategory}
+                  onChange={(e) => handleClauseCategoryChange(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: 120,
+                    padding: '6px 8px',
+                    backgroundColor: '#2d2d2d',
+                    border: '1px solid #404040',
+                    color: '#cccccc',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="">All Categories</option>
+                  {clauseCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+
+                {/* Search Input */}
+                <input
+                  type="text"
+                  value={clauseSearch}
+                  onChange={(e) => handleClauseSearch(e.target.value)}
+                  placeholder="Search clauses..."
+                  style={{
+                    flex: 2,
+                    minWidth: 120,
+                    padding: '6px 8px',
+                    backgroundColor: '#2d2d2d',
+                    border: '1px solid #404040',
+                    color: '#cccccc',
+                    fontSize: 12,
+                  }}
+                />
+
+                {/* Refresh Button */}
+                <Button
+                  appearance="subtle"
+                  icon={<ArrowSync24Regular />}
+                  onClick={() => loadClauses(selectedClauseCategory, clauseSearch)}
+                  disabled={isLoadingClauses}
+                  style={{ padding: '4px 8px' }}
+                >
+                  Refresh
+                </Button>
+              </div>
 
               {isLoadingClauses ? (
                 <div style={{
@@ -2919,15 +3070,20 @@ export default function App() {
                   </span>
                 </div>
               ) : clauses.length === 0 ? (
-                <Text style={{ color: '#A0A0A0', textAlign: 'center' }}>
-                  No clauses available. Add clauses in the MARS web app.
+                <Text style={{ color: '#A0A0A0', textAlign: 'center', padding: 16 }}>
+                  {clauseSearch || selectedClauseCategory
+                    ? 'No clauses match your filters.'
+                    : 'No clauses available. Add clauses in the MARS web app.'}
                 </Text>
               ) : (
                 <div style={styles.clauseList}>
                   {clauses.map((clause) => (
                     <div key={clause.id} style={styles.clauseCard}>
-                      {/* Flat clause header */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {/* Clause header with expand/collapse */}
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                        onClick={() => setExpandedClauseId(expandedClauseId === clause.id ? null : clause.id)}
+                      >
                         <span style={{
                           fontSize: 11,
                           fontWeight: 600,
@@ -2938,47 +3094,202 @@ export default function App() {
                           {clause.risk_level}
                         </span>
                         <span style={{ color: '#4d4d4d' }}>·</span>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: '#cccccc' }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: '#cccccc', flex: 1 }}>
                           {clause.name}
+                        </span>
+                        {/* Usage count badge */}
+                        {clause.usage_count !== undefined && clause.usage_count > 0 && (
+                          <span style={{
+                            fontSize: 10,
+                            backgroundColor: '#3a3a3a',
+                            color: '#9d9d9d',
+                            padding: '2px 6px',
+                            borderRadius: 10,
+                          }}>
+                            {clause.usage_count} uses
+                          </span>
+                        )}
+                        {/* Expand indicator */}
+                        <span style={{ color: '#666666', fontSize: 10 }}>
+                          {expandedClauseId === clause.id ? '▼' : '▶'}
                         </span>
                       </div>
                       <div style={{ fontSize: 11, color: '#666666', marginTop: 2 }}>
                         {clause.category}
-                      </div>
-                      <div style={styles.clauseText}>
-                        {clause.primary_text.substring(0, 150)}
-                        {clause.primary_text.length > 150 ? '...' : ''}
-                      </div>
-                      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                        <button
-                          onClick={() => insertClause(clause.primary_text)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#569cd6',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                            padding: 0,
-                          }}
-                        >
-                          Insert Primary
-                        </button>
-                        {clause.fallback_text && (
-                          <button
-                            onClick={() => insertClause(clause.fallback_text!)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#569cd6',
-                              fontSize: 12,
-                              cursor: 'pointer',
-                              padding: 0,
-                            }}
-                          >
-                            Insert Fallback
-                          </button>
+                        {clause.tags && clause.tags.length > 0 && (
+                          <span style={{ marginLeft: 8 }}>
+                            {clause.tags.slice(0, 3).map((tag, i) => (
+                              <span key={i} style={{
+                                backgroundColor: '#2d2d2d',
+                                padding: '1px 4px',
+                                marginLeft: 4,
+                                fontSize: 10,
+                                color: '#808080',
+                              }}>
+                                {tag}
+                              </span>
+                            ))}
+                          </span>
                         )}
                       </div>
+
+                      {/* Collapsed view - show truncated primary text */}
+                      {expandedClauseId !== clause.id && (
+                        <>
+                          <div style={styles.clauseText}>
+                            {clause.primary_text.substring(0, 150)}
+                            {clause.primary_text.length > 150 ? '...' : ''}
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); insertClause(clause.primary_text); }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#569cd6',
+                                fontSize: 12,
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
+                            >
+                              Insert Primary
+                            </button>
+                            {clause.fallback_text && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); insertClause(clause.fallback_text!); }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#569cd6',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                }}
+                              >
+                                Insert Fallback
+                              </button>
+                            )}
+                            {clause.last_resort_text && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); insertClause(clause.last_resort_text!); }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#808080',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                }}
+                              >
+                                Last Resort
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Expanded view - show all three positions */}
+                      {expandedClauseId === clause.id && (
+                        <div style={{ marginTop: 12 }}>
+                          {/* Primary Position */}
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: '#6a9955' }}>PRIMARY</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); insertClause(clause.primary_text); }}
+                                style={{
+                                  background: 'none',
+                                  border: '1px solid #404040',
+                                  color: '#569cd6',
+                                  fontSize: 11,
+                                  cursor: 'pointer',
+                                  padding: '2px 8px',
+                                }}
+                              >
+                                Insert
+                              </button>
+                            </div>
+                            <div style={{
+                              ...styles.clauseText,
+                              backgroundColor: '#252526',
+                              padding: 8,
+                              maxHeight: 120,
+                              overflowY: 'auto',
+                            }}>
+                              {clause.primary_text}
+                            </div>
+                          </div>
+
+                          {/* Fallback Position */}
+                          {clause.fallback_text && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#cca700' }}>FALLBACK</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); insertClause(clause.fallback_text!); }}
+                                  style={{
+                                    background: 'none',
+                                    border: '1px solid #404040',
+                                    color: '#569cd6',
+                                    fontSize: 11,
+                                    cursor: 'pointer',
+                                    padding: '2px 8px',
+                                  }}
+                                >
+                                  Insert
+                                </button>
+                              </div>
+                              <div style={{
+                                ...styles.clauseText,
+                                backgroundColor: '#252526',
+                                padding: 8,
+                                maxHeight: 120,
+                                overflowY: 'auto',
+                              }}>
+                                {clause.fallback_text}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Last Resort Position */}
+                          {clause.last_resort_text && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#d16969' }}>LAST RESORT</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); insertClause(clause.last_resort_text!); }}
+                                  style={{
+                                    background: 'none',
+                                    border: '1px solid #404040',
+                                    color: '#569cd6',
+                                    fontSize: 11,
+                                    cursor: 'pointer',
+                                    padding: '2px 8px',
+                                  }}
+                                >
+                                  Insert
+                                </button>
+                              </div>
+                              <div style={{
+                                ...styles.clauseText,
+                                backgroundColor: '#252526',
+                                padding: 8,
+                                maxHeight: 120,
+                                overflowY: 'auto',
+                              }}>
+                                {clause.last_resort_text}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* No fallback/last resort message */}
+                          {!clause.fallback_text && !clause.last_resort_text && (
+                            <div style={{ fontSize: 11, color: '#666666', fontStyle: 'italic' }}>
+                              Only primary position defined for this clause.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

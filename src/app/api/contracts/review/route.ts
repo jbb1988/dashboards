@@ -776,16 +776,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { text, contractId, provisionName, model, playbookContent, focusedClause } = body;
+    const { text, contractId, provisionName, model, playbookContent, focusedClause, riskLevel } = body;
 
     // Check if this is a focused clause analysis
     const isFocusedAnalysis = focusedClause && focusedClause.text && focusedClause.name;
+
+    // Risk level filter: 'high' (default), 'medium', or 'all'
+    const analysisRiskLevel = riskLevel || 'high';
 
     console.log('Request received:');
     console.log('- Text length:', text?.length || 0);
     console.log('- Contract ID:', contractId || 'none');
     console.log('- Provision:', provisionName || 'none');
     console.log('- Model:', model);
+    console.log('- Risk Level Filter:', analysisRiskLevel);
     console.log('- Playbook comparison:', playbookContent ? `${playbookContent.length} chars` : 'none');
     console.log('- Focused clause:', isFocusedAnalysis ? focusedClause.name : 'none');
 
@@ -841,6 +845,41 @@ export async function POST(request: NextRequest) {
       if (clauseContext) {
         userPrompt = clauseContext + '\n\n' + userPrompt;
       }
+
+      // Add risk level filtering instructions based on analysisRiskLevel
+      let riskLevelInstructions = '';
+      if (analysisRiskLevel === 'all') {
+        riskLevelInstructions = `
+ANALYSIS DEPTH: COMPREHENSIVE (All Risks)
+Include ALL deviations from MARS standard positions:
+- HIGH RISK: Material issues that significantly affect MARS's interests or liability
+- MEDIUM RISK: Unfavorable but not critical terms - suboptimal clauses that could be improved
+- LOW RISK: Minor deviations from MARS standards - style, preference, or non-material differences
+
+Be thorough. Find EVERY issue, even minor ones. Users want a complete review.
+`;
+      } else if (analysisRiskLevel === 'medium') {
+        riskLevelInstructions = `
+ANALYSIS DEPTH: MODERATE (High + Medium Risk)
+Include HIGH and MEDIUM risk issues:
+- HIGH RISK: Material issues that significantly affect MARS's interests or liability
+- MEDIUM RISK: Unfavorable but not critical terms - suboptimal clauses that could be improved
+
+Skip low-risk items that are merely preferences or style differences.
+`;
+      } else {
+        // Default: high only
+        riskLevelInstructions = `
+ANALYSIS DEPTH: FOCUSED (High Risk Only)
+Focus ONLY on HIGH RISK issues:
+- Material issues that significantly affect MARS's interests or liability
+- Terms that could cause substantial financial or legal exposure
+- Provisions that fundamentally conflict with MARS's standard positions
+
+Skip medium and low-risk items. Only flag material, high-impact issues.
+`;
+      }
+      userPrompt = riskLevelInstructions + '\n' + userPrompt;
 
       // Add playbook comparison if provided
       if (playbookContent && typeof playbookContent === 'string' && playbookContent.trim().length > 0) {

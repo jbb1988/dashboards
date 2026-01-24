@@ -628,6 +628,9 @@ function ContractReviewPageContent() {
         summary: item.summary || [],
         timestamp: item.createdAt,
       });
+      // Set the review ID so approval workflow can use it
+      // This enables "Send for Approval" for analyses loaded from history (including Word add-in)
+      setLastReviewId(item.id);
       setActiveTab('paste');
       setMainTab('review');
     }
