@@ -11,18 +11,41 @@ const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 export const maxDuration = 300; // 5 minutes max for Pro plan
 
 // ============================================
-// QUALITY GATE VALIDATION
+// TYPES FOR NEW ANCHOR-BASED SCHEMA
 // ============================================
 
+interface Edit {
+  section: string;
+  operation: 'replace_block';
+  anchor_start: string;
+  anchor_end: string;
+  new_text: string;
+}
+
+interface SelfCheck {
+  no_duplicate_sentence_starts: boolean;
+  no_orphaned_fragments: boolean;
+  no_duplicate_definitions: boolean;
+  no_contradictory_modifiers: boolean;
+  no_paragraph_starts_with_and: boolean;
+}
+
+interface AIResponse {
+  edits: Edit[];
+  self_check?: SelfCheck;
+  error?: string;
+}
+
 interface QualityIssue {
-  type: 'orphan_fragment' | 'duplicate_opening' | 'dangling_conjunction' | 'conflicting_modifiers' | 'incomplete_sentence';
+  type: 'duplicate_sentence_start' | 'orphan_fragment' | 'duplicate_definition' | 'contradictory_modifiers' | 'dangling_conjunction' | 'anchor_not_found' | 'incomplete_sentence';
   severity: 'error' | 'warning';
   description: string;
-  sectionTitle?: string;
+  section?: string;
   evidence?: string;
 }
 
-interface Section {
+// Legacy Section interface for backwards compatibility with frontend
+interface LegacySection {
   sectionNumber?: string;
   sectionTitle?: string;
   originalText?: string;
@@ -32,104 +55,191 @@ interface Section {
   rationale?: string;
 }
 
+// ============================================
+// QUALITY GATE VALIDATION (QA CHECKLIST)
+// ============================================
+
 /**
- * Quality Gate: Validate AI-generated sections for common issues
+ * Quality Gate: Validate AI-generated edits against the QA checklist
  * Returns list of issues found. Empty list = passed validation.
+ *
+ * Checklist:
+ * A) Structure / deletion integrity
+ * B) Defined terms & parentheticals
+ * C) Grammar mechanics
+ * D) Scope consistency (contradiction killer)
+ * E) Cap placement
  */
-function validateSections(
-  sections: Section[],
-  originalContract: string
+function validateEdits(
+  edits: Edit[],
+  originalContract: string,
+  selfCheck?: SelfCheck
 ): QualityIssue[] {
   const issues: QualityIssue[] = [];
 
-  for (const section of sections) {
-    if (!section.originalText || !section.revisedText) continue;
+  for (const edit of edits) {
+    const section = edit.section || 'Unknown';
+    const newText = edit.new_text || '';
 
-    const title = section.sectionTitle || section.sectionNumber || 'Unknown';
+    // A) STRUCTURE / DELETION INTEGRITY
 
-    // 1. Check for orphan fragments - originalText should end at a sentence boundary
-    const endsWithPunctuation = /[.!?;:]\s*$/.test(section.originalText.trim());
-    const endsWithClosingParen = /\)\s*$/.test(section.originalText.trim());
-    if (!endsWithPunctuation && !endsWithClosingParen) {
-      // Check if there's more text after in the original contract
-      const originalPos = originalContract.indexOf(section.originalText);
-      if (originalPos !== -1) {
-        const afterText = originalContract.substring(originalPos + section.originalText.length, originalPos + section.originalText.length + 100);
-        // If there's non-whitespace content immediately after, this might leave orphans
-        if (afterText.trim() && !afterText.trim().startsWith('\n\n')) {
+    // A1. No duplicate sentence starts
+    const sentencePattern = /(?:^|[.!?]\s+)([A-Z][a-z]+(?:\s+[a-z]+){0,4})/g;
+    const sentenceStarts: string[] = [];
+    let match;
+    while ((match = sentencePattern.exec(newText)) !== null) {
+      sentenceStarts.push(match[1].toLowerCase());
+    }
+    const uniqueStarts = new Set(sentenceStarts);
+    if (sentenceStarts.length > uniqueStarts.size) {
+      const duplicates = sentenceStarts.filter((s, i) => sentenceStarts.indexOf(s) !== i);
+      issues.push({
+        type: 'duplicate_sentence_start',
+        severity: 'error',
+        description: `Duplicate sentence opening detected`,
+        section,
+        evidence: `"${duplicates[0]}..." appears multiple times`
+      });
+    }
+
+    // A2. Check anchors exist and are unique in source
+    const anchorStart = edit.anchor_start;
+    const anchorEnd = edit.anchor_end;
+
+    if (anchorStart) {
+      const startCount = (originalContract.match(new RegExp(escapeRegExp(anchorStart), 'g')) || []).length;
+      if (startCount === 0) {
+        issues.push({
+          type: 'anchor_not_found',
+          severity: 'error',
+          description: `anchor_start not found in contract`,
+          section,
+          evidence: `"${anchorStart.substring(0, 50)}..."`
+        });
+      } else if (startCount > 1) {
+        issues.push({
+          type: 'anchor_not_found',
+          severity: 'warning',
+          description: `anchor_start appears ${startCount} times (should be unique)`,
+          section
+        });
+      }
+    }
+
+    if (anchorEnd) {
+      const endCount = (originalContract.match(new RegExp(escapeRegExp(anchorEnd), 'g')) || []).length;
+      if (endCount === 0) {
+        issues.push({
+          type: 'anchor_not_found',
+          severity: 'error',
+          description: `anchor_end not found in contract`,
+          section,
+          evidence: `"...${anchorEnd.slice(-50)}"`
+        });
+      }
+    }
+
+    // B) DEFINED TERMS & PARENTHETICALS
+
+    // B1. Defined term parenthetical appears max once
+    const definedTermPattern = /\(collectively[,]?\s*["'][^"']+["'][^)]*\)/gi;
+    const definedTerms = newText.match(definedTermPattern) || [];
+    if (definedTerms.length > 1) {
+      issues.push({
+        type: 'duplicate_definition',
+        severity: 'error',
+        description: `Defined term parenthetical appears ${definedTerms.length} times (max 1)`,
+        section,
+        evidence: definedTerms.join(' | ')
+      });
+    }
+
+    // C) GRAMMAR MECHANICS
+
+    // C1. No paragraph starts with "and/or/but" (dangling conjunction)
+    const danglingPattern = /(?:^|\n\n)\s*(and\s|or\s|but\s)/i;
+    if (danglingPattern.test(newText)) {
+      const matchedConj = newText.match(danglingPattern);
+      issues.push({
+        type: 'dangling_conjunction',
+        severity: 'error',
+        description: `Paragraph starts with conjunction without antecedent`,
+        section,
+        evidence: matchedConj ? matchedConj[0].trim() : undefined
+      });
+    }
+
+    // C2. Check for incomplete sentences (basic)
+    const trimmedText = newText.trim();
+    if (trimmedText && !trimmedText.endsWith('.') && !trimmedText.endsWith('"') && !trimmedText.endsWith(')')) {
+      issues.push({
+        type: 'incomplete_sentence',
+        severity: 'warning',
+        description: `new_text may not end with complete sentence`,
+        section,
+        evidence: `Ends with: "${trimmedText.slice(-30)}"`
+      });
+    }
+
+    // D) SCOPE CONSISTENCY (THE CONTRADICTION KILLER)
+
+    // D1. If limited causation, no broad causation phrases
+    const hasLimitedCausation = /to the extent caused by|to the extent arising from|but only to the extent/i.test(newText);
+    const broadCausationPhrases = [
+      'however caused',
+      'arising out of',
+      'in any way connected with',
+      'resulting from',
+      'regardless of cause'
+    ];
+
+    if (hasLimitedCausation) {
+      for (const phrase of broadCausationPhrases) {
+        if (newText.toLowerCase().includes(phrase)) {
           issues.push({
-            type: 'incomplete_sentence',
+            type: 'contradictory_modifiers',
             severity: 'error',
-            description: `originalText may not capture complete sentence - could leave orphan text`,
-            sectionTitle: title,
-            evidence: `Ends with: "${section.originalText.slice(-50)}" | Next in doc: "${afterText.substring(0, 50)}"`
+            description: `Contradictory scope: has "to the extent caused by" but also "${phrase}"`,
+            section
           });
         }
       }
     }
 
-    // 2. Check for duplicate sentence openings in revisedText
-    const sentenceStarts = section.revisedText.match(/(?:^|\.\s+)([A-Z][^.]{10,40})/g) || [];
-    const uniqueStarts = new Set(sentenceStarts.map(s => s.toLowerCase().trim()));
-    if (sentenceStarts.length > uniqueStarts.size) {
+    // D2. If limited to third-party claims, check for inconsistent first-party
+    const thirdPartyOnly = /third[- ]party claims/i.test(newText);
+    const hasFirstParty = /claims\s+(?:made\s+)?by\s+(?:FW|Client|County)/i.test(newText);
+    if (thirdPartyOnly && hasFirstParty) {
       issues.push({
-        type: 'duplicate_opening',
+        type: 'contradictory_modifiers',
         severity: 'warning',
-        description: `revisedText may have duplicate sentence openings`,
-        sectionTitle: title
+        description: `May have inconsistent scope: "third-party claims" but also mentions claims by FW/Client`,
+        section
       });
     }
+  }
 
-    // 3. Check for dangling conjunctions at paragraph start
-    const danglingConjunctionPattern = /(?:^|\n\n)\s*(and\s+against|and\s+including|and\s+any|or\s+any)\s/i;
-    if (danglingConjunctionPattern.test(section.revisedText)) {
-      issues.push({
-        type: 'dangling_conjunction',
-        severity: 'error',
-        description: `revisedText starts paragraph with dangling conjunction (no antecedent)`,
-        sectionTitle: title,
-        evidence: section.revisedText.match(danglingConjunctionPattern)?.[0]
-      });
-    }
-
-    // 4. Check for conflicting modifiers (legal scope issue)
-    const hasLimitedCausation = /to the extent caused by|to the extent arising from|proportionate to/i.test(section.revisedText);
-    const hasUnlimitedCausation = /however caused|regardless of cause|whether or not caused/i.test(section.revisedText);
-    if (hasLimitedCausation && hasUnlimitedCausation) {
-      issues.push({
-        type: 'conflicting_modifiers',
-        severity: 'warning',
-        description: `revisedText has conflicting causation language ("to the extent caused by" + "however caused")`,
-        sectionTitle: title
-      });
-    }
-
-    // 5. Check if revisedText is grammatically complete (basic check)
-    const revisedTrimmed = section.revisedText.trim();
-    if (!revisedTrimmed.endsWith('.') && !revisedTrimmed.endsWith('"') && !revisedTrimmed.endsWith(')')) {
-      issues.push({
-        type: 'incomplete_sentence',
-        severity: 'warning',
-        description: `revisedText may not be a complete sentence`,
-        sectionTitle: title,
-        evidence: `Ends with: "${revisedTrimmed.slice(-30)}"`
-      });
-    }
-
-    // 6. Check for duplicated defined terms - e.g., (collectively "FW"...) appearing twice
-    const definedTermPattern = /\(collectively\s+["'][^"']+["'][^)]*\)/gi;
-    const definedTerms = section.revisedText.match(definedTermPattern) || [];
-    if (definedTerms.length > 1) {
-      // Check if they're the same definition
-      const normalized = definedTerms.map(t => t.toLowerCase());
-      const uniqueTerms = new Set(normalized);
-      if (normalized.length > uniqueTerms.size) {
+  // Cross-check with AI's self-reported self_check
+  if (selfCheck) {
+    if (selfCheck.no_duplicate_sentence_starts === false) {
+      const existing = issues.find(i => i.type === 'duplicate_sentence_start');
+      if (!existing) {
         issues.push({
-          type: 'duplicate_opening',
-          severity: 'error',
-          description: `revisedText has duplicate defined term parenthetical`,
-          sectionTitle: title,
-          evidence: definedTerms.join(' ... ')
+          type: 'duplicate_sentence_start',
+          severity: 'warning',
+          description: `AI self-reported duplicate sentence starts (not detected by validator)`,
+          section: 'Self-Check'
+        });
+      }
+    }
+    if (selfCheck.no_contradictory_modifiers === false) {
+      const existing = issues.find(i => i.type === 'contradictory_modifiers');
+      if (!existing) {
+        issues.push({
+          type: 'contradictory_modifiers',
+          severity: 'warning',
+          description: `AI self-reported contradictory modifiers (not detected by validator)`,
+          section: 'Self-Check'
         });
       }
     }
@@ -147,13 +257,13 @@ function formatQualityFeedback(issues: QualityIssue[]): string {
   const errorIssues = issues.filter(i => i.severity === 'error');
   const warningIssues = issues.filter(i => i.severity === 'warning');
 
-  let feedback = '\n\n=== QUALITY VALIDATION FAILED - PLEASE FIX ===\n';
-  feedback += 'Your previous output had the following issues:\n\n';
+  let feedback = '\n\n=== QUALITY VALIDATION FAILED ===\n';
+  feedback += 'Your output failed the QA checklist. Fix these issues:\n\n';
 
   if (errorIssues.length > 0) {
     feedback += 'ERRORS (must fix):\n';
     for (const issue of errorIssues) {
-      feedback += `- [${issue.sectionTitle}] ${issue.description}`;
+      feedback += `- [${issue.section}] ${issue.description}`;
       if (issue.evidence) feedback += `\n  Evidence: ${issue.evidence}`;
       feedback += '\n';
     }
@@ -161,24 +271,23 @@ function formatQualityFeedback(issues: QualityIssue[]): string {
   }
 
   if (warningIssues.length > 0) {
-    feedback += 'WARNINGS (should fix):\n';
+    feedback += 'WARNINGS:\n';
     for (const issue of warningIssues) {
-      feedback += `- [${issue.sectionTitle}] ${issue.description}`;
+      feedback += `- [${issue.section}] ${issue.description}`;
       if (issue.evidence) feedback += `\n  Evidence: ${issue.evidence}`;
       feedback += '\n';
     }
-    feedback += '\n';
   }
 
   feedback += `
-REMINDER - TO AVOID THESE ISSUES:
-1. originalText MUST include COMPLETE sentences - never stop mid-sentence
-2. If original text contains "employees (collectively 'FW'...)" - include the ENTIRE parenthetical AND the sentence it's part of
-3. revisedText must be a grammatically complete, standalone replacement
-4. Do not use "to the extent caused by" AND "however caused" in the same clause - pick one
-5. Never start a new paragraph with "and against..." without a preceding clause in the same sentence
+REMINDER - HARD RULES:
+1. Replace means FULL replacement - no partial deletes, no leftovers
+2. Never duplicate sentence openings (e.g., two "The Contractor covenants...")
+3. Defined-term parentheticals appear MAX ONCE per section
+4. If using "to the extent caused by negligence", REMOVE all "however caused", "arising out of", etc.
+5. No paragraph starts with "and/or/but" unless continuing same sentence
 
-Please regenerate your response with these issues fixed.
+Regenerate with these fixes.
 `;
 
   return feedback;
@@ -189,17 +298,22 @@ Please regenerate your response with these issues fixed.
 // ============================================
 
 interface AIResult {
-  sections: Section[];
-  summary: string[];
+  edits: Edit[];
+  selfCheck?: SelfCheck;
+  error?: string;
   raw: string;
+  // Legacy fields for backwards compatibility
+  sections: LegacySection[];
+  summary: string[];
 }
 
 /**
  * Call OpenRouter API with the given prompt
- * Extracted for reuse in retry logic
+ * Returns structured edits using anchor-based schema
  */
 async function callOpenRouterAPI(
-  prompt: string,
+  systemPrompt: string,
+  userContent: string,
   model: string
 ): Promise<AIResult> {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -214,12 +328,16 @@ async function callOpenRouterAPI(
       model: model,
       messages: [
         {
+          role: 'system',
+          content: systemPrompt,
+        },
+        {
           role: 'user',
-          content: prompt,
+          content: userContent,
         },
       ],
       max_tokens: 8000,
-      temperature: 0.2,
+      temperature: 0.1, // Lower temperature for more deterministic output
       stream: true,
     }),
   });
@@ -290,7 +408,7 @@ async function callOpenRouterAPI(
   jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
 
   // Try parsing strategies
-  let result;
+  let result: AIResponse;
   try {
     result = JSON.parse(jsonStr);
   } catch {
@@ -306,10 +424,35 @@ async function callOpenRouterAPI(
     }
   }
 
+  // Check for error response
+  if (result.error) {
+    console.warn('AI returned error:', result.error);
+  }
+
+  const edits = Array.isArray(result.edits) ? result.edits : [];
+
+  // Convert edits to legacy sections format for backwards compatibility
+  const legacySections: LegacySection[] = edits.map(edit => ({
+    sectionTitle: edit.section,
+    originalText: '', // Will be filled in by anchor resolution
+    revisedText: edit.new_text,
+    riskLevel: 'high', // Default to high since these are flagged issues
+    materiality: 'high',
+    rationale: `Replace block from "${edit.anchor_start?.substring(0, 30)}..." to "...${edit.anchor_end?.slice(-30)}"`
+  }));
+
+  // Generate summary from edits
+  const summary = edits.map(edit =>
+    `[${edit.section}] Full block replacement with clean redline`
+  );
+
   return {
-    sections: Array.isArray(result.sections) ? result.sections : [],
-    summary: Array.isArray(result.summary) ? result.summary : [result.summary || 'No summary'],
+    edits,
+    selfCheck: result.self_check,
+    error: result.error,
     raw: fullContent,
+    sections: legacySections,
+    summary: summary.length > 0 ? summary : ['No material issues identified'],
   };
 }
 
@@ -411,125 +554,77 @@ function generateDiffDisplay(original: string, modified: string): string {
   return result.join('');
 }
 
-const MARS_CONTRACT_PROMPT = `You are an expert contract attorney reviewing agreements for MARS Company (the Contractor/Vendor). Your goal is to identify material risks and propose specific redlines.
+// ============================================
+// SYSTEM PROMPT - MECHANICALLY PRECISE REDLINE ENGINE
+// ============================================
 
-MARS STANDARD NEGOTIATING POSITIONS:
-- Liability: Cap at contract value, limit to direct damages only, exclude consequential/indirect damages
-- Indemnification: Must be mutual and proportionate to fault; never indemnify for County/Client's own negligence
-- IP/Work Product: MARS retains all pre-existing IP, tools, methodologies, templates; only deliverables specifically created become client property
-- Termination: Require payment for work performed plus reasonable wind-down costs if terminated without cause
-- Warranty: Should not exceed 1 year
-- Payment: Net 30 or longer
-- Audit Rights: Reasonable notice, limited frequency (annually), scope limited to records related to the agreement
-- Disputes: Preserve right to legal remedies, no unilateral final decisions by client
+const REDLINE_SYSTEM_PROMPT = `You are a contract redline engine. Your job is NOT to write legal advice. Your job is to output mechanically correct edits that can be applied to a Word document without leaving broken grammar, duplicate text, or orphaned fragments.
 
-=== MANDATORY FLAGS - ALWAYS IDENTIFY THESE ISSUES ===
-You MUST flag and revise ALL of the following, regardless of how the contract is worded:
+OUTPUT FORMAT (STRICT):
+Return ONLY valid JSON. No markdown. No commentary.
 
-1. NO LIMITATION OF LIABILITY CLAUSE
-   - If the contract lacks any limitation of liability, ADD ONE
-   - Suggest: "Contractor's aggregate liability under this Agreement shall not exceed the total fees paid under this Agreement. In no event shall Contractor be liable for indirect, incidental, consequential, punitive, or special damages."
-
-2. UNLIMITED OR UNCAPPED LIABILITY
-   - Any clause that makes MARS liable without limit → Suggest cap at contract value
-   - Any clause exposing MARS to consequential/indirect damages → Add exclusion
-
-3. BROAD OR ONE-SIDED INDEMNIFICATION
-   - If MARS must indemnify but Client does not → Make mutual
-   - If indemnification is not proportionate to fault → Add "to the extent caused by" language
-   - If contract is with MUNICIPALITY/GOVERNMENT: They legally CANNOT indemnify, so MARS MUST have a liability cap
-
-4. FULL IP/WORK PRODUCT TRANSFER WITHOUT CARVE-OUTS
-   - Any clause transferring all IP to Client → Add pre-existing IP carve-out
-   - Suggested language: "Notwithstanding the foregoing, Contractor retains all rights to its pre-existing intellectual property, including tools, methodologies, templates, and know-how developed prior to or independently of this Agreement."
-
-5. TERMINATION WITHOUT PAYMENT PROTECTION
-   - If Client can terminate without paying for work performed → Add wind-down payment provision
-
-YOUR TASK:
-1. Identify ONLY sections with MATERIAL risks to MARS (skip boilerplate that's not negotiable)
-2. For each material section, provide the EXACT ORIGINAL text and your REVISED text
-3. Briefly explain WHY each change protects MARS
-
-OUTPUT FORMAT:
+JSON SCHEMA:
 {
-  "sections": [
+  "edits": [
     {
-      "sectionNumber": "6",
-      "sectionTitle": "Indemnification",
-      "materiality": "high",
-      "riskLevel": "high",
-      "originalText": "Copy the EXACT text from the contract that needs changing - must match character-for-character so we can find it",
-      "revisedText": "The clean revised text WITHOUT any markdown formatting - plain text only",
-      "rationale": "One sentence explaining why this change protects MARS"
+      "section": "string (e.g., INDEMNIFICATION)",
+      "operation": "replace_block",
+      "anchor_start": "exact substring that appears ONCE in the source block",
+      "anchor_end": "exact substring that appears ONCE in the source block",
+      "new_text": "full replacement text for the block (final clean text)"
     }
   ],
-  "summary": [
-    "[Indemnification] Made indemnity proportionate to Contractor fault",
-    "[IP/Work Product] Added pre-existing IP carve-out",
-    "[Liability] Capped liability at contract value"
-  ]
+  "self_check": {
+    "no_duplicate_sentence_starts": true/false,
+    "no_orphaned_fragments": true/false,
+    "no_duplicate_definitions": true/false,
+    "no_contradictory_modifiers": true/false,
+    "no_paragraph_starts_with_and": true/false
+  }
 }
 
-MATERIALITY LEVELS:
-- "high" = Must negotiate or walk away (unlimited liability, one-sided indemnity, IP ownership)
-- "medium" = Should negotiate (audit scope, termination notice, dispute resolution)
-- "low" = Nice to have but not dealbreaker
+HARD RULES (MUST FOLLOW):
+1) Replace means FULL replacement: if you edit a sentence or paragraph, you must replace the entire block between anchor_start and anchor_end. Never partially delete. Never leave leftovers.
+2) Never duplicate sentence openings (e.g., two "The Contractor covenants...").
+3) Defined-term parentheticals (e.g., (collectively "FW"...)) may appear at most ONCE per section.
+4) If the indemnity is limited (e.g., "to the extent caused by negligence"), you must REMOVE any contradictory broad causation modifiers remaining in the same section (e.g., "however caused," "arising out of," "in any way connected with").
+5) Do not output any paragraph that starts with a conjunction ("and", "or", "but") unless it is truly a continuation of the same sentence inside the same paragraph.
+6) The resulting new_text must read as a clean standalone section with correct grammar and punctuation.
 
-RISK LEVELS (for riskLevel field):
-- "high" (Red) = Changes to liability, indemnification, IP/work product, termination for cause, insurance requirements
-- "medium" (Yellow) = Changes to payment terms, warranties, confidentiality periods, audit rights, dispute resolution
-- "low" (Green) = Formatting changes, word choices, minor clarifications, notice periods, standard boilerplate
+ANCHORS:
+- anchor_start and anchor_end must be exact substrings copied from the provided source text.
+- Each anchor must appear exactly once in the block being replaced.
+- anchor_start is typically the section heading or first words.
+- anchor_end is typically the last sentence of the block (ending with period).
 
-CRITICAL RULES:
-- Only flag sections that are MATERIALLY unfavorable - skip standard government boilerplate
-- The "originalText" MUST be copied EXACTLY from the contract - character for character - so it can be found and replaced
-- The "revisedText" must be PLAIN TEXT with NO markdown (no ** or ~~ or any formatting)
-- Keep changes surgical and minimal - only change what's necessary
-- PRESERVE ALL SPECIAL CHARACTERS exactly as they appear: § (section symbol), ¶ (paragraph symbol), © ® ™, and all legal citation formats
+MARS NEGOTIATING POSITIONS (apply these to edits):
+- Liability: Cap at contract value, exclude consequential/indirect damages
+- Indemnification: Proportionate to fault ("to the extent caused by negligence"), add liability cap since municipalities cannot indemnify
+- IP/Work Product: Contractor retains pre-existing IP, tools, methodologies, templates
+- Termination: Payment for work performed if terminated without cause
 
-CRITICAL - COMPLETE TEXT REPLACEMENT (READ CAREFULLY):
-These rules prevent broken documents with orphan text fragments:
+If you cannot comply with any rule, output:
+{ "edits": [], "error": "reason" }`;
 
-1. COMPLETE SENTENCES ONLY
-   - originalText MUST end at a sentence boundary (period, semicolon, or section break)
-   - If a sentence contains "employees (collectively 'FW' for purposes of this section)" - include the ENTIRE sentence through to its period
-   - NEVER stop mid-parenthetical or mid-definition
+// User prompt template for contract analysis
+const MARS_USER_PROMPT_TEMPLATE = `Analyze this contract for MARS Company (the Contractor/Vendor). Identify material risks and output redline edits.
 
-2. NO ORPHAN FRAGMENTS
-   - After your replacement, NO leftover words should remain from the original
-   - If original text is "The Contractor covenants... from and against any claims" - you must include ALL of it
-   - CHECK: What comes AFTER your originalText in the contract? If it's "and against..." or other continuation, expand originalText
+FOCUS ON THESE SECTIONS (if present):
+1. INDEMNIFICATION - Limit to negligence, add liability cap, remove "however caused"
+2. INTELLECTUAL PROPERTY / WORK PRODUCT - Add pre-existing IP carve-out
+3. LIMITATION OF LIABILITY - If missing, flag it; if unlimited, add cap
+4. TERMINATION - Ensure payment for work performed
 
-3. GRAMMATICALLY COMPLETE REPLACEMENTS
-   - revisedText must read as a complete, standalone paragraph
-   - No paragraph should start with "and against...", "and including...", "or any..." without an antecedent in the same sentence
-   - The first word after a period should make sense as a new sentence
+For each material issue, output a replace_block edit with:
+- anchor_start: The EXACT first words of the block (section heading or first sentence start)
+- anchor_end: The EXACT last sentence of the block (must end with period)
+- new_text: The COMPLETE clean replacement (no leftovers, no duplicates)
 
-4. NO CONFLICTING MODIFIERS
-   - Do NOT use both "to the extent caused by [negligence]" AND "however caused" in the same obligation
-   - These are logically contradictory - pick ONE scope of liability
-
-5. SINGLE DEFINITIONS
-   - Defined terms like "(collectively 'FW' for purposes of this section)" should appear ONCE per clause
-   - If your revision duplicates a definition, you've captured too little of the original
-
-6. SELF-TEST BEFORE OUTPUT
-   - Read your revisedText aloud - does it flow grammatically from start to finish?
-   - Imagine pasting revisedText into the document in place of originalText - would any words be left over?
-   - If YES to leftover words, expand originalText to include them
-
-=== SELF-CHECK BEFORE OUTPUTTING ===
-Before returning your response, verify for EACH section:
-1. Does the revisedText BENEFIT MARS (the Contractor)? If it benefits the Client more, reconsider.
-2. Does the revision LIMIT MARS's liability or exposure? If it increases liability, reconsider.
-3. Does the revision PROTECT MARS's IP and pre-existing work? If it gives more away, reconsider.
-4. For government/municipality contracts: Is there a liability cap? There MUST be one since they cannot indemnify.
-
-IMPORTANT: Your response must be ONLY a JSON object. No explanations, no markdown, no text before or after. Start your response with { and end with }
-
-CONTRACT:
+CONTRACT TEXT:
 `;
+
+// Legacy prompt for backwards compatibility (if new format fails)
+const MARS_CONTRACT_PROMPT = REDLINE_SYSTEM_PROMPT;
 
 export async function POST(request: NextRequest) {
   console.log('=== CONTRACT REVIEW API CALLED ===');
@@ -571,35 +666,29 @@ export async function POST(request: NextRequest) {
     console.log(`[NORMALIZATION] Input had smart quotes: ${hasSmartQuotes}, After normalization: ${hasSmartQuotesAfter}`);
 
     // Fetch approved clauses for RAG (Retrieval Augmented Generation)
-    // This provides the AI with concrete examples of MARS's approved language
     let clauseContext = '';
     try {
-      clauseContext = await getClauseContextForPrompt(false); // false = only critical categories
+      clauseContext = await getClauseContextForPrompt(false);
       if (clauseContext) {
         console.log(`RAG: Injecting ${clauseContext.length} chars of approved clause context`);
-      } else {
-        console.log('RAG: No approved clauses found in database');
       }
     } catch (ragError) {
       console.error('RAG: Error fetching clause context (continuing without):', ragError);
     }
 
-    // Build the full prompt - include clause context (RAG) and optionally playbook comparison
-    let fullPrompt = MARS_CONTRACT_PROMPT + clauseContext + normalizedInput;
+    // Build prompts using new system/user format
+    const systemPrompt = REDLINE_SYSTEM_PROMPT;
+    let userPrompt = MARS_USER_PROMPT_TEMPLATE + normalizedInput;
 
+    // Add RAG clause context if available
+    if (clauseContext) {
+      userPrompt = clauseContext + '\n\n' + userPrompt;
+    }
+
+    // Add playbook comparison if provided
     if (playbookContent && typeof playbookContent === 'string' && playbookContent.trim().length > 0) {
       const normalizedPlaybook = normalizeToASCII(playbookContent);
-      const playbookComparisonPrompt = `
-
-PLAYBOOK COMPARISON:
-The following is MARS's standard agreement template (playbook). Compare the contract above against this playbook and highlight any deviations from MARS's standard terms. Prioritize flagging clauses where the counterparty's version is LESS favorable than MARS's standard position.
-
-MARS PLAYBOOK:
-${normalizedPlaybook}
-
-When analyzing, note in the rationale if a change brings the contract CLOSER to MARS standard terms (good) or FURTHER from them (concerning).`;
-
-      fullPrompt = MARS_CONTRACT_PROMPT + clauseContext + normalizedInput + playbookComparisonPrompt;
+      userPrompt += `\n\nPLAYBOOK COMPARISON:\nCompare against MARS's standard terms and flag deviations:\n${normalizedPlaybook}`;
       console.log('Added playbook comparison to prompt');
     }
 
@@ -614,36 +703,44 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
 
     // PASS 1: Initial AI call
     try {
-      console.log('=== PASS 1: Initial AI Analysis ===');
-      result = await callOpenRouterAPI(fullPrompt, openRouterModel);
+      console.log('=== PASS 1: Initial AI Analysis (Anchor-Based) ===');
+      result = await callOpenRouterAPI(systemPrompt, userPrompt, openRouterModel);
       console.log(`Pass 1 completed in ${(Date.now() - startTime) / 1000}s`);
-      console.log(`Pass 1 sections: ${result.sections.length}, summary items: ${result.summary.length}`);
+      console.log(`Pass 1 edits: ${result.edits.length}`);
 
-      // Run quality gates on the result
-      qualityIssues = validateSections(result.sections, normalizedInput);
+      if (result.error) {
+        console.warn('AI reported error:', result.error);
+      }
+
+      // Run quality gates on the edits
+      qualityIssues = validateEdits(result.edits, normalizedInput, result.selfCheck);
 
       if (qualityIssues.length > 0) {
         const errorCount = qualityIssues.filter(i => i.severity === 'error').length;
         const warningCount = qualityIssues.filter(i => i.severity === 'warning').length;
         console.log(`Quality gate: ${errorCount} errors, ${warningCount} warnings`);
 
-        // If there are errors (not just warnings), retry
+        // Log self-check results
+        if (result.selfCheck) {
+          console.log('AI self-check:', JSON.stringify(result.selfCheck));
+        }
+
+        // If there are errors (not just warnings), retry with feedback
         if (errorCount > 0) {
           console.log('=== PASS 2: Retry with Quality Feedback ===');
           retryAttempted = true;
 
-          // Build retry prompt with feedback about what went wrong
           const qualityFeedback = formatQualityFeedback(qualityIssues);
-          const retryPrompt = fullPrompt + qualityFeedback;
+          const retryUserPrompt = userPrompt + qualityFeedback;
 
           try {
             const retryStartTime = Date.now();
-            result = await callOpenRouterAPI(retryPrompt, openRouterModel);
+            result = await callOpenRouterAPI(systemPrompt, retryUserPrompt, openRouterModel);
             console.log(`Pass 2 completed in ${(Date.now() - retryStartTime) / 1000}s`);
-            console.log(`Pass 2 sections: ${result.sections.length}, summary items: ${result.summary.length}`);
+            console.log(`Pass 2 edits: ${result.edits.length}`);
 
             // Re-validate after retry
-            qualityIssues = validateSections(result.sections, normalizedInput);
+            qualityIssues = validateEdits(result.edits, normalizedInput, result.selfCheck);
             const retryErrorCount = qualityIssues.filter(i => i.severity === 'error').length;
             const retryWarningCount = qualityIssues.filter(i => i.severity === 'warning').length;
             console.log(`Quality gate (retry): ${retryErrorCount} errors, ${retryWarningCount} warnings`);
@@ -653,7 +750,6 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
             }
           } catch (retryError) {
             console.error('Retry failed:', retryError);
-            // Continue with original result if retry fails
           }
         }
       } else {
@@ -663,7 +759,6 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
       console.error('=== OPENROUTER API ERROR ===');
       console.error('Error:', apiError);
       console.error('Model Used:', openRouterModel);
-      console.error('Input Length:', normalizedInput.length, 'chars');
       console.error('============================');
       return NextResponse.json(
         { error: apiError instanceof Error ? apiError.message : 'AI analysis failed' },
@@ -673,57 +768,62 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
 
     console.log(`Total analysis time: ${(Date.now() - startTime) / 1000}s (retry: ${retryAttempted})`);
 
-    // Use the result
+    // Use legacy sections for backwards compatibility
     const sections = result.sections;
 
-    // BUILD modifiedText ourselves by applying section changes
-    // This is much faster than having Claude output the entire 50K+ document
+    // BUILD modifiedText by applying anchor-based edits
+    // This uses anchor_start and anchor_end to find the exact block to replace
     let modifiedText = normalizedInput;
     let appliedChanges = 0;
     let failedChanges: string[] = [];
 
-    for (const section of sections) {
-      if (section.originalText && section.revisedText) {
-        // Clean up the revised text (remove any markdown that slipped through)
-        let cleanRevised = section.revisedText
-          .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove **bold** markers
-          .replace(/~~([^~]+)~~/g, '');        // Remove ~~strikethrough~~ content entirely
+    for (const edit of result.edits) {
+      if (!edit.anchor_start || !edit.anchor_end || !edit.new_text) {
+        console.warn(`Skipping edit for ${edit.section}: missing anchor_start, anchor_end, or new_text`);
+        failedChanges.push(edit.section || 'Unknown');
+        continue;
+      }
 
-        // Normalize both for matching
-        const normalizedOriginal = normalizeToASCII(section.originalText);
-        cleanRevised = normalizeToASCII(cleanRevised);
+      // Normalize anchors and new_text
+      const anchorStart = normalizeToASCII(edit.anchor_start);
+      const anchorEnd = normalizeToASCII(edit.anchor_end);
+      const newText = normalizeToASCII(edit.new_text);
 
-        // Try to find and replace
-        if (modifiedText.includes(normalizedOriginal)) {
-          modifiedText = modifiedText.replace(normalizedOriginal, cleanRevised);
-          appliedChanges++;
-          console.log(`Applied change to section: ${section.sectionTitle || section.sectionNumber}`);
-        } else {
-          // Try fuzzy match - sometimes whitespace differs
-          const fuzzyOriginal = normalizedOriginal.replace(/\s+/g, ' ').trim();
-          const fuzzyModified = modifiedText.replace(/\s+/g, ' ');
+      // Find positions of anchors
+      const startPos = modifiedText.indexOf(anchorStart);
+      if (startPos === -1) {
+        console.warn(`Could not find anchor_start for ${edit.section}: "${anchorStart.substring(0, 50)}..."`);
+        failedChanges.push(edit.section || 'Unknown');
+        continue;
+      }
 
-          if (fuzzyModified.includes(fuzzyOriginal)) {
-            // Found with fuzzy match - apply change
-            const regex = new RegExp(escapeRegExp(normalizedOriginal).replace(/\\s+/g, '\\s+'), 'g');
-            const before = modifiedText;
-            modifiedText = modifiedText.replace(regex, cleanRevised);
-            if (modifiedText !== before) {
-              appliedChanges++;
-              console.log(`Applied change (fuzzy) to section: ${section.sectionTitle || section.sectionNumber}`);
-            } else {
-              failedChanges.push(section.sectionTitle || section.sectionNumber || 'Unknown');
-            }
-          } else {
-            failedChanges.push(section.sectionTitle || section.sectionNumber || 'Unknown');
-            console.warn(`Could not find originalText for section: ${section.sectionTitle || section.sectionNumber}`);
-            console.warn(`Looking for (first 100 chars): ${normalizedOriginal.substring(0, 100)}`);
-          }
-        }
+      // Find anchor_end AFTER anchor_start
+      const searchAfterStart = modifiedText.substring(startPos);
+      const endPosRelative = searchAfterStart.indexOf(anchorEnd);
+      if (endPosRelative === -1) {
+        console.warn(`Could not find anchor_end for ${edit.section}: "...${anchorEnd.slice(-50)}"`);
+        failedChanges.push(edit.section || 'Unknown');
+        continue;
+      }
+
+      const endPos = startPos + endPosRelative + anchorEnd.length;
+
+      // Extract the block being replaced (for logging and legacy sections)
+      const originalBlock = modifiedText.substring(startPos, endPos);
+
+      // Apply the replacement
+      modifiedText = modifiedText.substring(0, startPos) + newText + modifiedText.substring(endPos);
+      appliedChanges++;
+      console.log(`Applied anchor-based edit to ${edit.section} (replaced ${originalBlock.length} chars with ${newText.length} chars)`);
+
+      // Update legacy section with the original text we found
+      const legacySection = sections.find(s => s.sectionTitle === edit.section);
+      if (legacySection) {
+        legacySection.originalText = originalBlock;
       }
     }
 
-    console.log(`Applied ${appliedChanges}/${sections.length} changes. Failed: ${failedChanges.length > 0 ? failedChanges.join(', ') : 'none'}`);
+    console.log(`Applied ${appliedChanges}/${result.edits.length} edits. Failed: ${failedChanges.length > 0 ? failedChanges.join(', ') : 'none'}`);
 
     // Generate diff display using diff-match-patch
     // Both normalizedInput and modifiedText are now in same encoding
@@ -772,7 +872,7 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
     // Include quality warnings in response if any remain
     const remainingWarnings = qualityIssues.filter(i => i.severity === 'warning');
     const qualityWarnings = remainingWarnings.length > 0
-      ? remainingWarnings.map(w => `[${w.sectionTitle}] ${w.description}`)
+      ? remainingWarnings.map(w => `[${w.section}] ${w.description}`)
       : undefined;
 
     if (qualityWarnings) {
