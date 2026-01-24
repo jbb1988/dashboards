@@ -1,255 +1,322 @@
 # Profitability Dashboard Reconciliation Fix
 
 **Date:** January 24, 2026
-**Issue:** Plano MCC June 2025 showing incorrect revenue and impossible GPM
+**Updated:** January 24, 2026 (Added Milwaukee case, best practices)
 **File:** `src/app/api/closeout/profitability/route.ts`
 
 ---
 
-## Problem Summary
+## Executive Summary
+
+The profitability dashboard calculates revenue by matching Sales Order (SO) line items to Work Order (WO) item IDs. When WO item IDs are incomplete or don't match SO line items, revenue is under-reported or incorrectly calculated.
+
+**Root Cause:** NetSuite WO line items often have different `item_id` values than corresponding SO line items, causing the matching logic to exclude valid revenue lines.
+
+---
+
+## Case Studies
+
+### Case 1: Plano MCC June 2025
 
 | Metric | Dashboard (Wrong) | Excel (Correct) |
 |--------|-------------------|-----------------|
 | Revenue | $10,458 | $9,586 |
 | GP | $14,000 | ~$6,000 |
 | GPM | 130.2% (impossible) | ~65% |
-| Discrepancy | +$872 extra revenue | - |
+
+**Issues Found:**
+1. Missing `Math.abs()` on cost estimate (caused 130% GPM)
+2. Credit line (+$872) not included because itemId not in WO
+
+**Data:**
+```
+WO5529 item IDs: [2521, 4332, 4277, 4278, 5130]
+
+SO6794 MCC lines (account 4101):
+- itemId=5130, amt=-$10,458 → MATCHED
+- itemId=5244, amt=+$872   → NOT MATCHED (credit, should offset revenue)
+- itemId=5134, amt=-$7,151 → NOT MATCHED (different month)
+- itemId=5244, amt=+$266   → NOT MATCHED (different month credit)
+```
+
+**Fix:** Include largest credit per matched account.
+- Calculation: `-10,458 + 872 = -9,586` → `$9,586` ✓
 
 ---
 
-## Root Causes
+### Case 2: Milwaukee MCC May 2025
 
-### Bug #1: Missing `Math.abs()` on SO Cost Estimate
+| Metric | Dashboard (Wrong) | Excel (Correct) |
+|--------|-------------------|-----------------|
+| Revenue | $35,952 | $63,364 |
+| Cost | $9,451 | $54,997 |
 
-**Location:** Line ~520 (after fix)
+**Issues Found:**
+1. MCC revenue line (-$27,412) excluded because itemId not in WO
 
-**Before:**
-```typescript
-const soCostEstimate = enhancedLines.reduce((sum, li) => sum + li.costEstimate, 0);
+**Data:**
+```
+WO5326 + WO5327 item IDs: [2521,4332,4335,655,5555,4278,4277,1267,5550,1266,4333]
+
+SO5249 MCC lines (account 4101):
+- itemId=5555, amt=-$10,785.60 → MATCHED
+- itemId=5550, amt=-$25,166.40 → MATCHED
+- itemId=5286, amt=-$27,412.00 → NOT MATCHED (missing from WO!)
 ```
 
-**After:**
-```typescript
-const soCostEstimate = Math.abs(enhancedLines.reduce((sum, li) => sum + li.costEstimate, 0));
-```
-
-**Why:** NetSuite stores cost estimates as negative values. Without `Math.abs()`, the GP calculation became:
-- Revenue: $10,458
-- Cost: -$3,500 (negative!)
-- GP: $10,458 - (-$3,500) = $13,958 (inflated!)
-- GPM: 133% (impossible!)
+**Fix:** Include ALL negative amounts (revenue) on matched MCC accounts.
+- Calculation: `-10,785.60 + -25,166.40 + -27,412 = -63,364` → `$63,364` ✓
 
 ---
 
-### Bug #2: WO Item ID Filtering Not Matching Credits
+## Common Patterns
 
-**The Data Structure:**
+### Pattern A: Missing Credits (Plano-type)
+- **Symptom:** Revenue slightly too HIGH
+- **Cause:** Credit/adjustment lines have different itemId than WO
+- **Fix:** Include largest credit per matched account
 
-Work Order (WO5529) has 5 item IDs: `[2521, 4332, 4277, 4278, 5130]`
+### Pattern B: Missing Revenue Lines (Milwaukee-type)
+- **Symptom:** Revenue significantly too LOW
+- **Cause:** Revenue lines have itemId not present in WO
+- **Fix:** Include all negative amounts on matched MCC accounts
 
-Sales Order (SO6794) line items for account 4101 (MCC):
-| itemId | item | amount | matched? |
-|--------|------|--------|----------|
-| 5130 | 81100010 | -$10,458 | YES (in WO) |
-| 5244 | 80000005 | +$872 | NO |
-| 5134 | 80100011 | -$7,151 | NO |
-| 5244 | 80000005 | +$266 | NO |
-
-**The Problem:**
-- Only `itemId=5130` matched the WO, giving revenue of `$10,458`
-- The `+$872` credit (itemId=5244) was NOT in the WO, so it was excluded
-- Correct calculation: `-10,458 + 872 = -9,586` → `Math.abs() = $9,586`
-
-**Why Credits Exist:**
-In NetSuite, positive amounts on revenue accounts (4101) represent credits/adjustments that reduce the base revenue. These credits may not have the same `item_id` as the main revenue line but still belong to the same engagement.
+### Pattern C: Impossible GPM (>100%)
+- **Symptom:** Gross margin over 100%
+- **Cause:** Missing `Math.abs()` on cost calculation
+- **Fix:** Always use `Math.abs()` when calculating costs
 
 ---
 
-## The Fix
+## Current Fix Logic
 
-### Strategy: Include Largest Credit Per Matched Account
-
-When a line matches by WO item_id, we note its account number. Then we find additional credit lines (positive amounts) on the same account and include only the **largest** credit per account.
-
-**Why "largest only"?**
-- The `+$872` credit belongs to June MCC (the current engagement)
-- The `+$266` credit likely belongs to a different month (February?)
-- Without rev rec dates populated, we can't distinguish by date
-- Taking the largest credit is a heuristic that works for this pattern
-
-**Code Flow:**
 ```
-1. Filter SO lines by WO item_id matching
-   → Matched: itemId=5130, amt=-10458, acct=4101
+1. PRIMARY: Filter by revenue recognition dates (if populated)
+   - Check if line's revrecstartdate/revrecenddate overlaps engagement month
 
-2. Collect account numbers from matched lines
-   → matchedAccounts = {4101}
+2. FALLBACK: Filter by WO item_id matching
+   - Match SO line itemId to WO line itemIds
 
-3. Find ALL credits on matched accounts (positive amounts, not already included)
-   → Found: +872 on 4101, +266 on 4101
+3. ENHANCEMENT A: Include all MCC revenue on matched accounts
+   - If account 4101-4111 has matched lines, include ALL negative amounts
 
-4. Keep only the LARGEST credit per account
-   → Largest on 4101: +872 (include)
-   → Smaller on 4101: +266 (exclude)
+4. ENHANCEMENT B: Include largest credit per account
+   - For positive amounts (credits), only include the largest one
 
-5. Calculate revenue
-   → Sum: -10458 + 872 = -9586
-   → Abs: $9,586 ✓
+5. CALCULATION: Sum then absolute value
+   - soRevenue = Math.abs(sum of all line amounts)
+   - soCostEstimate = Math.abs(sum of all cost estimates)
 ```
 
 ---
 
-## Key Code Sections
+## Best Practices to Prevent Reconciliation Issues
 
-### 1. SO Lines Query (includes rev rec dates for future use)
+### For NetSuite Data Entry
 
-```typescript
-netsuite_sales_order_lines (
-  line_number,
-  item_id,
-  item_name,
-  amount,
-  cost_estimate,
-  account_number,
-  account_name,
-  revrecstartdate,    // Revenue recognition start
-  revrecenddate       // Revenue recognition end
-)
-```
+1. **Ensure WO Line Items Match SO Line Items**
+   - When creating a Work Order from a Sales Order, verify all service items are included
+   - The WO should have line items for EVERY revenue line that will be billed
+   - Missing WO line items = missing revenue in dashboard
 
-### 2. Primary Filter: Rev Rec Dates (if available)
+2. **Use Consistent Item IDs**
+   - Same service should use same item across WO and SO
+   - Avoid creating duplicate items with different IDs for the same service
 
-```typescript
-if (year && month) {
-  const engagementStart = new Date(year, month - 1, 1);
-  const engagementEnd = new Date(year, month, 0);
+3. **Populate Revenue Recognition Dates**
+   - Set `revrecstartdate` and `revrecenddate` on SO line items
+   - This allows precise filtering by engagement month
+   - Without these, the system uses heuristics that may fail
 
-  if (revRecStart && revRecEnd) {
-    // Check if line's rev rec period overlaps engagement month
-    const overlaps = revRecStart <= engagementEnd && revRecEnd >= engagementStart;
-    return overlaps;
-  }
-}
-```
+4. **One SO Per Engagement Period (Ideal)**
+   - If possible, create separate SOs for different engagement months
+   - Multi-month SOs with mixed line items are hard to reconcile
 
-### 3. Fallback Filter: WO Item ID Matching
+5. **Credits Should Reference Original Items**
+   - Credit/adjustment lines should use the same itemId as the original revenue
+   - This ensures credits are properly matched to their revenue lines
 
-```typescript
-if (workOrderItemIds.size === 0) {
-  // No WO item_ids? Filter by MCC account numbers
-  const acct = line.accountNumber || '';
-  return acct.startsWith('410') || acct.startsWith('411');
-}
-return workOrderItemIds.has(line.itemId);
-```
+### For Excel Closeout Data
 
-### 4. Credit Inclusion: Largest Per Account
+1. **Include WO Numbers**
+   - Always record which WO number corresponds to which revenue
+   - This enables verification against NetSuite
 
-```typescript
-const creditsByAccount = new Map<string, any>();
-for (const line of validLines) {
-  const isCredit = line.amount > 0;
-  const sameAccount = matchedAccounts.has(line.account_number);
-  const alreadyIncluded = enhancedLines.some(el => el.lineNumber === line.line_number);
+2. **Match Account Numbers**
+   - Use consistent account numbers (4101 for MCC, 4081 for equipment)
+   - Dashboard filters by account number as fallback
 
-  if (isCredit && sameAccount && !alreadyIncluded) {
-    const existing = creditsByAccount.get(line.account_number);
-    if (!existing || line.amount > existing.amount) {
-      creditsByAccount.set(line.account_number, line);
-    }
-  }
-}
-// Add largest credit per account to enhancedLines
-```
+3. **Document Adjustments**
+   - Note any credits or adjustments separately
+   - Include itemId if known
 
-### 5. Revenue Calculation (with Math.abs)
+### For Dashboard Verification
 
-```typescript
-const soRevenue = Math.abs(enhancedLines.reduce((sum, li) => sum + li.amount, 0));
-const soCostEstimate = Math.abs(enhancedLines.reduce((sum, li) => sum + li.costEstimate, 0));
-const soGrossProfit = soRevenue - soCostEstimate;
-```
+1. **Check GPM Range**
+   - Valid GPM: 20-80% typically
+   - GPM > 100%: Indicates calculation bug (likely missing Math.abs)
+   - GPM < 0%: Indicates cost > revenue (check for missing revenue lines)
+
+2. **Compare Line Counts**
+   - Dashboard "X lines" should roughly match Excel row count
+   - Significant difference = filtering issue
+
+3. **Verify Account Distribution**
+   - Expand SO to see product type breakdown
+   - MCC should show account 4101
+   - Equipment should show account 4081
 
 ---
 
 ## Diagnostic Queries
 
-### Check WO Item IDs
+### Check WO Item IDs vs SO Item IDs
 
 ```sql
-SELECT wo.wo_number, wol.item_id, wol.item_name
-FROM netsuite_work_orders wo
-JOIN netsuite_work_order_lines wol ON wol.work_order_id = wo.id
-WHERE wo.wo_number = 'WO5529';
+-- Find mismatches between WO and SO item_ids
+WITH wo_items AS (
+  SELECT DISTINCT wol.item_id, wol.item_name
+  FROM netsuite_work_orders wo
+  JOIN netsuite_work_order_lines wol ON wol.work_order_id = wo.id
+  WHERE wo.wo_number IN ('WO5326', 'WO5327')
+),
+so_items AS (
+  SELECT DISTINCT sol.item_id, sol.item_name, sol.amount, sol.account_number
+  FROM netsuite_sales_orders so
+  JOIN netsuite_sales_order_lines sol ON sol.sales_order_id = so.id
+  WHERE so.so_number = 'SO5249'
+    AND sol.account_number LIKE '410%'
+)
+SELECT
+  so_items.*,
+  CASE WHEN wo_items.item_id IS NULL THEN 'NOT IN WO' ELSE 'MATCHED' END as status
+FROM so_items
+LEFT JOIN wo_items ON wo_items.item_id = so_items.item_id
+ORDER BY status, so_items.amount;
 ```
 
-### Check SO Lines with Credits
+### Check Revenue Recognition Date Coverage
 
 ```sql
 SELECT
-  sol.item_id,
-  sol.item_name,
-  sol.amount,
-  sol.account_number,
-  CASE WHEN sol.amount > 0 THEN 'CREDIT' ELSE 'REVENUE' END as line_type
+  so.so_number,
+  COUNT(*) as total_lines,
+  COUNT(sol.revrecstartdate) as with_rev_rec,
+  ROUND(100.0 * COUNT(sol.revrecstartdate) / COUNT(*), 1) as pct_coverage
 FROM netsuite_sales_orders so
 JOIN netsuite_sales_order_lines sol ON sol.sales_order_id = so.id
-WHERE so.so_number = 'SO6794'
-  AND sol.account_number = '4101'
-ORDER BY sol.amount;
+WHERE sol.account_number LIKE '410%'
+GROUP BY so.so_number
+HAVING COUNT(*) > 0
+ORDER BY pct_coverage ASC;
 ```
 
-### Check if Rev Rec Dates are Populated
+### Find Projects Likely to Have Issues
 
 ```sql
+-- Projects where WO item count << SO item count (likely missing items)
+WITH wo_counts AS (
+  SELECT wo.created_from_so_number as so_number, COUNT(DISTINCT wol.item_id) as wo_items
+  FROM netsuite_work_orders wo
+  JOIN netsuite_work_order_lines wol ON wol.work_order_id = wo.id
+  GROUP BY wo.created_from_so_number
+),
+so_counts AS (
+  SELECT so.so_number, COUNT(DISTINCT sol.item_id) as so_items
+  FROM netsuite_sales_orders so
+  JOIN netsuite_sales_order_lines sol ON sol.sales_order_id = so.id
+  WHERE sol.account_number LIKE '410%'
+  GROUP BY so.so_number
+)
 SELECT
-  COUNT(*) as total_lines,
-  COUNT(revrecstartdate) as with_start_date,
-  COUNT(revrecenddate) as with_end_date
-FROM netsuite_sales_order_lines
-WHERE sales_order_id = (SELECT id FROM netsuite_sales_orders WHERE so_number = 'SO6794');
+  so_counts.so_number,
+  so_counts.so_items,
+  COALESCE(wo_counts.wo_items, 0) as wo_items,
+  so_counts.so_items - COALESCE(wo_counts.wo_items, 0) as potential_missing
+FROM so_counts
+LEFT JOIN wo_counts ON wo_counts.so_number = so_counts.so_number
+WHERE so_counts.so_items > COALESCE(wo_counts.wo_items, 0)
+ORDER BY potential_missing DESC;
 ```
+
+---
+
+## Troubleshooting Flowchart
+
+```
+Revenue Mismatch?
+├── Dashboard > Excel (too high)
+│   ├── Check: Are non-MCC items included?
+│   ├── Check: Multiple months in same SO?
+│   └── Fix: Review account number filtering
+│
+├── Dashboard < Excel (too low)
+│   ├── Check: How many SO lines matched vs total?
+│   ├── Check: Are WO item_ids complete?
+│   └── Fix: Ensure WO has all revenue line items
+│
+└── GPM > 100% (impossible)
+    ├── Check: Is Math.abs() applied to costs?
+    └── Fix: Apply Math.abs() to cost calculations
+
+Cost Mismatch?
+├── Check: WO actual costs vs Excel
+├── Check: Are all WOs included?
+└── Check: Cost estimate vs actual cost fields
+```
+
+---
+
+## Code Reference
+
+### Key File
+`src/app/api/closeout/profitability/route.ts`
+
+### Critical Sections
+
+| Line Range | Purpose |
+|------------|---------|
+| ~380-390 | Collect WO item IDs |
+| ~475-505 | Filter SO lines (rev rec dates, item_id matching) |
+| ~510-545 | Include additional MCC revenue lines |
+| ~550-575 | Include largest credit per account |
+| ~580-585 | Calculate revenue with Math.abs() |
+
+### Debug Logging
+
+To enable debugging, add this after the filter:
+```typescript
+console.log(`[Debug] WO itemIds: size=${workOrderItemIds.size}, ids=[${Array.from(workOrderItemIds).join(',')}]`);
+console.log(`[Debug] After filter: ${enhancedLines.length} lines, validLines had ${validLines.length}`);
+```
+
+---
+
+## Commits History
+
+| Commit | Description |
+|--------|-------------|
+| `eae8592` | Initial fix: Math.abs on cost, account fallback |
+| `9c2d319` | Added rev rec date filtering |
+| `2bd22c1` | Include largest credit per account |
+| `35d6b8b` | Include all MCC revenue on matched accounts |
 
 ---
 
 ## Future Improvements
 
-1. **Populate Rev Rec Dates**: If NetSuite has these dates, sync them. This would allow precise filtering by engagement month instead of heuristics.
+1. **Sync Rev Rec Dates from NetSuite**
+   - Would eliminate need for item_id matching heuristics
+   - Enables precise month-based filtering
 
-2. **Match by Item Name**: If item_ids don't match between WO and SO, consider matching by item name as a fallback.
+2. **WO-SO Item Mapping Table**
+   - Create lookup table linking WO items to SO items
+   - Populate during sync process
 
-3. **Link Credits to Revenue Lines**: NetSuite may have a way to link credit lines to their corresponding revenue lines. Investigate if there's a reference field.
+3. **Automated Reconciliation Report**
+   - Nightly job comparing dashboard vs Excel
+   - Flag projects with >5% variance
 
-4. **Excel as Source of Truth**: For projects where SO data is unreliable, consider using the Excel closeout data for revenue instead of calculating from SO lines.
-
----
-
-## Testing Checklist
-
-When similar issues occur, verify:
-
-- [ ] Revenue matches Excel closeout data
-- [ ] GPM is in valid range (typically 30-70%, never >100%)
-- [ ] Check Vercel logs for which lines are matched/excluded
-- [ ] Compare WO item_ids with SO item_ids (often don't match!)
-- [ ] Look for positive amounts on revenue accounts (credits)
-- [ ] Check if rev rec dates are populated
-
----
-
-## Related Files
-
-- `src/app/api/closeout/profitability/route.ts` - Main profitability API
-- `supabase/migrations/034_add_revenue_fields.sql` - Added revrecstartdate/revrecenddate
-- `supabase/migrations/035_add_account_to_sales_order_lines.sql` - Added account fields
-
----
-
-## Commits
-
-1. `eae8592` - Initial fix: Math.abs on cost estimate, account number fallback
-2. `f12ec24` - Added debug logging
-3. `9c2d319` - Added rev rec date filtering
-4. `256498d` - Added credit line inclusion for matched accounts
-5. `2bd22c1` - Fixed to only include largest credit per account
-6. `ac95e7d` - Removed debug logging
+4. **Alert on GPM Anomalies**
+   - Warn when GPM < 0% or > 100%
+   - Indicates data or calculation issue
