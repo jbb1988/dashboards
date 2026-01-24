@@ -254,6 +254,11 @@ export async function GET(request: Request) {
     const actualRevenue = excelProjects.reduce((sum, p) => sum + (p.actual_revenue || 0), 0);
     const actualCost = excelProjects.reduce((sum, p) => sum + (p.actual_cost || 0), 0);
 
+    // Get list of project_types from filtered projects (to filter SO line items)
+    const allowedProjectTypes = new Set(
+      excelProjects.map(p => p.project_type).filter(Boolean)
+    );
+
     // STEP 2: Get all work orders for this project
     const { data: excelWOs } = await supabase
       .from('closeout_work_orders')
@@ -430,29 +435,35 @@ export async function GET(request: Request) {
             return true;
           });
 
-          // Enhance line items with product type
-          const enhancedLines: EnhancedSOLineItem[] = validLines.map((line: any) => {
-            const accountNumber = line.account_number || null;
-            const itemClassName = line.item_class_name || null;
-            const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
+          // Enhance line items with product type and filter by allowed types
+          const enhancedLines: EnhancedSOLineItem[] = validLines
+            .map((line: any) => {
+              const accountNumber = line.account_number || null;
+              const itemClassName = line.item_class_name || null;
+              const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
 
-            return {
-              lineNumber: line.line_number || 0,
-              itemId: line.item_id || '',
-              itemName: line.item_name,
-              itemDescription: line.item_description,
-              itemType: line.item_type,
-              quantity: line.quantity || 0,
-              rate: line.rate || 0,
-              amount: line.amount || 0,
-              costEstimate: line.cost_estimate || 0,
-              grossProfit: line.gross_profit || 0,
-              grossMarginPct: line.gross_margin_pct || 0,
-              isClosed: line.is_closed || false,
-              accountNumber,
-              accountName: line.account_name,
-              productType,
+              return {
+                lineNumber: line.line_number || 0,
+                itemId: line.item_id || '',
+                itemName: line.item_name,
+                itemDescription: line.item_description,
+                itemType: line.item_type,
+                quantity: line.quantity || 0,
+                rate: line.rate || 0,
+                amount: line.amount || 0,
+                costEstimate: line.cost_estimate || 0,
+                grossProfit: line.gross_profit || 0,
+                grossMarginPct: line.gross_margin_pct || 0,
+                isClosed: line.is_closed || false,
+                accountNumber,
+                accountName: line.account_name,
+                productType,
             };
+          })
+          .filter(line => {
+            // Only include line items for project_types in this filtered engagement
+            // This prevents summing Feb + June line items when filtering to just June
+            return allowedProjectTypes.size === 0 || allowedProjectTypes.has(line.productType);
           });
 
           // Group lines by product type
