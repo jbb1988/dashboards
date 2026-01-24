@@ -726,87 +726,55 @@ async function insertNewSection(
 ): Promise<{ success: boolean; error?: string }> {
   console.log(`insertNewSection: inserting after "${afterHeading}"`);
 
-  // Strategy 1: Try exact match first
-  let headingRange = await findSectionByHeading(context, afterHeading);
+  // Extract section number from heading (e.g., "21" from "21. INDEMNIFICATION")
+  const sectionNumMatch = afterHeading.match(/^(\d+)\./);
+  let currentSectionNum = 0;
 
-  // Strategy 2: Try with just the key word (e.g., "INDEMNIFICATION" from "23. INDEMNIFICATION")
-  if (!headingRange) {
-    const keyWord = afterHeading.replace(/^\d+\.\s*/, '').replace(/^ARTICLE\s+\d+\s*[-:.]?\s*/i, '').trim();
-    if (keyWord && keyWord !== afterHeading) {
-      console.log(`insertNewSection: trying keyword search: "${keyWord}"`);
-      headingRange = await findSectionByHeading(context, keyWord);
-    }
+  if (sectionNumMatch) {
+    currentSectionNum = parseInt(sectionNumMatch[1], 10);
+    console.log(`insertNewSection: current section number is ${currentSectionNum}`);
   }
 
-  // Strategy 3: Try searching for the section number pattern
-  if (!headingRange) {
-    const numberMatch = afterHeading.match(/^(\d+)\./);
-    if (numberMatch) {
-      const sectionNum = numberMatch[1];
-      console.log(`insertNewSection: trying section number search: "${sectionNum}."`);
-      const numResults = context.document.body.search(`${sectionNum}.`, {
+  // Strategy: Find the NEXT section number directly (e.g., "22." after "21.")
+  // This is more reliable than parsing paragraphs
+  let insertionPoint: Word.Range | null = null;
+
+  if (currentSectionNum > 0) {
+    // Try to find the next few section numbers (22., 23., 24., etc.)
+    for (let nextNum = currentSectionNum + 1; nextNum <= currentSectionNum + 10; nextNum++) {
+      const searchPattern = `${nextNum}.`;
+      console.log(`insertNewSection: searching for next section "${searchPattern}"`);
+
+      const results = context.document.body.search(searchPattern, {
         matchCase: false,
         matchWholeWord: false,
       });
-      numResults.load('items');
+      results.load('items');
       await context.sync();
-      if (numResults.items.length > 0) {
-        headingRange = numResults.items[0];
+
+      if (results.items.length > 0) {
+        // Found the next section - get its paragraph and insert before it
+        const nextSectionRange = results.items[0];
+        const nextParagraph = nextSectionRange.paragraphs.getFirst();
+        nextParagraph.load('text');
+        await context.sync();
+
+        console.log(`insertNewSection: found next section "${nextNum}." in: "${nextParagraph.text.substring(0, 50)}..."`);
+
+        // Insert BEFORE this paragraph
+        insertionPoint = nextParagraph.getRange('Start');
+        break;
       }
     }
   }
 
-  if (!headingRange) {
-    console.error(`Could not find section heading: "${afterHeading}"`);
-    return {
-      success: false,
-      error: `Could not find section "${afterHeading}" in document. Try manually copying the text and inserting it after the ${afterHeading} section.`
-    };
-  }
-
-  // Get the paragraph containing the heading
-  const paragraph = headingRange.paragraphs.getFirst();
-  paragraph.load('text');
-  await context.sync();
-
-  console.log(`insertNewSection: found heading in paragraph: "${paragraph.text.substring(0, 50)}..."`);
-
-  // Find the end of this section by looking for the next numbered section or end of document
-  // Get all paragraphs after this one
-  const afterRange = paragraph.getRange('After');
-  const allParagraphs = afterRange.paragraphs;
-  allParagraphs.load('items');
-  await context.sync();
-
-  // Look for the next TOP-LEVEL section heading only
-  // Must be: "22. TITLE" or "ARTICLE 5" format - NOT subsections like "(a)" or "(1)"
-  let insertionPoint: Word.Range | null = null;
-  // Match: "22." followed by space and uppercase word, OR "ARTICLE" followed by number
-  const sectionPattern = /^\s*(\d+\.\s+[A-Z]|ARTICLE\s+\d+)/;
-
-  for (let i = 0; i < Math.min(allParagraphs.items.length, 50); i++) {
-    const para = allParagraphs.items[i];
-    para.load('text');
-    await context.sync();
-
-    const trimmedText = para.text.trim();
-
-    // Skip empty paragraphs
-    if (trimmedText.length < 3) continue;
-
-    // Check if this looks like a new TOP-LEVEL section heading
-    if (sectionPattern.test(para.text)) {
-      // This is the next section - insert before it
-      insertionPoint = para.getRange('Start');
-      console.log(`insertNewSection: found next section at: "${para.text.substring(0, 40)}..."`);
-      break;
-    }
-  }
-
-  // If no next section found, insert at the end of the content we found
+  // Fallback: If no next section found, try to find the current section and go to end of document
   if (!insertionPoint) {
-    insertionPoint = afterRange.getRange('End');
-    console.log(`insertNewSection: no next section found, inserting at end of content`);
+    console.log(`insertNewSection: no next section found, inserting at end of document body`);
+
+    // Get the end of the document body
+    const body = context.document.body;
+    insertionPoint = body.getRange('End');
   }
 
   // Insert the new section with proper formatting
