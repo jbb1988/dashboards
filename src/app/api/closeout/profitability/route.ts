@@ -507,53 +507,58 @@ export async function GET(request: Request) {
             return matched;
           });
 
-          // Second pass: Find matched account numbers and include related credit lines
+          // Second pass: Find matched account numbers and include the LARGEST credit per account
           // This handles cases where credits/adjustments aren't in the WO but should offset matched revenue
+          // We only take the largest credit to avoid including credits from other engagement periods
           const matchedAccounts = new Set<string>();
           for (const line of enhancedLines) {
             if (line.accountNumber) matchedAccounts.add(line.accountNumber);
           }
 
-          // Re-filter from validLines to include credit lines for matched accounts
-          const additionalCredits = validLines
-            .map((line: any) => {
-              const accountNumber = line.account_number || null;
-              const itemClassName = line.item_class_name || null;
-              const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
-              return {
-                lineNumber: line.line_number || 0,
-                itemId: line.item_id || '',
-                itemName: line.item_name,
-                itemDescription: line.item_description,
-                itemType: line.item_type,
-                quantity: line.quantity || 0,
-                rate: line.rate || 0,
-                amount: line.amount || 0,
-                costEstimate: line.cost_estimate || 0,
-                grossProfit: line.gross_profit || 0,
-                grossMarginPct: line.gross_margin_pct || 0,
-                isClosed: line.is_closed || false,
-                accountNumber,
-                accountName: line.account_name,
-                productType,
-                revRecStartDate: line.revrecstartdate || null,
-                revRecEndDate: line.revrecenddate || null,
-              };
-            })
-            .filter(line => {
-              // Include if: same account as matched lines, positive amount (credit), not already in enhancedLines
-              const isCredit = line.amount > 0;
-              const sameAccount = matchedAccounts.has(line.accountNumber || '');
-              const alreadyIncluded = enhancedLines.some(el => el.lineNumber === line.lineNumber);
-              const shouldInclude = isCredit && sameAccount && !alreadyIncluded;
-              if (shouldInclude) {
-                console.log(`[Profitability Debug] Adding credit line: item=${line.itemName}, amt=${line.amount}, acct=${line.accountNumber}`);
-              }
-              return shouldInclude;
-            });
+          // Find ALL potential credit lines per account, then pick the largest
+          const creditsByAccount = new Map<string, any>();
+          for (const line of validLines) {
+            const accountNumber = line.account_number || '';
+            const amount = line.amount || 0;
+            const isCredit = amount > 0;
+            const sameAccount = matchedAccounts.has(accountNumber);
+            const alreadyIncluded = enhancedLines.some((el: any) => el.lineNumber === line.line_number);
 
-          // Merge credit lines with enhanced lines
-          enhancedLines.push(...additionalCredits);
+            if (isCredit && sameAccount && !alreadyIncluded) {
+              const existing = creditsByAccount.get(accountNumber);
+              if (!existing || amount > existing.amount) {
+                creditsByAccount.set(accountNumber, line);
+              }
+            }
+          }
+
+          // Add the largest credit per account
+          for (const [acct, line] of creditsByAccount) {
+            const accountNumber = line.account_number || null;
+            const itemClassName = line.item_class_name || null;
+            const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
+            const creditLine = {
+              lineNumber: line.line_number || 0,
+              itemId: line.item_id || '',
+              itemName: line.item_name,
+              itemDescription: line.item_description,
+              itemType: line.item_type,
+              quantity: line.quantity || 0,
+              rate: line.rate || 0,
+              amount: line.amount || 0,
+              costEstimate: line.cost_estimate || 0,
+              grossProfit: line.gross_profit || 0,
+              grossMarginPct: line.gross_margin_pct || 0,
+              isClosed: line.is_closed || false,
+              accountNumber,
+              accountName: line.account_name,
+              productType,
+              revRecStartDate: line.revrecstartdate || null,
+              revRecEndDate: line.revrecenddate || null,
+            };
+            console.log(`[Profitability Debug] Adding largest credit for acct ${acct}: item=${line.item_name}, amt=${line.amount}`);
+            enhancedLines.push(creditLine);
+          }
 
           // Group lines by product type
           const productTypeMap = new Map<string, EnhancedSOLineItem[]>();
