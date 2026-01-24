@@ -1071,83 +1071,24 @@ export default function App() {
   /**
    * Performs a cascading search with multiple fallback strategies
    * Handles long search strings by truncating and then validating matches
-   * Now tries section heading search first for better accuracy
+   *
+   * NOTE: Section heading search is NOT used here because risk.location is
+   * a specific text excerpt, not the full section. Use findFullRange() for
+   * full section matching (used by Insert All).
    */
   const cascadingSearch = async (
     searchText: string,
     context: Word.RequestContext,
-    sectionTitle?: string
+    _sectionTitle?: string  // Kept for API compatibility but not used
   ): Promise<SearchMatch[]> => {
     const matches: SearchMatch[] = [];
     const body = context.document.body;
     const fullSearchText = searchText;
-    const normalized = normalizeText(searchText);
     const isLongSearch = searchText.length > MAX_SEARCH_LENGTH;
 
-    console.log(`cascadingSearch: text length ${searchText.length}, section: ${sectionTitle || 'unknown'}`);
-
-    // STRATEGY 0: Try section heading search first (most reliable for long sections)
-    if (sectionTitle && sectionTitle.length > 3 && isLongSearch) {
-      console.log(`cascadingSearch: trying section heading search for "${sectionTitle}"`);
-
-      const headingResults = body.search(sectionTitle, {
-        matchCase: false,
-        matchWholeWord: false,
-      });
-      headingResults.load('items');
-      await context.sync();
-
-      if (headingResults.items.length > 0) {
-        console.log(`cascadingSearch: found ${headingResults.items.length} heading matches`);
-
-        for (const headingRange of headingResults.items) {
-          // Get the range from heading forward, then search for the end phrase
-          const endPhrase = normalized.slice(-80);
-          const afterHeading = headingRange.getRange('After');
-          const searchInSection = afterHeading.search(endPhrase, {
-            matchCase: false,
-            matchWholeWord: false,
-          });
-          searchInSection.load('items');
-          await context.sync();
-
-          if (searchInSection.items.length > 0) {
-            // Expand from heading to the end phrase
-            const fullRange = headingRange.expandToOrNullObject(searchInSection.items[0]);
-            await context.sync();
-
-            if (!fullRange.isNullObject) {
-              fullRange.load('text');
-              await context.sync();
-
-              const foundLength = normalizeText(fullRange.text).length;
-              const expectedLength = normalized.length;
-              const lengthDiff = Math.abs(foundLength - expectedLength) / expectedLength;
-
-              console.log(`cascadingSearch: heading-based range has ${foundLength} chars, expected ${expectedLength}, diff ${(lengthDiff * 100).toFixed(1)}%`);
-
-              // Accept if within 30% of expected length
-              if (lengthDiff < 0.30) {
-                console.log('cascadingSearch: SUCCESS via section heading search');
-                matches.push({
-                  range: fullRange,
-                  text: fullRange.text,
-                  context: fullRange.text.substring(0, 200),
-                  confidence: 98,
-                  matchType: 'section_heading',
-                });
-                return matches;
-              }
-            }
-          }
-        }
-        console.log('cascadingSearch: heading search found matches but could not expand to full section');
-      }
-    }
-
     // Truncate for Word API if needed
-    const truncatedSearch = truncateSearchText(normalized);
-    console.log(`cascadingSearch: falling back to truncated search, truncated to: ${truncatedSearch.length}`);
+    const truncatedSearch = truncateSearchText(normalizeText(searchText));
+    console.log(`Search text length: ${searchText.length}, truncated to: ${truncatedSearch.length}`);
 
     // Tier 1: Search with truncated text (or full if short enough)
     try {
