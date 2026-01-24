@@ -387,7 +387,6 @@ export async function GET(request: Request) {
         }
       }
     }
-    console.log(`[Profitability Debug] workOrderItemIds.size=${workOrderItemIds.size}, WO count=${workOrders.length}, itemIds=[${Array.from(workOrderItemIds).join(',')}]`);
 
     // STEP 4: Fetch Sales Orders with enhanced line items (including account info)
     const salesOrders: LinkedSalesOrder[] = [];
@@ -489,7 +488,6 @@ export async function GET(request: Request) {
               // If line has rev rec dates, check for overlap with engagement month
               if (revRecStart && revRecEnd) {
                 const overlaps = revRecStart <= engagementEnd && revRecEnd >= engagementStart;
-                console.log(`[Profitability Debug] RevRec filter: item=${line.itemName}, revRec=${revRecStart.toISOString().slice(0,10)} to ${revRecEnd.toISOString().slice(0,10)}, engagement=${engagementStart.toISOString().slice(0,10)} to ${engagementEnd.toISOString().slice(0,10)}, overlaps=${overlaps}, amt=${line.amount}`);
                 return overlaps;
               }
             }
@@ -498,13 +496,9 @@ export async function GET(request: Request) {
             if (workOrderItemIds.size === 0) {
               // If no WO item_ids found, use alternative filtering by account number for MCC
               const acct = line.accountNumber || '';
-              const included = acct.startsWith('410') || acct.startsWith('411');
-              console.log(`[Profitability Debug] Empty WO filter: acct=${acct}, included=${included}, item=${line.itemName}, amt=${line.amount}`);
-              return included;
+              return acct.startsWith('410') || acct.startsWith('411');
             }
-            const matched = workOrderItemIds.has(line.itemId);
-            console.log(`[Profitability Debug] WO item filter: itemId=${line.itemId}, matched=${matched}, item=${line.itemName}, amt=${line.amount}, acct=${line.accountNumber}`);
-            return matched;
+            return workOrderItemIds.has(line.itemId);
           });
 
           // Second pass: Find matched account numbers and include the LARGEST credit per account
@@ -556,7 +550,6 @@ export async function GET(request: Request) {
               revRecStartDate: line.revrecstartdate || null,
               revRecEndDate: line.revrecenddate || null,
             };
-            console.log(`[Profitability Debug] Adding largest credit for acct ${acct}: item=${line.item_name}, amt=${line.amount}`);
             enhancedLines.push(creditLine);
           }
 
