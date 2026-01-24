@@ -70,32 +70,62 @@ export async function GET(request: Request) {
     // Get current year for recent projects filter
     const currentYear = new Date().getFullYear();
 
-    // Treat each engagement as a separate project - DO NOT AGGREGATE
-    // Each row in closeout_projects represents a distinct project/engagement
-    let projectList: ProjectSummary[] = (projects || [])
-      .filter(row => row.project_name) // Filter out null names
-      .map((row) => {
-        const revenue = row.actual_revenue || 0;
-        const gpm = row.actual_gp_pct || 0;
-        const variance = row.variance || 0;
+    // GROUP BY (name, year, month) - each month is a separate engagement/project
+    // Multiple project_types in the same month (TBEN, PM, TBIN, etc.) are line items in one SO
+    const engagementMap = new Map<string, ProjectData[]>();
 
-        return {
-          name: row.project_name,
-          years: [row.project_year], // Single year since this is one engagement
-          latestYear: row.project_year,
-          latestMonth: row.project_month || null,
-          projectType: row.project_type || '',
-          recentRevenue: revenue,
-          recentGPM: gpm,
-          recentVariance: variance,
-          isAtRisk: gpm < 50 || variance < -10000,
-          isHighValue: revenue > 500000,
-          isRecent: row.project_year >= 2024 && row.project_year <= currentYear,
-          hasData: revenue > 0,
-          multipleEngagements: false, // No longer applicable - each is separate
-          engagementCount: 1, // Each entry is exactly one engagement
-        };
-      });
+    for (const row of (projects || [])) {
+      if (!row.project_name) continue;
+
+      // Key by name + year + month (month is the engagement identifier)
+      const key = `${row.project_name}|${row.project_year}|${row.project_month || 'null'}`;
+
+      if (!engagementMap.has(key)) {
+        engagementMap.set(key, []);
+      }
+      engagementMap.get(key)!.push(row as ProjectData);
+    }
+
+    // Convert grouped engagements to project summaries
+    let projectList: ProjectSummary[] = Array.from(engagementMap.entries()).map(([key, rows]) => {
+      // Sum revenue across all project_types in this engagement
+      const totalRevenue = rows.reduce((sum, r) => sum + (r.actual_revenue || 0), 0);
+
+      // Use weighted average for GPM based on revenue
+      let weightedGPM = 0;
+      if (totalRevenue > 0) {
+        weightedGPM = rows.reduce((sum, r) => {
+          const rev = r.actual_revenue || 0;
+          const gpm = r.actual_gp_pct || 0;
+          return sum + (gpm * rev);
+        }, 0) / totalRevenue;
+      }
+
+      // Sum variance across all project types
+      const totalVariance = rows.reduce((sum, r) => sum + (r.variance || 0), 0);
+
+      // Determine primary project type (prefer TBEN, MCC, or first non-PM type)
+      const primaryType = rows.find(r => ['TBEN', 'TBEU', 'MCC', 'M3NEW'].includes(r.project_type))?.project_type
+        || rows.find(r => r.project_type !== 'PM')?.project_type
+        || rows[0].project_type;
+
+      return {
+        name: rows[0].project_name,
+        years: [rows[0].project_year],
+        latestYear: rows[0].project_year,
+        latestMonth: rows[0].project_month || null,
+        projectType: primaryType || '',
+        recentRevenue: totalRevenue,
+        recentGPM: weightedGPM,
+        recentVariance: totalVariance,
+        isAtRisk: weightedGPM < 50 || totalVariance < -10000,
+        isHighValue: totalRevenue > 500000,
+        isRecent: rows[0].project_year >= 2024 && rows[0].project_year <= currentYear,
+        hasData: totalRevenue > 0,
+        multipleEngagements: false,
+        engagementCount: 1,
+      };
+    });
 
     // Apply category filter
     if (category) {
@@ -118,32 +148,42 @@ export async function GET(request: Request) {
       }
     }
 
-    // Calculate stats from all projects (before category filtering)
-    // Note: Each entry in projectList is a separate engagement/project
-    const allProjects = (projects || [])
-      .filter(row => row.project_name)
-      .map((row) => {
-        const revenue = row.actual_revenue || 0;
-        const gpm = row.actual_gp_pct || 0;
-        const variance = row.variance || 0;
+    // Calculate stats from all engagements (grouped by name+year+month)
+    const allProjects = Array.from(engagementMap.values()).map(rows => {
+      const totalRevenue = rows.reduce((sum, r) => sum + (r.actual_revenue || 0), 0);
 
-        return {
-          name: row.project_name,
-          years: [row.project_year],
-          latestYear: row.project_year,
-          latestMonth: row.project_month || null,
-          projectType: row.project_type || '',
-          recentRevenue: revenue,
-          recentGPM: gpm,
-          recentVariance: variance,
-          isAtRisk: gpm < 50 || variance < -10000,
-          isHighValue: revenue > 500000,
-          isRecent: row.project_year >= 2024 && row.project_year <= currentYear,
-          hasData: revenue > 0,
-          multipleEngagements: false,
-          engagementCount: 1,
-        };
-      });
+      let weightedGPM = 0;
+      if (totalRevenue > 0) {
+        weightedGPM = rows.reduce((sum, r) => {
+          const rev = r.actual_revenue || 0;
+          const gpm = r.actual_gp_pct || 0;
+          return sum + (gpm * rev);
+        }, 0) / totalRevenue;
+      }
+
+      const totalVariance = rows.reduce((sum, r) => sum + (r.variance || 0), 0);
+
+      const primaryType = rows.find(r => ['TBEN', 'TBEU', 'MCC', 'M3NEW'].includes(r.project_type))?.project_type
+        || rows.find(r => r.project_type !== 'PM')?.project_type
+        || rows[0].project_type;
+
+      return {
+        name: rows[0].project_name,
+        years: [rows[0].project_year],
+        latestYear: rows[0].project_year,
+        latestMonth: rows[0].project_month || null,
+        projectType: primaryType || '',
+        recentRevenue: totalRevenue,
+        recentGPM: weightedGPM,
+        recentVariance: totalVariance,
+        isAtRisk: weightedGPM < 50 || totalVariance < -10000,
+        isHighValue: totalRevenue > 500000,
+        isRecent: rows[0].project_year >= 2024 && rows[0].project_year <= currentYear,
+        hasData: totalRevenue > 0,
+        multipleEngagements: false,
+        engagementCount: 1,
+      };
+    });
 
     const stats = {
       totalProjects: allProjects.length,
