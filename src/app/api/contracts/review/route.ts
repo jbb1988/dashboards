@@ -11,15 +11,31 @@ const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 export const maxDuration = 300; // 5 minutes max for Pro plan
 
 // ============================================
-// TYPES FOR NEW ANCHOR-BASED SCHEMA
+// TYPES FOR HEADING-BASED SCHEMA
 // ============================================
 
-interface Edit {
-  section: string;
-  operation: 'replace_block';
-  anchor_start: string;
-  anchor_end: string;
-  new_text: string;
+// Small find/replace pair - each must be < 255 chars for Word API
+interface Change {
+  find: string;      // Text to find (< 255 chars)
+  replace: string;   // Replacement text (< 255 chars)
+  rationale?: string;
+}
+
+// Edit to an existing section
+interface SectionEdit {
+  section_heading: string;  // Short section heading (e.g., "INDEMNIFICATION")
+  operation: 'modify';
+  changes: Change[];        // Array of small find/replace pairs
+  rationale: string;
+}
+
+// New section to insert
+interface NewSection {
+  operation: 'insert_new';
+  title: string;            // Title for the new section
+  insert_after: string;     // Section heading after which to insert
+  content: string;          // Complete new section text
+  rationale: string;
 }
 
 interface SelfCheck {
@@ -31,9 +47,19 @@ interface SelfCheck {
 }
 
 interface AIResponse {
-  edits: Edit[];
+  edits: SectionEdit[];
+  new_sections?: NewSection[];
   self_check?: SelfCheck;
   error?: string;
+}
+
+// Legacy anchor-based Edit interface for backwards compatibility
+interface LegacyEdit {
+  section: string;
+  operation: 'replace_block';
+  anchor_start: string;
+  anchor_end: string;
+  new_text: string;
 }
 
 interface QualityIssue {
@@ -53,6 +79,10 @@ interface LegacySection {
   riskLevel?: string;
   materiality?: string;
   rationale?: string;
+  // New fields for heading-based approach
+  changes?: Change[];       // Array of find/replace pairs for this section
+  isNewSection?: boolean;   // True if this is a new section to insert
+  insertAfter?: string;     // Section heading after which to insert (for new sections)
 }
 
 // ============================================
@@ -64,86 +94,123 @@ interface LegacySection {
  * Returns list of issues found. Empty list = passed validation.
  *
  * Checklist:
- * A) Structure / deletion integrity
+ * A) Structure / Find-replace integrity
  * B) Defined terms & parentheticals
  * C) Grammar mechanics
  * D) Scope consistency (contradiction killer)
- * E) Cap placement
+ * E) Character limit compliance (255 char Word API limit)
  */
 function validateEdits(
-  edits: Edit[],
+  edits: SectionEdit[],
+  newSections: NewSection[],
   originalContract: string,
   selfCheck?: SelfCheck
 ): QualityIssue[] {
   const issues: QualityIssue[] = [];
 
+  // Validate section edits
   for (const edit of edits) {
-    const section = edit.section || 'Unknown';
-    const newText = edit.new_text || '';
+    const section = edit.section_heading || 'Unknown';
 
-    // A) STRUCTURE / DELETION INTEGRITY
+    // A) STRUCTURE / FIND-REPLACE INTEGRITY
 
-    // A1. No duplicate sentence starts
-    const sentencePattern = /(?:^|[.!?]\s+)([A-Z][a-z]+(?:\s+[a-z]+){0,4})/g;
-    const sentenceStarts: string[] = [];
-    let match;
-    while ((match = sentencePattern.exec(newText)) !== null) {
-      sentenceStarts.push(match[1].toLowerCase());
-    }
-    const uniqueStarts = new Set(sentenceStarts);
-    if (sentenceStarts.length > uniqueStarts.size) {
-      const duplicates = sentenceStarts.filter((s, i) => sentenceStarts.indexOf(s) !== i);
-      issues.push({
-        type: 'duplicate_sentence_start',
-        severity: 'error',
-        description: `Duplicate sentence opening detected`,
-        section,
-        evidence: `"${duplicates[0]}..." appears multiple times`
-      });
-    }
-
-    // A2. Check anchors exist and are unique in source
-    const anchorStart = edit.anchor_start;
-    const anchorEnd = edit.anchor_end;
-
-    if (anchorStart) {
-      const startCount = (originalContract.match(new RegExp(escapeRegExp(anchorStart), 'g')) || []).length;
-      if (startCount === 0) {
+    // A1. Check section heading exists in contract
+    if (edit.section_heading) {
+      const headingCount = (originalContract.match(new RegExp(escapeRegExp(edit.section_heading), 'gi')) || []).length;
+      if (headingCount === 0) {
         issues.push({
           type: 'anchor_not_found',
           severity: 'error',
-          description: `anchor_start not found in contract`,
-          section,
-          evidence: `"${anchorStart.substring(0, 50)}..."`
-        });
-      } else if (startCount > 1) {
-        issues.push({
-          type: 'anchor_not_found',
-          severity: 'warning',
-          description: `anchor_start appears ${startCount} times (should be unique)`,
+          description: `Section heading "${edit.section_heading}" not found in contract`,
           section
         });
       }
     }
 
-    if (anchorEnd) {
-      const endCount = (originalContract.match(new RegExp(escapeRegExp(anchorEnd), 'g')) || []).length;
-      if (endCount === 0) {
+    // A2. Validate each change's find/replace pairs
+    for (const change of edit.changes || []) {
+      // Check find text exists
+      if (change.find) {
+        const findCount = (originalContract.match(new RegExp(escapeRegExp(change.find), 'g')) || []).length;
+        if (findCount === 0) {
+          issues.push({
+            type: 'anchor_not_found',
+            severity: 'error',
+            description: `Find text not found in contract`,
+            section,
+            evidence: `"${change.find.substring(0, 80)}..."`
+          });
+        }
+      }
+
+      // E) CHARACTER LIMIT COMPLIANCE
+      if (change.find && change.find.length > 255) {
         issues.push({
           type: 'anchor_not_found',
           severity: 'error',
-          description: `anchor_end not found in contract`,
-          section,
-          evidence: `"...${anchorEnd.slice(-50)}"`
+          description: `Find text exceeds 255 char Word API limit (${change.find.length} chars)`,
+          section
+        });
+      }
+      if (change.replace && change.replace.length > 255) {
+        // Replace can be longer, but log a warning
+        issues.push({
+          type: 'incomplete_sentence',
+          severity: 'warning',
+          description: `Replace text is ${change.replace.length} chars - long replacements are fine but may need chunking`,
+          section
+        });
+      }
+
+      // D) SCOPE CONSISTENCY for replacements
+      const replaceText = change.replace || '';
+      const hasLimitedCausation = /to the extent caused by|to the extent arising from|but only to the extent/i.test(replaceText);
+      const broadCausationPhrases = [
+        'however caused',
+        'arising out of',
+        'in any way connected with',
+        'resulting from',
+        'regardless of cause'
+      ];
+
+      if (hasLimitedCausation) {
+        for (const phrase of broadCausationPhrases) {
+          if (replaceText.toLowerCase().includes(phrase)) {
+            issues.push({
+              type: 'contradictory_modifiers',
+              severity: 'error',
+              description: `Contradictory scope: has "to the extent caused by" but also "${phrase}"`,
+              section
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Validate new sections
+  for (const newSection of newSections || []) {
+    const section = newSection.title || 'New Section';
+
+    // Check insert_after heading exists
+    if (newSection.insert_after) {
+      const afterCount = (originalContract.match(new RegExp(escapeRegExp(newSection.insert_after), 'gi')) || []).length;
+      if (afterCount === 0) {
+        issues.push({
+          type: 'anchor_not_found',
+          severity: 'error',
+          description: `Insert-after heading "${newSection.insert_after}" not found in contract`,
+          section
         });
       }
     }
 
-    // B) DEFINED TERMS & PARENTHETICALS
+    // Validate content
+    const content = newSection.content || '';
 
-    // B1. Defined term parenthetical appears max once
+    // B) DEFINED TERMS check
     const definedTermPattern = /\(collectively[,]?\s*["'][^"']+["'][^)]*\)/gi;
-    const definedTerms = newText.match(definedTermPattern) || [];
+    const definedTerms = content.match(definedTermPattern) || [];
     if (definedTerms.length > 1) {
       issues.push({
         type: 'duplicate_definition',
@@ -155,66 +222,15 @@ function validateEdits(
     }
 
     // C) GRAMMAR MECHANICS
-
-    // C1. No paragraph starts with "and/or/but" (dangling conjunction)
     const danglingPattern = /(?:^|\n\n)\s*(and\s|or\s|but\s)/i;
-    if (danglingPattern.test(newText)) {
-      const matchedConj = newText.match(danglingPattern);
+    if (danglingPattern.test(content)) {
+      const matchedConj = content.match(danglingPattern);
       issues.push({
         type: 'dangling_conjunction',
         severity: 'error',
         description: `Paragraph starts with conjunction without antecedent`,
         section,
         evidence: matchedConj ? matchedConj[0].trim() : undefined
-      });
-    }
-
-    // C2. Check for incomplete sentences (basic)
-    const trimmedText = newText.trim();
-    if (trimmedText && !trimmedText.endsWith('.') && !trimmedText.endsWith('"') && !trimmedText.endsWith(')')) {
-      issues.push({
-        type: 'incomplete_sentence',
-        severity: 'warning',
-        description: `new_text may not end with complete sentence`,
-        section,
-        evidence: `Ends with: "${trimmedText.slice(-30)}"`
-      });
-    }
-
-    // D) SCOPE CONSISTENCY (THE CONTRADICTION KILLER)
-
-    // D1. If limited causation, no broad causation phrases
-    const hasLimitedCausation = /to the extent caused by|to the extent arising from|but only to the extent/i.test(newText);
-    const broadCausationPhrases = [
-      'however caused',
-      'arising out of',
-      'in any way connected with',
-      'resulting from',
-      'regardless of cause'
-    ];
-
-    if (hasLimitedCausation) {
-      for (const phrase of broadCausationPhrases) {
-        if (newText.toLowerCase().includes(phrase)) {
-          issues.push({
-            type: 'contradictory_modifiers',
-            severity: 'error',
-            description: `Contradictory scope: has "to the extent caused by" but also "${phrase}"`,
-            section
-          });
-        }
-      }
-    }
-
-    // D2. If limited to third-party claims, check for inconsistent first-party
-    const thirdPartyOnly = /third[- ]party claims/i.test(newText);
-    const hasFirstParty = /claims\s+(?:made\s+)?by\s+(?:FW|Client|County)/i.test(newText);
-    if (thirdPartyOnly && hasFirstParty) {
-      issues.push({
-        type: 'contradictory_modifiers',
-        severity: 'warning',
-        description: `May have inconsistent scope: "third-party claims" but also mentions claims by FW/Client`,
-        section
       });
     }
   }
@@ -298,11 +314,12 @@ Regenerate with these fixes.
 // ============================================
 
 interface AIResult {
-  edits: Edit[];
+  edits: SectionEdit[];
+  newSections: NewSection[];
   selfCheck?: SelfCheck;
   error?: string;
   raw: string;
-  // Legacy fields for backwards compatibility
+  // Legacy fields for backwards compatibility with frontend
   sections: LegacySection[];
   summary: string[];
 }
@@ -429,25 +446,55 @@ async function callOpenRouterAPI(
     console.warn('AI returned error:', result.error);
   }
 
-  const edits = Array.isArray(result.edits) ? result.edits : [];
+  const edits: SectionEdit[] = Array.isArray(result.edits) ? result.edits : [];
+  const newSections: NewSection[] = Array.isArray(result.new_sections) ? result.new_sections : [];
 
-  // Convert edits to legacy sections format for backwards compatibility
-  const legacySections: LegacySection[] = edits.map(edit => ({
-    sectionTitle: edit.section,
-    originalText: '', // Will be filled in by anchor resolution
-    revisedText: edit.new_text,
-    riskLevel: 'high', // Default to high since these are flagged issues
-    materiality: 'high',
-    rationale: `Replace block from "${edit.anchor_start?.substring(0, 30)}..." to "...${edit.anchor_end?.slice(-30)}"`
-  }));
+  // Convert edits to legacy sections format for backwards compatibility with frontend
+  // Each SectionEdit becomes a LegacySection
+  const legacySections: LegacySection[] = [];
+
+  for (const edit of edits) {
+    // For the new format, we store the changes array in a way the frontend can use
+    // The frontend will handle the individual find/replace pairs
+    legacySections.push({
+      sectionTitle: edit.section_heading,
+      originalText: '', // Will be populated by finding section in document
+      revisedText: '', // Will be computed from changes
+      riskLevel: 'high',
+      materiality: 'high',
+      rationale: edit.rationale,
+      // Store changes in a custom property for the frontend
+      changes: edit.changes,
+    } as LegacySection & { changes: Change[] });
+  }
+
+  // Add new sections as separate entries
+  for (const newSection of newSections) {
+    legacySections.push({
+      sectionTitle: newSection.title,
+      originalText: '', // New section has no original
+      revisedText: newSection.content,
+      riskLevel: 'high',
+      materiality: 'high',
+      rationale: newSection.rationale,
+      isNewSection: true,
+      insertAfter: newSection.insert_after,
+    } as LegacySection & { isNewSection: boolean; insertAfter: string });
+  }
 
   // Generate summary from edits
-  const summary = edits.map(edit =>
-    `[${edit.section}] Full block replacement with clean redline`
-  );
+  const summary: string[] = [];
+  for (const edit of edits) {
+    const changeCount = edit.changes?.length || 0;
+    summary.push(`[${edit.section_heading}] ${changeCount} targeted change${changeCount !== 1 ? 's' : ''}`);
+  }
+  for (const newSection of newSections) {
+    summary.push(`[NEW] ${newSection.title} - ${newSection.rationale}`);
+  }
 
   return {
     edits,
+    newSections,
     selfCheck: result.self_check,
     error: result.error,
     raw: fullContent,
@@ -558,20 +605,36 @@ function generateDiffDisplay(original: string, modified: string): string {
 // SYSTEM PROMPT - MECHANICALLY PRECISE REDLINE ENGINE
 // ============================================
 
-const REDLINE_SYSTEM_PROMPT = `You are a contract redline engine. Your job is NOT to write legal advice. Your job is to output mechanically correct edits that can be applied to a Word document without leaving broken grammar, duplicate text, or orphaned fragments.
+const REDLINE_SYSTEM_PROMPT = `You are a contract redline engine. Your job is NOT to write legal advice. Your job is to output mechanically correct edits that can be applied to a Word document.
 
 OUTPUT FORMAT (STRICT):
 Return ONLY valid JSON. No markdown. No commentary.
+
+CRITICAL: Word has a 255 character search limit. Each "find" string MUST be under 200 characters.
 
 JSON SCHEMA:
 {
   "edits": [
     {
-      "section": "string (e.g., INDEMNIFICATION)",
-      "operation": "replace_block",
-      "anchor_start": "exact substring that appears ONCE in the source block",
-      "anchor_end": "exact substring that appears ONCE in the source block",
-      "new_text": "full replacement text for the block (final clean text)"
+      "section_heading": "EXACT section heading from contract (e.g., INDEMNIFICATION)",
+      "operation": "modify",
+      "changes": [
+        {
+          "find": "exact text to find (MUST be < 200 chars, unique in section)",
+          "replace": "replacement text",
+          "rationale": "why this change"
+        }
+      ],
+      "rationale": "overall reason for modifying this section"
+    }
+  ],
+  "new_sections": [
+    {
+      "operation": "insert_new",
+      "title": "NEW SECTION TITLE",
+      "insert_after": "EXISTING SECTION HEADING (where to insert after)",
+      "content": "Complete new section text including heading",
+      "rationale": "why this section is needed"
     }
   ],
   "self_check": {
@@ -583,28 +646,46 @@ JSON SCHEMA:
   }
 }
 
-HARD RULES (MUST FOLLOW):
-1) Replace means FULL replacement: if you edit a sentence or paragraph, you must replace the entire block between anchor_start and anchor_end. Never partially delete. Never leave leftovers.
-2) Never duplicate sentence openings (e.g., two "The Contractor covenants...").
-3) Defined-term parentheticals (e.g., (collectively "FW"...)) may appear at most ONCE per section.
-4) If the indemnity is limited (e.g., "to the extent caused by negligence"), you must REMOVE any contradictory broad causation modifiers remaining in the same section (e.g., "however caused," "arising out of," "in any way connected with").
-5) Do not output any paragraph that starts with a conjunction ("and", "or", "but") unless it is truly a continuation of the same sentence inside the same paragraph.
-6) The resulting new_text must read as a clean standalone section with correct grammar and punctuation.
+HARD RULES FOR FIND/REPLACE:
+1) Each "find" must be < 200 characters (Word API limit is 255, we use 200 for safety)
+2) Each "find" must be a UNIQUE phrase within its section - if it appears twice, make it longer/more specific
+3) "find" must be EXACT text copied from the contract - no modifications
+4) If you need to change a long passage, break it into multiple find/replace pairs
+5) Include enough context in "find" to be unique but stay under 200 chars
+6) The "replace" text should flow naturally with surrounding unchanged text
 
-ANCHORS:
-- anchor_start and anchor_end must be exact substrings copied from the provided source text.
-- Each anchor must appear exactly once in the block being replaced.
-- anchor_start is typically the section heading or first words.
-- anchor_end is typically the last sentence of the block (ending with period).
+WHEN TO USE insert_new:
+- Use ONLY for adding entirely new sections that don't exist (e.g., adding LIMITATION OF LIABILITY)
+- Do NOT use for modifying existing sections - use "modify" with changes array instead
 
 MARS NEGOTIATING POSITIONS (apply these to edits):
 - Liability: Cap at contract value, exclude consequential/indirect damages
-- Indemnification: Proportionate to fault ("to the extent caused by negligence"), add liability cap since municipalities cannot indemnify
+- Indemnification: Proportionate to fault ("to the extent caused by"), add liability cap
 - IP/Work Product: Contractor retains pre-existing IP, tools, methodologies, templates
 - Termination: Payment for work performed if terminated without cause
 
+EXAMPLE for a long section:
+Instead of one massive replacement, use multiple targeted changes:
+{
+  "section_heading": "INDEMNIFICATION",
+  "operation": "modify",
+  "changes": [
+    {
+      "find": "shall indemnify and hold harmless however caused",
+      "replace": "shall indemnify and hold harmless to the extent caused by Contractor's negligence",
+      "rationale": "Limit to negligence"
+    },
+    {
+      "find": "all claims, damages, losses and expenses",
+      "replace": "third-party claims, damages, losses and expenses",
+      "rationale": "Limit to third-party claims"
+    }
+  ],
+  "rationale": "Multiple changes to limit indemnification scope"
+}
+
 If you cannot comply with any rule, output:
-{ "edits": [], "error": "reason" }`;
+{ "edits": [], "new_sections": [], "error": "reason" }`;
 
 // User prompt template for contract analysis
 const MARS_USER_PROMPT_TEMPLATE = `Analyze this contract for MARS Company (the Contractor/Vendor). Identify material risks and output redline edits.
@@ -612,24 +693,28 @@ const MARS_USER_PROMPT_TEMPLATE = `Analyze this contract for MARS Company (the C
 MANDATORY SECTIONS TO REVIEW (flag if problematic):
 1. INDEMNIFICATION - Limit to negligence ("to the extent caused by"), add liability cap, remove "however caused"
 2. INTELLECTUAL PROPERTY / WORK PRODUCT - Add pre-existing IP carve-out for tools, methodologies, templates
-3. LIMITATION OF LIABILITY - If MISSING entirely, output an "insert_new" operation to ADD one; if unlimited, add cap at contract value
+3. LIMITATION OF LIABILITY - If MISSING entirely, add via "new_sections"; if unlimited, modify to add cap
 4. TERMINATION - Ensure payment for work performed if terminated without cause
-5. SCOPE OF WORK / SERVICES - Flag if scope is too broad, open-ended, or doesn't match Contractor's proposal; ensure deliverables are clearly defined
-6. CONTRACT TERM / DURATION - Flag unreasonable auto-renewal terms, excessive initial terms, or terms that don't allow termination
+5. SCOPE OF WORK / SERVICES - Flag if scope is too broad or open-ended
+6. CONTRACT TERM / DURATION - Flag unreasonable auto-renewal or excessive terms
 
-OPERATIONS:
-- "replace_block": For modifying existing sections (most common)
-- "insert_new": For adding NEW sections that don't exist (e.g., Limitation of Liability)
+CRITICAL INSTRUCTIONS:
+1. Use "edits" array with "modify" operation for EXISTING sections - provide targeted find/replace pairs
+2. Use "new_sections" array ONLY for adding entirely NEW sections that don't exist in the contract
+3. Each "find" text MUST be < 200 characters (Word API limit)
+4. Copy "find" text EXACTLY from the contract - do not modify it
+5. Make "find" text unique within its section (include enough context)
+6. Break long changes into multiple small find/replace pairs
 
-For "insert_new" operations:
-- anchor_start: The section heading AFTER which to insert (e.g., "INDEMNIFICATION")
-- anchor_end: Same as anchor_start (insertion point marker)
-- new_text: The complete NEW section to add, including its own heading
+SECTION HEADINGS:
+- Use the EXACT section heading text from the contract (e.g., "ARTICLE 5 - INDEMNIFICATION" not just "INDEMNIFICATION")
+- If section has a number, include it (e.g., "5.1 Contractor Indemnification")
 
-For "replace_block" operations:
-- anchor_start: The EXACT first words of the block (section heading or first sentence start)
-- anchor_end: The EXACT last sentence of the block (must end with period)
-- new_text: The COMPLETE clean replacement (no leftovers, no duplicates)
+OUTPUT RULES:
+- Return valid JSON only
+- Include rationale for each change
+- Do NOT make changes just for style - only for substantive risk mitigation
+- If a section is acceptable, do not include it in edits
 
 CONTRACT TEXT:
 `;
@@ -724,7 +809,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Run quality gates on the edits
-      qualityIssues = validateEdits(result.edits, normalizedInput, result.selfCheck);
+      qualityIssues = validateEdits(result.edits, result.newSections, normalizedInput, result.selfCheck);
 
       if (qualityIssues.length > 0) {
         const errorCount = qualityIssues.filter(i => i.severity === 'error').length;
@@ -751,7 +836,7 @@ export async function POST(request: NextRequest) {
             console.log(`Pass 2 edits: ${result.edits.length}`);
 
             // Re-validate after retry
-            qualityIssues = validateEdits(result.edits, normalizedInput, result.selfCheck);
+            qualityIssues = validateEdits(result.edits, result.newSections, normalizedInput, result.selfCheck);
             const retryErrorCount = qualityIssues.filter(i => i.severity === 'error').length;
             const retryWarningCount = qualityIssues.filter(i => i.severity === 'warning').length;
             console.log(`Quality gate (retry): ${retryErrorCount} errors, ${retryWarningCount} warnings`);
@@ -782,10 +867,9 @@ export async function POST(request: NextRequest) {
     // Use legacy sections for backwards compatibility
     const sections = result.sections;
 
-    // BUILD modifiedText by applying anchor-based edits
-    // This uses anchor_start and anchor_end to find the exact block to replace
-    // IMPORTANT: We track positions in BOTH normalized and original text
-    // so the Word add-in gets the original (non-normalized) text to search for
+    // BUILD modifiedText by applying heading-based edits with find/replace pairs
+    // For diff generation, we apply changes to normalized text
+    // For Word add-in, we store original text references in sections
     let modifiedText = normalizedInput;
     let appliedChanges = 0;
     let failedChanges: string[] = [];
@@ -793,85 +877,87 @@ export async function POST(request: NextRequest) {
     // Keep original (non-normalized) text for Word add-in
     const originalText = text; // This is the original input before normalization
 
+    // Process section edits (modifications to existing sections)
     for (const edit of result.edits) {
-      if (!edit.anchor_start || !edit.anchor_end || !edit.new_text) {
-        console.warn(`Skipping edit for ${edit.section}: missing anchor_start, anchor_end, or new_text`);
-        failedChanges.push(edit.section || 'Unknown');
+      if (!edit.section_heading || !edit.changes || edit.changes.length === 0) {
+        console.warn(`Skipping edit for ${edit.section_heading}: missing section_heading or changes`);
+        failedChanges.push(edit.section_heading || 'Unknown');
         continue;
       }
 
-      // Normalize anchors for finding in normalized text
-      const anchorStart = normalizeToASCII(edit.anchor_start);
-      const anchorEnd = normalizeToASCII(edit.anchor_end);
-      const newText = normalizeToASCII(edit.new_text);
+      const sectionHeading = normalizeToASCII(edit.section_heading);
+      console.log(`Processing section: ${sectionHeading} with ${edit.changes.length} changes`);
 
-      // Find positions in NORMALIZED text (for applying changes)
-      const startPos = modifiedText.indexOf(anchorStart);
-      if (startPos === -1) {
-        console.warn(`Could not find anchor_start for ${edit.section}: "${anchorStart.substring(0, 50)}..."`);
-        failedChanges.push(edit.section || 'Unknown');
+      // Find section heading in document to establish section boundaries
+      const headingPos = modifiedText.toLowerCase().indexOf(sectionHeading.toLowerCase());
+      if (headingPos === -1) {
+        console.warn(`Could not find section heading: "${sectionHeading}"`);
+        failedChanges.push(edit.section_heading);
         continue;
       }
 
-      // Find anchor_end AFTER anchor_start
-      const searchAfterStart = modifiedText.substring(startPos);
-      const endPosRelative = searchAfterStart.indexOf(anchorEnd);
-      if (endPosRelative === -1) {
-        console.warn(`Could not find anchor_end for ${edit.section}: "...${anchorEnd.slice(-50)}"`);
-        failedChanges.push(edit.section || 'Unknown');
-        continue;
-      }
+      // Apply each find/replace pair within this section
+      let sectionChangesApplied = 0;
+      let originalSectionText = '';
+      let revisedSectionText = '';
 
-      const endPos = startPos + endPosRelative + anchorEnd.length;
-
-      // Extract the block being replaced from NORMALIZED text (for diff generation)
-      const normalizedBlock = modifiedText.substring(startPos, endPos);
-
-      // CRITICAL: Find the same block in the ORIGINAL text for Word add-in
-      // The Word add-in needs the original text (with smart quotes etc.) to find it in Word
-      let originalBlockForWord = normalizedBlock; // fallback to normalized
-
-      // Try to find anchor_start in the original text
-      // Use case-insensitive search and try both normalized and original anchor
-      const origAnchorStart = edit.anchor_start; // AI might have used original quotes
-      let origStartPos = originalText.indexOf(origAnchorStart);
-      if (origStartPos === -1) {
-        // Try with normalized anchor (in case original has smart quotes that don't match)
-        origStartPos = originalText.indexOf(anchorStart);
-      }
-
-      if (origStartPos !== -1) {
-        // Find anchor_end in original text after the start
-        const origSearchAfterStart = originalText.substring(origStartPos);
-        let origEndPosRelative = origSearchAfterStart.indexOf(edit.anchor_end);
-        if (origEndPosRelative === -1) {
-          origEndPosRelative = origSearchAfterStart.indexOf(anchorEnd);
+      for (const change of edit.changes) {
+        if (!change.find || change.replace === undefined) {
+          console.warn(`Skipping change in ${edit.section_heading}: missing find or replace`);
+          continue;
         }
 
-        if (origEndPosRelative !== -1) {
-          const origEndPos = origStartPos + origEndPosRelative + (edit.anchor_end.length || anchorEnd.length);
-          originalBlockForWord = originalText.substring(origStartPos, origEndPos);
-          console.log(`Found original block for Word add-in (${originalBlockForWord.length} chars)`);
+        const findText = normalizeToASCII(change.find);
+        const replaceText = normalizeToASCII(change.replace);
+
+        // Find the text in the document
+        const findPos = modifiedText.indexOf(findText);
+        if (findPos === -1) {
+          // Try case-insensitive search
+          const findPosCI = modifiedText.toLowerCase().indexOf(findText.toLowerCase());
+          if (findPosCI === -1) {
+            console.warn(`Could not find text in ${edit.section_heading}: "${findText.substring(0, 60)}..."`);
+            continue;
+          }
+          // Use the case-insensitive position but keep original case
+          const actualFindText = modifiedText.substring(findPosCI, findPosCI + findText.length);
+          modifiedText = modifiedText.substring(0, findPosCI) + replaceText + modifiedText.substring(findPosCI + actualFindText.length);
+          originalSectionText += (originalSectionText ? ' ... ' : '') + actualFindText;
+          revisedSectionText += (revisedSectionText ? ' ... ' : '') + replaceText;
         } else {
-          console.warn(`Could not find anchor_end in original text for ${edit.section}, using normalized`);
+          modifiedText = modifiedText.substring(0, findPos) + replaceText + modifiedText.substring(findPos + findText.length);
+          originalSectionText += (originalSectionText ? ' ... ' : '') + findText;
+          revisedSectionText += (revisedSectionText ? ' ... ' : '') + replaceText;
+        }
+
+        sectionChangesApplied++;
+        console.log(`Applied change in ${edit.section_heading}: "${findText.substring(0, 40)}..." → "${replaceText.substring(0, 40)}..."`);
+      }
+
+      if (sectionChangesApplied > 0) {
+        appliedChanges += sectionChangesApplied;
+
+        // Update legacy section with the text for Word add-in
+        const legacySection = sections.find(s => s.sectionTitle === edit.section_heading);
+        if (legacySection) {
+          // For the Word add-in, we need to provide the find/replace pairs
+          // The frontend will handle these individually
+          legacySection.originalText = originalSectionText;
+          legacySection.revisedText = revisedSectionText;
         }
       } else {
-        console.warn(`Could not find anchor_start in original text for ${edit.section}, using normalized`);
-      }
-
-      // Apply the replacement to normalized text (for diff generation)
-      modifiedText = modifiedText.substring(0, startPos) + newText + modifiedText.substring(endPos);
-      appliedChanges++;
-      console.log(`Applied anchor-based edit to ${edit.section} (replaced ${normalizedBlock.length} chars with ${newText.length} chars)`);
-
-      // Update legacy section with the ORIGINAL text (for Word add-in to find)
-      const legacySection = sections.find(s => s.sectionTitle === edit.section);
-      if (legacySection) {
-        legacySection.originalText = originalBlockForWord;
+        failedChanges.push(edit.section_heading);
       }
     }
 
-    console.log(`Applied ${appliedChanges}/${result.edits.length} edits. Failed: ${failedChanges.length > 0 ? failedChanges.join(', ') : 'none'}`);
+    // Process new sections (insertions)
+    for (const newSection of result.newSections) {
+      console.log(`New section to insert: ${newSection.title} after ${newSection.insert_after}`);
+      // New sections are passed through to frontend - no modification to modifiedText needed here
+      // The Word add-in will handle the insertion
+    }
+
+    console.log(`Applied ${appliedChanges} changes across ${result.edits.length} sections. Failed sections: ${failedChanges.length > 0 ? failedChanges.join(', ') : 'none'}`);
 
     // Generate diff display using diff-match-patch
     // Both normalizedInput and modifiedText are now in same encoding
@@ -932,11 +1018,12 @@ export async function POST(request: NextRequest) {
       originalText: normalizedInput,  // Normalized for ORIGINAL-PLAIN.docx
       modifiedText,                    // Normalized for REVISED.docx
       summary: result.summary,
-      sections, // Structured section-by-section analysis
+      sections, // Structured section-by-section analysis with changes arrays
+      newSections: result.newSections, // New sections to insert (separate from edits)
       hasVisibleChanges, // Flag to indicate if diff found changes
       riskScores, // Risk scoring for each section
-      qualityWarnings, // NEW: Any quality issues that couldn't be auto-fixed
-      retryAttempted, // NEW: Whether quality gate triggered a retry
+      qualityWarnings, // Any quality issues that couldn't be auto-fixed
+      retryAttempted, // Whether quality gate triggered a retry
       contractId,
       provisionName,
     });

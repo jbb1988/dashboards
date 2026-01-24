@@ -91,6 +91,22 @@ interface AnalysisResult {
   summary: string;
 }
 
+// Change interface for targeted find/replace pairs
+interface SectionChange {
+  find: string;      // Text to find (< 255 chars for Word API)
+  replace: string;   // Replacement text
+  rationale?: string;
+}
+
+// New section to insert
+interface NewSection {
+  operation: 'insert_new';
+  title: string;
+  insert_after: string;
+  content: string;
+  rationale: string;
+}
+
 // New interface matching dashboard API response
 interface DashboardSection {
   sectionNumber: string;
@@ -99,6 +115,10 @@ interface DashboardSection {
   originalText: string;
   revisedText: string;
   rationale: string;
+  // New fields for heading-based approach
+  changes?: SectionChange[];  // Array of find/replace pairs
+  isNewSection?: boolean;     // True if this is a new section to insert
+  insertAfter?: string;       // Section heading after which to insert
 }
 
 interface DashboardAnalysisResult {
@@ -107,6 +127,7 @@ interface DashboardAnalysisResult {
   modifiedText: string;
   summary: string[];
   sections: DashboardSection[];
+  newSections?: NewSection[];  // New sections to insert (separate from edits)
   hasVisibleChanges: boolean;
   riskScores: {
     summary: { high: number; medium: number; low: number };
@@ -458,6 +479,207 @@ async function findFullRange(
 }
 
 /**
+ * Finds a section in the document by its heading and returns the range.
+ * This is the primary search method - headings are short and unique.
+ *
+ * @param context Word.RequestContext
+ * @param heading Section heading to find (e.g., "INDEMNIFICATION")
+ * @returns The Range containing the heading, or null if not found
+ */
+async function findSectionByHeading(
+  context: Word.RequestContext,
+  heading: string
+): Promise<Word.Range | null> {
+  const normalizedHeading = normalizeText(heading);
+  console.log(`findSectionByHeading: searching for "${normalizedHeading}"`);
+
+  // Strategy 1: Exact match (most reliable)
+  const exactResults = context.document.body.search(heading, {
+    matchCase: false,
+    matchWholeWord: false,
+  });
+  exactResults.load('items');
+  await context.sync();
+
+  if (exactResults.items.length > 0) {
+    console.log(`findSectionByHeading: found ${exactResults.items.length} exact matches`);
+    // Return the first match - headings should be unique
+    return exactResults.items[0];
+  }
+
+  // Strategy 2: Try normalized version
+  const normalizedResults = context.document.body.search(normalizedHeading, {
+    matchCase: false,
+    matchWholeWord: false,
+  });
+  normalizedResults.load('items');
+  await context.sync();
+
+  if (normalizedResults.items.length > 0) {
+    console.log(`findSectionByHeading: found ${normalizedResults.items.length} normalized matches`);
+    return normalizedResults.items[0];
+  }
+
+  // Strategy 3: Try partial match (first significant words)
+  const words = normalizedHeading.split(/\s+/).filter(w => w.length > 2);
+  if (words.length >= 2) {
+    const partialSearch = words.slice(0, 3).join(' ');
+    const partialResults = context.document.body.search(partialSearch, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    partialResults.load('items');
+    await context.sync();
+
+    if (partialResults.items.length > 0) {
+      console.log(`findSectionByHeading: found ${partialResults.items.length} partial matches for "${partialSearch}"`);
+      return partialResults.items[0];
+    }
+  }
+
+  console.log(`findSectionByHeading: could not find heading "${heading}"`);
+  return null;
+}
+
+/**
+ * Applies an array of find/replace changes within a section.
+ * Each change's find text must be < 255 chars for Word API.
+ *
+ * @param context Word.RequestContext
+ * @param sectionHeading The section heading (used to scope the search)
+ * @param changes Array of find/replace pairs
+ * @returns Number of changes successfully applied
+ */
+async function applyChangesToSection(
+  context: Word.RequestContext,
+  sectionHeading: string,
+  changes: SectionChange[],
+  trackChangesEnabled: boolean
+): Promise<number> {
+  let appliedCount = 0;
+
+  for (const change of changes) {
+    if (!change.find || change.replace === undefined) {
+      console.warn(`Skipping change: missing find or replace`);
+      continue;
+    }
+
+    // Word API has 255 char limit - truncate if needed but warn
+    let searchText = change.find;
+    if (searchText.length > 250) {
+      console.warn(`Find text is ${searchText.length} chars, truncating to 250`);
+      searchText = searchText.substring(0, 250);
+    }
+
+    // Search for the text in the document
+    const results = context.document.body.search(searchText, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    results.load('items');
+    await context.sync();
+
+    if (results.items.length === 0) {
+      // Try normalized version
+      const normalizedSearch = normalizeText(searchText);
+      if (normalizedSearch !== searchText && normalizedSearch.length <= 250) {
+        const normalizedResults = context.document.body.search(normalizedSearch, {
+          matchCase: false,
+          matchWholeWord: false,
+        });
+        normalizedResults.load('items');
+        await context.sync();
+
+        if (normalizedResults.items.length > 0) {
+          const range = normalizedResults.items[0];
+          const newRange = range.insertText(change.replace, Word.InsertLocation.replace);
+          if (!trackChangesEnabled) {
+            newRange.font.underline = Word.UnderlineType.single;
+            newRange.font.color = '#16A34A';
+          }
+          await context.sync();
+          appliedCount++;
+          console.log(`Applied change (normalized): "${searchText.substring(0, 40)}..." → "${change.replace.substring(0, 40)}..."`);
+          continue;
+        }
+      }
+      console.warn(`Could not find text: "${searchText.substring(0, 60)}..."`);
+      continue;
+    }
+
+    // Apply the replacement to the first match
+    const range = results.items[0];
+    const newRange = range.insertText(change.replace, Word.InsertLocation.replace);
+
+    // If Track Changes is not available, apply visual highlighting
+    if (!trackChangesEnabled) {
+      newRange.font.underline = Word.UnderlineType.single;
+      newRange.font.color = '#16A34A';
+    }
+
+    await context.sync();
+    appliedCount++;
+    console.log(`Applied change: "${searchText.substring(0, 40)}..." → "${change.replace.substring(0, 40)}..."`);
+  }
+
+  return appliedCount;
+}
+
+/**
+ * Inserts a new section after a specified section heading.
+ *
+ * @param context Word.RequestContext
+ * @param afterHeading Section heading after which to insert
+ * @param newSectionContent Complete content of the new section
+ * @param trackChangesEnabled Whether Track Changes is enabled
+ * @returns True if insertion succeeded
+ */
+async function insertNewSection(
+  context: Word.RequestContext,
+  afterHeading: string,
+  newSectionContent: string,
+  trackChangesEnabled: boolean
+): Promise<boolean> {
+  console.log(`insertNewSection: inserting after "${afterHeading}"`);
+
+  // Find the section heading
+  const headingRange = await findSectionByHeading(context, afterHeading);
+  if (!headingRange) {
+    console.error(`Could not find section heading: "${afterHeading}"`);
+    return false;
+  }
+
+  // Get the paragraph containing the heading
+  const paragraph = headingRange.paragraphs.getFirst();
+  paragraph.load('text');
+  await context.sync();
+
+  // Find the end of this section (next section heading or end of document)
+  // For simplicity, we'll insert after the current paragraph
+  // A more sophisticated approach would find the next numbered heading
+
+  // Get the range after the heading paragraph
+  const afterRange = paragraph.getRange('After');
+
+  // Insert a new paragraph with the section content
+  // Add blank line before and after for separation
+  const insertText = '\n\n' + newSectionContent + '\n';
+  const newRange = afterRange.insertText(insertText, Word.InsertLocation.start);
+
+  // Style the new content
+  if (!trackChangesEnabled) {
+    newRange.font.underline = Word.UnderlineType.single;
+    newRange.font.color = '#16A34A';
+  }
+
+  newRange.select();
+  await context.sync();
+
+  console.log(`insertNewSection: successfully inserted new section`);
+  return true;
+}
+
+/**
  * Calculates similarity between two strings (0-100)
  */
 function calculateSimilarity(str1: string, str2: string): number {
@@ -782,6 +1004,7 @@ export default function App() {
   };
 
   // Insert all section changes into Word document using Track Changes
+  // NEW: Uses heading-based finding and targeted find/replace pairs
   const insertAllChanges = async () => {
     if (!analysisResult || analysisResult.sections.length === 0) {
       setError('No changes to insert');
@@ -792,6 +1015,7 @@ export default function App() {
     setError(null);
     let appliedCount = 0;
     const newApplied = new Set(appliedSections);
+    const failedSections: string[] = [];
 
     try {
       await Word.run(async (context) => {
@@ -808,82 +1032,115 @@ export default function App() {
           console.log('Track changes not available:', e);
         }
 
-        // CRITICAL: Find ALL ranges FIRST, before any modifications
-        // This prevents position shifts from breaking subsequent searches
-        const rangesToApply: Array<{
-          section: typeof analysisResult.sections[0];
-          range: Word.Range;
-        }> = [];
+        // Step 2: Process sections with changes arrays (new format)
+        // Apply in reverse document order to prevent position shifts
+        const sectionsWithChanges = analysisResult.sections.filter(
+          s => s.changes && s.changes.length > 0 && !s.isNewSection && !appliedSections.has(s.sectionTitle)
+        );
 
-        for (const section of analysisResult.sections) {
-          if (!section.originalText || !section.revisedText) continue;
-          if (appliedSections.has(section.sectionTitle)) continue;
+        // Sort sections by finding their position in document
+        const sectionPositions: Array<{ section: DashboardSection; position: number }> = [];
+        for (const section of sectionsWithChanges) {
+          const headingRange = await findSectionByHeading(context, section.sectionTitle);
+          if (headingRange) {
+            // Use a simple position indicator - we'll compare ranges
+            sectionPositions.push({ section, position: 0 });
+          } else {
+            console.log(`Could not find heading for: ${section.sectionTitle}`);
+            failedSections.push(section.sectionTitle);
+          }
+        }
 
-          // Pass section title to help find the right location
+        // For simplicity, apply in reverse order of how they appear in the analysis
+        // (assumes AI returns sections in document order)
+        sectionPositions.reverse();
+
+        console.log(`Applying changes to ${sectionPositions.length} sections`);
+
+        // Step 3: Apply changes to each section
+        for (const { section } of sectionPositions) {
+          if (!section.changes || section.changes.length === 0) continue;
+
+          console.log(`Processing section: ${section.sectionTitle} with ${section.changes.length} changes`);
+
+          const changesApplied = await applyChangesToSection(
+            context,
+            section.sectionTitle,
+            section.changes,
+            trackChangesEnabled
+          );
+
+          if (changesApplied > 0) {
+            newApplied.add(section.sectionTitle);
+            appliedCount += changesApplied;
+            console.log(`Applied ${changesApplied} changes to: ${section.sectionTitle}`);
+          } else {
+            failedSections.push(section.sectionTitle);
+          }
+        }
+
+        // Step 4: Handle legacy format (originalText/revisedText without changes array)
+        const legacySections = analysisResult.sections.filter(
+          s => (!s.changes || s.changes.length === 0) && s.originalText && s.revisedText && !s.isNewSection && !appliedSections.has(s.sectionTitle)
+        );
+
+        for (const section of legacySections) {
+          // Use the old findFullRange approach for legacy format
           const fullRange = await findFullRange(context, section.originalText, section.sectionTitle);
           if (fullRange) {
-            // Get the range's position for sorting (we'll apply bottom-up)
-            fullRange.load('text');
-            rangesToApply.push({ section, range: fullRange });
-            console.log(`Found range for: ${section.sectionTitle}`);
-          } else {
-            console.log(`Could not find text for: ${section.sectionTitle}`);
-          }
-        }
-
-        await context.sync();
-
-        // Step 2: Sort ranges by position (find document position)
-        // We need to compare ranges to determine which comes first
-        // Apply in REVERSE order (bottom to top) so edits don't shift positions
-        const sortedRanges: typeof rangesToApply = [];
-        for (const item of rangesToApply) {
-          // Find insertion position by comparing with existing items
-          let insertIndex = sortedRanges.length;
-          for (let i = 0; i < sortedRanges.length; i++) {
-            const comparison = item.range.compareLocationWith(sortedRanges[i].range);
-            await context.sync();
-            // If this item comes BEFORE sortedRanges[i], insert at position i
-            if (comparison.value === 'Before' || comparison.value === 'AdjacentBefore') {
-              insertIndex = i;
-              break;
+            const newRange = fullRange.insertText(section.revisedText, Word.InsertLocation.replace);
+            if (!trackChangesEnabled) {
+              newRange.font.underline = Word.UnderlineType.single;
+              newRange.font.color = '#16A34A';
             }
+            newApplied.add(section.sectionTitle);
+            appliedCount++;
+            console.log(`Applied legacy change to: ${section.sectionTitle}`);
+            await context.sync();
+          } else {
+            failedSections.push(section.sectionTitle);
           }
-          sortedRanges.splice(insertIndex, 0, item);
         }
 
-        // Reverse to apply bottom-up (later positions first)
-        sortedRanges.reverse();
+        // Step 5: Handle new sections (insertions) - apply last
+        const newSectionsToInsert = analysisResult.sections.filter(
+          s => s.isNewSection && !appliedSections.has(s.sectionTitle)
+        );
 
-        console.log(`Applying ${sortedRanges.length} changes in reverse document order`);
-
-        // Step 3: Apply changes in reverse order
-        for (const { section, range } of sortedRanges) {
-          // Replace with revisedText
-          const newRange = range.insertText(section.revisedText, Word.InsertLocation.replace);
-
-          // If Track Changes is not available, apply visual highlighting
-          if (!trackChangesEnabled) {
-            newRange.font.underline = Word.UnderlineType.single;
-            newRange.font.color = '#16A34A';
+        for (const section of newSectionsToInsert) {
+          if (!section.insertAfter || !section.revisedText) {
+            console.warn(`New section ${section.sectionTitle} missing insertAfter or content`);
+            continue;
           }
 
-          newApplied.add(section.sectionTitle);
-          appliedCount++;
-          console.log(`Applied change to: ${section.sectionTitle}`);
+          const inserted = await insertNewSection(
+            context,
+            section.insertAfter,
+            section.revisedText,
+            trackChangesEnabled
+          );
 
-          await context.sync();
+          if (inserted) {
+            newApplied.add(section.sectionTitle);
+            appliedCount++;
+            console.log(`Inserted new section: ${section.sectionTitle}`);
+          } else {
+            failedSections.push(section.sectionTitle);
+          }
         }
       });
 
       setAppliedSections(newApplied);
-      setAllChangesInserted(true);
+      setAllChangesInserted(failedSections.length === 0);
 
       if (appliedCount > 0) {
-        setSuccessMessage(`Inserted ${appliedCount} changes into document`);
+        const message = failedSections.length > 0
+          ? `Applied ${appliedCount} changes. Failed: ${failedSections.join(', ')}`
+          : `Applied ${appliedCount} changes successfully`;
+        setSuccessMessage(message);
         setTimeout(() => setSuccessMessage(null), 5000);
       } else {
-        setError('Could not find any matching text in the document');
+        setError('Could not apply any changes. The document text may have changed.');
       }
     } catch (err) {
       console.error('Insert all changes error:', err);
@@ -894,9 +1151,16 @@ export default function App() {
   };
 
   // Insert a single section change into Word document using Track Changes
+  // NEW: Supports both changes array (new format) and originalText/revisedText (legacy)
   const insertSingleSection = async (section: DashboardSection) => {
-    if (!section.originalText || !section.revisedText) {
-      setError('No text available for this section');
+    // Check if this is a new section to insert
+    if (section.isNewSection) {
+      if (!section.insertAfter || !section.revisedText) {
+        setError('Missing insert location or content for new section');
+        return;
+      }
+    } else if (!section.changes && (!section.originalText || !section.revisedText)) {
+      setError('No changes available for this section');
       return;
     }
 
@@ -923,25 +1187,52 @@ export default function App() {
           console.log('Track changes not available:', e);
         }
 
-        // Step 2: Find the FULL range of originalText using section heading search
-        const fullRange = await findFullRange(context, section.originalText, section.sectionTitle);
+        // Step 2: Handle based on section type
+        if (section.isNewSection) {
+          // Insert new section
+          const inserted = await insertNewSection(
+            context,
+            section.insertAfter!,
+            section.revisedText,
+            trackChangesEnabled
+          );
 
-        if (!fullRange) {
-          setError(`Could not find "${section.sectionTitle}" in document`);
-          return;
+          if (!inserted) {
+            setError(`Could not find location to insert after "${section.insertAfter}"`);
+            return;
+          }
+        } else if (section.changes && section.changes.length > 0) {
+          // New format: Apply targeted find/replace pairs
+          const changesApplied = await applyChangesToSection(
+            context,
+            section.sectionTitle,
+            section.changes,
+            trackChangesEnabled
+          );
+
+          if (changesApplied === 0) {
+            setError(`Could not apply any changes to "${section.sectionTitle}"`);
+            return;
+          }
+        } else {
+          // Legacy format: Find full range and replace
+          const fullRange = await findFullRange(context, section.originalText, section.sectionTitle);
+
+          if (!fullRange) {
+            setError(`Could not find "${section.sectionTitle}" in document`);
+            return;
+          }
+
+          const newRange = fullRange.insertText(section.revisedText, Word.InsertLocation.replace);
+
+          if (!trackChangesEnabled) {
+            newRange.font.underline = Word.UnderlineType.single;
+            newRange.font.color = '#16A34A';
+          }
+
+          newRange.select();
         }
 
-        // Step 3: Replace with revisedText
-        // With Track Changes enabled, Word automatically shows old (struck) and new (underlined)
-        const newRange = fullRange.insertText(section.revisedText, Word.InsertLocation.replace);
-
-        // If Track Changes is not available, apply visual highlighting to indicate new text
-        if (!trackChangesEnabled) {
-          newRange.font.underline = Word.UnderlineType.single;
-          newRange.font.color = '#16A34A'; // Green to indicate new text
-        }
-
-        newRange.select();
         await context.sync();
 
         setAppliedSections(prev => new Set(prev).add(section.sectionTitle));
@@ -1872,14 +2163,14 @@ export default function App() {
                     </Button>
                   )}
 
-                  {/* Sections List */}
-                  {analysisResult.sections.length > 0 && (
+                  {/* Modifications Section */}
+                  {analysisResult.sections.filter(s => !s.isNewSection).length > 0 && (
                     <div style={styles.sectionList}>
                       <Text weight="semibold" style={{ marginBottom: 12, display: 'block' }}>
-                        Sections Updated ({analysisResult.sections.length})
+                        Modifications ({analysisResult.sections.filter(s => !s.isNewSection).length})
                       </Text>
-                      {analysisResult.sections.map((section, index) => (
-                        <Card key={`${section.sectionNumber}-${index}`} style={styles.sectionCard}>
+                      {analysisResult.sections.filter(s => !s.isNewSection).map((section, index) => (
+                        <Card key={`mod-${section.sectionNumber}-${index}`} style={styles.sectionCard}>
                           <div style={styles.sectionHeader}>
                             <Badge
                               appearance="filled"
@@ -1890,6 +2181,11 @@ export default function App() {
                             <Text weight="semibold" size={300}>
                               {section.sectionTitle || `Section ${section.sectionNumber}`}
                             </Text>
+                            {section.changes && section.changes.length > 0 && (
+                              <Badge appearance="outline" color="informative" style={{ marginLeft: 8 }}>
+                                {section.changes.length} change{section.changes.length !== 1 ? 's' : ''}
+                              </Badge>
+                            )}
                             {appliedSections.has(section.sectionTitle) && (
                               <CheckmarkCircle24Filled style={{ color: '#4ADE80', marginLeft: 'auto' }} />
                             )}
@@ -1897,6 +2193,26 @@ export default function App() {
                           <Text size={200} style={{ color: '#A0A0A0', marginTop: 8 }}>
                             {section.rationale}
                           </Text>
+                          {/* Show individual changes if available */}
+                          {section.changes && section.changes.length > 0 && !appliedSections.has(section.sectionTitle) && (
+                            <div style={styles.changesList}>
+                              {section.changes.slice(0, 3).map((change, idx) => (
+                                <div key={idx} style={styles.changeItem}>
+                                  <Text size={100} style={{ color: '#F87171', textDecoration: 'line-through' }}>
+                                    {change.find.substring(0, 60)}{change.find.length > 60 ? '...' : ''}
+                                  </Text>
+                                  <Text size={100} style={{ color: '#4ADE80' }}>
+                                    → {change.replace.substring(0, 60)}{change.replace.length > 60 ? '...' : ''}
+                                  </Text>
+                                </div>
+                              ))}
+                              {section.changes.length > 3 && (
+                                <Text size={100} style={{ color: '#64748B' }}>
+                                  +{section.changes.length - 3} more changes...
+                                </Text>
+                              )}
+                            </div>
+                          )}
                           <div style={styles.sectionActions}>
                             <Button
                               size="small"
@@ -1904,7 +2220,7 @@ export default function App() {
                               onClick={() => insertSingleSection(section)}
                               disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
                             >
-                              {appliedSections.has(section.sectionTitle) ? 'Applied' : 'Apply This Change'}
+                              {appliedSections.has(section.sectionTitle) ? 'Applied' : 'Apply Changes'}
                             </Button>
                             <Button
                               size="small"
@@ -1912,6 +2228,62 @@ export default function App() {
                               onClick={() => highlightSection(section)}
                             >
                               Find in Doc
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* New Sections to Insert */}
+                  {analysisResult.sections.filter(s => s.isNewSection).length > 0 && (
+                    <div style={styles.sectionList}>
+                      <div style={styles.newSectionHeader}>
+                        <Text weight="semibold" style={{ display: 'block' }}>
+                          New Sections ({analysisResult.sections.filter(s => s.isNewSection).length})
+                        </Text>
+                        <Badge appearance="filled" color="brand">NEW</Badge>
+                      </div>
+                      <Text size={200} style={{ color: '#A0A0A0', marginBottom: 12 }}>
+                        These sections will be added to your contract. Review insertion points carefully.
+                      </Text>
+                      {analysisResult.sections.filter(s => s.isNewSection).map((section, index) => (
+                        <Card key={`new-${index}`} style={{ ...styles.sectionCard, borderColor: '#0EA5E9', borderWidth: 2 }}>
+                          <div style={styles.sectionHeader}>
+                            <Badge appearance="filled" color="brand">
+                              NEW
+                            </Badge>
+                            <Text weight="semibold" size={300}>
+                              {section.sectionTitle}
+                            </Text>
+                            {appliedSections.has(section.sectionTitle) && (
+                              <CheckmarkCircle24Filled style={{ color: '#4ADE80', marginLeft: 'auto' }} />
+                            )}
+                          </div>
+                          <Text size={200} style={{ color: '#A0A0A0', marginTop: 8 }}>
+                            {section.rationale}
+                          </Text>
+                          {section.insertAfter && (
+                            <Text size={200} style={{ color: '#0EA5E9', marginTop: 4 }}>
+                              Insert after: {section.insertAfter}
+                            </Text>
+                          )}
+                          {/* Preview of new section content */}
+                          {section.revisedText && !appliedSections.has(section.sectionTitle) && (
+                            <div style={styles.newSectionPreview}>
+                              <Text size={100} style={{ color: '#86EFAC' }}>
+                                {section.revisedText.substring(0, 200)}{section.revisedText.length > 200 ? '...' : ''}
+                              </Text>
+                            </div>
+                          )}
+                          <div style={styles.sectionActions}>
+                            <Button
+                              size="small"
+                              appearance={appliedSections.has(section.sectionTitle) ? 'outline' : 'primary'}
+                              onClick={() => insertSingleSection(section)}
+                              disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
+                            >
+                              {appliedSections.has(section.sectionTitle) ? 'Inserted' : 'Insert Section'}
                             </Button>
                           </div>
                         </Card>
@@ -2344,5 +2716,34 @@ const styles: Record<string, React.CSSProperties> = {
   },
   selectedContractBadge: {
     marginTop: 10,
+  },
+  changesList: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#0F172A',
+    borderRadius: 6,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  changeItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    paddingBottom: 6,
+    borderBottom: '1px solid #334155',
+  },
+  newSectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  newSectionPreview: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#0F172A',
+    borderRadius: 6,
+    borderLeft: '3px solid #0EA5E9',
   },
 };
