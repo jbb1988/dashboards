@@ -509,13 +509,51 @@ export async function GET(request: Request) {
 
           console.log(`[Debug] After filter: ${enhancedLines.length} lines, validLines had ${validLines.length}`);
 
-          // Second pass: Find matched account numbers and include the LARGEST credit per account
-          // This handles cases where credits/adjustments aren't in the WO but should offset matched revenue
-          // We only take the largest credit to avoid including credits from other engagement periods
+          // Second pass: Find matched account numbers
           const matchedAccounts = new Set<string>();
           for (const line of enhancedLines) {
             if (line.accountNumber) matchedAccounts.add(line.accountNumber);
           }
+
+          // For MCC accounts (4101-4111), include ALL negative amounts (revenue) on matched accounts
+          // This handles cases where WO item_ids are incomplete but the SO lines belong to the same engagement
+          for (const line of validLines) {
+            const accountNumber = line.account_number || '';
+            const amount = line.amount || 0;
+            const isMCCAccount = accountNumber.startsWith('410') || accountNumber.startsWith('411');
+            const isRevenue = amount < 0; // Negative = revenue in NetSuite
+            const sameAccount = matchedAccounts.has(accountNumber);
+            const alreadyIncluded = enhancedLines.some((el: any) => el.lineNumber === line.line_number);
+
+            if (isMCCAccount && isRevenue && sameAccount && !alreadyIncluded) {
+              const itemClassName = line.item_class_name || null;
+              const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
+              const additionalLine = {
+                lineNumber: line.line_number || 0,
+                itemId: line.item_id || '',
+                itemName: line.item_name,
+                itemDescription: line.item_description,
+                itemType: line.item_type,
+                quantity: line.quantity || 0,
+                rate: line.rate || 0,
+                amount: line.amount || 0,
+                costEstimate: line.cost_estimate || 0,
+                grossProfit: line.gross_profit || 0,
+                grossMarginPct: line.gross_margin_pct || 0,
+                isClosed: line.is_closed || false,
+                accountNumber,
+                accountName: line.account_name,
+                productType,
+                revRecStartDate: line.revrecstartdate || null,
+                revRecEndDate: line.revrecenddate || null,
+              };
+              console.log(`[Debug] Adding MCC revenue line: item=${line.item_name}, amt=${line.amount}, acct=${accountNumber}`);
+              enhancedLines.push(additionalLine);
+            }
+          }
+
+          // Third pass: Include the LARGEST credit per matched account
+          // This handles cases where credits/adjustments aren't in the WO but should offset matched revenue
 
           // Find ALL potential credit lines per account, then pick the largest
           const creditsByAccount = new Map<string, any>();
