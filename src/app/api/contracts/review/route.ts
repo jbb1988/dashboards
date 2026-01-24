@@ -10,6 +10,309 @@ const DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 // Increase timeout for Vercel - this requires vercel.json config as well
 export const maxDuration = 300; // 5 minutes max for Pro plan
 
+// ============================================
+// QUALITY GATE VALIDATION
+// ============================================
+
+interface QualityIssue {
+  type: 'orphan_fragment' | 'duplicate_opening' | 'dangling_conjunction' | 'conflicting_modifiers' | 'incomplete_sentence';
+  severity: 'error' | 'warning';
+  description: string;
+  sectionTitle?: string;
+  evidence?: string;
+}
+
+interface Section {
+  sectionNumber?: string;
+  sectionTitle?: string;
+  originalText?: string;
+  revisedText?: string;
+  riskLevel?: string;
+  materiality?: string;
+  rationale?: string;
+}
+
+/**
+ * Quality Gate: Validate AI-generated sections for common issues
+ * Returns list of issues found. Empty list = passed validation.
+ */
+function validateSections(
+  sections: Section[],
+  originalContract: string
+): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+
+  for (const section of sections) {
+    if (!section.originalText || !section.revisedText) continue;
+
+    const title = section.sectionTitle || section.sectionNumber || 'Unknown';
+
+    // 1. Check for orphan fragments - originalText should end at a sentence boundary
+    const endsWithPunctuation = /[.!?;:]\s*$/.test(section.originalText.trim());
+    const endsWithClosingParen = /\)\s*$/.test(section.originalText.trim());
+    if (!endsWithPunctuation && !endsWithClosingParen) {
+      // Check if there's more text after in the original contract
+      const originalPos = originalContract.indexOf(section.originalText);
+      if (originalPos !== -1) {
+        const afterText = originalContract.substring(originalPos + section.originalText.length, originalPos + section.originalText.length + 100);
+        // If there's non-whitespace content immediately after, this might leave orphans
+        if (afterText.trim() && !afterText.trim().startsWith('\n\n')) {
+          issues.push({
+            type: 'incomplete_sentence',
+            severity: 'error',
+            description: `originalText may not capture complete sentence - could leave orphan text`,
+            sectionTitle: title,
+            evidence: `Ends with: "${section.originalText.slice(-50)}" | Next in doc: "${afterText.substring(0, 50)}"`
+          });
+        }
+      }
+    }
+
+    // 2. Check for duplicate sentence openings in revisedText
+    const sentenceStarts = section.revisedText.match(/(?:^|\.\s+)([A-Z][^.]{10,40})/g) || [];
+    const uniqueStarts = new Set(sentenceStarts.map(s => s.toLowerCase().trim()));
+    if (sentenceStarts.length > uniqueStarts.size) {
+      issues.push({
+        type: 'duplicate_opening',
+        severity: 'warning',
+        description: `revisedText may have duplicate sentence openings`,
+        sectionTitle: title
+      });
+    }
+
+    // 3. Check for dangling conjunctions at paragraph start
+    const danglingConjunctionPattern = /(?:^|\n\n)\s*(and\s+against|and\s+including|and\s+any|or\s+any)\s/i;
+    if (danglingConjunctionPattern.test(section.revisedText)) {
+      issues.push({
+        type: 'dangling_conjunction',
+        severity: 'error',
+        description: `revisedText starts paragraph with dangling conjunction (no antecedent)`,
+        sectionTitle: title,
+        evidence: section.revisedText.match(danglingConjunctionPattern)?.[0]
+      });
+    }
+
+    // 4. Check for conflicting modifiers (legal scope issue)
+    const hasLimitedCausation = /to the extent caused by|to the extent arising from|proportionate to/i.test(section.revisedText);
+    const hasUnlimitedCausation = /however caused|regardless of cause|whether or not caused/i.test(section.revisedText);
+    if (hasLimitedCausation && hasUnlimitedCausation) {
+      issues.push({
+        type: 'conflicting_modifiers',
+        severity: 'warning',
+        description: `revisedText has conflicting causation language ("to the extent caused by" + "however caused")`,
+        sectionTitle: title
+      });
+    }
+
+    // 5. Check if revisedText is grammatically complete (basic check)
+    const revisedTrimmed = section.revisedText.trim();
+    if (!revisedTrimmed.endsWith('.') && !revisedTrimmed.endsWith('"') && !revisedTrimmed.endsWith(')')) {
+      issues.push({
+        type: 'incomplete_sentence',
+        severity: 'warning',
+        description: `revisedText may not be a complete sentence`,
+        sectionTitle: title,
+        evidence: `Ends with: "${revisedTrimmed.slice(-30)}"`
+      });
+    }
+
+    // 6. Check for duplicated defined terms - e.g., (collectively "FW"...) appearing twice
+    const definedTermPattern = /\(collectively\s+["'][^"']+["'][^)]*\)/gi;
+    const definedTerms = section.revisedText.match(definedTermPattern) || [];
+    if (definedTerms.length > 1) {
+      // Check if they're the same definition
+      const normalized = definedTerms.map(t => t.toLowerCase());
+      const uniqueTerms = new Set(normalized);
+      if (normalized.length > uniqueTerms.size) {
+        issues.push({
+          type: 'duplicate_opening',
+          severity: 'error',
+          description: `revisedText has duplicate defined term parenthetical`,
+          sectionTitle: title,
+          evidence: definedTerms.join(' ... ')
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Format quality issues into feedback for retry prompt
+ */
+function formatQualityFeedback(issues: QualityIssue[]): string {
+  if (issues.length === 0) return '';
+
+  const errorIssues = issues.filter(i => i.severity === 'error');
+  const warningIssues = issues.filter(i => i.severity === 'warning');
+
+  let feedback = '\n\n=== QUALITY VALIDATION FAILED - PLEASE FIX ===\n';
+  feedback += 'Your previous output had the following issues:\n\n';
+
+  if (errorIssues.length > 0) {
+    feedback += 'ERRORS (must fix):\n';
+    for (const issue of errorIssues) {
+      feedback += `- [${issue.sectionTitle}] ${issue.description}`;
+      if (issue.evidence) feedback += `\n  Evidence: ${issue.evidence}`;
+      feedback += '\n';
+    }
+    feedback += '\n';
+  }
+
+  if (warningIssues.length > 0) {
+    feedback += 'WARNINGS (should fix):\n';
+    for (const issue of warningIssues) {
+      feedback += `- [${issue.sectionTitle}] ${issue.description}`;
+      if (issue.evidence) feedback += `\n  Evidence: ${issue.evidence}`;
+      feedback += '\n';
+    }
+    feedback += '\n';
+  }
+
+  feedback += `
+REMINDER - TO AVOID THESE ISSUES:
+1. originalText MUST include COMPLETE sentences - never stop mid-sentence
+2. If original text contains "employees (collectively 'FW'...)" - include the ENTIRE parenthetical AND the sentence it's part of
+3. revisedText must be a grammatically complete, standalone replacement
+4. Do not use "to the extent caused by" AND "however caused" in the same clause - pick one
+5. Never start a new paragraph with "and against..." without a preceding clause in the same sentence
+
+Please regenerate your response with these issues fixed.
+`;
+
+  return feedback;
+}
+
+// ============================================
+// OPENROUTER API CALL
+// ============================================
+
+interface AIResult {
+  sections: Section[];
+  summary: string[];
+  raw: string;
+}
+
+/**
+ * Call OpenRouter API with the given prompt
+ * Extracted for reuse in retry logic
+ */
+async function callOpenRouterAPI(
+  prompt: string,
+  model: string
+): Promise<AIResult> {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://mars-contracts.vercel.app',
+      'X-Title': 'MARS Contract Review',
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      max_tokens: 8000,
+      temperature: 0.2,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`AI API failed (${response.status}): ${errorText.substring(0, 200)}`);
+  }
+
+  // Collect streamed response
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Failed to get response stream');
+  }
+
+  const decoder = new TextDecoder();
+  let fullContent = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content || '';
+            if (content) {
+              fullContent += content;
+            }
+          } catch {
+            // Skip malformed JSON chunks
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (!fullContent) {
+    throw new Error('AI returned empty response');
+  }
+
+  // Parse JSON from response
+  let jsonStr = fullContent.trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const firstBrace = jsonStr.indexOf('{');
+  const lastBrace = jsonStr.lastIndexOf('}');
+
+  if (firstBrace === -1 || lastBrace <= firstBrace) {
+    throw new Error('No JSON object found in response');
+  }
+
+  jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+
+  // Try parsing strategies
+  let result;
+  try {
+    result = JSON.parse(jsonStr);
+  } catch {
+    // Try with escaped control characters
+    try {
+      const fixedJson = jsonStr
+        .replace(/\t/g, '\\t')
+        .replace(/\r/g, '\\r')
+        .replace(/\n/g, '\\n');
+      result = JSON.parse(fixedJson);
+    } catch {
+      throw new Error('Could not parse JSON response');
+    }
+  }
+
+  return {
+    sections: Array.isArray(result.sections) ? result.sections : [],
+    summary: Array.isArray(result.summary) ? result.summary : [result.summary || 'No summary'],
+    raw: fullContent,
+  };
+}
+
 /**
  * Normalize Unicode characters to ASCII equivalents.
  *
@@ -185,13 +488,36 @@ CRITICAL RULES:
 - Keep changes surgical and minimal - only change what's necessary
 - PRESERVE ALL SPECIAL CHARACTERS exactly as they appear: § (section symbol), ¶ (paragraph symbol), © ® ™, and all legal citation formats
 
-CRITICAL - COMPLETE TEXT REPLACEMENT:
-- The "originalText" MUST include the COMPLETE sentence(s) or paragraph(s) being modified
-- DO NOT stop mid-sentence - include text up to a natural sentence boundary (period, or section break)
-- If a clause spans multiple sentences, include ALL sentences that will be affected by your revision
-- The "revisedText" must be a COMPLETE replacement - it should read as a standalone, grammatically correct paragraph
-- NEVER leave dangling text - if original says "The Contractor covenants... employees (collectively 'FW')" then include the ENTIRE phrase through to its natural end
-- CHECK: After replacement, would the document flow grammatically? If not, expand originalText to include more context
+CRITICAL - COMPLETE TEXT REPLACEMENT (READ CAREFULLY):
+These rules prevent broken documents with orphan text fragments:
+
+1. COMPLETE SENTENCES ONLY
+   - originalText MUST end at a sentence boundary (period, semicolon, or section break)
+   - If a sentence contains "employees (collectively 'FW' for purposes of this section)" - include the ENTIRE sentence through to its period
+   - NEVER stop mid-parenthetical or mid-definition
+
+2. NO ORPHAN FRAGMENTS
+   - After your replacement, NO leftover words should remain from the original
+   - If original text is "The Contractor covenants... from and against any claims" - you must include ALL of it
+   - CHECK: What comes AFTER your originalText in the contract? If it's "and against..." or other continuation, expand originalText
+
+3. GRAMMATICALLY COMPLETE REPLACEMENTS
+   - revisedText must read as a complete, standalone paragraph
+   - No paragraph should start with "and against...", "and including...", "or any..." without an antecedent in the same sentence
+   - The first word after a period should make sense as a new sentence
+
+4. NO CONFLICTING MODIFIERS
+   - Do NOT use both "to the extent caused by [negligence]" AND "however caused" in the same obligation
+   - These are logically contradictory - pick ONE scope of liability
+
+5. SINGLE DEFINITIONS
+   - Defined terms like "(collectively 'FW' for purposes of this section)" should appear ONCE per clause
+   - If your revision duplicates a definition, you've captured too little of the original
+
+6. SELF-TEST BEFORE OUTPUT
+   - Read your revisedText aloud - does it flow grammatically from start to finish?
+   - Imagine pasting revisedText into the document in place of originalText - would any words be left over?
+   - If YES to leftover words, expand originalText to include them
 
 === SELF-CHECK BEFORE OUTPUTTING ===
 Before returning your response, verify for EACH section:
@@ -277,235 +603,78 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
       console.log('Added playbook comparison to prompt');
     }
 
-    // Call OpenRouter API - use model ID directly from frontend
+    // Call OpenRouter API with quality gate validation and retry
     const openRouterModel = model || DEFAULT_MODEL;
     console.log(`Starting OpenRouter analysis with model: ${openRouterModel}...`);
     const startTime = Date.now();
 
-    // Use streaming to prevent timeout on large contracts
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mars-contracts.vercel.app',
-        'X-Title': 'MARS Contract Review',
-      },
-      body: JSON.stringify({
-        model: openRouterModel,
-        messages: [
-          {
-            role: 'user',
-            content: fullPrompt,
-          },
-        ],
-        max_tokens: 8000,  // Reduced - no longer outputting full document
-        temperature: 0.2,
-        stream: true, // Enable streaming to prevent timeout
-      }),
-    });
+    let result: AIResult;
+    let qualityIssues: QualityIssue[] = [];
+    let retryAttempted = false;
 
-    if (!response.ok) {
-      const errorText = await response.text();
+    // PASS 1: Initial AI call
+    try {
+      console.log('=== PASS 1: Initial AI Analysis ===');
+      result = await callOpenRouterAPI(fullPrompt, openRouterModel);
+      console.log(`Pass 1 completed in ${(Date.now() - startTime) / 1000}s`);
+      console.log(`Pass 1 sections: ${result.sections.length}, summary items: ${result.summary.length}`);
+
+      // Run quality gates on the result
+      qualityIssues = validateSections(result.sections, normalizedInput);
+
+      if (qualityIssues.length > 0) {
+        const errorCount = qualityIssues.filter(i => i.severity === 'error').length;
+        const warningCount = qualityIssues.filter(i => i.severity === 'warning').length;
+        console.log(`Quality gate: ${errorCount} errors, ${warningCount} warnings`);
+
+        // If there are errors (not just warnings), retry
+        if (errorCount > 0) {
+          console.log('=== PASS 2: Retry with Quality Feedback ===');
+          retryAttempted = true;
+
+          // Build retry prompt with feedback about what went wrong
+          const qualityFeedback = formatQualityFeedback(qualityIssues);
+          const retryPrompt = fullPrompt + qualityFeedback;
+
+          try {
+            const retryStartTime = Date.now();
+            result = await callOpenRouterAPI(retryPrompt, openRouterModel);
+            console.log(`Pass 2 completed in ${(Date.now() - retryStartTime) / 1000}s`);
+            console.log(`Pass 2 sections: ${result.sections.length}, summary items: ${result.summary.length}`);
+
+            // Re-validate after retry
+            qualityIssues = validateSections(result.sections, normalizedInput);
+            const retryErrorCount = qualityIssues.filter(i => i.severity === 'error').length;
+            const retryWarningCount = qualityIssues.filter(i => i.severity === 'warning').length;
+            console.log(`Quality gate (retry): ${retryErrorCount} errors, ${retryWarningCount} warnings`);
+
+            if (retryErrorCount > 0) {
+              console.warn('Quality issues persist after retry - proceeding with warnings');
+            }
+          } catch (retryError) {
+            console.error('Retry failed:', retryError);
+            // Continue with original result if retry fails
+          }
+        }
+      } else {
+        console.log('Quality gate: PASSED (no issues)');
+      }
+    } catch (apiError) {
       console.error('=== OPENROUTER API ERROR ===');
-      console.error('Status:', response.status);
-      console.error('Status Text:', response.statusText);
-      console.error('Response Body:', errorText);
+      console.error('Error:', apiError);
       console.error('Model Used:', openRouterModel);
       console.error('Input Length:', normalizedInput.length, 'chars');
       console.error('============================');
       return NextResponse.json(
-        { error: `AI analysis failed (${response.status}): ${errorText.substring(0, 200)}` },
+        { error: apiError instanceof Error ? apiError.message : 'AI analysis failed' },
         { status: 500 }
       );
     }
 
-    // Collect streamed response chunks
-    const reader = response.body?.getReader();
-    if (!reader) {
-      return NextResponse.json(
-        { error: 'Failed to get response stream' },
-        { status: 500 }
-      );
-    }
+    console.log(`Total analysis time: ${(Date.now() - startTime) / 1000}s (retry: ${retryAttempted})`);
 
-    const decoder = new TextDecoder();
-    let fullContent = '';
-    let chunkCount = 0;
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
-
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content || '';
-              if (content) {
-                fullContent += content;
-                chunkCount++;
-              }
-            } catch {
-              // Skip malformed JSON chunks
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    console.log(`Received ${chunkCount} chunks, total content: ${fullContent.length} chars`);
-    const stdout = fullContent;
-    if (!stdout) {
-      console.error('=== OPENROUTER EMPTY RESPONSE ===');
-      console.error('No content in streamed AI response');
-      console.error('Chunk count:', chunkCount);
-      console.error('=================================');
-      return NextResponse.json(
-        { error: 'AI returned empty response. Please try again.' },
-        { status: 500 }
-      );
-    }
-
-    console.log(`OpenRouter completed in ${(Date.now() - startTime) / 1000}s`);
-    console.log('Raw output length:', stdout.length);
-
-    // Parse the response
-    let result;
-    try {
-      // Try to extract JSON from the response - find the outermost { }
-      let jsonStr = stdout.trim();
-
-      // Strip markdown code blocks if present (multiple patterns)
-      jsonStr = jsonStr
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .replace(/```json/gi, '')
-        .replace(/```/g, '')
-        .trim();
-
-      // Find JSON object boundaries - look for the structure we expect
-      const firstBrace = jsonStr.indexOf('{');
-      const lastBrace = jsonStr.lastIndexOf('}');
-
-      if (firstBrace !== -1 && lastBrace > firstBrace) {
-        jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
-
-        // Try multiple parsing strategies
-        let parseSuccess = false;
-        const parseErrors: string[] = [];
-
-        // Strategy 1: Direct parse
-        try {
-          result = JSON.parse(jsonStr);
-          parseSuccess = true;
-        } catch (e) {
-          parseErrors.push(`Direct: ${e instanceof Error ? e.message : 'unknown'}`);
-        }
-
-        // Strategy 2: Fix control characters in strings
-        if (!parseSuccess) {
-          try {
-            // Replace literal newlines/tabs inside strings with escaped versions
-            // This regex finds strings and escapes control chars within them
-            const fixedJson = jsonStr
-              .replace(/\t/g, '\\t')
-              .replace(/\r/g, '\\r')
-              .replace(/\n/g, '\\n');
-            result = JSON.parse(fixedJson);
-            parseSuccess = true;
-          } catch (e) {
-            parseErrors.push(`ControlChars: ${e instanceof Error ? e.message : 'unknown'}`);
-          }
-        }
-
-        // Strategy 3: Use a more lenient approach - try to extract key fields manually
-        if (!parseSuccess) {
-          try {
-            // Try to extract sections array
-            const sectionsMatch = jsonStr.match(/"sections"\s*:\s*\[([\s\S]*?)\](?=\s*[,}])/);
-            const summaryMatch = jsonStr.match(/"summary"\s*:\s*\[([\s\S]*?)\](?=\s*[,}])/);
-
-            if (sectionsMatch || summaryMatch) {
-              result = {
-                sections: [],
-                summary: []
-              };
-
-              // If we found sections, try to parse them
-              if (sectionsMatch) {
-                try {
-                  const sectionsStr = `[${sectionsMatch[1]}]`;
-                  result.sections = JSON.parse(sectionsStr);
-                } catch {
-                  // Try with newline escaping
-                  const sectionsStr = `[${sectionsMatch[1].replace(/\n/g, '\\n')}]`;
-                  result.sections = JSON.parse(sectionsStr);
-                }
-              }
-
-              // If we found summary, try to parse it
-              if (summaryMatch) {
-                try {
-                  const summaryStr = `[${summaryMatch[1]}]`;
-                  result.summary = JSON.parse(summaryStr);
-                } catch {
-                  const summaryStr = `[${summaryMatch[1].replace(/\n/g, '\\n')}]`;
-                  result.summary = JSON.parse(summaryStr);
-                }
-              }
-
-              parseSuccess = true;
-              console.log('Used fallback extraction for sections/summary');
-            }
-          } catch (e) {
-            parseErrors.push(`Fallback: ${e instanceof Error ? e.message : 'unknown'}`);
-          }
-        }
-
-        if (!parseSuccess) {
-          console.error('All JSON parse strategies failed:', parseErrors);
-          console.log('JSON preview:', jsonStr.substring(0, 1000));
-          throw new Error('Could not parse JSON response');
-        }
-
-        console.log('Successfully parsed JSON response');
-        console.log('Fields in result:', Object.keys(result));
-        console.log('sections count:', result.sections?.length || 0);
-        console.log('summary count:', result.summary?.length || 0);
-      } else {
-        // No JSON found - maybe the AI returned text. Try to extract any useful info
-        console.log('No JSON braces found. Raw output:', stdout.substring(0, 1000));
-        throw new Error('No JSON object found in response');
-      }
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.log('Raw output preview:', stdout.substring(0, 500));
-
-      // If JSON parsing fails, return error with more context
-      return NextResponse.json(
-        { error: 'AI analysis failed to return structured data. Please try again.' },
-        { status: 500 }
-      );
-    }
-
-    // Ensure summary is an array
-    if (!Array.isArray(result.summary)) {
-      result.summary = [result.summary || 'No summary provided'];
-    }
-
-    // Ensure sections is an array
-    const sections = Array.isArray(result.sections) ? result.sections : [];
+    // Use the result
+    const sections = result.sections;
 
     // BUILD modifiedText ourselves by applying section changes
     // This is much faster than having Claude output the entire 50K+ document
@@ -600,14 +769,26 @@ When analyzing, note in the rationale if a change brings the contract CLOSER to 
 
     console.log(`Risk scores: ${riskScores.summary.high} high, ${riskScores.summary.medium} medium, ${riskScores.summary.low} low`);
 
+    // Include quality warnings in response if any remain
+    const remainingWarnings = qualityIssues.filter(i => i.severity === 'warning');
+    const qualityWarnings = remainingWarnings.length > 0
+      ? remainingWarnings.map(w => `[${w.sectionTitle}] ${w.description}`)
+      : undefined;
+
+    if (qualityWarnings) {
+      console.log(`Returning with ${qualityWarnings.length} quality warnings`);
+    }
+
     return NextResponse.json({
       redlinedText,
       originalText: normalizedInput,  // Normalized for ORIGINAL-PLAIN.docx
       modifiedText,                    // Normalized for REVISED.docx
       summary: result.summary,
-      sections, // NEW: Structured section-by-section analysis
-      hasVisibleChanges, // NEW: Flag to indicate if diff found changes
-      riskScores, // NEW: Risk scoring for each section
+      sections, // Structured section-by-section analysis
+      hasVisibleChanges, // Flag to indicate if diff found changes
+      riskScores, // Risk scoring for each section
+      qualityWarnings, // NEW: Any quality issues that couldn't be auto-fixed
+      retryAttempted, // NEW: Whether quality gate triggered a retry
       contractId,
       provisionName,
     });
