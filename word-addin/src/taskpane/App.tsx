@@ -184,19 +184,81 @@ function getSearchablePhrase(text: string, maxLen: number = 200): string {
  * Works even for text longer than Word's 255-char search limit.
  *
  * STRATEGY:
- * 1. For short text (<200 chars): Direct search
- * 2. For long text: Find start, then search for end phrase AFTER start position
- * 3. CRITICAL: Validate that found range matches expected text before returning
- * 4. If validation fails, try expanding to paragraph boundaries
+ * 1. Try to find by SECTION HEADING first (most reliable for long sections)
+ * 2. For short text (<200 chars): Direct search
+ * 3. For long text: Find start, then search for end phrase AFTER start position
+ * 4. CRITICAL: Validate that found range matches expected text before returning
  */
 async function findFullRange(
   context: Word.RequestContext,
-  originalText: string
+  originalText: string,
+  sectionTitle?: string
 ): Promise<Word.Range | null> {
   const normalized = normalizeText(originalText);
   const expectedLength = normalized.length;
 
-  console.log(`findFullRange: searching for text of length ${expectedLength}`);
+  console.log(`findFullRange: searching for text of length ${expectedLength}, section: ${sectionTitle || 'unknown'}`);
+
+  // STRATEGY 1: Try to find by section heading first (most reliable)
+  // Section headings are typically unique and in ALL CAPS
+  if (sectionTitle && sectionTitle.length > 3) {
+    console.log(`findFullRange: trying section heading search for "${sectionTitle}"`);
+
+    const headingResults = context.document.body.search(sectionTitle, {
+      matchCase: false,
+      matchWholeWord: false,
+    });
+    headingResults.load('items');
+    await context.sync();
+
+    if (headingResults.items.length > 0) {
+      console.log(`findFullRange: found ${headingResults.items.length} heading matches`);
+
+      // For each heading match, try to expand to capture the full section
+      for (const headingRange of headingResults.items) {
+        // Get paragraphs starting from this heading
+        // We need to expand forward to capture the section content
+        const headingPara = headingRange.paragraphs.getFirst();
+        headingPara.load('text');
+        await context.sync();
+
+        // Get the range from heading to end of document, then search for our end phrase
+        const endPhrase = normalized.slice(-80);
+        const afterHeading = headingRange.getRange('After');
+        const searchInSection = afterHeading.search(endPhrase, {
+          matchCase: false,
+          matchWholeWord: false,
+        });
+        searchInSection.load('items');
+        await context.sync();
+
+        if (searchInSection.items.length > 0) {
+          // Expand from heading to the end phrase
+          const fullRange = headingRange.expandToOrNullObject(searchInSection.items[0]);
+          await context.sync();
+
+          if (!fullRange.isNullObject) {
+            fullRange.load('text');
+            await context.sync();
+
+            const foundLength = normalizeText(fullRange.text).length;
+            const lengthDiff = Math.abs(foundLength - expectedLength) / expectedLength;
+
+            console.log(`findFullRange: heading-based range has ${foundLength} chars, expected ${expectedLength}, diff ${(lengthDiff * 100).toFixed(1)}%`);
+
+            // Accept if within 25% of expected length
+            if (lengthDiff < 0.25) {
+              console.log('findFullRange: SUCCESS via section heading search');
+              return fullRange;
+            }
+          }
+        }
+      }
+      console.log('findFullRange: heading search found matches but could not expand to full section');
+    } else {
+      console.log('findFullRange: section heading not found in document');
+    }
+  }
 
   // For short text, search directly
   if (normalized.length <= 200) {
@@ -756,7 +818,8 @@ export default function App() {
           if (!section.originalText || !section.revisedText) continue;
           if (appliedSections.has(section.sectionTitle)) continue;
 
-          const fullRange = await findFullRange(context, section.originalText);
+          // Pass section title to help find the right location
+          const fullRange = await findFullRange(context, section.originalText, section.sectionTitle);
           if (fullRange) {
             // Get the range's position for sorting (we'll apply bottom-up)
             fullRange.load('text');
@@ -859,8 +922,8 @@ export default function App() {
           console.log('Track changes not available:', e);
         }
 
-        // Step 2: Find the FULL range of originalText using bookend search
-        const fullRange = await findFullRange(context, section.originalText);
+        // Step 2: Find the FULL range of originalText using section heading search
+        const fullRange = await findFullRange(context, section.originalText, section.sectionTitle);
 
         if (!fullRange) {
           setError(`Could not find "${section.sectionTitle}" in document`);

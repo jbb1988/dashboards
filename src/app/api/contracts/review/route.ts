@@ -609,13 +609,24 @@ If you cannot comply with any rule, output:
 // User prompt template for contract analysis
 const MARS_USER_PROMPT_TEMPLATE = `Analyze this contract for MARS Company (the Contractor/Vendor). Identify material risks and output redline edits.
 
-FOCUS ON THESE SECTIONS (if present):
-1. INDEMNIFICATION - Limit to negligence, add liability cap, remove "however caused"
-2. INTELLECTUAL PROPERTY / WORK PRODUCT - Add pre-existing IP carve-out
-3. LIMITATION OF LIABILITY - If missing, flag it; if unlimited, add cap
-4. TERMINATION - Ensure payment for work performed
+MANDATORY SECTIONS TO REVIEW (flag if problematic):
+1. INDEMNIFICATION - Limit to negligence ("to the extent caused by"), add liability cap, remove "however caused"
+2. INTELLECTUAL PROPERTY / WORK PRODUCT - Add pre-existing IP carve-out for tools, methodologies, templates
+3. LIMITATION OF LIABILITY - If MISSING entirely, output an "insert_new" operation to ADD one; if unlimited, add cap at contract value
+4. TERMINATION - Ensure payment for work performed if terminated without cause
+5. SCOPE OF WORK / SERVICES - Flag if scope is too broad, open-ended, or doesn't match Contractor's proposal; ensure deliverables are clearly defined
+6. CONTRACT TERM / DURATION - Flag unreasonable auto-renewal terms, excessive initial terms, or terms that don't allow termination
 
-For each material issue, output a replace_block edit with:
+OPERATIONS:
+- "replace_block": For modifying existing sections (most common)
+- "insert_new": For adding NEW sections that don't exist (e.g., Limitation of Liability)
+
+For "insert_new" operations:
+- anchor_start: The section heading AFTER which to insert (e.g., "INDEMNIFICATION")
+- anchor_end: Same as anchor_start (insertion point marker)
+- new_text: The complete NEW section to add, including its own heading
+
+For "replace_block" operations:
 - anchor_start: The EXACT first words of the block (section heading or first sentence start)
 - anchor_end: The EXACT last sentence of the block (must end with period)
 - new_text: The COMPLETE clean replacement (no leftovers, no duplicates)
