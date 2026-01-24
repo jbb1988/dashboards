@@ -147,6 +147,8 @@ function formatCurrency(value: number): string {
 export default function ProfitabilityDashboard({ initialProject, initialYear }: ProfitabilityDashboardProps) {
   const [projectName, setProjectName] = useState(initialProject || '');
   const [year, setYear] = useState<number | ''>(initialYear || '');
+  const [month, setMonth] = useState<number | ''>('');
+  const [projectType, setProjectType] = useState<string>('');
   const [searchInput, setSearchInput] = useState(initialProject || '');
   const [data, setData] = useState<ProfitabilityData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -227,7 +229,12 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     p.name.toLowerCase().includes(searchInput.toLowerCase())
   );
 
-  const fetchData = async (project: string, yr?: number | '') => {
+  const fetchData = async (
+    project: string,
+    yr?: number | '',
+    mon?: number | '',
+    type?: string
+  ) => {
     if (!project) {
       setData(null);
       return;
@@ -240,6 +247,12 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
       let url = `/api/closeout/profitability?project=${encodeURIComponent(project)}`;
       if (yr) {
         url += `&year=${yr}`;
+      }
+      if (mon) {
+        url += `&month=${mon}`;
+      }
+      if (type) {
+        url += `&type=${encodeURIComponent(type)}`;
       }
 
       const response = await fetch(url);
@@ -273,7 +286,7 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     if (trimmedProject) {
       setProjectName(trimmedProject);
       setIsDropdownOpen(false);
-      fetchData(trimmedProject, year);
+      fetchData(trimmedProject, year, month, projectType);
     }
   };
 
@@ -289,14 +302,18 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     setSearchInput(project.name);
     setProjectName(project.name);
     setYear(selectedYear || '');
+    setMonth('');
+    setProjectType('');
     setIsDropdownOpen(false);
-    fetchData(project.name, selectedYear || '');
+    fetchData(project.name, selectedYear || '', '', '');
   };
 
   const clearSelection = () => {
     setSearchInput('');
     setProjectName('');
     setYear('');
+    setMonth('');
+    setProjectType('');
     setData(null);
   };
 
@@ -304,8 +321,10 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     setSearchInput(project);
     setProjectName(project);
     setYear(selectedYear || '');
+    setMonth('');
+    setProjectType('');
     setShowBrowser(false);
-    fetchData(project, selectedYear || '');
+    fetchData(project, selectedYear || '', '', '');
   };
 
   const handleRefresh = async () => {
@@ -324,7 +343,7 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
 
         // If currently viewing a project, reload its data
         if (projectName) {
-          await fetchData(projectName, year);
+          await fetchData(projectName, year, month, projectType);
         }
 
         // Show success notification
@@ -450,6 +469,54 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
               placeholder="All"
               className="w-24 px-3 py-2 bg-[#0A0F1E] border border-white/[0.10] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#22C55E]/50"
             />
+          </div>
+
+          {/* Month Filter */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-400">Month:</label>
+            <select
+              value={month}
+              onChange={(e) => setMonth(e.target.value ? parseInt(e.target.value) : '')}
+              className="w-32 px-3 py-2 bg-[#0A0F1E] border border-white/[0.10] rounded-lg text-white focus:outline-none focus:border-[#22C55E]/50"
+            >
+              <option value="">All</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+
+          {/* Type Filter */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-400">Type:</label>
+            <select
+              value={projectType}
+              onChange={(e) => setProjectType(e.target.value)}
+              className="w-32 px-3 py-2 bg-[#0A0F1E] border border-white/[0.10] rounded-lg text-white focus:outline-none focus:border-[#22C55E]/50"
+            >
+              <option value="">All</option>
+              <option value="TBEN">TBEN</option>
+              <option value="TBEU">TBEU</option>
+              <option value="TBIN">TBIN</option>
+              <option value="TBIU">TBIU</option>
+              <option value="M3NEW">M3 New</option>
+              <option value="M3IN">M3 Install</option>
+              <option value="M3IU">M3 Upgrade</option>
+              <option value="DRM3">DR M3</option>
+              <option value="DRMCC">DR MCC</option>
+              <option value="MCC">MCC</option>
+              <option value="PM">PM</option>
+              <option value="SCH">Shipping</option>
+            </select>
           </div>
 
           {/* Search Button */}
