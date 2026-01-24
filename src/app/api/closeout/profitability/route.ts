@@ -53,6 +53,8 @@ interface EnhancedSOLineItem {
   accountNumber: string | null;
   accountName: string | null;
   productType: string; // Derived from account_number
+  revRecStartDate: string | null; // Revenue recognition start date
+  revRecEndDate: string | null; // Revenue recognition end date
 }
 
 // Product type group (lines grouped by product type)
@@ -416,7 +418,9 @@ export async function GET(request: Request) {
             gross_margin_pct,
             is_closed,
             account_number,
-            account_name
+            account_name,
+            revrecstartdate,
+            revrecenddate
           )
         `)
         .in('netsuite_id', Array.from(linkedSOIds));
@@ -465,22 +469,41 @@ export async function GET(request: Request) {
                 accountNumber,
                 accountName: line.account_name,
                 productType,
+                revRecStartDate: line.revrecstartdate || null,
+                revRecEndDate: line.revrecenddate || null,
             };
           })
           .filter(line => {
-            // CRITICAL: Only include SO line items that match items in the filtered Work Orders
-            // This ensures we only count revenue for items actually part of this engagement (month)
-            // Example: June WO has MCC service items → only count those MCC items in SO, not Feb items
+            // CRITICAL: Only include SO line items that match the engagement period
+            // Primary filter: Use revenue recognition dates if available
+            // Fallback: Use WO item_id matching
+
+            // Build engagement month date range if year/month provided
+            if (year && month) {
+              const engagementStart = new Date(year, month - 1, 1); // month is 1-indexed
+              const engagementEnd = new Date(year, month, 0); // Last day of month
+
+              const revRecStart = line.revRecStartDate ? new Date(line.revRecStartDate) : null;
+              const revRecEnd = line.revRecEndDate ? new Date(line.revRecEndDate) : null;
+
+              // If line has rev rec dates, check for overlap with engagement month
+              if (revRecStart && revRecEnd) {
+                const overlaps = revRecStart <= engagementEnd && revRecEnd >= engagementStart;
+                console.log(`[Profitability Debug] RevRec filter: item=${line.itemName}, revRec=${revRecStart.toISOString().slice(0,10)} to ${revRecEnd.toISOString().slice(0,10)}, engagement=${engagementStart.toISOString().slice(0,10)} to ${engagementEnd.toISOString().slice(0,10)}, overlaps=${overlaps}, amt=${line.amount}`);
+                return overlaps;
+              }
+            }
+
+            // Fallback to WO item_id filtering
             if (workOrderItemIds.size === 0) {
               // If no WO item_ids found, use alternative filtering by account number for MCC
-              // Include only MCC revenue lines (accounts 4100-4111) to avoid including unrelated items
               const acct = line.accountNumber || '';
               const included = acct.startsWith('410') || acct.startsWith('411');
               console.log(`[Profitability Debug] Empty WO filter: acct=${acct}, included=${included}, item=${line.itemName}, amt=${line.amount}`);
               return included;
             }
             const matched = workOrderItemIds.has(line.itemId);
-            console.log(`[Profitability Debug] WO filter: itemId=${line.itemId}, matched=${matched}, item=${line.itemName}, amt=${line.amount}, acct=${line.accountNumber}`);
+            console.log(`[Profitability Debug] WO item filter: itemId=${line.itemId}, matched=${matched}, item=${line.itemName}, amt=${line.amount}, acct=${line.accountNumber}`);
             return matched;
           });
 
