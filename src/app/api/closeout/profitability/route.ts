@@ -149,6 +149,8 @@ interface ProjectProfitabilityResponse {
   project: {
     name: string;
     year: number | null;
+    month: number | null;
+    projectType: string | null;
     customerName: string | null;
   };
   kpis: ProjectKPIs;
@@ -170,13 +172,16 @@ export async function GET(request: Request) {
     const projectName = url.searchParams.get('project');
     const yearParam = url.searchParams.get('year');
     const year = yearParam ? parseInt(yearParam) : null;
+    const monthParam = url.searchParams.get('month');
+    const month = monthParam ? parseInt(monthParam) : null;
+    const projectType = url.searchParams.get('type');
     // Optional: Use WIP reports for real-time cost data (defaults to false)
     const useWipReport = url.searchParams.get('useWipReport') === 'true';
 
     if (!projectName) {
       return NextResponse.json({
         error: 'Missing required parameter',
-        message: 'project parameter is required (e.g., ?project=Sarasota&year=2025)',
+        message: 'project parameter is required (e.g., ?project=Sarasota&year=2025&month=2&type=TBEN)',
       }, { status: 400 });
     }
 
@@ -191,6 +196,14 @@ export async function GET(request: Request) {
 
     if (year) {
       projectQuery = projectQuery.eq('project_year', year);
+    }
+
+    if (month) {
+      projectQuery = projectQuery.eq('project_month', month);
+    }
+
+    if (projectType) {
+      projectQuery = projectQuery.eq('project_type', projectType);
     }
 
     const { data: excelProjects, error: projError } = await projectQuery;
@@ -210,6 +223,14 @@ export async function GET(request: Request) {
 
     if (year) {
       budgetQuery = budgetQuery.eq('project_year', year);
+    }
+
+    if (month) {
+      budgetQuery = budgetQuery.eq('project_month', month);
+    }
+
+    if (projectType) {
+      budgetQuery = budgetQuery.eq('project_type', projectType);
     }
 
     const { data: netSuiteBudgets } = await budgetQuery;
@@ -548,6 +569,8 @@ export async function GET(request: Request) {
       project: {
         name: projectName,
         year,
+        month,
+        projectType,
         customerName: salesOrders[0]?.customerName || null,
       },
       kpis: {
