@@ -199,6 +199,9 @@ interface DashboardSection {
   changes?: SectionChange[];  // Array of find/replace pairs
   isNewSection?: boolean;     // True if this is a new section to insert
   insertAfter?: string;       // Section heading after which to insert
+  // Fields for "Analyze Selection" feature
+  fromSelection?: boolean;          // True if this came from analyzeSelection
+  originalSelectedText?: string;    // The exact text that was selected (for direct search)
 }
 
 interface DashboardAnalysisResult {
@@ -888,6 +891,13 @@ export default function App() {
   // Track if all changes have been inserted
   const [allChangesInserted, setAllChangesInserted] = useState(false);
 
+  // Track the selected text range for "Analyze Selection" feature
+  // This stores the original selected text so we can find it directly when inserting
+  const [selectionContext, setSelectionContext] = useState<{
+    originalText: string;
+    sectionTitle: string;
+  } | null>(null);
+
   // Contract linking state
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<string>('');
@@ -1141,7 +1151,8 @@ export default function App() {
   };
 
   // Re-analyze a specific section/clause for deeper review
-  const reanalyzeClause = async (clauseName: string, clauseText: string) => {
+  // fromSelection: if true, marks sections as coming from selection analysis
+  const reanalyzeClause = async (clauseName: string, clauseText: string, fromSelection = false) => {
     if (!user) {
       setError('Please log in first');
       return;
@@ -1178,6 +1189,17 @@ export default function App() {
       }
 
       const result: DashboardAnalysisResult = await response.json();
+
+      // If from selection, mark sections with the original selected text
+      // This allows insertSingleSection to find the exact selected text
+      if (fromSelection && result.sections.length > 0) {
+        result.sections = result.sections.map(s => ({
+          ...s,
+          fromSelection: true,
+          originalSelectedText: clauseText, // Store the exact text that was selected
+        }));
+        console.log('reanalyzeClause: marked sections as fromSelection with originalSelectedText');
+      }
 
       // Merge new sections with existing results
       if (result.sections.length > 0) {
@@ -1245,7 +1267,15 @@ export default function App() {
       const firstLine = selectedText.trim().split('\n')[0];
       const clauseName = firstLine.length < 100 ? firstLine : 'Selected Text';
 
-      await reanalyzeClause(clauseName, selectedText);
+      // IMPORTANT: Save the selection context so we can find the exact text when inserting
+      // This ensures changes are applied to the selected text, not some other location
+      setSelectionContext({
+        originalText: selectedText,
+        sectionTitle: clauseName,
+      });
+      console.log('analyzeSelection: saved selection context for:', clauseName);
+
+      await reanalyzeClause(clauseName, selectedText, true); // true = fromSelection
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze selection');
       console.error('Selection analysis error:', err);
@@ -1450,6 +1480,72 @@ export default function App() {
 
           if (!result.success) {
             setError(result.error || `Could not find location to insert after "${section.insertAfter}"`);
+            return;
+          }
+        } else if (section.fromSelection && section.originalSelectedText && section.changes && section.changes.length > 0) {
+          // Selection-based analysis: Search for the exact selected text first
+          console.log('insertSingleSection: fromSelection mode, searching for originalSelectedText');
+
+          // Search for the original selected text directly (truncate if needed for Word API limit)
+          const searchText = section.originalSelectedText.length > 200
+            ? section.originalSelectedText.substring(0, 200)
+            : section.originalSelectedText;
+
+          const selectionResults = context.document.body.search(searchText, {
+            matchCase: false,
+            matchWholeWord: false,
+          });
+          selectionResults.load('items');
+          await context.sync();
+
+          if (selectionResults.items.length === 0) {
+            // Try normalized version
+            const normalizedSearch = normalizeText(searchText);
+            const normalizedResults = context.document.body.search(normalizedSearch, {
+              matchCase: false,
+              matchWholeWord: false,
+            });
+            normalizedResults.load('items');
+            await context.sync();
+
+            if (normalizedResults.items.length === 0) {
+              setError(`Could not find the selected text "${section.sectionTitle}" in document. It may have been modified.`);
+              return;
+            }
+
+            console.log(`Found ${normalizedResults.items.length} matches for normalized selected text`);
+          } else {
+            console.log(`Found ${selectionResults.items.length} matches for selected text`);
+          }
+
+          // Now apply the changes within the document (search globally since we verified context)
+          let changesApplied = 0;
+          for (const change of section.changes) {
+            if (!change.find || change.replace === undefined) continue;
+
+            const findText = change.find.length > 200 ? change.find.substring(0, 200) : change.find;
+            const results = context.document.body.search(findText, {
+              matchCase: false,
+              matchWholeWord: false,
+            });
+            results.load('items');
+            await context.sync();
+
+            if (results.items.length > 0) {
+              const range = results.items[0];
+              const newRange = range.insertText(change.replace, Word.InsertLocation.replace);
+              if (!trackChangesEnabled) {
+                newRange.font.underline = Word.UnderlineType.single;
+                newRange.font.color = '#16A34A';
+              }
+              await context.sync();
+              changesApplied++;
+              console.log(`Applied selection change: "${change.find.substring(0, 50)}..." → "${change.replace.substring(0, 50)}..."`);
+            }
+          }
+
+          if (changesApplied === 0) {
+            setError(`Could not apply any changes to "${section.sectionTitle}"`);
             return;
           }
         } else if (section.changes && section.changes.length > 0) {
