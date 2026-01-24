@@ -627,26 +627,58 @@ async function applyChangesToSection(
 
 /**
  * Inserts a new section after a specified section heading.
+ * Uses multiple search strategies to find the insertion point.
  *
  * @param context Word.RequestContext
  * @param afterHeading Section heading after which to insert
  * @param newSectionContent Complete content of the new section
  * @param trackChangesEnabled Whether Track Changes is enabled
- * @returns True if insertion succeeded
+ * @returns Object with success status and error message if failed
  */
 async function insertNewSection(
   context: Word.RequestContext,
   afterHeading: string,
   newSectionContent: string,
   trackChangesEnabled: boolean
-): Promise<boolean> {
+): Promise<{ success: boolean; error?: string }> {
   console.log(`insertNewSection: inserting after "${afterHeading}"`);
 
-  // Find the section heading
-  const headingRange = await findSectionByHeading(context, afterHeading);
+  // Strategy 1: Try exact match first
+  let headingRange = await findSectionByHeading(context, afterHeading);
+
+  // Strategy 2: Try with just the key word (e.g., "INDEMNIFICATION" from "23. INDEMNIFICATION")
+  if (!headingRange) {
+    const keyWord = afterHeading.replace(/^\d+\.\s*/, '').replace(/^ARTICLE\s+\d+\s*[-:.]?\s*/i, '').trim();
+    if (keyWord && keyWord !== afterHeading) {
+      console.log(`insertNewSection: trying keyword search: "${keyWord}"`);
+      headingRange = await findSectionByHeading(context, keyWord);
+    }
+  }
+
+  // Strategy 3: Try searching for the section number pattern
+  if (!headingRange) {
+    const numberMatch = afterHeading.match(/^(\d+)\./);
+    if (numberMatch) {
+      const sectionNum = numberMatch[1];
+      console.log(`insertNewSection: trying section number search: "${sectionNum}."`);
+      const numResults = context.document.body.search(`${sectionNum}.`, {
+        matchCase: false,
+        matchWholeWord: false,
+      });
+      numResults.load('items');
+      await context.sync();
+      if (numResults.items.length > 0) {
+        headingRange = numResults.items[0];
+      }
+    }
+  }
+
   if (!headingRange) {
     console.error(`Could not find section heading: "${afterHeading}"`);
-    return false;
+    return {
+      success: false,
+      error: `Could not find section "${afterHeading}" in document. Try manually copying the text and inserting it after the ${afterHeading} section.`
+    };
   }
 
   // Get the paragraph containing the heading
@@ -654,17 +686,42 @@ async function insertNewSection(
   paragraph.load('text');
   await context.sync();
 
-  // Find the end of this section (next section heading or end of document)
-  // For simplicity, we'll insert after the current paragraph
-  // A more sophisticated approach would find the next numbered heading
+  console.log(`insertNewSection: found heading in paragraph: "${paragraph.text.substring(0, 50)}..."`);
 
-  // Get the range after the heading paragraph
+  // Find the end of this section by looking for the next numbered section or end of document
+  // Get all paragraphs after this one
   const afterRange = paragraph.getRange('After');
+  const allParagraphs = afterRange.paragraphs;
+  allParagraphs.load('items');
+  await context.sync();
 
-  // Insert a new paragraph with the section content
-  // Add blank line before and after for separation
-  const insertText = '\n\n' + newSectionContent + '\n';
-  const newRange = afterRange.insertText(insertText, Word.InsertLocation.start);
+  // Look for the next section heading (numbered paragraph or all caps heading)
+  let insertionPoint: Word.Range | null = null;
+  const sectionPattern = /^\s*(\d+\.|\([a-z]\)|\([0-9]+\)|ARTICLE\s+\d+)/i;
+
+  for (let i = 0; i < Math.min(allParagraphs.items.length, 50); i++) {
+    const para = allParagraphs.items[i];
+    para.load('text');
+    await context.sync();
+
+    // Check if this looks like a new section heading
+    if (sectionPattern.test(para.text) && para.text.trim().length > 5) {
+      // This is the next section - insert before it
+      insertionPoint = para.getRange('Start');
+      console.log(`insertNewSection: found next section at: "${para.text.substring(0, 40)}..."`);
+      break;
+    }
+  }
+
+  // If no next section found, insert at the end of the content we found
+  if (!insertionPoint) {
+    insertionPoint = afterRange.getRange('End');
+    console.log(`insertNewSection: no next section found, inserting at end of content`);
+  }
+
+  // Insert the new section with proper formatting
+  const insertText = '\n\n' + newSectionContent + '\n\n';
+  const newRange = insertionPoint.insertText(insertText, Word.InsertLocation.before);
 
   // Style the new content
   if (!trackChangesEnabled) {
@@ -676,7 +733,7 @@ async function insertNewSection(
   await context.sync();
 
   console.log(`insertNewSection: successfully inserted new section`);
-  return true;
+  return { success: true };
 }
 
 /**
@@ -1113,19 +1170,20 @@ export default function App() {
             continue;
           }
 
-          const inserted = await insertNewSection(
+          const result = await insertNewSection(
             context,
             section.insertAfter,
             section.revisedText,
             trackChangesEnabled
           );
 
-          if (inserted) {
+          if (result.success) {
             newApplied.add(section.sectionTitle);
             appliedCount++;
             console.log(`Inserted new section: ${section.sectionTitle}`);
           } else {
             failedSections.push(section.sectionTitle);
+            console.error(`Failed to insert ${section.sectionTitle}: ${result.error}`);
           }
         }
       });
@@ -1190,15 +1248,15 @@ export default function App() {
         // Step 2: Handle based on section type
         if (section.isNewSection) {
           // Insert new section
-          const inserted = await insertNewSection(
+          const result = await insertNewSection(
             context,
             section.insertAfter!,
             section.revisedText,
             trackChangesEnabled
           );
 
-          if (!inserted) {
-            setError(`Could not find location to insert after "${section.insertAfter}"`);
+          if (!result.success) {
+            setError(result.error || `Could not find location to insert after "${section.insertAfter}"`);
             return;
           }
         } else if (section.changes && section.changes.length > 0) {
@@ -2268,12 +2326,31 @@ export default function App() {
                               Insert after: {section.insertAfter}
                             </Text>
                           )}
-                          {/* Preview of new section content */}
+                          {/* Full content of new section - scrollable */}
                           {section.revisedText && !appliedSections.has(section.sectionTitle) && (
-                            <div style={styles.newSectionPreview}>
-                              <Text size={100} style={{ color: '#86EFAC' }}>
-                                {section.revisedText.substring(0, 200)}{section.revisedText.length > 200 ? '...' : ''}
-                              </Text>
+                            <div style={styles.newSectionFullContent}>
+                              <div style={styles.newSectionContentHeader}>
+                                <Text size={100} weight="semibold" style={{ color: '#94A3B8' }}>
+                                  Full Section Content:
+                                </Text>
+                                <Button
+                                  size="small"
+                                  appearance="subtle"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(section.revisedText);
+                                    setSuccessMessage('Copied to clipboard!');
+                                    setTimeout(() => setSuccessMessage(null), 2000);
+                                  }}
+                                  style={{ padding: '2px 8px', minWidth: 'auto' }}
+                                >
+                                  Copy
+                                </Button>
+                              </div>
+                              <div style={styles.newSectionTextBox}>
+                                <Text size={100} style={{ color: '#86EFAC', whiteSpace: 'pre-wrap' }}>
+                                  {section.revisedText}
+                                </Text>
+                              </div>
                             </div>
                           )}
                           <div style={styles.sectionActions}>
@@ -2284,6 +2361,17 @@ export default function App() {
                               disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
                             >
                               {appliedSections.has(section.sectionTitle) ? 'Inserted' : 'Insert Section'}
+                            </Button>
+                            <Button
+                              size="small"
+                              appearance="outline"
+                              onClick={() => {
+                                navigator.clipboard.writeText(section.revisedText);
+                                setSuccessMessage('Copied to clipboard!');
+                                setTimeout(() => setSuccessMessage(null), 2000);
+                              }}
+                            >
+                              Copy Text
                             </Button>
                           </div>
                         </Card>
@@ -2745,5 +2833,27 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: '#0F172A',
     borderRadius: 6,
     borderLeft: '3px solid #0EA5E9',
+  },
+  newSectionFullContent: {
+    marginTop: 10,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  newSectionContentHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  newSectionTextBox: {
+    padding: 12,
+    backgroundColor: '#0F172A',
+    borderRadius: 6,
+    borderLeft: '3px solid #0EA5E9',
+    maxHeight: 300,
+    overflowY: 'auto',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    lineHeight: 1.5,
   },
 };
