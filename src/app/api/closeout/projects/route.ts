@@ -31,6 +31,8 @@ interface ProjectSummary {
   isHighValue: boolean;
   isRecent: boolean;
   hasData: boolean;
+  multipleEngagements: boolean;  // True if project has multiple month/type entries
+  engagementCount: number;  // Count of distinct engagements
 }
 
 export async function GET(request: Request) {
@@ -92,6 +94,10 @@ export async function GET(request: Request) {
       const recentGPM = mostRecent.actual_gp_pct || 0;
       const recentVariance = mostRecent.variance || 0;
 
+      // Check if project has multiple engagements (different month/type combinations)
+      const engagementCount = yearData.length;
+      const multipleEngagements = engagementCount > 1;
+
       return {
         name,
         years,
@@ -105,6 +111,8 @@ export async function GET(request: Request) {
         isHighValue: recentRevenue > 500000,
         isRecent: mostRecent.project_year >= 2024 && mostRecent.project_year <= currentYear,
         hasData: recentRevenue > 0,
+        multipleEngagements,
+        engagementCount,
       };
     });
 
@@ -138,6 +146,10 @@ export async function GET(request: Request) {
       const recentGPM = mostRecent.actual_gp_pct || 0;
       const recentVariance = mostRecent.variance || 0;
 
+      // Check if project has multiple engagements (different month/type combinations)
+      const engagementCount = yearData.length;
+      const multipleEngagements = engagementCount > 1;
+
       return {
         name,
         years,
@@ -151,6 +163,8 @@ export async function GET(request: Request) {
         isHighValue: recentRevenue > 500000,
         isRecent: mostRecent.project_year >= 2024 && mostRecent.project_year <= currentYear,
         hasData: recentRevenue > 0,
+        multipleEngagements,
+        engagementCount,
       };
     });
 

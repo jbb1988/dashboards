@@ -23,6 +23,8 @@ interface ProjectSummary {
   isHighValue: boolean;
   isRecent: boolean;
   hasData: boolean;
+  multipleEngagements: boolean;
+  engagementCount: number;
 }
 
 interface ProjectBrowserProps {
@@ -326,13 +328,26 @@ export default function ProjectBrowser({ onSelectProject }: ProjectBrowserProps)
                             isRecent={project.isRecent && !project.isAtRisk && !project.isHighValue}
                           />
                           <div className="min-w-0 flex-1">
-                            <h4 className="font-semibold text-gray-200 group-hover:text-white transition-colors truncate">
-                              {project.name}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-gray-200 group-hover:text-white transition-colors truncate">
+                                {project.name}
+                              </h4>
+                              {project.multipleEngagements && (
+                                <span
+                                  className="px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[10px] font-medium rounded-full whitespace-nowrap"
+                                  title={`${project.engagementCount} separate engagements - use Month/Type filters to view individually`}
+                                >
+                                  {project.engagementCount}x
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 text-xs text-gray-500">
                               {project.projectType && <span>{project.projectType}</span>}
                               {project.projectType && <span>•</span>}
                               <span>{formatMonth(project.latestMonth, project.latestYear)}</span>
+                              {project.multipleEngagements && (
+                                <span className="text-blue-400">• Multiple entries</span>
+                              )}
                             </div>
                           </div>
                         </div>
