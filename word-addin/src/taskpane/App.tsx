@@ -2444,273 +2444,319 @@ export default function App() {
                 )}
               </div>
 
-              {/* Analyze Buttons - Premium Loading State */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {/* Loading State - Inline with subtle animation */}
-                {isAnalyzing && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '12px 16px',
-                      backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                      borderRadius: 10,
-                      animation: 'premium-fade-in 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-                    }}
-                  >
-                    <PremiumSpinner size={16} color="rgba(148, 163, 184, 0.5)" />
-                    <span style={{
-                      fontSize: 13,
-                      fontWeight: 450,
-                      color: 'rgba(148, 163, 184, 0.7)',
-                      letterSpacing: '0.01em',
-                    }}>
-                      Analyzing document
-                    </span>
-                  </div>
-                )}
-
-                {/* Button Row */}
+              {/* Analyze Controls - Flat, Microsoft-native */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Button Row - Simple horizontal layout */}
                 <div style={styles.analyzeButtons}>
                   <Button
                     appearance="primary"
-                    icon={!isAnalyzing ? <DocumentSearch24Regular /> : undefined}
                     onClick={analyzeDocument}
                     disabled={isAnalyzing}
                     style={{
                       flex: 1,
-                      opacity: isAnalyzing ? 0.4 : 1,
+                      opacity: isAnalyzing ? 0.5 : 1,
                       cursor: isAnalyzing ? 'default' : 'pointer',
-                      transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
                   >
                     Analyze Document
                   </Button>
                   <Button
-                    appearance="secondary"
+                    appearance="outline"
                     onClick={analyzeSelection}
                     disabled={isAnalyzing}
                     title="Select text in Word and click to analyze just that section"
                     style={{
-                      backgroundColor: isAnalyzing ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.15)',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      color: '#60A5FA',
-                      opacity: isAnalyzing ? 0.4 : 1,
+                      opacity: isAnalyzing ? 0.5 : 1,
                       cursor: isAnalyzing ? 'default' : 'pointer',
-                      transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
                   >
                     Analyze Selection
                   </Button>
                 </div>
 
-                {/* Progress Bar - Premium shimmer effect */}
-                <PremiumProgressBar show={isAnalyzing} />
+                {/* Loading State - Full width progress bar + muted text */}
+                {isAnalyzing && (
+                  <div style={{ marginTop: 4 }}>
+                    {/* Thin indeterminate progress bar */}
+                    <div style={{
+                      width: '100%',
+                      height: 2,
+                      backgroundColor: '#333333',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        width: '30%',
+                        height: '100%',
+                        backgroundColor: '#569cd6',
+                        animation: 'premium-shimmer 2s ease-in-out infinite',
+                      }} />
+                    </div>
+                    <span style={{
+                      display: 'block',
+                      marginTop: 8,
+                      fontSize: 12,
+                      color: '#808080',
+                    }}>
+                      Analyzing clauses...
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Analysis Results - Dashboard Style */}
               {analysisResult && (
                 <div style={styles.results}>
                   {/* Risk Summary Bar */}
+                  {/* Results line - muted, informational */}
                   <div style={styles.riskSummaryBar}>
-                    <Badge appearance="filled" color="danger" style={styles.riskBadgeLarge}>
-                      {analysisResult.riskScores.summary.high} High
-                    </Badge>
-                    <Badge appearance="filled" color="warning" style={styles.riskBadgeLarge}>
-                      {analysisResult.riskScores.summary.medium} Medium
-                    </Badge>
-                    <Badge appearance="filled" color="success" style={styles.riskBadgeLarge}>
-                      {analysisResult.riskScores.summary.low} Low
-                    </Badge>
+                    <span style={{ fontSize: 12, color: '#808080' }}>Results:</span>
+                    <span style={{ fontSize: 12, color: '#d16969' }}>{analysisResult.riskScores.summary.high} High</span>
+                    <span style={{ fontSize: 12, color: '#808080' }}>•</span>
+                    <span style={{ fontSize: 12, color: '#cca700' }}>{analysisResult.riskScores.summary.medium} Medium</span>
+                    <span style={{ fontSize: 12, color: '#808080' }}>•</span>
+                    <span style={{ fontSize: 12, color: '#6a9955' }}>{analysisResult.riskScores.summary.low} Low</span>
                   </div>
 
-                  {/* Insert All Changes Button */}
-                  {analysisResult.sections.length > 0 && (
-                    <Button
-                      appearance="primary"
+                  {/* Insert All Changes - simple link style */}
+                  {analysisResult.sections.length > 0 && !allChangesInserted && (
+                    <button
                       onClick={insertAllChanges}
-                      disabled={isApplyingChange || allChangesInserted}
+                      disabled={isApplyingChange}
                       style={{
-                        width: '100%',
-                        marginTop: 8,
-                        opacity: isApplyingChange ? 0.7 : 1,
-                        transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                        background: 'none',
+                        border: 'none',
+                        color: isApplyingChange ? '#666666' : '#569cd6',
+                        fontSize: 12,
+                        cursor: isApplyingChange ? 'default' : 'pointer',
+                        padding: '8px 0',
+                        textAlign: 'left',
                       }}
-                      icon={isApplyingChange ? <PremiumSpinner size={14} color="rgba(255,255,255,0.6)" /> : allChangesInserted ? <CheckmarkCircle24Filled /> : undefined}
                     >
-                      {isApplyingChange ? 'Inserting changes' : allChangesInserted ? 'All Changes Inserted' : 'Insert All Changes into Document'}
-                    </Button>
+                      {isApplyingChange ? 'Inserting changes...' : 'Insert All Changes into Document'}
+                    </button>
+                  )}
+                  {allChangesInserted && (
+                    <span style={{ fontSize: 12, color: '#6a9955', padding: '8px 0', display: 'block' }}>
+                      ✓ All changes inserted
+                    </span>
                   )}
 
                   {/* Modifications Section */}
                   {analysisResult.sections.filter(s => !s.isNewSection).length > 0 && (
                     <div style={styles.sectionList}>
-                      <Text weight="semibold" style={{ marginBottom: 12, display: 'block' }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#cccccc', marginBottom: 8, display: 'block', marginTop: 12 }}>
                         Modifications ({analysisResult.sections.filter(s => !s.isNewSection).length})
-                      </Text>
+                      </span>
                       {analysisResult.sections.filter(s => !s.isNewSection).map((section, index) => (
-                        <Card key={`mod-${section.sectionNumber}-${index}`} style={styles.sectionCard}>
-                          <div style={styles.sectionHeader}>
-                            <Badge
-                              appearance="filled"
-                              color={getRiskColor(section.riskLevel)}
-                            >
-                              {section.riskLevel.toUpperCase()}
-                            </Badge>
-                            <Text weight="semibold" size={300}>
+                        <div key={`mod-${section.sectionNumber}-${index}`} style={styles.sectionCard}>
+                          {/* Flat header: HIGH · INDEMNIFICATION    2 changes */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: section.riskLevel === 'high' ? '#d16969' : section.riskLevel === 'medium' ? '#cca700' : '#6a9955',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                            }}>
+                              {section.riskLevel}
+                            </span>
+                            <span style={{ color: '#4d4d4d' }}>·</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#cccccc' }}>
                               {section.sectionTitle || `Section ${section.sectionNumber}`}
-                            </Text>
+                            </span>
                             {section.changes && section.changes.length > 0 && (
-                              <Badge appearance="outline" color="informative" style={{ marginLeft: 8 }}>
+                              <span style={{ fontSize: 11, color: '#808080', marginLeft: 'auto' }}>
                                 {section.changes.length} change{section.changes.length !== 1 ? 's' : ''}
-                              </Badge>
+                              </span>
                             )}
                             {appliedSections.has(section.sectionTitle) && (
-                              <CheckmarkCircle24Filled style={{ color: '#4ADE80', marginLeft: 'auto' }} />
+                              <CheckmarkCircle24Filled style={{ color: '#6a9955', marginLeft: 'auto', width: 16, height: 16 }} />
                             )}
                           </div>
-                          <Text size={200} style={{ color: '#A0A0A0', marginTop: 8 }}>
+
+                          {/* Rationale */}
+                          <div style={{ fontSize: 12, color: '#9d9d9d', marginTop: 6, lineHeight: 1.5 }}>
                             {section.rationale}
-                          </Text>
-                          {/* Show individual changes if available */}
+                          </div>
+
+                          {/* Redlines - clinical, not aggressive */}
                           {section.changes && section.changes.length > 0 && !appliedSections.has(section.sectionTitle) && (
-                            <div style={styles.changesList}>
+                            <div style={{ marginTop: 10, paddingLeft: 0 }}>
                               {section.changes.slice(0, 3).map((change, idx) => (
-                                <div key={idx} style={styles.changeItem}>
-                                  <Text size={100} style={{ color: '#F87171', textDecoration: 'line-through' }}>
-                                    {change.find.substring(0, 60)}{change.find.length > 60 ? '...' : ''}
-                                  </Text>
-                                  <Text size={100} style={{ color: '#4ADE80' }}>
-                                    → {change.replace.substring(0, 60)}{change.replace.length > 60 ? '...' : ''}
-                                  </Text>
+                                <div key={idx} style={{ marginBottom: 6, fontSize: 12, lineHeight: 1.6 }}>
+                                  <span style={{ color: '#b55a5a', textDecoration: 'line-through', fontWeight: 400 }}>
+                                    {change.find.substring(0, 80)}{change.find.length > 80 ? '...' : ''}
+                                  </span>
+                                  <br />
+                                  <span style={{ color: '#5a9e5a', fontWeight: 400 }}>
+                                    → {change.replace.substring(0, 80)}{change.replace.length > 80 ? '...' : ''}
+                                  </span>
                                 </div>
                               ))}
                               {section.changes.length > 3 && (
-                                <Text size={100} style={{ color: '#64748B' }}>
-                                  +{section.changes.length - 3} more changes...
-                                </Text>
+                                <span style={{ fontSize: 11, color: '#666666' }}>
+                                  +{section.changes.length - 3} more changes
+                                </span>
                               )}
                             </div>
                           )}
-                          <div style={styles.sectionActions}>
-                            <Button
-                              size="small"
-                              appearance={appliedSections.has(section.sectionTitle) ? 'outline' : 'primary'}
+
+                          {/* Actions - flat text buttons */}
+                          <div style={{ display: 'flex', gap: 12, marginTop: 10, paddingTop: 8 }}>
+                            <button
                               onClick={() => insertSingleSection(section)}
                               disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: appliedSections.has(section.sectionTitle) ? '#666666' : '#569cd6',
+                                fontSize: 12,
+                                cursor: appliedSections.has(section.sectionTitle) ? 'default' : 'pointer',
+                                padding: 0,
+                              }}
                             >
                               {appliedSections.has(section.sectionTitle) ? 'Applied' : 'Apply Changes'}
-                            </Button>
-                            <Button
-                              size="small"
-                              appearance="subtle"
+                            </button>
+                            <button
                               onClick={() => highlightSection(section)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#569cd6',
+                                fontSize: 12,
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
                             >
                               Find in Doc
-                            </Button>
-                            <Button
-                              size="small"
-                              appearance="secondary"
+                            </button>
+                            <button
                               onClick={() => reanalyzeClause(section.sectionTitle, section.originalText || '')}
                               disabled={isAnalyzing}
-                              title="Run deeper analysis on this section"
                               style={{
-                                backgroundColor: 'rgba(139, 92, 246, 0.15)',
-                                border: '1px solid rgba(139, 92, 246, 0.4)',
-                                color: '#A78BFA'
+                                background: 'none',
+                                border: 'none',
+                                color: isAnalyzing ? '#666666' : '#569cd6',
+                                fontSize: 12,
+                                cursor: isAnalyzing ? 'default' : 'pointer',
+                                padding: 0,
                               }}
                             >
                               Re-analyze
-                            </Button>
+                            </button>
                           </div>
-                        </Card>
+                        </div>
                       ))}
                     </div>
                   )}
 
-                  {/* New Sections to Insert */}
+                  {/* New Sections to Insert - Flat design */}
                   {analysisResult.sections.filter(s => s.isNewSection).length > 0 && (
-                    <div style={styles.sectionList}>
-                      <div style={styles.newSectionHeader}>
-                        <Text weight="semibold" style={{ display: 'block' }}>
-                          New Sections ({analysisResult.sections.filter(s => s.isNewSection).length})
-                        </Text>
-                        <Badge appearance="filled" color="brand">NEW</Badge>
-                      </div>
-                      <Text size={200} style={{ color: '#A0A0A0', marginBottom: 12 }}>
-                        These sections will be added to your contract. Review insertion points carefully.
-                      </Text>
+                    <div style={{ marginTop: 16, borderTop: '1px solid #333333', paddingTop: 12 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#cccccc', display: 'block', marginBottom: 4 }}>
+                        New Sections ({analysisResult.sections.filter(s => s.isNewSection).length})
+                      </span>
+                      <span style={{ fontSize: 11, color: '#666666', display: 'block', marginBottom: 12 }}>
+                        These will be added to your contract
+                      </span>
                       {analysisResult.sections.filter(s => s.isNewSection).map((section, index) => (
-                        <Card key={`new-${index}`} style={{ ...styles.sectionCard, borderColor: '#0EA5E9', borderWidth: 2 }}>
-                          <div style={styles.sectionHeader}>
-                            <Badge appearance="filled" color="brand">
+                        <div key={`new-${index}`} style={styles.sectionCard}>
+                          {/* Flat header: NEW · LIMITATION OF LIABILITY */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#569cd6',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                            }}>
                               NEW
-                            </Badge>
-                            <Text weight="semibold" size={300}>
+                            </span>
+                            <span style={{ color: '#4d4d4d' }}>·</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#cccccc' }}>
                               {section.sectionTitle}
-                            </Text>
+                            </span>
                             {appliedSections.has(section.sectionTitle) && (
-                              <CheckmarkCircle24Filled style={{ color: '#4ADE80', marginLeft: 'auto' }} />
+                              <CheckmarkCircle24Filled style={{ color: '#6a9955', marginLeft: 'auto', width: 16, height: 16 }} />
                             )}
                           </div>
-                          <Text size={200} style={{ color: '#A0A0A0', marginTop: 8 }}>
+
+                          <div style={{ fontSize: 12, color: '#9d9d9d', marginTop: 6, lineHeight: 1.5 }}>
                             {section.rationale}
-                          </Text>
+                          </div>
+
                           {section.insertAfter && (
-                            <Text size={200} style={{ color: '#0EA5E9', marginTop: 4 }}>
-                              Insert after: {section.insertAfter}
-                            </Text>
+                            <div style={{ fontSize: 11, color: '#808080', marginTop: 4 }}>
+                              Insert after: <span style={{ color: '#569cd6' }}>{section.insertAfter}</span>
+                            </div>
                           )}
-                          {/* Full content of new section - scrollable */}
+
+                          {/* Full content preview - scrollable */}
                           {section.revisedText && !appliedSections.has(section.sectionTitle) && (
-                            <div style={styles.newSectionFullContent}>
-                              <div style={styles.newSectionContentHeader}>
-                                <Text size={100} weight="semibold" style={{ color: '#94A3B8' }}>
-                                  Full Section Content:
-                                </Text>
-                                <Button
-                                  size="small"
-                                  appearance="subtle"
+                            <div style={{ marginTop: 10 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <span style={{ fontSize: 11, color: '#666666' }}>Section content:</span>
+                                <button
                                   onClick={() => {
                                     navigator.clipboard.writeText(section.revisedText);
-                                    setSuccessMessage('Copied to clipboard!');
+                                    setSuccessMessage('Copied to clipboard');
                                     setTimeout(() => setSuccessMessage(null), 2000);
                                   }}
-                                  style={{ padding: '2px 8px', minWidth: 'auto' }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#569cd6',
+                                    fontSize: 11,
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                  }}
                                 >
                                   Copy
-                                </Button>
+                                </button>
                               </div>
                               <div style={styles.newSectionTextBox}>
-                                <Text size={100} style={{ color: '#86EFAC', whiteSpace: 'pre-wrap' }}>
+                                <span style={{ color: '#5a9e5a', whiteSpace: 'pre-wrap', fontSize: 11 }}>
                                   {section.revisedText}
-                                </Text>
+                                </span>
                               </div>
                             </div>
                           )}
-                          <div style={styles.sectionActions}>
-                            <Button
-                              size="small"
-                              appearance={appliedSections.has(section.sectionTitle) ? 'outline' : 'primary'}
+
+                          {/* Actions - flat text buttons */}
+                          <div style={{ display: 'flex', gap: 12, marginTop: 10, paddingTop: 8 }}>
+                            <button
                               onClick={() => insertSingleSection(section)}
                               disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: appliedSections.has(section.sectionTitle) ? '#666666' : '#569cd6',
+                                fontSize: 12,
+                                cursor: appliedSections.has(section.sectionTitle) ? 'default' : 'pointer',
+                                padding: 0,
+                              }}
                             >
                               {appliedSections.has(section.sectionTitle) ? 'Inserted' : 'Insert Section'}
-                            </Button>
-                            <Button
-                              size="small"
-                              appearance="outline"
+                            </button>
+                            <button
                               onClick={() => {
                                 navigator.clipboard.writeText(section.revisedText);
-                                setSuccessMessage('Copied to clipboard!');
+                                setSuccessMessage('Copied to clipboard');
                                 setTimeout(() => setSuccessMessage(null), 2000);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#569cd6',
+                                fontSize: 12,
+                                cursor: 'pointer',
+                                padding: 0,
                               }}
                             >
                               Copy Text
-                            </Button>
+                            </button>
                           </div>
-                        </Card>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -2731,17 +2777,15 @@ export default function App() {
 
                   {/* No changes found */}
                   {analysisResult.sections.length === 0 && (
-                    <Card style={styles.summaryCard}>
-                      <div style={{ textAlign: 'center', padding: 16 }}>
-                        <CheckmarkCircle24Filled style={{ color: '#4ADE80', fontSize: 32 }} />
-                        <Text size={300} weight="semibold" style={{ display: 'block', marginTop: 8 }}>
-                          No Material Risks Found
-                        </Text>
-                        <Text size={200} style={{ color: '#A0A0A0' }}>
-                          This contract appears to be favorable or already aligned with MARS positions.
-                        </Text>
+                    <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                      <CheckmarkCircle24Filled style={{ color: '#6a9955', width: 24, height: 24 }} />
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#cccccc', marginTop: 8 }}>
+                        No Material Risks Found
                       </div>
-                    </Card>
+                      <div style={{ fontSize: 12, color: '#666666', marginTop: 4 }}>
+                        This contract appears to be favorable or already aligned with MARS positions.
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -2784,41 +2828,61 @@ export default function App() {
               ) : (
                 <div style={styles.clauseList}>
                   {clauses.map((clause) => (
-                    <Card key={clause.id} style={styles.clauseCard}>
-                      <CardHeader
-                        header={<Text weight="semibold">{clause.name}</Text>}
-                        description={
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <Text size={200}>{clause.category}</Text>
-                            {getRiskBadge(clause.risk_level)}
-                          </div>
-                        }
-                      />
-                      <div style={styles.clauseText}>
-                        <Text size={200}>
-                          {clause.primary_text.substring(0, 150)}
-                          {clause.primary_text.length > 150 ? '...' : ''}
-                        </Text>
+                    <div key={clause.id} style={styles.clauseCard}>
+                      {/* Flat clause header */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: clause.risk_level === 'high' ? '#d16969' : clause.risk_level === 'medium' ? '#cca700' : '#6a9955',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                        }}>
+                          {clause.risk_level}
+                        </span>
+                        <span style={{ color: '#4d4d4d' }}>·</span>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: '#cccccc' }}>
+                          {clause.name}
+                        </span>
                       </div>
-                      <div style={styles.clauseActions}>
-                        <Button
-                          size="small"
-                          appearance="primary"
+                      <div style={{ fontSize: 11, color: '#666666', marginTop: 2 }}>
+                        {clause.category}
+                      </div>
+                      <div style={styles.clauseText}>
+                        {clause.primary_text.substring(0, 150)}
+                        {clause.primary_text.length > 150 ? '...' : ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                        <button
                           onClick={() => insertClause(clause.primary_text)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#569cd6',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            padding: 0,
+                          }}
                         >
                           Insert Primary
-                        </Button>
+                        </button>
                         {clause.fallback_text && (
-                          <Button
-                            size="small"
-                            appearance="outline"
+                          <button
                             onClick={() => insertClause(clause.fallback_text!)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#569cd6',
+                              fontSize: 12,
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
                           >
                             Insert Fallback
-                          </Button>
+                          </button>
                         )}
                       </div>
-                    </Card>
+                    </div>
                   ))}
                 </div>
               )}
@@ -2831,178 +2895,140 @@ export default function App() {
 }
 
 // ============================================
-// SOPHISTICATED MODERN DESIGN SYSTEM
-// Premium SaaS aesthetic inspired by Linear, Notion, Stripe
+// MICROSOFT-NATIVE FLAT DESIGN SYSTEM
+// Quiet, flat, serious legal tooling aesthetic
 // ============================================
 
-// Dynamic style function for score circle
-const getScoreCircleStyle = (riskLevel: string): React.CSSProperties => ({
-  width: 52,
-  height: 52,
-  borderRadius: '50%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: riskLevel === 'high'
-    ? 'linear-gradient(135deg, rgba(248, 113, 113, 0.15), rgba(248, 113, 113, 0.25))'
-    : riskLevel === 'medium'
-    ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.25))'
-    : 'linear-gradient(135deg, rgba(74, 222, 128, 0.15), rgba(74, 222, 128, 0.25))',
-  boxShadow: riskLevel === 'high'
-    ? '0 0 24px rgba(248, 113, 113, 0.25)'
-    : riskLevel === 'medium'
-    ? '0 0 24px rgba(251, 191, 36, 0.25)'
-    : '0 0 24px rgba(74, 222, 128, 0.25)',
-  border: `1.5px solid ${riskLevel === 'high' ? 'rgba(248, 113, 113, 0.5)' : riskLevel === 'medium' ? 'rgba(251, 191, 36, 0.5)' : 'rgba(74, 222, 128, 0.5)'}`,
-});
+// NO score circles - removed for flat design
 
-// Styles - Sophisticated dark theme
+// Styles - Microsoft-native flat design (Word panel aesthetic)
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    backgroundColor: '#0a0f1a',
-    color: '#f1f5f9',
-    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    backgroundColor: '#1e1e1e',
+    color: '#cccccc',
+    fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif',
     fontSize: 13,
-    lineHeight: 1.5,
+    lineHeight: 1.4,
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '14px 18px',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.08)',
-    background: 'linear-gradient(180deg, #0f1520, #0a0f1a)',
+    padding: '10px 16px',
+    borderBottom: '1px solid #333333',
+    backgroundColor: '#252526',
   },
   headerContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   errorBanner: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '11px 18px',
-    background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.06))',
-    borderBottom: '1px solid rgba(239, 68, 68, 0.15)',
-    color: '#fca5a5',
-    fontSize: 13,
+    gap: 8,
+    padding: '8px 16px',
+    backgroundColor: '#5a1d1d',
+    borderBottom: '1px solid #6e2020',
+    color: '#f48771',
+    fontSize: 12,
   },
   tabs: {
-    borderBottom: '1px solid rgba(148, 163, 184, 0.08)',
-    background: 'linear-gradient(180deg, #0d1117, #0a0f1a)',
-    padding: '0 6px',
+    borderBottom: '1px solid #333333',
+    backgroundColor: '#252526',
+    padding: '0 8px',
   },
   content: {
     flex: 1,
     overflow: 'auto',
-    padding: '18px 16px',
-    backgroundColor: '#0a0f1a',
+    padding: '12px 16px',
+    backgroundColor: '#1e1e1e',
   },
   loginCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 18,
-    padding: 36,
+    gap: 16,
+    padding: 24,
     margin: 'auto',
-    maxWidth: 300,
-    background: 'linear-gradient(180deg, #111827, #0a0f1a)',
-    borderRadius: 16,
-    border: '1px solid rgba(148, 163, 184, 0.1)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+    maxWidth: 280,
   },
   analyzeTab: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 14,
+    gap: 12,
   },
   results: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 14,
-    marginTop: 6,
+    gap: 0,
+    marginTop: 12,
   },
   scoreCard: {
-    padding: 18,
-    background: 'linear-gradient(135deg, #111827, #1a2332)',
-    borderRadius: 14,
-    border: '1px solid rgba(148, 163, 184, 0.08)',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+    padding: 12,
   },
   scoreContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: 18,
+    gap: 12,
   },
   summaryCard: {
-    padding: 16,
-    background: 'linear-gradient(135deg, #111827, #1a2332)',
-    borderRadius: 14,
-    border: '1px solid rgba(148, 163, 184, 0.08)',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+    padding: 12,
   },
   riskHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   riskContent: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
-    paddingTop: 10,
+    gap: 8,
+    paddingTop: 8,
   },
   suggestion: {
-    padding: 12,
-    backgroundColor: '#1a2332',
-    borderRadius: 10,
+    padding: 8,
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    border: '1px solid rgba(148, 163, 184, 0.06)',
+    gap: 4,
   },
   clausesTab: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 14,
+    gap: 0,
   },
   clauseList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
+    gap: 0,
   },
   clauseCard: {
-    background: 'linear-gradient(135deg, #111827, #1a2332)',
-    padding: 16,
-    borderRadius: 14,
-    border: '1px solid rgba(148, 163, 184, 0.08)',
-    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
+    padding: '12px 0',
+    borderBottom: '1px solid #333333',
   },
   clauseText: {
-    padding: '10px 0',
-    color: '#94a3b8',
-    fontSize: 13,
-    lineHeight: 1.6,
+    padding: '6px 0',
+    color: '#9d9d9d',
+    fontSize: 12,
+    lineHeight: 1.5,
   },
   clauseActions: {
     display: 'flex',
-    gap: 10,
-    paddingTop: 12,
+    gap: 8,
+    paddingTop: 8,
   },
   successBanner: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '11px 18px',
-    background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.06))',
-    borderBottom: '1px solid rgba(16, 185, 129, 0.15)',
-    color: '#6ee7b7',
-    fontSize: 13,
+    gap: 8,
+    padding: '8px 16px',
+    backgroundColor: '#1d3d1d',
+    borderBottom: '1px solid #2d5d2d',
+    color: '#89d185',
+    fontSize: 12,
   },
   previewOverlay: {
     position: 'fixed',
@@ -3010,149 +3036,127 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(10, 15, 26, 0.92)',
-    backdropFilter: 'blur(8px)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    padding: 18,
+    padding: 16,
   },
   previewPanel: {
-    background: 'linear-gradient(180deg, #111827, #0d1117)',
-    borderRadius: 16,
-    padding: 22,
-    maxWidth: 460,
-    maxHeight: '88vh',
+    backgroundColor: '#252526',
+    padding: 16,
+    maxWidth: 400,
+    maxHeight: '85vh',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: 18,
-    border: '1px solid rgba(148, 163, 184, 0.12)',
-    boxShadow: '0 24px 48px rgba(0, 0, 0, 0.4)',
+    gap: 12,
+    border: '1px solid #454545',
   },
   diffView: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 14,
+    gap: 8,
   },
   diffSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 4,
   },
   diffText: {
-    padding: 14,
-    backgroundColor: '#1a2332',
-    borderRadius: 10,
-    maxHeight: 140,
+    padding: 10,
+    backgroundColor: '#1e1e1e',
+    maxHeight: 120,
     overflowY: 'auto',
-    border: '1px solid rgba(148, 163, 184, 0.06)',
+    border: '1px solid #333333',
+    fontSize: 12,
   },
   diffArrow: {
     textAlign: 'center',
-    fontSize: 18,
-    color: '#475569',
+    fontSize: 14,
+    color: '#666666',
     padding: '2px 0',
   },
   matchInfo: {
     display: 'flex',
-    gap: 10,
+    gap: 8,
     flexWrap: 'wrap',
   },
   matchSelector: {
-    padding: 14,
-    backgroundColor: '#1a2332',
-    borderRadius: 10,
-    border: '1px solid rgba(148, 163, 184, 0.06)',
+    padding: 10,
+    backgroundColor: '#1e1e1e',
+    border: '1px solid #333333',
   },
   matchList: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
+    gap: 6,
+    marginTop: 8,
   },
   previewActions: {
     display: 'flex',
-    gap: 10,
+    gap: 8,
     justifyContent: 'flex-end',
-    marginTop: 6,
+    marginTop: 4,
   },
   locationBox: {
-    padding: 10,
-    backgroundColor: '#1a2332',
-    borderRadius: 8,
-    borderLeft: '3px solid #fbbf24',
+    padding: 8,
+    backgroundColor: '#1e1e1e',
+    borderLeft: '2px solid #cca700',
   },
   fixItSection: {
-    padding: 14,
-    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05))',
-    borderRadius: 10,
-    marginTop: 10,
-    border: '1px solid rgba(16, 185, 129, 0.15)',
+    padding: 10,
+    backgroundColor: '#1d3d1d',
+    marginTop: 8,
+    border: '1px solid #2d5d2d',
   },
   fixItButtons: {
     display: 'flex',
-    gap: 8,
+    gap: 6,
     flexWrap: 'wrap',
   },
   riskSummaryBar: {
     display: 'flex',
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: '14px 16px',
-    background: 'linear-gradient(135deg, #111827, #1a2332)',
-    borderRadius: 14,
-    gap: 14,
-    border: '1px solid rgba(148, 163, 184, 0.08)',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+    padding: '8px 0',
+    gap: 16,
+    borderBottom: '1px solid #333333',
+    marginBottom: 8,
   },
   riskBadgeLarge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 7,
-    padding: '7px 14px',
     fontSize: 12,
-    fontWeight: 600,
-    borderRadius: 20,
-    letterSpacing: '0.01em',
+    fontWeight: 400,
+    color: '#9d9d9d',
   },
   sectionList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
-    marginTop: 6,
+    gap: 0,
   },
   sectionCard: {
-    background: 'linear-gradient(135deg, #111827, #1a2332)',
-    padding: 16,
-    borderRadius: 14,
-    border: '1px solid rgba(148, 163, 184, 0.08)',
-    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
-    transition: 'border-color 0.2s, transform 0.2s',
+    padding: '14px 0',
+    borderBottom: '1px solid #333333',
   },
   sectionHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     flexWrap: 'wrap',
   },
   sectionActions: {
     display: 'flex',
-    gap: 10,
-    marginTop: 14,
-    paddingTop: 12,
-    borderTop: '1px solid rgba(148, 163, 184, 0.06)',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 8,
   },
   summaryList: {
-    marginTop: 14,
-    padding: 16,
-    background: 'linear-gradient(135deg, #111827, #1a2332)',
-    borderRadius: 14,
-    border: '1px solid rgba(148, 163, 184, 0.08)',
+    marginTop: 12,
+    padding: '12px 0',
+    borderTop: '1px solid #333333',
   },
   contractSection: {
-    marginBottom: 14,
+    marginBottom: 12,
     position: 'relative',
   },
   contractDropdownContainer: {
@@ -3162,92 +3166,82 @@ const styles: Record<string, React.CSSProperties> = {
   },
   contractInput: {
     width: '100%',
-    padding: '11px 38px 11px 14px',
-    backgroundColor: '#111827',
-    border: '1px solid rgba(148, 163, 184, 0.12)',
-    borderRadius: 10,
-    color: '#f1f5f9',
+    padding: '8px 32px 8px 10px',
+    backgroundColor: '#3c3c3c',
+    border: '1px solid #454545',
+    color: '#cccccc',
     fontSize: 13,
     outline: 'none',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
   },
   clearButton: {
     position: 'absolute',
-    right: 12,
+    right: 8,
     background: 'none',
     border: 'none',
-    color: '#64748b',
+    color: '#666666',
     cursor: 'pointer',
-    fontSize: 14,
+    fontSize: 12,
     padding: 4,
     lineHeight: 1,
-    opacity: 0.8,
-    transition: 'opacity 0.2s',
   },
   contractDropdown: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
-    marginTop: 6,
-    backgroundColor: '#111827',
-    border: '1px solid rgba(148, 163, 184, 0.12)',
-    borderRadius: 12,
-    maxHeight: 220,
+    marginTop: 2,
+    backgroundColor: '#3c3c3c',
+    border: '1px solid #454545',
+    maxHeight: 200,
     overflowY: 'auto',
     zIndex: 100,
-    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
   },
   contractOption: {
     width: '100%',
     textAlign: 'left',
-    padding: '12px 14px',
+    padding: '8px 10px',
     border: 'none',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.06)',
+    borderBottom: '1px solid #454545',
     background: 'none',
     cursor: 'pointer',
     display: 'block',
-    color: '#f1f5f9',
-    transition: 'background-color 0.15s',
+    color: '#cccccc',
+    fontSize: 12,
   },
   selectedContractBadge: {
-    marginTop: 10,
+    marginTop: 8,
   },
   changesList: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#0d1117',
-    borderRadius: 10,
+    marginTop: 8,
+    padding: '8px 0',
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    border: '1px solid rgba(148, 163, 184, 0.06)',
+    gap: 6,
   },
   changeItem: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 3,
-    paddingBottom: 8,
-    borderBottom: '1px solid rgba(148, 163, 184, 0.06)',
+    gap: 2,
+    paddingBottom: 6,
+    borderBottom: '1px solid #333333',
   },
   newSectionHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 8,
   },
   newSectionPreview: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#0d1117',
-    borderRadius: 10,
-    borderLeft: '3px solid #6366f1',
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#1e1e1e',
+    borderLeft: '2px solid #569cd6',
   },
   newSectionFullContent: {
-    marginTop: 12,
+    marginTop: 8,
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 6,
   },
   newSectionContentHeader: {
     display: 'flex',
@@ -3255,19 +3249,18 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   newSectionTextBox: {
-    padding: 14,
-    backgroundColor: '#0d1117',
-    borderRadius: 10,
-    borderLeft: '3px solid #6366f1',
-    maxHeight: 280,
+    padding: 10,
+    backgroundColor: '#1e1e1e',
+    borderLeft: '2px solid #569cd6',
+    maxHeight: 200,
     overflowY: 'auto',
-    fontFamily: '"SF Mono", Monaco, Menlo, monospace',
+    fontFamily: '"Consolas", "Courier New", monospace',
     fontSize: 11,
-    lineHeight: 1.6,
+    lineHeight: 1.5,
   },
   analyzeButtons: {
     display: 'flex',
-    gap: 10,
+    gap: 8,
     width: '100%',
   },
 };
