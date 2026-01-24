@@ -387,6 +387,7 @@ export async function GET(request: Request) {
         }
       }
     }
+    console.log(`[Debug] WO itemIds: size=${workOrderItemIds.size}, ids=[${Array.from(workOrderItemIds).slice(0, 20).join(',')}], WO count=${workOrders.length}`);
 
     // STEP 4: Fetch Sales Orders with enhanced line items (including account info)
     const salesOrders: LinkedSalesOrder[] = [];
@@ -488,6 +489,7 @@ export async function GET(request: Request) {
               // If line has rev rec dates, check for overlap with engagement month
               if (revRecStart && revRecEnd) {
                 const overlaps = revRecStart <= engagementEnd && revRecEnd >= engagementStart;
+                console.log(`[Debug] RevRec filter: item=${line.itemName}, amt=${line.amount}, overlaps=${overlaps}`);
                 return overlaps;
               }
             }
@@ -496,10 +498,16 @@ export async function GET(request: Request) {
             if (workOrderItemIds.size === 0) {
               // If no WO item_ids found, use alternative filtering by account number for MCC
               const acct = line.accountNumber || '';
-              return acct.startsWith('410') || acct.startsWith('411');
+              const included = acct.startsWith('410') || acct.startsWith('411');
+              console.log(`[Debug] Empty WO filter: item=${line.itemName}, acct=${acct}, amt=${line.amount}, included=${included}`);
+              return included;
             }
-            return workOrderItemIds.has(line.itemId);
+            const matched = workOrderItemIds.has(line.itemId);
+            console.log(`[Debug] WO filter: itemId=${line.itemId}, item=${line.itemName}, amt=${line.amount}, acct=${line.accountNumber}, matched=${matched}`);
+            return matched;
           });
+
+          console.log(`[Debug] After filter: ${enhancedLines.length} lines, validLines had ${validLines.length}`);
 
           // Second pass: Find matched account numbers and include the LARGEST credit per account
           // This handles cases where credits/adjustments aren't in the WO but should offset matched revenue
