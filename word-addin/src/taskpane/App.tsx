@@ -1060,6 +1060,119 @@ export default function App() {
     }
   };
 
+  // Re-analyze a specific section/clause for deeper review
+  const reanalyzeClause = async (clauseName: string, clauseText: string) => {
+    if (!user) {
+      setError('Please log in first');
+      return;
+    }
+
+    if (!clauseText || clauseText.trim().length < 20) {
+      setError('Clause text is too short to analyze');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('mars_token');
+      const response = await fetch(`${API_BASE}/api/contracts/review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          text: clauseText, // Still need full text for context
+          focusedClause: {
+            name: clauseName,
+            text: clauseText,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Re-analysis failed');
+      }
+
+      const result: DashboardAnalysisResult = await response.json();
+
+      // Merge new sections with existing results
+      if (result.sections.length > 0) {
+        setAnalysisResult(prev => {
+          if (!prev) return result;
+
+          // Add new sections, avoiding duplicates by section title
+          const existingTitles = new Set(prev.sections.map(s => s.sectionTitle));
+          const newSections = result.sections.filter(s => !existingTitles.has(s.sectionTitle));
+
+          // If analyzing same section again, replace it
+          const updatedSections = prev.sections.map(s => {
+            const replacement = result.sections.find(r => r.sectionTitle === s.sectionTitle);
+            return replacement || s;
+          });
+
+          return {
+            ...prev,
+            sections: [...updatedSections, ...newSections],
+            summary: [...prev.summary, ...result.summary.filter(s => !prev.summary.includes(s))],
+          };
+        });
+
+        setSuccessMessage(`Found ${result.sections.length} additional suggestions for ${clauseName}`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        setSuccessMessage(`No additional issues found in ${clauseName}`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Re-analysis failed');
+      console.error('Re-analysis error:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Analyze selected text in Word document
+  const analyzeSelection = async () => {
+    if (!user) {
+      setError('Please log in first');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      // Get selected text from Word
+      let selectedText = '';
+      await Word.run(async (context) => {
+        const selection = context.document.getSelection();
+        selection.load('text');
+        await context.sync();
+        selectedText = selection.text;
+      });
+
+      if (!selectedText || selectedText.trim().length < 50) {
+        setError('Please select more text in the document (at least a full clause or paragraph)');
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // Try to identify the clause name from the first line
+      const firstLine = selectedText.trim().split('\n')[0];
+      const clauseName = firstLine.length < 100 ? firstLine : 'Selected Text';
+
+      await reanalyzeClause(clauseName, selectedText);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to analyze selection');
+      console.error('Selection analysis error:', err);
+      setIsAnalyzing(false);
+    }
+  };
+
   // Insert all section changes into Word document using Track Changes
   // NEW: Uses heading-based finding and targeted find/replace pairs
   const insertAllChanges = async () => {
@@ -2182,15 +2295,25 @@ export default function App() {
               </div>
 
               {/* Analyze Button */}
-              <Button
-                appearance="primary"
-                icon={isAnalyzing ? <Spinner size="tiny" /> : <DocumentSearch24Regular />}
-                onClick={analyzeDocument}
-                disabled={isAnalyzing}
-                style={{ width: '100%' }}
-              >
-                {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
-              </Button>
+              <div style={styles.analyzeButtons}>
+                <Button
+                  appearance="primary"
+                  icon={isAnalyzing ? <Spinner size="tiny" /> : <DocumentSearch24Regular />}
+                  onClick={analyzeDocument}
+                  disabled={isAnalyzing}
+                  style={{ flex: 1 }}
+                >
+                  {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
+                </Button>
+                <Button
+                  appearance="outline"
+                  onClick={analyzeSelection}
+                  disabled={isAnalyzing}
+                  title="Select text in Word and click to analyze just that section"
+                >
+                  Analyze Selection
+                </Button>
+              </div>
 
               {/* Analysis Results - Dashboard Style */}
               {analysisResult && (
@@ -2286,6 +2409,15 @@ export default function App() {
                               onClick={() => highlightSection(section)}
                             >
                               Find in Doc
+                            </Button>
+                            <Button
+                              size="small"
+                              appearance="subtle"
+                              onClick={() => reanalyzeClause(section.sectionTitle, section.originalText || '')}
+                              disabled={isAnalyzing}
+                              title="Run deeper analysis on this section"
+                            >
+                              Re-analyze
                             </Button>
                           </div>
                         </Card>
@@ -2855,5 +2987,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'monospace',
     fontSize: 11,
     lineHeight: 1.5,
+  },
+  analyzeButtons: {
+    display: 'flex',
+    gap: 8,
+    width: '100%',
   },
 };

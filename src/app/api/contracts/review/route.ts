@@ -752,13 +752,34 @@ CONTRACT TEXT:
 // Legacy prompt for backwards compatibility (if new format fails)
 const MARS_CONTRACT_PROMPT = REDLINE_SYSTEM_PROMPT;
 
+// Focused clause analysis prompt - for re-analyzing a specific section
+const FOCUSED_CLAUSE_PROMPT = `You are analyzing a SPECIFIC clause that the user wants reviewed more thoroughly.
+
+This clause may have been previously analyzed but the user wants a DEEPER, MORE AGGRESSIVE review.
+Be thorough. Find EVERY issue. Suggest STRONG protections for MARS (the Contractor).
+
+OUTPUT FORMAT: Same JSON schema as full contract analysis.
+Each "find" text MUST be < 200 characters.
+
+MARS POSITION: Protect Contractor's interests aggressively.
+- Indemnification: Limit to negligence, cap liability, third-party claims only
+- IP: Custom work = Client's, everything else = Contractor's (tools, templates, pre-existing IP)
+- Liability: Cap at contract value, exclude consequential damages
+- Termination: Payment for work performed
+
+Analyze this clause and output ALL recommended changes:
+`;
+
 export async function POST(request: NextRequest) {
   console.log('=== CONTRACT REVIEW API CALLED ===');
   console.log('Timestamp:', new Date().toISOString());
 
   try {
     const body = await request.json();
-    const { text, contractId, provisionName, model, playbookContent } = body;
+    const { text, contractId, provisionName, model, playbookContent, focusedClause } = body;
+
+    // Check if this is a focused clause analysis
+    const isFocusedAnalysis = focusedClause && focusedClause.text && focusedClause.name;
 
     console.log('Request received:');
     console.log('- Text length:', text?.length || 0);
@@ -766,6 +787,7 @@ export async function POST(request: NextRequest) {
     console.log('- Provision:', provisionName || 'none');
     console.log('- Model:', model);
     console.log('- Playbook comparison:', playbookContent ? `${playbookContent.length} chars` : 'none');
+    console.log('- Focused clause:', isFocusedAnalysis ? focusedClause.name : 'none');
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return NextResponse.json(
@@ -804,18 +826,28 @@ export async function POST(request: NextRequest) {
 
     // Build prompts using new system/user format
     const systemPrompt = REDLINE_SYSTEM_PROMPT;
-    let userPrompt = MARS_USER_PROMPT_TEMPLATE + normalizedInput;
+    let userPrompt: string;
 
-    // Add RAG clause context if available
-    if (clauseContext) {
-      userPrompt = clauseContext + '\n\n' + userPrompt;
-    }
+    if (isFocusedAnalysis) {
+      // Focused clause analysis - use specialized prompt
+      const normalizedClauseText = normalizeToASCII(focusedClause.text);
+      userPrompt = FOCUSED_CLAUSE_PROMPT + `\n\nCLAUSE NAME: ${focusedClause.name}\n\nCLAUSE TEXT:\n${normalizedClauseText}`;
+      console.log(`Focused analysis on: ${focusedClause.name} (${normalizedClauseText.length} chars)`);
+    } else {
+      // Full contract analysis
+      userPrompt = MARS_USER_PROMPT_TEMPLATE + normalizedInput;
 
-    // Add playbook comparison if provided
-    if (playbookContent && typeof playbookContent === 'string' && playbookContent.trim().length > 0) {
-      const normalizedPlaybook = normalizeToASCII(playbookContent);
-      userPrompt += `\n\nPLAYBOOK COMPARISON:\nCompare against MARS's standard terms and flag deviations:\n${normalizedPlaybook}`;
-      console.log('Added playbook comparison to prompt');
+      // Add RAG clause context if available
+      if (clauseContext) {
+        userPrompt = clauseContext + '\n\n' + userPrompt;
+      }
+
+      // Add playbook comparison if provided
+      if (playbookContent && typeof playbookContent === 'string' && playbookContent.trim().length > 0) {
+        const normalizedPlaybook = normalizeToASCII(playbookContent);
+        userPrompt += `\n\nPLAYBOOK COMPARISON:\nCompare against MARS's standard terms and flag deviations:\n${normalizedPlaybook}`;
+        console.log('Added playbook comparison to prompt');
+      }
     }
 
     // Call OpenRouter API with quality gate validation and retry
