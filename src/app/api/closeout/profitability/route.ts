@@ -387,7 +387,7 @@ export async function GET(request: Request) {
         }
       }
     }
-    console.log(`[Profitability Debug] workOrderItemIds.size=${workOrderItemIds.size}, WO count=${workOrders.length}`);
+    console.log(`[Profitability Debug] workOrderItemIds.size=${workOrderItemIds.size}, WO count=${workOrders.length}, itemIds=[${Array.from(workOrderItemIds).join(',')}]`);
 
     // STEP 4: Fetch Sales Orders with enhanced line items (including account info)
     const salesOrders: LinkedSalesOrder[] = [];
@@ -506,6 +506,54 @@ export async function GET(request: Request) {
             console.log(`[Profitability Debug] WO item filter: itemId=${line.itemId}, matched=${matched}, item=${line.itemName}, amt=${line.amount}, acct=${line.accountNumber}`);
             return matched;
           });
+
+          // Second pass: Find matched account numbers and include related credit lines
+          // This handles cases where credits/adjustments aren't in the WO but should offset matched revenue
+          const matchedAccounts = new Set<string>();
+          for (const line of enhancedLines) {
+            if (line.accountNumber) matchedAccounts.add(line.accountNumber);
+          }
+
+          // Re-filter from validLines to include credit lines for matched accounts
+          const additionalCredits = validLines
+            .map((line: any) => {
+              const accountNumber = line.account_number || null;
+              const itemClassName = line.item_class_name || null;
+              const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
+              return {
+                lineNumber: line.line_number || 0,
+                itemId: line.item_id || '',
+                itemName: line.item_name,
+                itemDescription: line.item_description,
+                itemType: line.item_type,
+                quantity: line.quantity || 0,
+                rate: line.rate || 0,
+                amount: line.amount || 0,
+                costEstimate: line.cost_estimate || 0,
+                grossProfit: line.gross_profit || 0,
+                grossMarginPct: line.gross_margin_pct || 0,
+                isClosed: line.is_closed || false,
+                accountNumber,
+                accountName: line.account_name,
+                productType,
+                revRecStartDate: line.revrecstartdate || null,
+                revRecEndDate: line.revrecenddate || null,
+              };
+            })
+            .filter(line => {
+              // Include if: same account as matched lines, positive amount (credit), not already in enhancedLines
+              const isCredit = line.amount > 0;
+              const sameAccount = matchedAccounts.has(line.accountNumber || '');
+              const alreadyIncluded = enhancedLines.some(el => el.lineNumber === line.lineNumber);
+              const shouldInclude = isCredit && sameAccount && !alreadyIncluded;
+              if (shouldInclude) {
+                console.log(`[Profitability Debug] Adding credit line: item=${line.itemName}, amt=${line.amount}, acct=${line.accountNumber}`);
+              }
+              return shouldInclude;
+            });
+
+          // Merge credit lines with enhanced lines
+          enhancedLines.push(...additionalCredits);
 
           // Group lines by product type
           const productTypeMap = new Map<string, EnhancedSOLineItem[]>();
