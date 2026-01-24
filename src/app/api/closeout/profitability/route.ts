@@ -470,7 +470,13 @@ export async function GET(request: Request) {
             // CRITICAL: Only include SO line items that match items in the filtered Work Orders
             // This ensures we only count revenue for items actually part of this engagement (month)
             // Example: June WO has MCC service items → only count those MCC items in SO, not Feb items
-            return workOrderItemIds.size === 0 || workOrderItemIds.has(line.itemId);
+            if (workOrderItemIds.size === 0) {
+              // If no WO item_ids found, use alternative filtering by account number for MCC
+              // Include only MCC revenue lines (accounts 4100-4111) to avoid including unrelated items
+              const acct = line.accountNumber || '';
+              return acct.startsWith('410') || acct.startsWith('411');
+            }
+            return workOrderItemIds.has(line.itemId);
           });
 
           // Group lines by product type
@@ -511,7 +517,7 @@ export async function GET(request: Request) {
           // Calculate SO totals from filtered line items (excludes tax)
           // Use absolute values since NetSuite stores some amounts as negative
           const soRevenue = Math.abs(enhancedLines.reduce((sum, li) => sum + li.amount, 0));
-          const soCostEstimate = enhancedLines.reduce((sum, li) => sum + li.costEstimate, 0);
+          const soCostEstimate = Math.abs(enhancedLines.reduce((sum, li) => sum + li.costEstimate, 0));
           const soGrossProfit = soRevenue - soCostEstimate;
 
           // Create rollup validation
