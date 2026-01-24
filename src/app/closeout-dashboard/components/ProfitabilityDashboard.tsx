@@ -11,6 +11,10 @@ import ProjectBrowser from './ProjectBrowser';
 interface ProjectOption {
   name: string;
   years: number[];
+  latestYear: number;
+  latestMonth: number | null;
+  projectType: string;
+  recentRevenue: number;
 }
 
 // New API Response Structure
@@ -142,6 +146,13 @@ function formatCurrency(value: number): string {
   if (absValue >= 1000000) return `${sign}$${(absValue / 1000000).toFixed(1)}M`;
   if (absValue >= 1000) return `${sign}$${(absValue / 1000).toFixed(0)}K`;
   return `${sign}$${absValue.toFixed(0)}`;
+}
+
+function formatMonth(month: number | null, year: number): string {
+  if (!month) return `${year}`;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${monthNames[month - 1]} ${year}`;
 }
 
 export default function ProfitabilityDashboard({ initialProject, initialYear }: ProfitabilityDashboardProps) {
@@ -298,14 +309,14 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
     }
   };
 
-  const selectProject = (project: ProjectOption, selectedYear?: number) => {
+  const selectProject = (project: ProjectOption) => {
     setSearchInput(project.name);
     setProjectName(project.name);
-    setYear(selectedYear || '');
-    setMonth('');
-    setProjectType('');
+    setYear(project.latestYear);
+    setMonth(project.latestMonth || '');
+    setProjectType(project.projectType);
     setIsDropdownOpen(false);
-    fetchData(project.name, selectedYear || '', '', '');
+    fetchData(project.name, project.latestYear, project.latestMonth || '', project.projectType);
   };
 
   const clearSelection = () => {
@@ -448,22 +459,30 @@ export default function ProfitabilityDashboard({ initialProject, initialYear }: 
             {isDropdownOpen && !loadingProjects && filteredProjects.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-[#111827] border border-white/[0.10] rounded-lg shadow-xl z-50 max-h-96 overflow-auto">
                 {filteredProjects.map((project, idx) => (
-                  <div key={idx} className="border-b border-white/[0.04] last:border-0">
-                    <div className="px-4 py-2 font-medium text-white hover:bg-white/[0.04]">
-                      {project.name}
+                  <button
+                    key={idx}
+                    onClick={() => selectProject(project)}
+                    className="w-full border-b border-white/[0.04] last:border-0 px-4 py-3 hover:bg-white/[0.04] transition-colors text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-white truncate">
+                          {project.name}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
+                          {project.projectType && (
+                            <span className="px-2 py-0.5 bg-white/[0.06] rounded text-gray-300">
+                              {project.projectType}
+                            </span>
+                          )}
+                          <span>•</span>
+                          <span>{formatMonth(project.latestMonth, project.latestYear)}</span>
+                          <span>•</span>
+                          <span className="text-green-400">{formatCurrency(project.recentRevenue)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 px-4 pb-2">
-                      {project.years.map(yr => (
-                        <button
-                          key={yr}
-                          onClick={() => selectProject(project, yr)}
-                          className="px-3 py-1 text-xs bg-white/[0.06] hover:bg-[#22C55E]/20 text-gray-300 hover:text-[#22C55E] rounded-full transition-colors"
-                        >
-                          {yr}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
