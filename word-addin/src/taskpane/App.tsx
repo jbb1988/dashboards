@@ -2446,32 +2446,43 @@ export default function App() {
 
               {/* Analyze Controls - Flat, Microsoft-native */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {/* Button Row - Simple horizontal layout */}
+                {/* Button Row - Primary action emphasized */}
                 <div style={styles.analyzeButtons}>
-                  <Button
-                    appearance="primary"
+                  {/* Primary action - subtle emphasis */}
+                  <button
                     onClick={analyzeDocument}
                     disabled={isAnalyzing}
                     style={{
                       flex: 1,
-                      opacity: isAnalyzing ? 0.5 : 1,
+                      padding: '8px 16px',
+                      backgroundColor: isAnalyzing ? 'transparent' : 'rgba(86, 156, 214, 0.08)',
+                      border: '1px solid rgba(86, 156, 214, 0.25)',
+                      color: isAnalyzing ? '#666666' : '#6cb6ff',
+                      fontSize: 13,
+                      fontWeight: 500,
                       cursor: isAnalyzing ? 'default' : 'pointer',
+                      fontFamily: 'inherit',
                     }}
                   >
                     Analyze Document
-                  </Button>
-                  <Button
-                    appearance="outline"
+                  </button>
+                  {/* Secondary action - quieter */}
+                  <button
                     onClick={analyzeSelection}
                     disabled={isAnalyzing}
                     title="Select text in Word and click to analyze just that section"
                     style={{
-                      opacity: isAnalyzing ? 0.5 : 1,
+                      padding: '8px 12px',
+                      backgroundColor: 'transparent',
+                      border: '1px solid #404040',
+                      color: isAnalyzing ? '#505050' : '#808080',
+                      fontSize: 12,
                       cursor: isAnalyzing ? 'default' : 'pointer',
+                      fontFamily: 'inherit',
                     }}
                   >
                     Analyze Selection
-                  </Button>
+                  </button>
                 </div>
 
                 {/* Loading State - Full width progress bar + muted text */}
@@ -2509,12 +2520,12 @@ export default function App() {
                   {/* Risk Summary Bar */}
                   {/* Results line - muted, informational */}
                   <div style={styles.riskSummaryBar}>
-                    <span style={{ fontSize: 12, color: '#808080' }}>Results:</span>
-                    <span style={{ fontSize: 12, color: '#d16969' }}>{analysisResult.riskScores.summary.high} High</span>
-                    <span style={{ fontSize: 12, color: '#808080' }}>•</span>
-                    <span style={{ fontSize: 12, color: '#cca700' }}>{analysisResult.riskScores.summary.medium} Medium</span>
-                    <span style={{ fontSize: 12, color: '#808080' }}>•</span>
-                    <span style={{ fontSize: 12, color: '#6a9955' }}>{analysisResult.riskScores.summary.low} Low</span>
+                    <span style={{ fontSize: 11, color: '#606060', opacity: 0.8 }}>Results:</span>
+                    <span style={{ fontSize: 11, color: '#b05050', opacity: 0.75 }}>{analysisResult.riskScores.summary.high} High</span>
+                    <span style={{ fontSize: 9, color: '#505050', opacity: 0.5 }}>•</span>
+                    <span style={{ fontSize: 11, color: '#a08000', opacity: 0.75 }}>{analysisResult.riskScores.summary.medium} Medium</span>
+                    <span style={{ fontSize: 9, color: '#505050', opacity: 0.5 }}>•</span>
+                    <span style={{ fontSize: 11, color: '#508050', opacity: 0.75 }}>{analysisResult.riskScores.summary.low} Low</span>
                   </div>
 
                   {/* Insert All Changes - simple link style */}
@@ -2560,12 +2571,12 @@ export default function App() {
                             }}>
                               {section.riskLevel}
                             </span>
-                            <span style={{ color: '#4d4d4d' }}>·</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#cccccc' }}>
+                            <span style={{ color: '#404040' }}>·</span>
+                            <span style={{ fontSize: 13, fontWeight: 400, color: '#b0b0b0' }}>
                               {section.sectionTitle || `Section ${section.sectionNumber}`}
                             </span>
                             {section.changes && section.changes.length > 0 && (
-                              <span style={{ fontSize: 11, color: '#808080', marginLeft: 'auto' }}>
+                              <span style={{ fontSize: 10, color: '#606060', marginLeft: 'auto' }}>
                                 {section.changes.length} change{section.changes.length !== 1 ? 's' : ''}
                               </span>
                             )}
@@ -2601,28 +2612,31 @@ export default function App() {
                             </div>
                           )}
 
-                          {/* Actions - flat text buttons */}
-                          <div style={{ display: 'flex', gap: 12, marginTop: 10, paddingTop: 8 }}>
+                          {/* Actions - primary/secondary hierarchy */}
+                          <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingTop: 10 }}>
+                            {/* Primary action - brighter */}
                             <button
                               onClick={() => insertSingleSection(section)}
                               disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: appliedSections.has(section.sectionTitle) ? '#666666' : '#569cd6',
+                                color: appliedSections.has(section.sectionTitle) ? '#505050' : '#6cb6ff',
                                 fontSize: 12,
+                                fontWeight: appliedSections.has(section.sectionTitle) ? 400 : 500,
                                 cursor: appliedSections.has(section.sectionTitle) ? 'default' : 'pointer',
                                 padding: 0,
                               }}
                             >
                               {appliedSections.has(section.sectionTitle) ? 'Applied' : 'Apply Changes'}
                             </button>
+                            {/* Secondary actions - muted */}
                             <button
                               onClick={() => highlightSection(section)}
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: '#569cd6',
+                                color: '#707070',
                                 fontSize: 12,
                                 cursor: 'pointer',
                                 padding: 0,
@@ -2636,7 +2650,7 @@ export default function App() {
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: isAnalyzing ? '#666666' : '#569cd6',
+                                color: isAnalyzing ? '#505050' : '#707070',
                                 fontSize: 12,
                                 cursor: isAnalyzing ? 'default' : 'pointer',
                                 padding: 0,
@@ -2672,8 +2686,8 @@ export default function App() {
                             }}>
                               NEW
                             </span>
-                            <span style={{ color: '#4d4d4d' }}>·</span>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#cccccc' }}>
+                            <span style={{ color: '#404040' }}>·</span>
+                            <span style={{ fontSize: 13, fontWeight: 400, color: '#b0b0b0' }}>
                               {section.sectionTitle}
                             </span>
                             {appliedSections.has(section.sectionTitle) && (
@@ -2723,21 +2737,25 @@ export default function App() {
                           )}
 
                           {/* Actions - flat text buttons */}
-                          <div style={{ display: 'flex', gap: 12, marginTop: 10, paddingTop: 8 }}>
+                          {/* Actions - primary/secondary hierarchy */}
+                          <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingTop: 10 }}>
+                            {/* Primary action */}
                             <button
                               onClick={() => insertSingleSection(section)}
                               disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: appliedSections.has(section.sectionTitle) ? '#666666' : '#569cd6',
+                                color: appliedSections.has(section.sectionTitle) ? '#505050' : '#6cb6ff',
                                 fontSize: 12,
+                                fontWeight: appliedSections.has(section.sectionTitle) ? 400 : 500,
                                 cursor: appliedSections.has(section.sectionTitle) ? 'default' : 'pointer',
                                 padding: 0,
                               }}
                             >
                               {appliedSections.has(section.sectionTitle) ? 'Inserted' : 'Insert Section'}
                             </button>
+                            {/* Secondary action */}
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(section.revisedText);
@@ -2747,7 +2765,7 @@ export default function App() {
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: '#569cd6',
+                                color: '#707070',
                                 fontSize: 12,
                                 cursor: 'pointer',
                                 padding: 0,
@@ -3006,8 +3024,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 0,
   },
   clauseCard: {
-    padding: '12px 0',
-    borderBottom: '1px solid #333333',
+    padding: '14px 0',
+    borderBottom: '1px solid #3a3a3a',
+    marginBottom: 2,
   },
   clauseText: {
     padding: '6px 0',
@@ -3119,10 +3138,10 @@ const styles: Record<string, React.CSSProperties> = {
   riskSummaryBar: {
     display: 'flex',
     alignItems: 'center',
-    padding: '8px 0',
-    gap: 16,
-    borderBottom: '1px solid #333333',
-    marginBottom: 8,
+    padding: '6px 0 10px 0',
+    gap: 12,
+    borderBottom: '1px solid #3a3a3a',
+    marginBottom: 12,
   },
   riskBadgeLarge: {
     fontSize: 12,
@@ -3135,8 +3154,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 0,
   },
   sectionCard: {
-    padding: '14px 0',
-    borderBottom: '1px solid #333333',
+    padding: '16px 0',
+    borderBottom: '1px solid #3a3a3a',
+    marginBottom: 2,
   },
   sectionHeader: {
     display: 'flex',
