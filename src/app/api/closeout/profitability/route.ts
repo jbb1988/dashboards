@@ -385,6 +385,7 @@ export async function GET(request: Request) {
         }
       }
     }
+    console.log(`[Profitability Debug] workOrderItemIds.size=${workOrderItemIds.size}, WO count=${workOrders.length}`);
 
     // STEP 4: Fetch Sales Orders with enhanced line items (including account info)
     const salesOrders: LinkedSalesOrder[] = [];
@@ -474,9 +475,13 @@ export async function GET(request: Request) {
               // If no WO item_ids found, use alternative filtering by account number for MCC
               // Include only MCC revenue lines (accounts 4100-4111) to avoid including unrelated items
               const acct = line.accountNumber || '';
-              return acct.startsWith('410') || acct.startsWith('411');
+              const included = acct.startsWith('410') || acct.startsWith('411');
+              console.log(`[Profitability Debug] Empty WO filter: acct=${acct}, included=${included}, item=${line.itemName}, amt=${line.amount}`);
+              return included;
             }
-            return workOrderItemIds.has(line.itemId);
+            const matched = workOrderItemIds.has(line.itemId);
+            console.log(`[Profitability Debug] WO filter: itemId=${line.itemId}, matched=${matched}, item=${line.itemName}, amt=${line.amount}, acct=${line.accountNumber}`);
+            return matched;
           });
 
           // Group lines by product type
