@@ -29,6 +29,86 @@ import {
   Person24Regular,
 } from '@fluentui/react-icons';
 
+// ============================================
+// PREMIUM LOADING COMPONENTS
+// Enterprise-grade, minimal, intentional
+// ============================================
+
+// CSS Keyframes injected into document
+const injectKeyframes = () => {
+  if (typeof document !== 'undefined' && !document.getElementById('premium-loader-keyframes')) {
+    const style = document.createElement('style');
+    style.id = 'premium-loader-keyframes';
+    style.textContent = `
+      @keyframes premium-spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes premium-shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(200%); }
+      }
+      @keyframes premium-fade-in {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+};
+
+// Premium Thin Stroke Spinner - Option A (Preferred)
+const PremiumSpinner: React.FC<{ size?: number; color?: string }> = ({
+  size = 16,
+  color = 'rgba(148, 163, 184, 0.6)'
+}) => {
+  React.useEffect(() => { injectKeyframes(); }, []);
+
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        border: `1.5px solid ${color}`,
+        borderTopColor: 'transparent',
+        animation: 'premium-spin 1.2s linear infinite',
+        flexShrink: 0,
+      }}
+    />
+  );
+};
+
+// Premium Progress Bar - Option B (Alternative)
+const PremiumProgressBar: React.FC<{ show: boolean }> = ({ show }) => {
+  React.useEffect(() => { injectKeyframes(); }, []);
+
+  if (!show) return null;
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: 2,
+        backgroundColor: 'rgba(148, 163, 184, 0.1)',
+        borderRadius: 1,
+        overflow: 'hidden',
+        opacity: 0.4,
+        animation: 'premium-fade-in 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
+    >
+      <div
+        style={{
+          width: '40%',
+          height: '100%',
+          background: 'linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.6), transparent)',
+          animation: 'premium-shimmer 2.5s ease-in-out infinite',
+        }}
+      />
+    </div>
+  );
+};
+
 // Types
 interface MatchedClause {
   id: string;
@@ -2020,8 +2100,28 @@ export default function App() {
   if (!isOfficeReady) {
     return (
       <FluentProvider theme={webDarkTheme}>
-        <div style={styles.container}>
-          <Spinner label="Loading MARS..." />
+        <div style={{
+          ...styles.container,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+          }}>
+            <PremiumSpinner size={24} color="rgba(148, 163, 184, 0.5)" />
+            <span style={{
+              fontSize: 13,
+              fontWeight: 450,
+              color: 'rgba(148, 163, 184, 0.6)',
+              letterSpacing: '0.01em',
+            }}>
+              Loading MARS
+            </span>
+          </div>
         </div>
       </FluentProvider>
     );
@@ -2081,9 +2181,14 @@ export default function App() {
                   appearance="primary"
                   onClick={handleQuickLogin}
                   disabled={isLoggingIn}
-                  style={{ width: '100%' }}
+                  style={{
+                    width: '100%',
+                    opacity: isLoggingIn ? 0.7 : 1,
+                    transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
+                  icon={isLoggingIn ? <PremiumSpinner size={14} color="rgba(255,255,255,0.6)" /> : undefined}
                 >
-                  {isLoggingIn ? 'Signing in...' : 'Sign In'}
+                  {isLoggingIn ? 'Signing in' : 'Sign In'}
                 </Button>
                 <Button
                   appearance="subtle"
@@ -2217,14 +2322,23 @@ export default function App() {
                   appearance="primary"
                   onClick={confirmChange}
                   disabled={isApplyingChange}
-                  icon={isApplyingChange ? <Spinner size="tiny" /> : <CheckmarkCircle24Filled />}
+                  icon={isApplyingChange ? <PremiumSpinner size={14} color="rgba(255,255,255,0.6)" /> : <CheckmarkCircle24Filled />}
+                  style={{
+                    opacity: isApplyingChange ? 0.7 : 1,
+                    transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
                 >
-                  {isApplyingChange ? 'Applying...' : 'Apply Change'}
+                  {isApplyingChange ? 'Applying change' : 'Apply Change'}
                 </Button>
                 <Button
                   appearance="outline"
                   onClick={cancelChange}
                   disabled={isApplyingChange}
+                  style={{
+                    opacity: isApplyingChange ? 0.4 : 1,
+                    cursor: isApplyingChange ? 'default' : 'pointer',
+                    transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
                 >
                   Cancel
                 </Button>
@@ -2330,30 +2444,69 @@ export default function App() {
                 )}
               </div>
 
-              {/* Analyze Button */}
-              <div style={styles.analyzeButtons}>
-                <Button
-                  appearance="primary"
-                  icon={isAnalyzing ? <Spinner size="tiny" /> : <DocumentSearch24Regular />}
-                  onClick={analyzeDocument}
-                  disabled={isAnalyzing}
-                  style={{ flex: 1 }}
-                >
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
-                </Button>
-                <Button
-                  appearance="secondary"
-                  onClick={analyzeSelection}
-                  disabled={isAnalyzing}
-                  title="Select text in Word and click to analyze just that section"
-                  style={{
-                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                    border: '1px solid rgba(59, 130, 246, 0.4)',
-                    color: '#60A5FA'
-                  }}
-                >
-                  Analyze Selection
-                </Button>
+              {/* Analyze Buttons - Premium Loading State */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Loading State - Inline with subtle animation */}
+                {isAnalyzing && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '12px 16px',
+                      backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                      borderRadius: 10,
+                      animation: 'premium-fade-in 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    }}
+                  >
+                    <PremiumSpinner size={16} color="rgba(148, 163, 184, 0.5)" />
+                    <span style={{
+                      fontSize: 13,
+                      fontWeight: 450,
+                      color: 'rgba(148, 163, 184, 0.7)',
+                      letterSpacing: '0.01em',
+                    }}>
+                      Analyzing document
+                    </span>
+                  </div>
+                )}
+
+                {/* Button Row */}
+                <div style={styles.analyzeButtons}>
+                  <Button
+                    appearance="primary"
+                    icon={!isAnalyzing ? <DocumentSearch24Regular /> : undefined}
+                    onClick={analyzeDocument}
+                    disabled={isAnalyzing}
+                    style={{
+                      flex: 1,
+                      opacity: isAnalyzing ? 0.4 : 1,
+                      cursor: isAnalyzing ? 'default' : 'pointer',
+                      transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    }}
+                  >
+                    Analyze Document
+                  </Button>
+                  <Button
+                    appearance="secondary"
+                    onClick={analyzeSelection}
+                    disabled={isAnalyzing}
+                    title="Select text in Word and click to analyze just that section"
+                    style={{
+                      backgroundColor: isAnalyzing ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.15)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      color: '#60A5FA',
+                      opacity: isAnalyzing ? 0.4 : 1,
+                      cursor: isAnalyzing ? 'default' : 'pointer',
+                      transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    }}
+                  >
+                    Analyze Selection
+                  </Button>
+                </div>
+
+                {/* Progress Bar - Premium shimmer effect */}
+                <PremiumProgressBar show={isAnalyzing} />
               </div>
 
               {/* Analysis Results - Dashboard Style */}
@@ -2378,10 +2531,15 @@ export default function App() {
                       appearance="primary"
                       onClick={insertAllChanges}
                       disabled={isApplyingChange || allChangesInserted}
-                      style={{ width: '100%', marginTop: 8 }}
-                      icon={allChangesInserted ? <CheckmarkCircle24Filled /> : undefined}
+                      style={{
+                        width: '100%',
+                        marginTop: 8,
+                        opacity: isApplyingChange ? 0.7 : 1,
+                        transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                      icon={isApplyingChange ? <PremiumSpinner size={14} color="rgba(255,255,255,0.6)" /> : allChangesInserted ? <CheckmarkCircle24Filled /> : undefined}
                     >
-                      {isApplyingChange ? 'Inserting...' : allChangesInserted ? 'All Changes Inserted' : 'Insert All Changes into Document'}
+                      {isApplyingChange ? 'Inserting changes' : allChangesInserted ? 'All Changes Inserted' : 'Insert All Changes into Document'}
                     </Button>
                   )}
 
@@ -2602,7 +2760,23 @@ export default function App() {
               </Button>
 
               {isLoadingClauses ? (
-                <Spinner label="Loading clauses..." />
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  padding: 24,
+                }}>
+                  <PremiumSpinner size={16} color="rgba(148, 163, 184, 0.5)" />
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 450,
+                    color: 'rgba(148, 163, 184, 0.6)',
+                    letterSpacing: '0.01em',
+                  }}>
+                    Loading clauses
+                  </span>
+                </div>
               ) : clauses.length === 0 ? (
                 <Text style={{ color: '#A0A0A0', textAlign: 'center' }}>
                   No clauses available. Add clauses in the MARS web app.
