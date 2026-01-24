@@ -663,55 +663,33 @@ MARS NEGOTIATING POSITIONS (apply these to edits):
 - Indemnification: Proportionate to fault ("to the extent caused by"), add liability cap
 - Termination: Payment for work performed if terminated without cause
 
-🚨 CRITICAL IP/WORK PRODUCT RULES (MANDATORY):
-Intellectual Property clauses are the most dangerous. Apply ALL of these rules:
+IP/WORK PRODUCT - ONE SIMPLE RULE:
+Custom work for Client = theirs. Everything else = ours. No middle ground.
 
-1) DEFINE "Contractor Background IP" - Every IP clause MUST define this term:
-   "Contractor Background IP means all intellectual property, software, tools, methodologies,
-   templates, processes, and know-how owned or developed by Contractor prior to this Contract
-   or developed outside the scope of this Contract, including derivatives and improvements thereof."
+WHAT CLIENT GETS:
+- Custom deliverables created specifically for them under this contract
 
-2) LIMIT OWNERSHIP STRICTLY TO DELIVERABLES:
-   - Client gets ownership ONLY of "Deliverables specifically created for Client under this Contract"
-   - NEVER "any and all works created pursuant to this Contract" - this is a rights grab
-   - NEVER "works capable of IP protection" - too broad
+WHAT STAYS WITH CONTRACTOR (non-negotiable):
+- Pre-existing IP, tools, software, methodologies, templates
+- Reusable components, frameworks, libraries
+- General knowledge and know-how
 
-3) GRANT LICENSE (NOT OWNERSHIP) FOR EMBEDDED BACKGROUND IP:
-   - If Deliverables contain embedded Contractor Background IP, Client gets a LICENSE only
-   - "Client is granted a non-exclusive, perpetual license to use Contractor Background IP
-     solely as embedded in and necessary to use the Deliverables"
+REMOVE these phrases - they are rights grabs:
+- "irrevocably transfers" → just "assigns"
+- "any and all works created pursuant to this Contract" → "custom deliverables created specifically for Client"
+- "works capable of patent, copyright, trade secret protection" → DELETE
+- Multiple assignment clauses → consolidate into ONE clear statement
 
-4) FLAG AND REMOVE DANGEROUS PHRASES:
-   - "irrevocably transfers" → change to "assigns" with carve-out
-   - "any and all works" → change to "Deliverables"
-   - "pursuant to this Contract" → change to "specifically created for Client"
-   - "however caused" in IP context → REMOVE
-   - "irrevocable rights" → ADD "except for Contractor Background IP"
-
-5) CARVE-OUTS MUST BE REPEATED:
-   - If a clause has MULTIPLE ownership grants, the carve-out MUST appear in EACH ONE
-   - If you add "Except for Contractor Background IP" to one sentence, add it to ALL assignment sentences
-   - Example BAD: "Except for Background IP, Contractor transfers... and conveys all rights..."
-   - Example GOOD: "Except for Background IP, Contractor transfers... Except for Background IP, Contractor also conveys..."
-
-6) BLOCK DERIVATIVE CAPTURE:
-   - NEVER allow "improvements" or "derivatives" of Contractor IP to be transferred
-   - ADD: "Improvements or derivatives of Contractor Background IP remain Contractor's property"
-
-7) IRREVOCABLE CLAUSES - ADD PROTECTION:
-   - If clause says "rights granted are irrevocable", ADD: "This irrevocability applies only to
-     rights in Deliverables and does not affect Contractor's ownership of Background IP"
-
-EXAMPLE IP REPLACEMENT (use this structure):
+EXAMPLE - Keep it SHORT:
 {
-  "find": "The Contractor hereby irrevocably transfers, assigns, sets over",
-  "replace": "Except for Contractor Background IP (defined as all intellectual property, tools, methodologies, and templates owned by Contractor prior to or developed outside this Contract, including derivatives thereof), the Contractor transfers and assigns",
-  "rationale": "Define Background IP and add carve-out"
+  "find": "irrevocably transfers, assigns, sets over and conveys to FW all right, title and interest",
+  "replace": "assigns to Client all right, title and interest",
+  "rationale": "Remove irrevocable language"
 },
 {
   "find": "in any and all works created pursuant to this Contract",
-  "replace": "in the Deliverables specifically created for Client under this Contract, excluding any Contractor Background IP embedded therein, which Client receives a non-exclusive license to use solely as incorporated in the Deliverables",
-  "rationale": "Limit to Deliverables, grant license for embedded IP"
+  "replace": "in custom deliverables created specifically for Client. Contractor retains all rights to its pre-existing IP, tools, methodologies, templates, and reusable components",
+  "rationale": "Custom work = theirs, everything else = ours"
 }
 
 EXAMPLE for a long section:
@@ -742,13 +720,9 @@ const MARS_USER_PROMPT_TEMPLATE = `Analyze this contract for MARS Company (the C
 
 MANDATORY SECTIONS TO REVIEW (flag if problematic):
 1. INDEMNIFICATION - Limit to negligence ("to the extent caused by"), add liability cap, remove "however caused"
-2. 🚨 INTELLECTUAL PROPERTY / WORK PRODUCT - THIS IS THE MOST CRITICAL SECTION:
-   - MUST define "Contractor Background IP" (tools, methodologies, templates, pre-existing software)
-   - MUST limit ownership to "Deliverables specifically created for Client" only
-   - MUST add license (not ownership) for embedded Background IP
-   - MUST remove dangerous phrases: "any and all works", "pursuant to this Contract", "irrevocably"
-   - MUST repeat carve-outs in EVERY ownership grant (not just the first sentence)
-   - MUST protect derivatives and improvements of Contractor's IP
+2. INTELLECTUAL PROPERTY / WORK PRODUCT - Simple rule: custom work = theirs, everything else = ours
+   - Remove "irrevocably" and "any and all works"
+   - Change to: Client gets custom deliverables only, Contractor keeps tools/templates/pre-existing IP
 3. LIMITATION OF LIABILITY - If MISSING entirely, add via "new_sections"; if unlimited, modify to add cap
 4. TERMINATION - Ensure payment for work performed if terminated without cause
 5. SCOPE OF WORK / SERVICES - Flag if scope is too broad or open-ended
