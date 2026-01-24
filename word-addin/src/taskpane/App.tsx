@@ -1966,17 +1966,53 @@ export default function App() {
     }
   };
 
-  // Risk severity badge
-  const getRiskBadge = (severity: string) => {
-    const colors: Record<string, 'danger' | 'warning' | 'success'> = {
-      high: 'danger',
-      medium: 'warning',
-      low: 'success',
+  // Risk severity badge - elegant pill style
+  const getRiskBadge = (severity: string, isApplied?: boolean) => {
+    if (isApplied) {
+      return (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 10px',
+          fontSize: 11,
+          fontWeight: 500,
+          letterSpacing: '0.02em',
+          borderRadius: 20,
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          color: '#10b981',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#10b981' }} />
+          Applied
+        </span>
+      );
+    }
+
+    const config: Record<string, { color: string; bg: string; border: string }> = {
+      high: { color: '#f87171', bg: 'rgba(248, 113, 113, 0.12)', border: 'rgba(248, 113, 113, 0.25)' },
+      medium: { color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.12)', border: 'rgba(251, 191, 36, 0.25)' },
+      low: { color: '#4ade80', bg: 'rgba(74, 222, 128, 0.12)', border: 'rgba(74, 222, 128, 0.25)' },
     };
+    const { color, bg, border } = config[severity.toLowerCase()] || config.low;
+
     return (
-      <Badge appearance="filled" color={colors[severity] || 'informative'}>
-        {severity.toUpperCase()}
-      </Badge>
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 10px',
+        fontSize: 11,
+        fontWeight: 500,
+        letterSpacing: '0.02em',
+        borderRadius: 20,
+        backgroundColor: bg,
+        color: color,
+        border: `1px solid ${border}`,
+      }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: color, boxShadow: `0 0 6px ${color}` }} />
+        {severity.charAt(0).toUpperCase() + severity.slice(1).toLowerCase()}
+      </span>
     );
   };
 
@@ -2306,10 +2342,15 @@ export default function App() {
                   {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
                 </Button>
                 <Button
-                  appearance="outline"
+                  appearance="secondary"
                   onClick={analyzeSelection}
                   disabled={isAnalyzing}
                   title="Select text in Word and click to analyze just that section"
+                  style={{
+                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    color: '#60A5FA'
+                  }}
                 >
                   Analyze Selection
                 </Button>
@@ -2412,10 +2453,15 @@ export default function App() {
                             </Button>
                             <Button
                               size="small"
-                              appearance="subtle"
+                              appearance="secondary"
                               onClick={() => reanalyzeClause(section.sectionTitle, section.originalText || '')}
                               disabled={isAnalyzing}
                               title="Run deeper analysis on this section"
+                              style={{
+                                backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                                border: '1px solid rgba(139, 92, 246, 0.4)',
+                                color: '#A78BFA'
+                              }}
                             >
                               Re-analyze
                             </Button>
@@ -2610,34 +2656,51 @@ export default function App() {
   );
 }
 
+// ============================================
+// SOPHISTICATED MODERN DESIGN SYSTEM
+// Premium SaaS aesthetic inspired by Linear, Notion, Stripe
+// ============================================
+
 // Dynamic style function for score circle
 const getScoreCircleStyle = (riskLevel: string): React.CSSProperties => ({
-  width: 64,
-  height: 64,
+  width: 52,
+  height: 52,
   borderRadius: '50%',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: riskLevel === 'high' ? '#7F1D1D' : riskLevel === 'medium' ? '#78350F' : '#14532D',
+  background: riskLevel === 'high'
+    ? 'linear-gradient(135deg, rgba(248, 113, 113, 0.15), rgba(248, 113, 113, 0.25))'
+    : riskLevel === 'medium'
+    ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.25))'
+    : 'linear-gradient(135deg, rgba(74, 222, 128, 0.15), rgba(74, 222, 128, 0.25))',
+  boxShadow: riskLevel === 'high'
+    ? '0 0 24px rgba(248, 113, 113, 0.25)'
+    : riskLevel === 'medium'
+    ? '0 0 24px rgba(251, 191, 36, 0.25)'
+    : '0 0 24px rgba(74, 222, 128, 0.25)',
+  border: `1.5px solid ${riskLevel === 'high' ? 'rgba(248, 113, 113, 0.5)' : riskLevel === 'medium' ? 'rgba(251, 191, 36, 0.5)' : 'rgba(74, 222, 128, 0.5)'}`,
 });
 
-// Styles
+// Styles - Sophisticated dark theme
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    backgroundColor: '#0F172A',
-    color: '#F1F5F9',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    backgroundColor: '#0a0f1a',
+    color: '#f1f5f9',
+    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontSize: 13,
+    lineHeight: 1.5,
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '14px 16px',
-    borderBottom: '1px solid #1E293B',
-    backgroundColor: '#0F172A',
+    padding: '14px 18px',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.08)',
+    background: 'linear-gradient(180deg, #0f1520, #0a0f1a)',
   },
   headerContent: {
     display: 'flex',
@@ -2647,30 +2710,36 @@ const styles: Record<string, React.CSSProperties> = {
   errorBanner: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: '10px 16px',
-    backgroundColor: '#7F1D1D',
-    color: '#FCA5A5',
+    gap: 12,
+    padding: '11px 18px',
+    background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.06))',
+    borderBottom: '1px solid rgba(239, 68, 68, 0.15)',
+    color: '#fca5a5',
     fontSize: 13,
   },
   tabs: {
-    borderBottom: '1px solid #1E293B',
-    backgroundColor: '#0F172A',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.08)',
+    background: 'linear-gradient(180deg, #0d1117, #0a0f1a)',
+    padding: '0 6px',
   },
   content: {
     flex: 1,
     overflow: 'auto',
-    padding: '16px 14px',
-    backgroundColor: '#0F172A',
+    padding: '18px 16px',
+    backgroundColor: '#0a0f1a',
   },
   loginCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
-    padding: 32,
+    gap: 18,
+    padding: 36,
     margin: 'auto',
-    maxWidth: 280,
+    maxWidth: 300,
+    background: 'linear-gradient(180deg, #111827, #0a0f1a)',
+    borderRadius: 16,
+    border: '1px solid rgba(148, 163, 184, 0.1)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
   },
   analyzeTab: {
     display: 'flex',
@@ -2681,72 +2750,84 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 14,
-    marginTop: 8,
+    marginTop: 6,
   },
   scoreCard: {
-    padding: 16,
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
+    padding: 18,
+    background: 'linear-gradient(135deg, #111827, #1a2332)',
+    borderRadius: 14,
+    border: '1px solid rgba(148, 163, 184, 0.08)',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
   },
   scoreContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: 16,
+    gap: 18,
   },
   summaryCard: {
-    padding: 14,
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
+    padding: 16,
+    background: 'linear-gradient(135deg, #111827, #1a2332)',
+    borderRadius: 14,
+    border: '1px solid rgba(148, 163, 184, 0.08)',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
   },
   riskHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   riskContent: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    paddingTop: 8,
+    gap: 10,
+    paddingTop: 10,
   },
   suggestion: {
-    padding: 10,
-    backgroundColor: '#1E293B',
-    borderRadius: 6,
+    padding: 12,
+    backgroundColor: '#1a2332',
+    borderRadius: 10,
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 8,
+    border: '1px solid rgba(148, 163, 184, 0.06)',
   },
   clausesTab: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
+    gap: 14,
   },
   clauseList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
+    gap: 12,
   },
   clauseCard: {
-    backgroundColor: '#1E293B',
-    padding: 14,
-    borderRadius: 10,
+    background: 'linear-gradient(135deg, #111827, #1a2332)',
+    padding: 16,
+    borderRadius: 14,
+    border: '1px solid rgba(148, 163, 184, 0.08)',
+    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
   },
   clauseText: {
     padding: '10px 0',
+    color: '#94a3b8',
+    fontSize: 13,
+    lineHeight: 1.6,
   },
   clauseActions: {
     display: 'flex',
-    gap: 8,
-    paddingTop: 10,
+    gap: 10,
+    paddingTop: 12,
   },
   successBanner: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: '10px 16px',
-    backgroundColor: '#14532D',
-    color: '#86EFAC',
+    gap: 12,
+    padding: '11px 18px',
+    background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.06))',
+    borderBottom: '1px solid rgba(16, 185, 129, 0.15)',
+    color: '#6ee7b7',
     fontSize: 13,
   },
   previewOverlay: {
@@ -2755,78 +2836,86 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(10, 15, 26, 0.92)',
+    backdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    padding: 16,
+    padding: 18,
   },
   previewPanel: {
-    backgroundColor: '#2D2D2D',
-    borderRadius: 8,
-    padding: 20,
-    maxWidth: 500,
-    maxHeight: '90vh',
+    background: 'linear-gradient(180deg, #111827, #0d1117)',
+    borderRadius: 16,
+    padding: 22,
+    maxWidth: 460,
+    maxHeight: '88vh',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: 16,
+    gap: 18,
+    border: '1px solid rgba(148, 163, 184, 0.12)',
+    boxShadow: '0 24px 48px rgba(0, 0, 0, 0.4)',
   },
   diffView: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
+    gap: 14,
   },
   diffSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 4,
+    gap: 6,
   },
   diffText: {
-    padding: 12,
-    backgroundColor: '#1F1F1F',
-    borderRadius: 4,
-    maxHeight: 150,
+    padding: 14,
+    backgroundColor: '#1a2332',
+    borderRadius: 10,
+    maxHeight: 140,
     overflowY: 'auto',
+    border: '1px solid rgba(148, 163, 184, 0.06)',
   },
   diffArrow: {
     textAlign: 'center',
-    fontSize: 24,
-    color: '#6B7280',
+    fontSize: 18,
+    color: '#475569',
+    padding: '2px 0',
   },
   matchInfo: {
     display: 'flex',
-    gap: 8,
+    gap: 10,
     flexWrap: 'wrap',
   },
   matchSelector: {
-    padding: 12,
-    backgroundColor: '#1F1F1F',
-    borderRadius: 4,
+    padding: 14,
+    backgroundColor: '#1a2332',
+    borderRadius: 10,
+    border: '1px solid rgba(148, 163, 184, 0.06)',
   },
   matchList: {
     display: 'flex',
     flexWrap: 'wrap',
-    marginTop: 8,
+    gap: 8,
+    marginTop: 10,
   },
   previewActions: {
     display: 'flex',
-    gap: 8,
+    gap: 10,
     justifyContent: 'flex-end',
-    marginTop: 8,
+    marginTop: 6,
   },
   locationBox: {
-    padding: 8,
-    backgroundColor: '#1F2937',
-    borderRadius: 4,
-    borderLeft: '3px solid #FBBF24',
+    padding: 10,
+    backgroundColor: '#1a2332',
+    borderRadius: 8,
+    borderLeft: '3px solid #fbbf24',
   },
   fixItSection: {
-    padding: 12,
-    backgroundColor: '#14532D',
-    borderRadius: 4,
-    marginTop: 8,
+    padding: 14,
+    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05))',
+    borderRadius: 10,
+    marginTop: 10,
+    border: '1px solid rgba(16, 185, 129, 0.15)',
   },
   fixItButtons: {
     display: 'flex',
@@ -2836,28 +2925,37 @@ const styles: Record<string, React.CSSProperties> = {
   riskSummaryBar: {
     display: 'flex',
     justifyContent: 'center',
-    padding: '14px 12px',
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
-    gap: 12,
+    alignItems: 'center',
+    padding: '14px 16px',
+    background: 'linear-gradient(135deg, #111827, #1a2332)',
+    borderRadius: 14,
+    gap: 14,
+    border: '1px solid rgba(148, 163, 184, 0.08)',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
   },
   riskBadgeLarge: {
-    padding: '6px 12px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 7,
+    padding: '7px 14px',
     fontSize: 12,
     fontWeight: 600,
-    borderRadius: 6,
+    borderRadius: 20,
+    letterSpacing: '0.01em',
   },
   sectionList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
+    marginTop: 6,
   },
   sectionCard: {
-    backgroundColor: '#1E293B',
-    padding: 14,
-    borderRadius: 10,
-    border: '1px solid #334155',
+    background: 'linear-gradient(135deg, #111827, #1a2332)',
+    padding: 16,
+    borderRadius: 14,
+    border: '1px solid rgba(148, 163, 184, 0.08)',
+    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
+    transition: 'border-color 0.2s, transform 0.2s',
   },
   sectionHeader: {
     display: 'flex',
@@ -2867,17 +2965,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sectionActions: {
     display: 'flex',
-    gap: 8,
+    gap: 10,
     marginTop: 14,
     paddingTop: 12,
-    borderTop: '1px solid #334155',
+    borderTop: '1px solid rgba(148, 163, 184, 0.06)',
   },
   summaryList: {
     marginTop: 14,
-    padding: 14,
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
-    border: '1px solid #334155',
+    padding: 16,
+    background: 'linear-gradient(135deg, #111827, #1a2332)',
+    borderRadius: 14,
+    border: '1px solid rgba(148, 163, 184, 0.08)',
   },
   contractSection: {
     marginBottom: 14,
@@ -2890,24 +2988,27 @@ const styles: Record<string, React.CSSProperties> = {
   },
   contractInput: {
     width: '100%',
-    padding: '11px 36px 11px 14px',
-    backgroundColor: '#1E293B',
-    border: '1px solid #334155',
-    borderRadius: 8,
-    color: '#F1F5F9',
+    padding: '11px 38px 11px 14px',
+    backgroundColor: '#111827',
+    border: '1px solid rgba(148, 163, 184, 0.12)',
+    borderRadius: 10,
+    color: '#f1f5f9',
     fontSize: 13,
     outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
   },
   clearButton: {
     position: 'absolute',
-    right: 10,
+    right: 12,
     background: 'none',
     border: 'none',
-    color: '#64748B',
+    color: '#64748b',
     cursor: 'pointer',
-    fontSize: 16,
+    fontSize: 14,
     padding: 4,
     lineHeight: 1,
+    opacity: 0.8,
+    transition: 'opacity 0.2s',
   },
   contractDropdown: {
     position: 'absolute',
@@ -2915,62 +3016,64 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     marginTop: 6,
-    backgroundColor: '#1E293B',
-    border: '1px solid #334155',
-    borderRadius: 8,
+    backgroundColor: '#111827',
+    border: '1px solid rgba(148, 163, 184, 0.12)',
+    borderRadius: 12,
     maxHeight: 220,
     overflowY: 'auto',
     zIndex: 100,
-    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
   },
   contractOption: {
     width: '100%',
     textAlign: 'left',
     padding: '12px 14px',
     border: 'none',
-    borderBottom: '1px solid #334155',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.06)',
     background: 'none',
     cursor: 'pointer',
     display: 'block',
-    color: '#F1F5F9',
+    color: '#f1f5f9',
+    transition: 'background-color 0.15s',
   },
   selectedContractBadge: {
     marginTop: 10,
   },
   changesList: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#0F172A',
-    borderRadius: 6,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#0d1117',
+    borderRadius: 10,
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 8,
+    border: '1px solid rgba(148, 163, 184, 0.06)',
   },
   changeItem: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 2,
-    paddingBottom: 6,
-    borderBottom: '1px solid #334155',
+    gap: 3,
+    paddingBottom: 8,
+    borderBottom: '1px solid rgba(148, 163, 184, 0.06)',
   },
   newSectionHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   newSectionPreview: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#0F172A',
-    borderRadius: 6,
-    borderLeft: '3px solid #0EA5E9',
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#0d1117',
+    borderRadius: 10,
+    borderLeft: '3px solid #6366f1',
   },
   newSectionFullContent: {
-    marginTop: 10,
+    marginTop: 12,
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 8,
   },
   newSectionContentHeader: {
     display: 'flex',
@@ -2978,19 +3081,19 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   newSectionTextBox: {
-    padding: 12,
-    backgroundColor: '#0F172A',
-    borderRadius: 6,
-    borderLeft: '3px solid #0EA5E9',
-    maxHeight: 300,
+    padding: 14,
+    backgroundColor: '#0d1117',
+    borderRadius: 10,
+    borderLeft: '3px solid #6366f1',
+    maxHeight: 280,
     overflowY: 'auto',
-    fontFamily: 'monospace',
+    fontFamily: '"SF Mono", Monaco, Menlo, monospace',
     fontSize: 11,
-    lineHeight: 1.5,
+    lineHeight: 1.6,
   },
   analyzeButtons: {
     display: 'flex',
-    gap: 8,
+    gap: 10,
     width: '100%',
   },
 };
