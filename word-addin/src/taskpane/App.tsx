@@ -158,6 +158,29 @@ function normalizeText(text: string): string {
 }
 
 /**
+ * Extracts a unique phrase from text for precise searching
+ * Takes the first 2-3 sentences or up to 200 chars at a word boundary
+ */
+function getSearchablePhrase(text: string, maxLen: number = 200): string {
+  // Normalize and get first portion
+  const normalized = normalizeText(text);
+  if (normalized.length <= maxLen) return normalized;
+
+  // Find a good break point (end of sentence or word boundary)
+  const truncated = normalized.substring(0, maxLen);
+  const lastSentence = truncated.lastIndexOf('. ');
+  const lastSpace = truncated.lastIndexOf(' ');
+
+  if (lastSentence > maxLen * 0.5) {
+    return truncated.substring(0, lastSentence + 1);
+  }
+  if (lastSpace > maxLen * 0.7) {
+    return truncated.substring(0, lastSpace);
+  }
+  return truncated;
+}
+
+/**
  * Calculates similarity between two strings (0-100)
  */
 function calculateSimilarity(str1: string, str2: string): number {
@@ -504,7 +527,7 @@ export default function App() {
     }
   };
 
-  // Insert all section changes into Word document with track-changes styling
+  // Insert all section changes into Word document with word-level diff styling
   const insertAllChanges = async () => {
     if (!analysisResult || analysisResult.sections.length === 0) {
       setError('No changes to insert');
@@ -518,25 +541,58 @@ export default function App() {
 
     try {
       await Word.run(async (context) => {
+        // Step 1: Enable Track Changes if available
+        try {
+          if (Office.context.requirements.isSetSupported('WordApi', '1.4')) {
+            (context.document as unknown as { changeTrackingMode: string }).changeTrackingMode = 'TrackAll';
+            await context.sync();
+          }
+        } catch (e) {
+          console.log('Track changes mode not available, using visual markup');
+        }
+
         for (const section of analysisResult.sections) {
           if (!section.originalText || !section.revisedText) continue;
           if (appliedSections.has(section.sectionTitle)) continue; // Skip already applied
 
-          // Find original text in document
-          const matches = await cascadingSearch(section.originalText, context);
+          // Step 2: Search for the original text using a unique phrase
+          const searchPhrase = getSearchablePhrase(section.originalText);
+          const searchResults = context.document.body.search(searchPhrase, {
+            matchCase: false,
+            matchWholeWord: false,
+          });
+          searchResults.load('items');
+          await context.sync();
 
-          if (matches.length > 0) {
-            const range = matches[0].range;
+          if (searchResults.items.length > 0) {
+            // Step 3: Use the first match - REPLACE only this range
+            const range = searchResults.items[0];
 
-            // Apply strikethrough to original (red)
-            range.font.strikeThrough = true;
-            range.font.color = '#DC2626';
+            // Compute the diff and build replacement text with visual markup
+            const dmp = new DiffMatchPatch();
+            const diffs = dmp.diff_main(section.originalText, section.revisedText);
+            dmp.diff_cleanupSemantic(diffs);
 
-            // Insert revised text after (green, underlined)
-            const newRange = range.insertText(' ' + section.revisedText, Word.InsertLocation.after);
-            newRange.font.strikeThrough = false;
-            newRange.font.underline = Word.UnderlineType.single;
-            newRange.font.color = '#16A34A';
+            // Clear only the matched range (NOT the entire paragraph)
+            range.clear();
+
+            // Rebuild with formatted diff content
+            for (const [op, text] of diffs) {
+              if (op === 0) {
+                // Equal - plain text
+                range.insertText(text, Word.InsertLocation.end);
+              } else if (op === -1) {
+                // Deletion - red strikethrough
+                const deletedRange = range.insertText(text, Word.InsertLocation.end);
+                deletedRange.font.strikeThrough = true;
+                deletedRange.font.color = '#DC2626';
+              } else if (op === 1) {
+                // Insertion - green underline
+                const insertedRange = range.insertText(text, Word.InsertLocation.end);
+                insertedRange.font.underline = Word.UnderlineType.single;
+                insertedRange.font.color = '#16A34A';
+              }
+            }
 
             newApplied.add(section.sectionTitle);
             appliedCount++;
@@ -562,7 +618,7 @@ export default function App() {
     }
   };
 
-  // Insert a single section change into Word document
+  // Insert a single section change into Word document with word-level diff
   const insertSingleSection = async (section: DashboardSection) => {
     if (!section.originalText || !section.revisedText) {
       setError('No text available for this section');
@@ -579,37 +635,69 @@ export default function App() {
 
     try {
       await Word.run(async (context) => {
-        // Find original text in document
-        const matches = await cascadingSearch(section.originalText, context);
-
-        if (matches.length > 0) {
-          const range = matches[0].range;
-
-          // Apply strikethrough to original (red)
-          range.font.strikeThrough = true;
-          range.font.color = '#DC2626';
-
-          // Insert revised text after (green, underlined)
-          const newRange = range.insertText(' ' + section.revisedText, Word.InsertLocation.after);
-          newRange.font.strikeThrough = false;
-          newRange.font.underline = Word.UnderlineType.single;
-          newRange.font.color = '#16A34A';
-
-          // Select the new range to show user where change was made
-          newRange.select();
-
-          await context.sync();
-
-          setAppliedSections(prev => new Set(prev).add(section.sectionTitle));
-          setSuccessMessage(`Applied change to: ${section.sectionTitle}`);
-          setTimeout(() => setSuccessMessage(null), 3000);
-        } else {
-          setError(`Could not find "${section.sectionTitle}" text in document. It may have been modified.`);
+        // Step 1: Enable Track Changes if available
+        try {
+          if (Office.context.requirements.isSetSupported('WordApi', '1.4')) {
+            (context.document as unknown as { changeTrackingMode: string }).changeTrackingMode = 'TrackAll';
+            await context.sync();
+          }
+        } catch (e) {
+          console.log('Track changes mode not available, using visual markup');
         }
+
+        // Step 2: Search for the original text using a unique phrase
+        const searchPhrase = getSearchablePhrase(section.originalText);
+        const searchResults = context.document.body.search(searchPhrase, {
+          matchCase: false,
+          matchWholeWord: false,
+        });
+        searchResults.load('items');
+        await context.sync();
+
+        if (searchResults.items.length === 0) {
+          setError(`Could not find "${section.sectionTitle}" in document`);
+          return;
+        }
+
+        // Step 3: Use the first match - REPLACE only this range
+        const range = searchResults.items[0];
+
+        // Compute the diff and build replacement text with visual markup
+        const dmp = new DiffMatchPatch();
+        const diffs = dmp.diff_main(section.originalText, section.revisedText);
+        dmp.diff_cleanupSemantic(diffs);
+
+        // Clear only the matched range (NOT the entire paragraph)
+        range.clear();
+
+        // Rebuild with formatted diff content
+        for (const [op, text] of diffs) {
+          if (op === 0) {
+            // Equal - plain text
+            range.insertText(text, Word.InsertLocation.end);
+          } else if (op === -1) {
+            // Deletion - red strikethrough
+            const deletedRange = range.insertText(text, Word.InsertLocation.end);
+            deletedRange.font.strikeThrough = true;
+            deletedRange.font.color = '#DC2626';
+          } else if (op === 1) {
+            // Insertion - green underline
+            const insertedRange = range.insertText(text, Word.InsertLocation.end);
+            insertedRange.font.underline = Word.UnderlineType.single;
+            insertedRange.font.color = '#16A34A';
+          }
+        }
+
+        range.select();
+        await context.sync();
+
+        setAppliedSections(prev => new Set(prev).add(section.sectionTitle));
+        setSuccessMessage(`Applied changes to: ${section.sectionTitle}`);
+        setTimeout(() => setSuccessMessage(null), 3000);
       });
     } catch (err) {
       console.error('Insert section error:', err);
-      setError('Failed to apply change. Please try again.');
+      setError('Failed to apply change');
     } finally {
       setIsApplyingChange(false);
     }
