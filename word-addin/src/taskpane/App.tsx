@@ -2449,10 +2449,18 @@ export default function App() {
           onTabSelect={handleTabChange}
           style={styles.tabs}
         >
-          <Tab value="analyze" icon={<DocumentSearch24Regular />}>
+          <Tab
+            value="analyze"
+            icon={<DocumentSearch24Regular style={{ color: activeTab === 'analyze' ? '#ffffff' : '#9d9d9d' }} />}
+            style={{ color: activeTab === 'analyze' ? '#ffffff' : '#9d9d9d' }}
+          >
             Analyze
           </Tab>
-          <Tab value="clauses" icon={<Library24Regular />}>
+          <Tab
+            value="clauses"
+            icon={<Library24Regular style={{ color: activeTab === 'clauses' ? '#ffffff' : '#9d9d9d' }} />}
+            style={{ color: activeTab === 'clauses' ? '#ffffff' : '#9d9d9d' }}
+          >
             Clauses
           </Tab>
         </TabList>
