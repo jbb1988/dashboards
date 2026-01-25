@@ -31,9 +31,18 @@ function formatCurrency(value: number): string {
 }
 
 export default function ProfitabilityKPIs({ kpis, projectName }: ProfitabilityKPIsProps) {
-  const isRevenueGood = kpis.actualRevenue >= kpis.budgetRevenue;
+  // Calculate revenue variance percentage
+  const revenueVariancePct = kpis.budgetRevenue > 0
+    ? ((kpis.actualRevenue - kpis.budgetRevenue) / kpis.budgetRevenue) * 100
+    : 0;
+  // Treat near-zero variances (within 1%) as acceptable - don't penalize for -0.0% or -0.5%
+  const isRevenueGood = kpis.actualRevenue >= kpis.budgetRevenue || revenueVariancePct >= -1;
   const isCostGood = kpis.variance > 0; // Positive variance means under budget
-  const isGPGood = kpis.actualGP >= kpis.budgetGP;
+  // Same tolerance for GP
+  const gpVariancePct = kpis.budgetGP > 0
+    ? ((kpis.actualGP - kpis.budgetGP) / kpis.budgetGP) * 100
+    : 0;
+  const isGPGood = kpis.actualGP >= kpis.budgetGP || gpVariancePct >= -1;
   const isGPMHealthy = kpis.actualGPM >= 50;
   const isCPIGood = kpis.cpi >= 1;
 
