@@ -55,6 +55,7 @@ interface EnhancedSOLineItem {
   productType: string; // Derived from account_number
   revRecStartDate: string | null; // Revenue recognition start date
   revRecEndDate: string | null; // Revenue recognition end date
+  lineMemo: string | null; // Line-level memo with contract year info
 }
 
 // Product type group (lines grouped by product type)
@@ -405,6 +406,7 @@ export async function GET(request: Request) {
             item_id,
             item_name,
             item_description,
+            line_memo,
             item_type,
             item_class_id,
             item_class_name,
@@ -469,11 +471,13 @@ export async function GET(request: Request) {
                 productType,
                 revRecStartDate: line.revrecstartdate || null,
                 revRecEndDate: line.revrecenddate || null,
+                lineMemo: line.line_memo || null,
             };
           })
           .filter(line => {
             // CRITICAL: Only include SO line items that match the engagement period
-            // Primary filter: Use revenue recognition dates if available
+            // Priority 1: Use revenue recognition dates if available
+            // Priority 2: Parse line_memo for "Contracted YYYY" (deferred revenue contracts)
             // Fallback: Use WO item_id matching
 
             // Build engagement month date range if year/month provided
@@ -484,10 +488,21 @@ export async function GET(request: Request) {
               const revRecStart = line.revRecStartDate ? new Date(line.revRecStartDate) : null;
               const revRecEnd = line.revRecEndDate ? new Date(line.revRecEndDate) : null;
 
-              // If line has rev rec dates, check for overlap with engagement month
+              // Priority 1: If line has rev rec dates, check for overlap with engagement month
               if (revRecStart && revRecEnd) {
                 const overlaps = revRecStart <= engagementEnd && revRecEnd >= engagementStart;
                 return overlaps;
+              }
+
+              // Priority 2: Check line_memo for "Contracted YYYY" pattern (deferred revenue)
+              // This handles multi-year contracts where the memo indicates which year each line belongs to
+              if (line.lineMemo) {
+                const contractYearMatch = line.lineMemo.match(/Contracted\s+(\d{4})/i);
+                if (contractYearMatch) {
+                  const contractYear = parseInt(contractYearMatch[1]);
+                  // For MCC, the engagement year should match the contract year
+                  return contractYear === year;
+                }
               }
             }
 
@@ -508,6 +523,7 @@ export async function GET(request: Request) {
 
           // For MCC accounts (4101-4111), include ALL negative amounts (revenue) on matched accounts
           // This handles cases where WO item_ids are incomplete but the SO lines belong to the same engagement
+          // IMPORTANT: Also check line_memo for contract year to avoid mixing deferred revenue from different years
           for (const line of validLines) {
             const accountNumber = line.account_number || '';
             const amount = line.amount || 0;
@@ -516,7 +532,17 @@ export async function GET(request: Request) {
             const sameAccount = matchedAccounts.has(accountNumber);
             const alreadyIncluded = enhancedLines.some((el: any) => el.lineNumber === line.line_number);
 
-            if (isMCCAccount && isRevenue && sameAccount && !alreadyIncluded) {
+            // Check if line's contract year matches engagement year (for deferred revenue)
+            let contractYearMatches = true; // Default to true if no contract year in memo
+            if (year && line.line_memo) {
+              const contractYearMatch = line.line_memo.match(/Contracted\s+(\d{4})/i);
+              if (contractYearMatch) {
+                const contractYear = parseInt(contractYearMatch[1]);
+                contractYearMatches = contractYear === year;
+              }
+            }
+
+            if (isMCCAccount && isRevenue && sameAccount && !alreadyIncluded && contractYearMatches) {
               const itemClassName = line.item_class_name || null;
               const productType = parseProjectType(accountNumber, line.account_name, itemClassName);
               const additionalLine = {
@@ -537,12 +563,13 @@ export async function GET(request: Request) {
                 productType,
                 revRecStartDate: line.revrecstartdate || null,
                 revRecEndDate: line.revrecenddate || null,
+                lineMemo: line.line_memo || null,
               };
               enhancedLines.push(additionalLine);
             }
           }
 
-          // Third pass: Include the LARGEST credit per matched account
+          // Third pass: Include the LARGEST credit per matched account (respecting contract year)
           // This handles cases where credits/adjustments aren't in the WO but should offset matched revenue
 
           // Find ALL potential credit lines per account, then pick the largest
@@ -554,7 +581,17 @@ export async function GET(request: Request) {
             const sameAccount = matchedAccounts.has(accountNumber);
             const alreadyIncluded = enhancedLines.some((el: any) => el.lineNumber === line.line_number);
 
-            if (isCredit && sameAccount && !alreadyIncluded) {
+            // Check if line's contract year matches engagement year (for deferred revenue)
+            let contractYearMatches = true;
+            if (year && line.line_memo) {
+              const contractYearMatch = line.line_memo.match(/Contracted\s+(\d{4})/i);
+              if (contractYearMatch) {
+                const contractYear = parseInt(contractYearMatch[1]);
+                contractYearMatches = contractYear === year;
+              }
+            }
+
+            if (isCredit && sameAccount && !alreadyIncluded && contractYearMatches) {
               const existing = creditsByAccount.get(accountNumber);
               if (!existing || amount > existing.amount) {
                 creditsByAccount.set(accountNumber, line);
@@ -585,6 +622,7 @@ export async function GET(request: Request) {
               productType,
               revRecStartDate: line.revrecstartdate || null,
               revRecEndDate: line.revrecenddate || null,
+              lineMemo: line.line_memo || null,
             };
             enhancedLines.push(creditLine);
           }

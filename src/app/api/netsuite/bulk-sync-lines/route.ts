@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const nsDate = `${m}/${d}/${y}`;
 
     // ONE query for ALL line items
-    // For SalesOrd, include account_number, revrecstartdate, revrecenddate (critical for profitability)
+    // For SalesOrd, include account_number, revrecstartdate, revrecenddate, line_memo (critical for profitability)
     const query = type === 'SalesOrd' ? `
       SELECT
         t.id AS transaction_id,
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
         tl.item AS item_id,
         COALESCE(i.itemid, BUILTIN.DF(tl.item)) AS item_name,
         COALESCE(i.displayname, BUILTIN.DF(tl.item)) AS item_description,
+        tl.memo AS line_memo,
         tl.itemtype AS item_type,
         tl.quantity,
         tl.rate,
@@ -178,6 +179,7 @@ export async function POST(request: Request) {
           record.is_closed = line.isclosed === 'T';
           record.account_number = line.account_number || null;
           record.account_name = line.account_name || null;
+          record.line_memo = line.line_memo || null;  // Contains contract year for deferred revenue
           record.revrecstartdate = line.revrecstartdate || null;
           record.revrecenddate = line.revrecenddate || null;
           record.item_class_id = line.class_id || null;
