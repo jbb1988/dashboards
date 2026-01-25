@@ -15,7 +15,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Dynamic import to ensure env vars are loaded first
-let netsuiteRequest: any;
+let netsuiteRequest: typeof import('../src/lib/netsuite').netsuiteRequest;
 
 async function initNetsuite() {
   const ns = await import('../src/lib/netsuite');
@@ -23,14 +23,14 @@ async function initNetsuite() {
 }
 
 async function netsuiteQuery(query: string): Promise<any[]> {
-  const response = await netsuiteRequest<{ items: any[] }>(
+  const response = await netsuiteRequest(
     '/services/rest/query/v1/suiteql',
     {
       method: 'POST',
       body: { q: query },
       params: { limit: '1000' },
     }
-  );
+  ) as { items: any[] };
   return response.items || [];
 }
 
