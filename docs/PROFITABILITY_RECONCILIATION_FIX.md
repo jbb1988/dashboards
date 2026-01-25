@@ -1,7 +1,7 @@
 # Profitability Dashboard Reconciliation Fix
 
 **Date:** January 24, 2026
-**Updated:** January 24, 2026 (Added Milwaukee case, best practices)
+**Updated:** January 24, 2026 (Added Mt Pleasant case, force-sync script)
 **File:** `src/app/api/closeout/profitability/route.ts`
 
 ---
@@ -69,6 +69,29 @@ SO5249 MCC lines (account 4101):
 
 ---
 
+### Case 3: Mt Pleasant MCC June 2025
+
+| Metric | Dashboard (Wrong) | Excel (Correct) |
+|--------|-------------------|-----------------|
+| Revenue | $0 | $14,005 |
+| Cost | N/A | $2,784 |
+
+**Issue Found:**
+- SO5571 existed in database but had **0 line items synced**
+- The bulk sync script doesn't include `account_number`, `revrecstartdate`, `revrecenddate`
+
+**Cause:** The `bulk-sync-lines` endpoint only syncs basic fields. Some SOs get headers created but lines fail to sync.
+
+**Fix:** Created `scripts/force-sync-so.ts` to resync individual SOs with complete data.
+
+```bash
+npx tsx scripts/force-sync-so.ts SO5571
+```
+
+**Result:** 26 lines synced, MCC revenue = $14,271 - $266 credit = **$14,005** ✓
+
+---
+
 ## Common Patterns
 
 ### Pattern A: Missing Credits (Plano-type)
@@ -85,6 +108,12 @@ SO5249 MCC lines (account 4101):
 - **Symptom:** Gross margin over 100%
 - **Cause:** Missing `Math.abs()` on cost calculation
 - **Fix:** Always use `Math.abs()` when calculating costs
+
+### Pattern D: Missing SO Line Items (Mt Pleasant-type)
+- **Symptom:** Revenue shows as $0 despite SO existing
+- **Cause:** SO header synced but line items failed to sync
+- **Detection:** Check if SO has 0 lines in `netsuite_sales_order_lines`
+- **Fix:** Run `npx tsx scripts/force-sync-so.ts SO####` to resync
 
 ---
 
@@ -303,6 +332,51 @@ console.log(`[Debug] After filter: ${enhancedLines.length} lines, validLines had
 
 ---
 
+## Diagnostic Scripts
+
+### Check SOs with Missing Lines
+```bash
+# Find SOs that have no line items synced
+npx tsx -e '
+import * as dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
+import { createClient } from "@supabase/supabase-js";
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+async function main() {
+  const { data: sos } = await supabase.from("netsuite_sales_orders").select("id, so_number");
+  for (const so of sos || []) {
+    const { count } = await supabase
+      .from("netsuite_sales_order_lines")
+      .select("*", { count: "exact", head: true })
+      .eq("sales_order_id", so.id);
+    if (count === 0) console.log(so.so_number, "has 0 lines");
+  }
+}
+main();
+'
+```
+
+### Force Sync a Single SO
+```bash
+# Resync an SO with all fields including account_number, revrecstartdate, revrecenddate
+npx tsx scripts/force-sync-so.ts SO5571
+```
+
+### Diagnose WO Cost Calculation
+```bash
+# See how dashboard calculates costs for a WO
+npx tsx scripts/diagnose-wo-costs.ts WO5421
+```
+
+### Diagnose Project Reconciliation Issues
+```bash
+# Scan all MCC projects for potential issues
+npx tsx scripts/diagnose-reconciliation.ts
+```
+
+---
+
 ## Future Improvements
 
 1. **Sync Rev Rec Dates from NetSuite**
@@ -320,3 +394,7 @@ console.log(`[Debug] After filter: ${enhancedLines.length} lines, validLines had
 4. **Alert on GPM Anomalies**
    - Warn when GPM < 0% or > 100%
    - Indicates data or calculation issue
+
+5. **Enhanced Bulk Sync**
+   - Update `bulk-sync-lines` to include all required fields
+   - Add `account_number`, `revrecstartdate`, `revrecenddate` to sync query

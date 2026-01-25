@@ -24,7 +24,38 @@ export async function POST(request: Request) {
     const nsDate = `${m}/${d}/${y}`;
 
     // ONE query for ALL line items
-    const query = `
+    // For SalesOrd, include account_number, revrecstartdate, revrecenddate (critical for profitability)
+    const query = type === 'SalesOrd' ? `
+      SELECT
+        t.id AS transaction_id,
+        t.tranid AS transaction_number,
+        tl.id AS line_id,
+        tl.linesequencenumber AS line_number,
+        tl.item AS item_id,
+        COALESCE(i.itemid, BUILTIN.DF(tl.item)) AS item_name,
+        COALESCE(i.displayname, BUILTIN.DF(tl.item)) AS item_description,
+        tl.itemtype AS item_type,
+        tl.quantity,
+        tl.rate,
+        tl.amount,
+        tl.costestimate,
+        tl.class AS class_id,
+        BUILTIN.DF(tl.class) AS class_name,
+        tl.location AS location_id,
+        tl.isclosed,
+        a.acctnumber AS account_number,
+        BUILTIN.DF(tl.account) AS account_name,
+        tl.revrecstartdate,
+        tl.revrecenddate
+      FROM Transaction t
+      INNER JOIN TransactionLine tl ON tl.transaction = t.id
+      LEFT JOIN Item i ON i.id = tl.item
+      LEFT JOIN Account a ON a.id = tl.account
+      WHERE t.type = 'SalesOrd'
+        AND t.trandate >= TO_DATE('${nsDate}', 'MM/DD/YYYY')
+        AND tl.mainline = 'F'
+      ORDER BY t.id, tl.linesequencenumber
+    ` : `
       SELECT
         t.id AS transaction_id,
         t.tranid AS transaction_number,
@@ -139,10 +170,18 @@ export async function POST(request: Request) {
           record.class_name = line.class_name;
           record.location_id = line.location_id;
         } else {
+          // SalesOrd - include all fields needed for profitability calculations
           record.rate = parseFloat(line.rate) || null;
           record.amount = parseFloat(line.amount) || null;
           record.cost_estimate = parseFloat(line.costestimate) || null;
           record.location_id = line.location_id;
+          record.is_closed = line.isclosed === 'T';
+          record.account_number = line.account_number || null;
+          record.account_name = line.account_name || null;
+          record.revrecstartdate = line.revrecstartdate || null;
+          record.revrecenddate = line.revrecenddate || null;
+          record.item_class_id = line.class_id || null;
+          record.item_class_name = line.class_name || null;
         }
 
         allRecords.push(record);
