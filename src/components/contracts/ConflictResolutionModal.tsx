@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ConflictInfo {
@@ -76,18 +76,33 @@ export default function ConflictResolutionModal({
 }: ConflictResolutionModalProps) {
   const [resolutions, setResolutions] = useState<Record<string, 'use_salesforce' | 'keep_local'>>({});
 
+  // Reset resolutions when modal opens or conflicts change
+  useEffect(() => {
+    if (isOpen) {
+      console.log('ConflictResolutionModal: Resetting resolutions for', conflicts.length, 'conflicts');
+      setResolutions({});
+    }
+  }, [isOpen, conflicts]);
+
   const handleResolutionChange = (contractId: string, action: 'use_salesforce' | 'keep_local') => {
-    setResolutions(prev => ({
-      ...prev,
-      [contractId]: action,
-    }));
+    console.log('ConflictResolutionModal: Setting resolution for', contractId, 'to', action);
+    setResolutions(prev => {
+      const newResolutions = {
+        ...prev,
+        [contractId]: action,
+      };
+      console.log('ConflictResolutionModal: New resolutions state:', newResolutions);
+      return newResolutions;
+    });
   };
 
   const handleBulkAction = (action: 'use_salesforce' | 'keep_local') => {
+    console.log('ConflictResolutionModal: Bulk action', action, 'for', conflicts.length, 'conflicts');
     const bulkResolutions: Record<string, 'use_salesforce' | 'keep_local'> = {};
     conflicts.forEach(conflict => {
       bulkResolutions[conflict.contractId] = action;
     });
+    console.log('ConflictResolutionModal: Bulk resolutions:', bulkResolutions);
     setResolutions(bulkResolutions);
   };
 
@@ -149,12 +164,14 @@ export default function ConflictResolutionModal({
               {/* Bulk Actions */}
               <div className="flex gap-3 mt-4">
                 <button
+                  type="button"
                   onClick={() => handleBulkAction('use_salesforce')}
                   className="px-4 py-2 bg-cyan-500/10 text-cyan-400 rounded-lg hover:bg-cyan-500/20 transition-colors text-sm font-medium"
                 >
                   Accept All from Salesforce
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleBulkAction('keep_local')}
                   className="px-4 py-2 bg-yellow-500/10 text-yellow-400 rounded-lg hover:bg-yellow-500/20 transition-colors text-sm font-medium"
                 >
@@ -174,7 +191,11 @@ export default function ConflictResolutionModal({
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleResolutionChange(conflict.contractId, 'keep_local')}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleResolutionChange(conflict.contractId, 'keep_local');
+                        }}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           resolutions[conflict.contractId] === 'keep_local'
                             ? 'bg-yellow-500 text-black'
@@ -184,7 +205,11 @@ export default function ConflictResolutionModal({
                         Keep Local
                       </button>
                       <button
-                        onClick={() => handleResolutionChange(conflict.contractId, 'use_salesforce')}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleResolutionChange(conflict.contractId, 'use_salesforce');
+                        }}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           resolutions[conflict.contractId] === 'use_salesforce'
                             ? 'bg-cyan-500 text-black'
