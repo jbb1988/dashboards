@@ -2258,6 +2258,217 @@ const guideContent: Record<string, GuideData> = {
       },
     ],
   },
+  'wip-operations': {
+    title: 'WIP Operations Guide',
+    description: 'Track manufacturing operations, work order status, and production progress directly from NetSuite.',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    color: '#F59E0B',
+    topics: [
+      {
+        id: 'overview',
+        title: 'Dashboard Overview',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The WIP Operations Dashboard provides real-time visibility into manufacturing work orders and their routing operations directly from NetSuite.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { title: 'Total WIP', desc: 'Count of active work orders in production', color: '#5B8DEF' },
+                { title: 'WIP Value', desc: 'Total revenue value currently in progress', color: '#22C55E' },
+                { title: 'Operations Behind', desc: 'Work orders exceeding time thresholds', color: '#F59E0B' },
+                { title: 'Ready to Ship', desc: 'Work orders at final operations (90%+ complete)', color: '#22C55E' },
+              ].map((kpi) => (
+                <div key={kpi.title} className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: kpi.color }} />
+                    <span className="text-white font-medium text-sm">{kpi.title}</span>
+                  </div>
+                  <p className="text-[#64748B] text-sm">{kpi.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'operations',
+        title: 'Manufacturing Operations',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Each work order follows a manufacturing routing with sequential operations (Op 10, Op 20, Op 30, etc.) that represent actual production stages:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Typical Operation Sequence</h4>
+              <div className="space-y-2">
+                {[
+                  { op: 'Op 10', name: 'Engineering', desc: 'Design review and documentation' },
+                  { op: 'Op 20', name: 'Procurement', desc: 'Material ordering and receiving' },
+                  { op: 'Op 30', name: 'Fab/Assembly', desc: 'Manufacturing and assembly' },
+                  { op: 'Op 40', name: 'Test Bench', desc: 'Quality testing and calibration' },
+                  { op: 'Op 50', name: 'QA/QC', desc: 'Final quality inspection' },
+                  { op: 'Op 60', name: 'Ship Prep', desc: 'Packaging and shipping preparation' },
+                ].map((step) => (
+                  <div key={step.op} className="flex items-center gap-3 p-2 rounded bg-white/[0.02]">
+                    <span className="text-[#F59E0B] font-mono text-xs w-12">{step.op}</span>
+                    <span className="text-white text-sm font-medium w-28">{step.name}</span>
+                    <span className="text-[#64748B] text-sm">{step.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'operation-status',
+        title: 'Operation Status',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Each operation has a status indicating its progress:
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-green-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-green-400 font-medium">Complete</span>
+                </div>
+                <p className="text-[#64748B] text-sm">Operation finished successfully</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-blue-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-blue-400 font-medium">In Progress</span>
+                </div>
+                <p className="text-[#64748B] text-sm">Currently being worked on</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-gray-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-gray-500/10 flex items-center justify-center">
+                    <div className="w-2 h-2 rounded-full bg-gray-500" />
+                  </div>
+                  <span className="text-gray-400 font-medium">Pending</span>
+                </div>
+                <p className="text-[#64748B] text-sm">Waiting to start</p>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'expandable-rows',
+        title: 'Work Order Details',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Click any row in the work order table to expand and see all operations for that work order:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Expanded View Shows</h4>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+                  <span className="text-[#8FA3BF]"><span className="text-white">Operation Timeline</span> - Visual progress through all routing steps</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+                  <span className="text-[#8FA3BF]"><span className="text-white">Status per Operation</span> - Complete, In Progress, or Pending</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+                  <span className="text-[#8FA3BF]"><span className="text-white">Days in Operation</span> - Time spent at each step</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+                  <span className="text-[#8FA3BF]"><span className="text-white">Work Center</span> - Where the work is being done</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+                  <span className="text-[#8FA3BF]"><span className="text-white">Quantity</span> - Completed vs. total quantity</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'filtering',
+        title: 'Filtering & Search',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Use the filtering tools to find specific work orders:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Available Filters</h4>
+              <ul className="space-y-2 text-sm">
+                <li className="text-[#8FA3BF]"><strong className="text-white">Search:</strong> Find by WO#, customer name, SO#, or description</li>
+                <li className="text-[#8FA3BF]"><strong className="text-white">Status:</strong> Filter by work order status (Active, Released, Closed)</li>
+              </ul>
+            </div>
+            <div className="p-4 bg-[#F59E0B]/10 border border-[#F59E0B]/20 rounded-lg">
+              <p className="text-[#F59E0B] text-sm">
+                <strong>Tip:</strong> Click any KPI card at the top to quickly filter to that subset of work orders.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'netsuite-integration',
+        title: 'NetSuite Integration',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The WIP Operations Dashboard pulls data directly from NetSuite in real-time:
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-[#F97316] font-medium mb-2">Data Sources</h4>
+                <ul className="space-y-1 text-sm text-[#64748B]">
+                  <li>Work Orders (Transactions)</li>
+                  <li>Manufacturing Operation Tasks</li>
+                  <li>WIP Cost Reports</li>
+                </ul>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-[#F97316] font-medium mb-2">Refresh</h4>
+                <p className="text-[#64748B] text-sm">
+                  Click the Refresh button to pull the latest data from NetSuite. Data is queried live on each page load.
+                </p>
+              </div>
+            </div>
+            <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-2">Required Permissions</h4>
+              <p className="text-[#8FA3BF] text-sm mb-2">
+                The NetSuite API role needs these permissions to access operations data:
+              </p>
+              <ul className="space-y-1 text-sm text-[#64748B]">
+                <li>Lists {'>'} Manufacturing {'>'} Manufacturing Operation Task - View</li>
+                <li>Lists {'>'} Manufacturing {'>'} Manufacturing Routing - View</li>
+                <li>Setup {'>'} SuiteQL - Full</li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+    ],
+  },
 };
 
 export default function GuideCategoryPage() {

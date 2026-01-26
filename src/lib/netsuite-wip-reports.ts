@@ -316,7 +316,7 @@ export async function getWorkOrderOperations(filters?: {
       {
         method: 'POST',
         body: { q: query },
-        params: { limit: '5000' },
+        params: { limit: '1000' },
       }
     );
 
@@ -440,7 +440,7 @@ export async function getWorkOrdersWithOperations(filters?: {
       {
         method: 'POST',
         body: { q: opsQuery },
-        params: { limit: '10000' },
+        params: { limit: '1000' },
       }
     );
 
@@ -664,7 +664,7 @@ export async function getWIPReportDetail(filters?: {
       {
         method: 'POST',
         body: { q: query },
-        params: { limit: '5000' },
+        params: { limit: '1000' },
       }
     );
 

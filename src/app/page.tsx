@@ -130,7 +130,9 @@ const departments: Department[] = [
       </svg>
     ),
     color: 'from-[#F59E0B] to-[#FBBF24]',
-    dashboards: [],
+    dashboards: [
+      { name: 'WIP Operations', href: '/wip-dashboard', description: 'Work order manufacturing operations', badge: 'NetSuite' },
+    ],
   },
   {
     name: 'Sales',
