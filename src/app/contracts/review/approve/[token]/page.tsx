@@ -112,7 +112,6 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const [discussionComments, setDiscussionComments] = useState<DiscussionComment[]>([]);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject' | null>(null);
-  const [showEmbeddedEditor, setShowEmbeddedEditor] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -430,51 +429,31 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
               ref={editorRef}
               className="min-h-[calc(100vh-60px)] relative"
             >
-              {/* View Toggle - only show if OneDrive embed is available */}
+              {/* Open in Word Online button - only show if OneDrive URL is available */}
               {review.onedriveEmbedUrl && (
-                <div className="absolute top-4 left-4 z-50 flex gap-2 bg-[#151F2E] p-2 rounded-lg border-2 border-[#38BDF8] shadow-lg">
-                  <button
-                    onClick={() => setShowEmbeddedEditor(false)}
-                    className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                      !showEmbeddedEditor
-                        ? 'bg-[#38BDF8] text-white'
-                        : 'text-[#8FA3BF] hover:text-white hover:bg-white/5'
-                    }`}
+                <div className="absolute top-4 left-4 z-50">
+                  <a
+                    href={review.onedriveEmbedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#2B579A] hover:bg-[#1E3F6F] text-white text-sm font-medium rounded-lg shadow-lg transition-colors"
                   >
-                    Text View
-                  </button>
-                  <button
-                    onClick={() => setShowEmbeddedEditor(true)}
-                    className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                      showEmbeddedEditor
-                        ? 'bg-[#38BDF8] text-white'
-                        : 'text-[#8FA3BF] hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    Word Editor
-                  </button>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M21.17 3.25q.33 0 .59.25.24.24.24.58v15.84q0 .34-.24.58-.26.25-.59.25H7.83q-.33 0-.59-.25-.24-.24-.24-.58V17H2.83q-.33 0-.59-.24-.24-.25-.24-.59V7.83q0-.33.24-.59.26-.24.59-.24H7V4.08q0-.34.24-.58.26-.25.59-.25h13.34M7 13.06l1.18 2.22h1.79L8 12.06l1.93-3.17H8.22l-1.15 2.07h-.05l-1.14-2.07H4.09l1.9 3.18-2 3.22h1.78l1.24-2.23h.04M20 17V5H8v2h4.17q.33 0 .59.24.24.26.24.59v8.34q0 .33-.24.59-.26.24-.59.24H8v2h12z"/>
+                    </svg>
+                    Edit in Word Online
+                  </a>
                 </div>
               )}
 
-              {/* Embedded Word Editor or Redline Editor */}
-              {showEmbeddedEditor && review.onedriveEmbedUrl ? (
-                <div className="w-full h-[calc(100vh-60px)] bg-white">
-                  <iframe
-                    src={review.onedriveEmbedUrl}
-                    className="w-full h-full border-0"
-                    title="Word Document Editor"
-                    allow="clipboard-read; clipboard-write"
-                  />
-                </div>
-              ) : (
-                <RedlineEditor
-                  initialContent={review.redlinedText}
-                  approverEditedContent={review.approverEditedText}
-                  onChange={handleEditorChange}
-                  readOnly={!!decision}
-                  contractName={review.contractName}
-                />
-              )}
+              {/* Redline Editor - text-based view */}
+              <RedlineEditor
+                initialContent={review.redlinedText}
+                approverEditedContent={review.approverEditedText}
+                onChange={handleEditorChange}
+                readOnly={!!decision}
+                contractName={review.contractName}
+              />
             </motion.div>
           </div>
 
