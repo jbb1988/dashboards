@@ -2751,15 +2751,15 @@ export default function App() {
                   {/* Results line - muted, informational */}
                   <div style={styles.riskSummaryBar}>
                     <span style={{ fontSize: 11, color: '#606060', opacity: 0.8 }}>Results:</span>
-                    <span style={{ fontSize: 11, color: '#b05050', opacity: 0.75 }}>{analysisResult.riskScores.summary.high} High</span>
+                    <span style={{ fontSize: 11, color: '#b05050', opacity: 0.75 }}>{analysisResult.riskScores?.summary?.high ?? 0} High</span>
                     <span style={{ fontSize: 9, color: '#505050', opacity: 0.5 }}>•</span>
-                    <span style={{ fontSize: 11, color: '#a08000', opacity: 0.75 }}>{analysisResult.riskScores.summary.medium} Medium</span>
+                    <span style={{ fontSize: 11, color: '#a08000', opacity: 0.75 }}>{analysisResult.riskScores?.summary?.medium ?? 0} Medium</span>
                     <span style={{ fontSize: 9, color: '#505050', opacity: 0.5 }}>•</span>
-                    <span style={{ fontSize: 11, color: '#508050', opacity: 0.75 }}>{analysisResult.riskScores.summary.low} Low</span>
+                    <span style={{ fontSize: 11, color: '#508050', opacity: 0.75 }}>{analysisResult.riskScores?.summary?.low ?? 0} Low</span>
                   </div>
 
                   {/* Insert All Changes - simple link style */}
-                  {analysisResult.sections.length > 0 && !allChangesInserted && (
+                  {(analysisResult.sections?.length ?? 0) > 0 && !allChangesInserted && (
                     <button
                       onClick={insertAllChanges}
                       disabled={isApplyingChange}
@@ -2810,12 +2810,12 @@ export default function App() {
                   )}
 
                   {/* Modifications Section */}
-                  {analysisResult.sections.filter(s => !s.isNewSection).length > 0 && (
+                  {(analysisResult.sections?.filter(s => !s.isNewSection).length ?? 0) > 0 && (
                     <div style={styles.sectionList}>
                       <span style={{ fontSize: 12, fontWeight: 500, color: '#cccccc', marginBottom: 8, display: 'block', marginTop: 12 }}>
-                        Modifications ({analysisResult.sections.filter(s => !s.isNewSection).length})
+                        Modifications ({analysisResult.sections?.filter(s => !s.isNewSection).length ?? 0})
                       </span>
-                      {analysisResult.sections.filter(s => !s.isNewSection).map((section, index) => (
+                      {(analysisResult.sections ?? []).filter(s => !s.isNewSection).map((section, index) => (
                         <div key={`mod-${section.sectionNumber}-${index}`} style={styles.sectionCard}>
                           {/* Flat header: HIGH · INDEMNIFICATION    2 changes */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -2922,15 +2922,15 @@ export default function App() {
                   )}
 
                   {/* New Sections to Insert - Flat design */}
-                  {analysisResult.sections.filter(s => s.isNewSection).length > 0 && (
+                  {(analysisResult.sections?.filter(s => s.isNewSection).length ?? 0) > 0 && (
                     <div style={{ marginTop: 16, borderTop: '1px solid #333333', paddingTop: 12 }}>
                       <span style={{ fontSize: 12, fontWeight: 500, color: '#cccccc', display: 'block', marginBottom: 4 }}>
-                        New Sections ({analysisResult.sections.filter(s => s.isNewSection).length})
+                        New Sections ({analysisResult.sections?.filter(s => s.isNewSection).length ?? 0})
                       </span>
                       <span style={{ fontSize: 11, color: '#666666', display: 'block', marginBottom: 12 }}>
                         Position your cursor where you want to insert, then click the button
                       </span>
-                      {analysisResult.sections.filter(s => s.isNewSection).map((section, index) => (
+                      {(analysisResult.sections ?? []).filter(s => s.isNewSection).map((section, index) => (
                         <div key={`new-${index}`} style={styles.sectionCard}>
                           {/* Flat header: NEW · LIMITATION OF LIABILITY */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -3031,12 +3031,12 @@ export default function App() {
                   )}
 
                   {/* Summary List */}
-                  {analysisResult.summary.length > 0 && (
+                  {(analysisResult.summary?.length ?? 0) > 0 && (
                     <div style={styles.summaryList}>
                       <Text weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
                         Summary of Changes:
                       </Text>
-                      {analysisResult.summary.map((item, idx) => (
+                      {analysisResult.summary?.map((item, idx) => (
                         <Text key={idx} size={200} style={{ display: 'block', marginBottom: 4, color: '#D1D5DB' }}>
                           • {item}
                         </Text>
@@ -3045,7 +3045,7 @@ export default function App() {
                   )}
 
                   {/* No changes found */}
-                  {analysisResult.sections.length === 0 && (
+                  {(analysisResult.sections?.length ?? 0) === 0 && (
                     <div style={{ textAlign: 'center', padding: '24px 0' }}>
                       <CheckmarkCircle24Filled style={{ color: '#6a9955', width: 24, height: 24 }} />
                       <div style={{ fontSize: 13, fontWeight: 500, color: '#cccccc', marginTop: 8 }}>
