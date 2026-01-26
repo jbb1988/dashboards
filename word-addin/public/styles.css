@@ -1,4 +1,4 @@
-/* MARS Word Add-in Base Styles */
+/* MARS Word Add-in Base Styles - Premium Charcoal Design System */
 
 * {
   box-sizing: border-box;
@@ -8,34 +8,34 @@
 
 html, body {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  background-color: #1F1F1F;
-  color: #FFFFFF;
+  background-color: #1B1F24;
+  color: rgba(255,255,255,0.88);
 }
 
 #root {
   height: 100%;
 }
 
-/* Scrollbar Styles */
+/* Scrollbar Styles - Subtle, premium */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #2D2D2D;
+  background: #1B1F24;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4A4A4A;
+  background: rgba(255,255,255,0.15);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5A5A5A;
+  background: rgba(255,255,255,0.25);
 }
 
 /* Focus Styles */

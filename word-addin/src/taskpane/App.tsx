@@ -2663,9 +2663,10 @@ export default function App() {
                     style={{
                       flex: 1,
                       padding: '4px 8px',
-                      backgroundColor: '#2d2d2d',
-                      border: '1px solid #404040',
-                      color: '#cccccc',
+                      backgroundColor: '#242A30',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 4,
+                      color: 'rgba(255,255,255,0.88)',
                       fontSize: 12,
                       cursor: isAnalyzing ? 'default' : 'pointer',
                     }}
@@ -2685,9 +2686,10 @@ export default function App() {
                     style={{
                       flex: 1,
                       padding: '8px 16px',
-                      backgroundColor: isAnalyzing ? 'transparent' : 'rgba(86, 156, 214, 0.08)',
-                      border: '1px solid rgba(86, 156, 214, 0.25)',
-                      color: isAnalyzing ? '#666666' : '#6cb6ff',
+                      backgroundColor: isAnalyzing ? 'transparent' : 'rgba(88, 166, 255, 0.08)',
+                      border: '1px solid rgba(88, 166, 255, 0.25)',
+                      borderRadius: 4,
+                      color: isAnalyzing ? 'rgba(255,255,255,0.4)' : '#58A6FF',
                       fontSize: 13,
                       fontWeight: 500,
                       cursor: isAnalyzing ? 'default' : 'pointer',
@@ -2704,8 +2706,9 @@ export default function App() {
                     style={{
                       padding: '8px 12px',
                       backgroundColor: 'transparent',
-                      border: '1px solid #404040',
-                      color: isAnalyzing ? '#505050' : '#808080',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 4,
+                      color: isAnalyzing ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.62)',
                       fontSize: 12,
                       cursor: isAnalyzing ? 'default' : 'pointer',
                       fontFamily: 'inherit',
@@ -2722,13 +2725,14 @@ export default function App() {
                     <div style={{
                       width: '100%',
                       height: 2,
-                      backgroundColor: '#333333',
+                      backgroundColor: 'rgba(255,255,255,0.06)',
                       overflow: 'hidden',
+                      borderRadius: 1,
                     }}>
                       <div style={{
                         width: '30%',
                         height: '100%',
-                        backgroundColor: '#569cd6',
+                        backgroundColor: '#58A6FF',
                         animation: 'premium-shimmer 2s ease-in-out infinite',
                       }} />
                     </div>
@@ -2736,7 +2740,7 @@ export default function App() {
                       display: 'block',
                       marginTop: 8,
                       fontSize: 12,
-                      color: '#808080',
+                      color: 'rgba(255,255,255,0.5)',
                     }}>
                       Analyzing clauses...
                     </span>
@@ -2750,12 +2754,12 @@ export default function App() {
                   {/* Risk Summary Bar */}
                   {/* Results line - muted, informational */}
                   <div style={styles.riskSummaryBar}>
-                    <span style={{ fontSize: 11, color: '#606060', opacity: 0.8 }}>Results:</span>
-                    <span style={{ fontSize: 11, color: '#b05050', opacity: 0.75 }}>{analysisResult.riskScores?.summary?.high ?? 0} High</span>
-                    <span style={{ fontSize: 9, color: '#505050', opacity: 0.5 }}>•</span>
-                    <span style={{ fontSize: 11, color: '#a08000', opacity: 0.75 }}>{analysisResult.riskScores?.summary?.medium ?? 0} Medium</span>
-                    <span style={{ fontSize: 9, color: '#505050', opacity: 0.5 }}>•</span>
-                    <span style={{ fontSize: 11, color: '#508050', opacity: 0.75 }}>{analysisResult.riskScores?.summary?.low ?? 0} Low</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Results:</span>
+                    <span style={{ fontSize: 11, color: '#F85149' }}>{analysisResult.riskScores?.summary?.high ?? 0} High</span>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>•</span>
+                    <span style={{ fontSize: 11, color: '#D29922' }}>{analysisResult.riskScores?.summary?.medium ?? 0} Medium</span>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>•</span>
+                    <span style={{ fontSize: 11, color: '#238636' }}>{analysisResult.riskScores?.summary?.low ?? 0} Low</span>
                   </div>
 
                   {/* Insert All Changes - simple link style */}
@@ -2766,7 +2770,7 @@ export default function App() {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: isApplyingChange ? '#666666' : '#569cd6',
+                        color: isApplyingChange ? 'rgba(255,255,255,0.4)' : '#58A6FF',
                         fontSize: 12,
                         cursor: isApplyingChange ? 'default' : 'pointer',
                         padding: '8px 0',
@@ -2777,8 +2781,9 @@ export default function App() {
                     </button>
                   )}
                   {allChangesInserted && (
-                    <span style={{ fontSize: 12, color: '#6a9955', padding: '8px 0', display: 'block' }}>
-                      ✓ All changes inserted
+                    <span style={{ fontSize: 12, color: '#238636', padding: '8px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
+                      All changes inserted
                     </span>
                   )}
 
@@ -2791,9 +2796,10 @@ export default function App() {
                         width: '100%',
                         padding: '10px 16px',
                         marginTop: 8,
-                        backgroundColor: isSavingToHistory ? 'transparent' : 'rgba(34, 197, 94, 0.08)',
-                        border: '1px solid rgba(34, 197, 94, 0.25)',
-                        color: isSavingToHistory ? '#666666' : '#22c55e',
+                        backgroundColor: 'transparent',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: 4,
+                        color: isSavingToHistory ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.88)',
                         fontSize: 13,
                         fontWeight: 500,
                         cursor: isSavingToHistory ? 'default' : 'pointer',
@@ -2804,15 +2810,16 @@ export default function App() {
                     </button>
                   )}
                   {savedToHistory && (
-                    <span style={{ fontSize: 12, color: '#6a9955', padding: '8px 0', display: 'block' }}>
-                      ✓ Saved to dashboard history
+                    <span style={{ fontSize: 12, color: '#238636', padding: '8px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
+                      Saved to dashboard history
                     </span>
                   )}
 
                   {/* Modifications Section */}
                   {(analysisResult.sections?.filter(s => !s.isNewSection).length ?? 0) > 0 && (
                     <div style={styles.sectionList}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: '#cccccc', marginBottom: 8, display: 'block', marginTop: 12 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.88)', marginBottom: 8, display: 'block', marginTop: 12 }}>
                         Modifications ({analysisResult.sections?.filter(s => !s.isNewSection).length ?? 0})
                       </span>
                       {(analysisResult.sections ?? []).filter(s => !s.isNewSection).map((section, index) => (
@@ -2822,28 +2829,28 @@ export default function App() {
                             <span style={{
                               fontSize: 11,
                               fontWeight: 600,
-                              color: section.riskLevel === 'high' ? '#d16969' : section.riskLevel === 'medium' ? '#cca700' : '#6a9955',
+                              color: section.riskLevel === 'high' ? '#F85149' : section.riskLevel === 'medium' ? '#D29922' : '#238636',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
                             }}>
                               {section.riskLevel}
                             </span>
-                            <span style={{ color: '#404040' }}>·</span>
-                            <span style={{ fontSize: 13, fontWeight: 400, color: '#b0b0b0' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                            <span style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.88)' }}>
                               {section.sectionTitle || `Section ${section.sectionNumber}`}
                             </span>
                             {section.changes && section.changes.length > 0 && (
-                              <span style={{ fontSize: 10, color: '#606060', marginLeft: 'auto' }}>
+                              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 'auto' }}>
                                 {section.changes.length} change{section.changes.length !== 1 ? 's' : ''}
                               </span>
                             )}
                             {appliedSections.has(section.sectionTitle) && (
-                              <CheckmarkCircle24Filled style={{ color: '#6a9955', marginLeft: 'auto', width: 16, height: 16 }} />
+                              <CheckmarkCircle24Filled style={{ color: '#238636', marginLeft: 'auto', width: 16, height: 16 }} />
                             )}
                           </div>
 
                           {/* Rationale */}
-                          <div style={{ fontSize: 12, color: '#9d9d9d', marginTop: 6, lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', marginTop: 6, lineHeight: 1.5 }}>
                             {section.rationale}
                           </div>
 
@@ -2852,17 +2859,17 @@ export default function App() {
                             <div style={{ marginTop: 10, paddingLeft: 0 }}>
                               {section.changes.slice(0, 3).map((change, idx) => (
                                 <div key={idx} style={{ marginBottom: 6, fontSize: 12, lineHeight: 1.6 }}>
-                                  <span style={{ color: '#b55a5a', textDecoration: 'line-through', fontWeight: 400 }}>
+                                  <span style={{ color: '#F85149', textDecoration: 'line-through', fontWeight: 400, opacity: 0.8 }}>
                                     {change.find.substring(0, 80)}{change.find.length > 80 ? '...' : ''}
                                   </span>
                                   <br />
-                                  <span style={{ color: '#5a9e5a', fontWeight: 400 }}>
+                                  <span style={{ color: '#238636', fontWeight: 400 }}>
                                     → {change.replace.substring(0, 80)}{change.replace.length > 80 ? '...' : ''}
                                   </span>
                                 </div>
                               ))}
                               {section.changes.length > 3 && (
-                                <span style={{ fontSize: 11, color: '#666666' }}>
+                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
                                   +{section.changes.length - 3} more changes
                                 </span>
                               )}
@@ -2878,7 +2885,7 @@ export default function App() {
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: appliedSections.has(section.sectionTitle) ? '#505050' : '#6cb6ff',
+                                color: appliedSections.has(section.sectionTitle) ? 'rgba(255,255,255,0.3)' : '#58A6FF',
                                 fontSize: 12,
                                 fontWeight: appliedSections.has(section.sectionTitle) ? 400 : 500,
                                 cursor: appliedSections.has(section.sectionTitle) ? 'default' : 'pointer',
@@ -2893,7 +2900,7 @@ export default function App() {
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: '#707070',
+                                color: 'rgba(255,255,255,0.5)',
                                 fontSize: 12,
                                 cursor: 'pointer',
                                 padding: 0,
@@ -2907,7 +2914,7 @@ export default function App() {
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: isAnalyzing ? '#505050' : '#707070',
+                                color: isAnalyzing ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)',
                                 fontSize: 12,
                                 cursor: isAnalyzing ? 'default' : 'pointer',
                                 padding: 0,
@@ -2923,11 +2930,11 @@ export default function App() {
 
                   {/* New Sections to Insert - Flat design */}
                   {(analysisResult.sections?.filter(s => s.isNewSection).length ?? 0) > 0 && (
-                    <div style={{ marginTop: 16, borderTop: '1px solid #333333', paddingTop: 12 }}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: '#cccccc', display: 'block', marginBottom: 4 }}>
+                    <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.88)', display: 'block', marginBottom: 4 }}>
                         New Sections ({analysisResult.sections?.filter(s => s.isNewSection).length ?? 0})
                       </span>
-                      <span style={{ fontSize: 11, color: '#666666', display: 'block', marginBottom: 12 }}>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 12 }}>
                         Position your cursor where you want to insert, then click the button
                       </span>
                       {(analysisResult.sections ?? []).filter(s => s.isNewSection).map((section, index) => (
@@ -2937,22 +2944,22 @@ export default function App() {
                             <span style={{
                               fontSize: 11,
                               fontWeight: 600,
-                              color: '#569cd6',
+                              color: '#58A6FF',
                               textTransform: 'uppercase',
                               letterSpacing: '0.5px',
                             }}>
                               NEW
                             </span>
-                            <span style={{ color: '#404040' }}>·</span>
-                            <span style={{ fontSize: 13, fontWeight: 400, color: '#b0b0b0' }}>
+                            <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                            <span style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.88)' }}>
                               {section.sectionTitle}
                             </span>
                             {appliedSections.has(section.sectionTitle) && (
-                              <CheckmarkCircle24Filled style={{ color: '#6a9955', marginLeft: 'auto', width: 16, height: 16 }} />
+                              <CheckmarkCircle24Filled style={{ color: '#238636', marginLeft: 'auto', width: 16, height: 16 }} />
                             )}
                           </div>
 
-                          <div style={{ fontSize: 12, color: '#9d9d9d', marginTop: 6, lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', marginTop: 6, lineHeight: 1.5 }}>
                             {section.rationale}
                           </div>
 
@@ -2960,7 +2967,7 @@ export default function App() {
                           {section.revisedText && !appliedSections.has(section.sectionTitle) && (
                             <div style={{ marginTop: 10 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, color: '#666666' }}>Section content:</span>
+                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Section content:</span>
                                 <button
                                   onClick={() => {
                                     navigator.clipboard.writeText(section.revisedText);
@@ -2970,7 +2977,7 @@ export default function App() {
                                   style={{
                                     background: 'none',
                                     border: 'none',
-                                    color: '#569cd6',
+                                    color: '#58A6FF',
                                     fontSize: 11,
                                     cursor: 'pointer',
                                     padding: 0,
@@ -2980,7 +2987,7 @@ export default function App() {
                                 </button>
                               </div>
                               <div style={styles.newSectionTextBox}>
-                                <span style={{ color: '#5a9e5a', whiteSpace: 'pre-wrap', fontSize: 11 }}>
+                                <span style={{ color: '#238636', whiteSpace: 'pre-wrap', fontSize: 11 }}>
                                   {section.revisedText}
                                 </span>
                               </div>
@@ -2997,7 +3004,7 @@ export default function App() {
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: appliedSections.has(section.sectionTitle) ? '#505050' : '#6cb6ff',
+                                color: appliedSections.has(section.sectionTitle) ? 'rgba(255,255,255,0.3)' : '#58A6FF',
                                 fontSize: 12,
                                 fontWeight: appliedSections.has(section.sectionTitle) ? 400 : 500,
                                 cursor: appliedSections.has(section.sectionTitle) ? 'default' : 'pointer',
@@ -3037,7 +3044,7 @@ export default function App() {
                         Summary of Changes:
                       </Text>
                       {analysisResult.summary?.map((item, idx) => (
-                        <Text key={idx} size={200} style={{ display: 'block', marginBottom: 4, color: '#D1D5DB' }}>
+                        <Text key={idx} size={200} style={{ display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.62)' }}>
                           • {item}
                         </Text>
                       ))}
@@ -3047,11 +3054,11 @@ export default function App() {
                   {/* No changes found */}
                   {(analysisResult.sections?.length ?? 0) === 0 && (
                     <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                      <CheckmarkCircle24Filled style={{ color: '#6a9955', width: 24, height: 24 }} />
-                      <div style={{ fontSize: 13, fontWeight: 500, color: '#cccccc', marginTop: 8 }}>
+                      <CheckmarkCircle24Filled style={{ color: '#238636', width: 24, height: 24 }} />
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.88)', marginTop: 8 }}>
                         No Material Risks Found
                       </div>
-                      <div style={{ fontSize: 12, color: '#666666', marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
                         This contract appears to be favorable or already aligned with MARS positions.
                       </div>
                     </div>
@@ -3073,9 +3080,10 @@ export default function App() {
                     flex: 1,
                     minWidth: 120,
                     padding: '6px 8px',
-                    backgroundColor: '#2d2d2d',
-                    border: '1px solid #404040',
-                    color: '#cccccc',
+                    backgroundColor: '#242A30',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 4,
+                    color: 'rgba(255,255,255,0.88)',
                     fontSize: 12,
                     cursor: 'pointer',
                   }}
@@ -3096,9 +3104,10 @@ export default function App() {
                     flex: 2,
                     minWidth: 120,
                     padding: '6px 8px',
-                    backgroundColor: '#2d2d2d',
-                    border: '1px solid #404040',
-                    color: '#cccccc',
+                    backgroundColor: '#242A30',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 4,
+                    color: 'rgba(255,255,255,0.88)',
                     fontSize: 12,
                   }}
                 />
@@ -3123,18 +3132,18 @@ export default function App() {
                   gap: 10,
                   padding: 24,
                 }}>
-                  <PremiumSpinner size={16} color="rgba(148, 163, 184, 0.5)" />
+                  <PremiumSpinner size={16} color="rgba(255,255,255,0.4)" />
                   <span style={{
                     fontSize: 13,
                     fontWeight: 450,
-                    color: 'rgba(148, 163, 184, 0.6)',
+                    color: 'rgba(255,255,255,0.5)',
                     letterSpacing: '0.01em',
                   }}>
                     Loading clauses
                   </span>
                 </div>
               ) : clauses.length === 0 ? (
-                <Text style={{ color: '#A0A0A0', textAlign: 'center', padding: 16 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: 16 }}>
                   {clauseSearch || selectedClauseCategory
                     ? 'No clauses match your filters.'
                     : 'No clauses available. Add clauses in the MARS web app.'}
@@ -3151,22 +3160,22 @@ export default function App() {
                         <span style={{
                           fontSize: 11,
                           fontWeight: 600,
-                          color: clause.risk_level === 'high' ? '#d16969' : clause.risk_level === 'medium' ? '#cca700' : '#6a9955',
+                          color: clause.risk_level === 'high' ? '#F85149' : clause.risk_level === 'medium' ? '#D29922' : '#238636',
                           textTransform: 'uppercase',
                           letterSpacing: '0.5px',
                         }}>
                           {clause.risk_level}
                         </span>
-                        <span style={{ color: '#4d4d4d' }}>·</span>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: '#cccccc', flex: 1 }}>
+                        <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.88)', flex: 1 }}>
                           {clause.name}
                         </span>
                         {/* Usage count badge */}
                         {clause.usage_count !== undefined && clause.usage_count > 0 && (
                           <span style={{
                             fontSize: 10,
-                            backgroundColor: '#3a3a3a',
-                            color: '#9d9d9d',
+                            backgroundColor: 'rgba(255,255,255,0.08)',
+                            color: 'rgba(255,255,255,0.62)',
                             padding: '2px 6px',
                             borderRadius: 10,
                           }}>
@@ -3174,21 +3183,22 @@ export default function App() {
                           </span>
                         )}
                         {/* Expand indicator */}
-                        <span style={{ color: '#666666', fontSize: 10 }}>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>
                           {expandedClauseId === clause.id ? '▼' : '▶'}
                         </span>
                       </div>
-                      <div style={{ fontSize: 11, color: '#666666', marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
                         {clause.category}
                         {clause.tags && clause.tags.length > 0 && (
                           <span style={{ marginLeft: 8 }}>
                             {clause.tags.slice(0, 3).map((tag, i) => (
                               <span key={i} style={{
-                                backgroundColor: '#2d2d2d',
+                                backgroundColor: 'rgba(255,255,255,0.08)',
                                 padding: '1px 4px',
                                 marginLeft: 4,
                                 fontSize: 10,
-                                color: '#808080',
+                                color: 'rgba(255,255,255,0.5)',
+                                borderRadius: 2,
                               }}>
                                 {tag}
                               </span>
@@ -3210,7 +3220,7 @@ export default function App() {
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: '#569cd6',
+                                color: '#58A6FF',
                                 fontSize: 12,
                                 cursor: 'pointer',
                                 padding: 0,
@@ -3224,7 +3234,7 @@ export default function App() {
                                 style={{
                                   background: 'none',
                                   border: 'none',
-                                  color: '#569cd6',
+                                  color: '#58A6FF',
                                   fontSize: 12,
                                   cursor: 'pointer',
                                   padding: 0,
@@ -3239,7 +3249,7 @@ export default function App() {
                                 style={{
                                   background: 'none',
                                   border: 'none',
-                                  color: '#808080',
+                                  color: 'rgba(255,255,255,0.5)',
                                   fontSize: 12,
                                   cursor: 'pointer',
                                   padding: 0,
@@ -3258,13 +3268,14 @@ export default function App() {
                           {/* Primary Position */}
                           <div style={{ marginBottom: 12 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                              <span style={{ fontSize: 11, fontWeight: 600, color: '#6a9955' }}>PRIMARY</span>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: '#238636' }}>PRIMARY</span>
                               <button
                                 onClick={(e) => { e.stopPropagation(); insertClause(clause.primary_text); }}
                                 style={{
                                   background: 'none',
-                                  border: '1px solid #404040',
-                                  color: '#569cd6',
+                                  border: '1px solid rgba(255,255,255,0.1)',
+                                  borderRadius: 4,
+                                  color: '#58A6FF',
                                   fontSize: 11,
                                   cursor: 'pointer',
                                   padding: '2px 8px',
@@ -3275,8 +3286,9 @@ export default function App() {
                             </div>
                             <div style={{
                               ...styles.clauseText,
-                              backgroundColor: '#252526',
+                              backgroundColor: '#242A30',
                               padding: 8,
+                              borderRadius: 4,
                               maxHeight: 120,
                               overflowY: 'auto',
                             }}>
@@ -3288,13 +3300,14 @@ export default function App() {
                           {clause.fallback_text && (
                             <div style={{ marginBottom: 12 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#cca700' }}>FALLBACK</span>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#D29922' }}>FALLBACK</span>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); insertClause(clause.fallback_text!); }}
                                   style={{
                                     background: 'none',
-                                    border: '1px solid #404040',
-                                    color: '#569cd6',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: 4,
+                                    color: '#58A6FF',
                                     fontSize: 11,
                                     cursor: 'pointer',
                                     padding: '2px 8px',
@@ -3305,8 +3318,9 @@ export default function App() {
                               </div>
                               <div style={{
                                 ...styles.clauseText,
-                                backgroundColor: '#252526',
+                                backgroundColor: '#242A30',
                                 padding: 8,
+                                borderRadius: 4,
                                 maxHeight: 120,
                                 overflowY: 'auto',
                               }}>
@@ -3319,13 +3333,14 @@ export default function App() {
                           {clause.last_resort_text && (
                             <div style={{ marginBottom: 12 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#d16969' }}>LAST RESORT</span>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#F85149' }}>LAST RESORT</span>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); insertClause(clause.last_resort_text!); }}
                                   style={{
                                     background: 'none',
-                                    border: '1px solid #404040',
-                                    color: '#569cd6',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: 4,
+                                    color: '#58A6FF',
                                     fontSize: 11,
                                     cursor: 'pointer',
                                     padding: '2px 8px',
@@ -3336,8 +3351,9 @@ export default function App() {
                               </div>
                               <div style={{
                                 ...styles.clauseText,
-                                backgroundColor: '#252526',
+                                backgroundColor: '#242A30',
                                 padding: 8,
+                                borderRadius: 4,
                                 maxHeight: 120,
                                 overflowY: 'auto',
                               }}>
@@ -3348,7 +3364,7 @@ export default function App() {
 
                           {/* No fallback/last resort message */}
                           {!clause.fallback_text && !clause.last_resort_text && (
-                            <div style={{ fontSize: 11, color: '#666666', fontStyle: 'italic' }}>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
                               Only primary position defined for this clause.
                             </div>
                           )}
@@ -3373,14 +3389,21 @@ export default function App() {
 
 // NO score circles - removed for flat design
 
-// Styles - Microsoft-native flat design (Word panel aesthetic)
+// Styles - Premium charcoal design system (2026 modern legal tooling)
+// Color tokens:
+// - Base background: #1B1F24 (charcoal)
+// - Raised surface: #242A30
+// - Header: #1B1F24
+// - Dividers: rgba(255,255,255,0.06)
+// - Primary text: rgba(255,255,255,0.88)
+// - Secondary text: rgba(255,255,255,0.62)
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    backgroundColor: '#1e1e1e',
-    color: '#cccccc',
+    backgroundColor: '#1B1F24',
+    color: 'rgba(255,255,255,0.88)',
     fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif',
     fontSize: 13,
     lineHeight: 1.4,
@@ -3390,8 +3413,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '10px 16px',
-    borderBottom: '1px solid #333333',
-    backgroundColor: '#252526',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    backgroundColor: '#1B1F24',
   },
   headerContent: {
     display: 'flex',
@@ -3403,21 +3426,21 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 8,
     padding: '8px 16px',
-    backgroundColor: '#5a1d1d',
-    borderBottom: '1px solid #6e2020',
-    color: '#f48771',
+    backgroundColor: 'rgba(248, 81, 73, 0.1)',
+    borderBottom: '1px solid rgba(248, 81, 73, 0.2)',
+    color: '#F85149',
     fontSize: 12,
   },
   tabs: {
-    borderBottom: '1px solid #333333',
-    backgroundColor: '#252526',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    backgroundColor: '#1F2328',
     padding: '0 8px',
   },
   content: {
     flex: 1,
     overflow: 'auto',
     padding: '12px 16px',
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#1B1F24',
   },
   loginCard: {
     display: 'flex',
@@ -3479,12 +3502,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   clauseCard: {
     padding: '14px 0',
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
     marginBottom: 2,
   },
   clauseText: {
     padding: '6px 0',
-    color: '#9d9d9d',
+    color: 'rgba(255,255,255,0.62)',
     fontSize: 12,
     lineHeight: 1.5,
   },
@@ -3498,9 +3521,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 8,
     padding: '8px 16px',
-    backgroundColor: '#1d3d1d',
-    borderBottom: '1px solid #2d5d2d',
-    color: '#89d185',
+    backgroundColor: 'rgba(35, 134, 54, 0.1)',
+    borderBottom: '1px solid rgba(35, 134, 54, 0.2)',
+    color: '#238636',
     fontSize: 12,
   },
   previewOverlay: {
@@ -3517,7 +3540,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 16,
   },
   previewPanel: {
-    backgroundColor: '#252526',
+    backgroundColor: '#242A30',
     padding: 16,
     maxWidth: 400,
     maxHeight: '85vh',
@@ -3525,7 +3548,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
-    border: '1px solid #454545',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 6,
   },
   diffView: {
     display: 'flex',
@@ -3539,16 +3563,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   diffText: {
     padding: 10,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#1B1F24',
     maxHeight: 120,
     overflowY: 'auto',
-    border: '1px solid #333333',
+    border: '1px solid rgba(255,255,255,0.06)',
     fontSize: 12,
+    borderRadius: 4,
   },
   diffArrow: {
     textAlign: 'center',
     fontSize: 14,
-    color: '#666666',
+    color: 'rgba(255,255,255,0.4)',
     padding: '2px 0',
   },
   matchInfo: {
@@ -3558,8 +3583,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   matchSelector: {
     padding: 10,
-    backgroundColor: '#1e1e1e',
-    border: '1px solid #333333',
+    backgroundColor: '#1B1F24',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 4,
   },
   matchList: {
     display: 'flex',
@@ -3575,14 +3601,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   locationBox: {
     padding: 8,
-    backgroundColor: '#1e1e1e',
-    borderLeft: '2px solid #cca700',
+    backgroundColor: '#1B1F24',
+    borderLeft: '2px solid #D29922',
+    borderRadius: 2,
   },
   fixItSection: {
     padding: 10,
-    backgroundColor: '#1d3d1d',
+    backgroundColor: 'rgba(35, 134, 54, 0.08)',
     marginTop: 8,
-    border: '1px solid #2d5d2d',
+    border: '1px solid rgba(35, 134, 54, 0.2)',
+    borderRadius: 4,
   },
   fixItButtons: {
     display: 'flex',
@@ -3594,13 +3622,13 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: '6px 0 10px 0',
     gap: 12,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
     marginBottom: 12,
   },
   riskBadgeLarge: {
     fontSize: 12,
     fontWeight: 400,
-    color: '#9d9d9d',
+    color: 'rgba(255,255,255,0.62)',
   },
   sectionList: {
     display: 'flex',
@@ -3609,7 +3637,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sectionCard: {
     padding: '16px 0',
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
     marginBottom: 2,
   },
   sectionHeader: {
@@ -3627,7 +3655,7 @@ const styles: Record<string, React.CSSProperties> = {
   summaryList: {
     marginTop: 12,
     padding: '12px 0',
-    borderTop: '1px solid #333333',
+    borderTop: '1px solid rgba(255,255,255,0.06)',
   },
   contractSection: {
     marginBottom: 12,
@@ -3641,9 +3669,10 @@ const styles: Record<string, React.CSSProperties> = {
   contractInput: {
     width: '100%',
     padding: '8px 32px 8px 10px',
-    backgroundColor: '#3c3c3c',
-    border: '1px solid #454545',
-    color: '#cccccc',
+    backgroundColor: '#242A30',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    color: 'rgba(255,255,255,0.88)',
     fontSize: 13,
     outline: 'none',
   },
@@ -3652,7 +3681,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: 8,
     background: 'none',
     border: 'none',
-    color: '#666666',
+    color: 'rgba(255,255,255,0.4)',
     cursor: 'pointer',
     fontSize: 12,
     padding: 4,
@@ -3664,8 +3693,9 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     marginTop: 2,
-    backgroundColor: '#3c3c3c',
-    border: '1px solid #454545',
+    backgroundColor: '#242A30',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 4,
     maxHeight: 200,
     overflowY: 'auto',
     zIndex: 100,
@@ -3675,11 +3705,11 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'left',
     padding: '8px 10px',
     border: 'none',
-    borderBottom: '1px solid #454545',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
     background: 'none',
     cursor: 'pointer',
     display: 'block',
-    color: '#cccccc',
+    color: 'rgba(255,255,255,0.88)',
     fontSize: 12,
   },
   selectedContractBadge: {
@@ -3697,7 +3727,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 2,
     paddingBottom: 6,
-    borderBottom: '1px solid #333333',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
   },
   newSectionHeader: {
     display: 'flex',
@@ -3708,8 +3738,9 @@ const styles: Record<string, React.CSSProperties> = {
   newSectionPreview: {
     marginTop: 8,
     padding: 8,
-    backgroundColor: '#1e1e1e',
-    borderLeft: '2px solid #569cd6',
+    backgroundColor: '#1B1F24',
+    borderLeft: '2px solid #58A6FF',
+    borderRadius: 2,
   },
   newSectionFullContent: {
     marginTop: 8,
@@ -3724,8 +3755,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   newSectionTextBox: {
     padding: 10,
-    backgroundColor: '#1e1e1e',
-    borderLeft: '2px solid #569cd6',
+    backgroundColor: '#1B1F24',
+    borderLeft: '2px solid #58A6FF',
+    borderRadius: 2,
     maxHeight: 200,
     overflowY: 'auto',
     fontFamily: '"Consolas", "Courier New", monospace',
