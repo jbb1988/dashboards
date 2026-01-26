@@ -154,6 +154,26 @@ const guideCategories: GuideCategory[] = [
     href: '/guides/distributors',
   },
   {
+    id: 'operations',
+    title: 'Operations Command Center',
+    description: 'Monitor Order→Cash visibility, inventory status, and operational KPIs from a single dashboard.',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+    color: '#F97316',
+    topics: [
+      'Revenue at Risk',
+      'Order Aging Buckets',
+      'On-Time Delivery',
+      'Low Stock Alerts',
+      'Backlog Tracking',
+      'Inventory Value',
+    ],
+    href: '/guides/operations',
+  },
+  {
     id: 'wip-operations',
     title: 'WIP Operations',
     description: 'Track work order manufacturing operations, routing steps, and production status directly from NetSuite.',

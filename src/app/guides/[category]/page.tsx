@@ -2258,6 +2258,193 @@ const guideContent: Record<string, GuideData> = {
       },
     ],
   },
+  operations: {
+    title: 'Operations Command Center Guide',
+    description: 'Monitor Order→Cash visibility, inventory status, and operational KPIs in real-time.',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+    color: '#F97316',
+    topics: [
+      {
+        id: 'overview',
+        title: 'Dashboard Overview',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Operations Command Center provides real-time visibility into your Order→Cash cycle and inventory status, pulling live data from NetSuite.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { title: 'Revenue at Risk', desc: 'Order values weighted by aging (90+ days = 100% risk)', color: '#D4A72C' },
+                { title: 'Backlog Value', desc: 'Total value of all open sales orders', color: '#5B8DEF' },
+                { title: 'On-Time Delivery', desc: 'Percentage of orders shipped by expected date', color: '#22C55E' },
+                { title: 'Low Stock Items', desc: 'Items below reorder point that need attention', color: '#E5484D' },
+              ].map((kpi) => (
+                <div key={kpi.title} className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: kpi.color }} />
+                    <span className="text-white font-medium text-sm">{kpi.title}</span>
+                  </div>
+                  <p className="text-[#64748B] text-sm">{kpi.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'order-aging',
+        title: 'Order Aging Buckets',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              Orders are automatically categorized into aging buckets to help prioritize attention:
+            </p>
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { bucket: '0-30 days', desc: 'Healthy - normal processing', color: '#22C55E' },
+                { bucket: '31-60 days', desc: 'Watch - needs attention', color: '#D4A72C' },
+                { bucket: '61-90 days', desc: 'Warning - follow up required', color: '#F97316' },
+                { bucket: '90+ days', desc: 'Critical - immediate action', color: '#E5484D' },
+              ].map((item) => (
+                <div key={item.bucket} className="p-3 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                  <div className="w-full h-1 rounded-full mb-2" style={{ backgroundColor: item.color }} />
+                  <span className="text-white font-medium text-sm">{item.bucket}</span>
+                  <p className="text-[#64748B] text-xs mt-1">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-[#F97316]/10 rounded-lg p-4 border border-[#F97316]/20">
+              <h4 className="text-[#F97316] font-medium mb-2">Revenue at Risk Calculation</h4>
+              <p className="text-[#8FA3BF] text-sm">
+                Revenue at Risk weights order values by their age: 90+ days = 100%, 61-90 = 70%, 31-60 = 40%, 0-30 = 10%. This helps prioritize which orders to address first.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'orders-tab',
+        title: 'Orders Tab',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Orders tab shows all open sales orders with aging information and allows filtering by bucket:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Features</h4>
+              <ul className="space-y-2 text-sm">
+                <li className="text-[#8FA3BF]"><strong className="text-white">Aging Distribution:</strong> Click any bucket to filter orders</li>
+                <li className="text-[#8FA3BF]"><strong className="text-white">Order Details:</strong> View order number, customer, date, status, and amount</li>
+                <li className="text-[#8FA3BF]"><strong className="text-white">Age Badges:</strong> Color-coded badges show which bucket each order falls into</li>
+                <li className="text-[#8FA3BF]"><strong className="text-white">Sorting:</strong> Orders are sorted by age, with oldest first</li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'inventory-tab',
+        title: 'Inventory Tab',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The Inventory tab provides three views into your inventory status:
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-red-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <span className="text-red-400 font-medium">Low Stock</span>
+                </div>
+                <p className="text-[#64748B] text-sm">Items below their reorder point</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-amber-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  </div>
+                  <span className="text-amber-400 font-medium">Backordered</span>
+                </div>
+                <p className="text-[#64748B] text-sm">Items with pending backorders</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-purple-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <span className="text-purple-400 font-medium">Value by Type</span>
+                </div>
+                <p className="text-[#64748B] text-sm">Inventory value breakdown</p>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'alerts',
+        title: 'Alerts & Notifications',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              The dashboard automatically shows alerts when exceptions are detected:
+            </p>
+            <div className="bg-[#0B1220] rounded-lg p-4 border border-white/[0.04]">
+              <h4 className="text-white font-medium mb-3">Alert Types</h4>
+              <ul className="space-y-2 text-sm">
+                <li className="text-[#8FA3BF]"><strong className="text-amber-400">Warning:</strong> Orders aging 90+ days or low stock items detected</li>
+                <li className="text-[#8FA3BF]"><strong className="text-red-400">Error:</strong> Critical issues requiring immediate attention</li>
+                <li className="text-[#8FA3BF]"><strong className="text-blue-400">Info:</strong> General notifications about data changes</li>
+              </ul>
+            </div>
+            <p className="text-[#64748B] text-sm">
+              Alerts appear as toast notifications in the top-right corner and auto-dismiss after 8 seconds.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: 'netsuite',
+        title: 'NetSuite Integration',
+        content: (
+          <div className="space-y-4">
+            <p className="text-[#8FA3BF]">
+              All data is pulled directly from NetSuite in real-time via SuiteQL queries:
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-[#F97316] font-medium mb-2">Sales Orders</h4>
+                <p className="text-[#64748B] text-sm">Open orders with status, amounts, and aging calculated from transaction date.</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-[#F97316] font-medium mb-2">Fulfillments</h4>
+                <p className="text-[#64748B] text-sm">Item fulfillments with ship dates for on-time delivery tracking.</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-[#F97316] font-medium mb-2">Inventory</h4>
+                <p className="text-[#64748B] text-sm">Item quantities, costs, and reorder points from the Item table.</p>
+              </div>
+              <div className="p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                <h4 className="text-[#F97316] font-medium mb-2">Backorders</h4>
+                <p className="text-[#64748B] text-sm">Items with backordered quantities from open sales order lines.</p>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+    ],
+  },
   'wip-operations': {
     title: 'WIP Operations Guide',
     description: 'Track manufacturing operations, work order status, and production progress directly from NetSuite.',

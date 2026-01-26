@@ -131,6 +131,7 @@ const departments: Department[] = [
     ),
     color: 'from-[#F59E0B] to-[#FBBF24]',
     dashboards: [
+      { name: 'Command Center', href: '/operations', description: 'Order→Cash visibility & inventory status', badge: 'NetSuite' },
       { name: 'WIP Operations', href: '/wip-dashboard', description: 'Work order manufacturing operations', badge: 'NetSuite' },
     ],
   },
