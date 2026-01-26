@@ -8,15 +8,10 @@ import ApprovalHeader from '@/components/contracts/ApprovalHeader';
 import ApprovalContextSidebar from '@/components/contracts/ApprovalContextSidebar';
 import { ActivityLogEntry } from '@/components/contracts/ActivityLog';
 
-// Dynamically import components to avoid SSR issues
+// Dynamically import RedlineEditor to avoid SSR issues with TipTap
 const RedlineEditor = dynamic(
   () => import('@/components/contracts/RedlineEditor'),
-  { ssr: false, loading: () => <div className="h-full bg-[#161B22] animate-pulse rounded" /> }
-);
-
-const DecisionList = dynamic(
-  () => import('@/components/contracts/DecisionList'),
-  { ssr: false, loading: () => <div className="h-full bg-[#161B22] animate-pulse rounded" /> }
+  { ssr: false, loading: () => <div className="h-full bg-[#1B1F24] animate-pulse rounded" /> }
 );
 
 interface Document {
@@ -118,7 +113,6 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject' | null>(null);
   const [refreshingFromWord, setRefreshingFromWord] = useState(false);
-  const [viewMode, setViewMode] = useState<'decisions' | 'redlines'>('decisions');
 
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -393,10 +387,10 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#161B22] flex items-center justify-center">
+      <div className="min-h-screen bg-[#1B1F24] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-[#58A6FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#8B949E] text-sm">Loading...</p>
+          <div className="w-12 h-12 border-4 border-[#58A6FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[rgba(255,255,255,0.62)]">Loading approval request...</p>
         </div>
       </div>
     );
@@ -405,15 +399,13 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-[#161B22] flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-[#1E2328] border border-white/5 rounded-lg p-8 text-center">
-          <div className="w-12 h-12 rounded-full bg-[#F85149]/10 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-[#F85149]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
-            </svg>
-          </div>
-          <h1 className="text-base font-medium text-[#E6EDF3] mb-2">Unable to Load</h1>
-          <p className="text-[#8B949E] text-sm">{error}</p>
+      <div className="min-h-screen bg-[#1B1F24] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-[#242A30] border border-[#F85149]/30 rounded-lg p-8 text-center">
+          <svg className="w-16 h-16 text-[#F85149] mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h1 className="text-xl font-semibold text-[rgba(255,255,255,0.88)] mb-2">Unable to Load Approval</h1>
+          <p className="text-[rgba(255,255,255,0.62)] text-sm">{error}</p>
         </div>
       </div>
     );
@@ -426,7 +418,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const mainSidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
-    <div className="min-h-screen bg-[#161B22]">
+    <div className="min-h-screen bg-[#1B1F24]">
       {/* Main Navigation Sidebar (Left) */}
       <Sidebar
         isCollapsed={sidebarCollapsed}
@@ -462,66 +454,27 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
 
         {/* Main Content: Document + Context Sidebar */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Document Viewer Area */}
-          <div className="flex-1 overflow-hidden bg-[#161B22]">
-            {/* View Mode Toggle - minimal */}
-            <div className="px-4 py-2 border-b border-white/5 bg-[#1E2328] flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('decisions')}
-                  className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                    viewMode === 'decisions'
-                      ? 'bg-[#58A6FF]/15 text-[#58A6FF]'
-                      : 'text-[#8B949E] hover:text-[#E6EDF3]'
-                  }`}
-                >
-                  Decisions
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('redlines')}
-                  className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                    viewMode === 'redlines'
-                      ? 'bg-[#58A6FF]/15 text-[#58A6FF]'
-                      : 'text-[#8B949E] hover:text-[#E6EDF3]'
-                  }`}
-                >
-                  Full Document
-                </button>
-              </div>
-            </div>
-
+          {/* Document Viewer Area - aligned left */}
+          <div className="flex-1 overflow-auto bg-[#1B1F24]">
             {/* Document Container */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               ref={editorRef}
-              className="h-[calc(100vh-60px-41px)] overflow-hidden"
+              className="min-h-[calc(100vh-60px)] relative"
             >
-              {viewMode === 'decisions' ? (
-                <DecisionList
-                  redlinedText={review.redlinedText}
-                  riskScores={review.riskScores}
-                  summaries={review.summary}
-                  readOnly={!!decision}
-                  contractName={review.contractName}
-                  onRefreshFromWord={refreshFromWord}
-                  refreshingFromWord={refreshingFromWord}
-                />
-              ) : (
-                <RedlineEditor
-                  initialContent={review.redlinedText}
-                  approverEditedContent={review.approverEditedText}
-                  onChange={handleEditorChange}
-                  readOnly={!!decision}
-                  contractName={review.contractName}
-                  onedriveEmbedUrl={review.onedriveEmbedUrl}
-                  onedriveWebUrl={review.onedriveWebUrl}
-                  onRefreshFromWord={refreshFromWord}
-                  refreshingFromWord={refreshingFromWord}
-                />
-              )}
+              {/* Redline Editor - text-based view */}
+              <RedlineEditor
+                initialContent={review.redlinedText}
+                approverEditedContent={review.approverEditedText}
+                onChange={handleEditorChange}
+                readOnly={!!decision}
+                contractName={review.contractName}
+                onedriveEmbedUrl={review.onedriveEmbedUrl}
+                onedriveWebUrl={review.onedriveWebUrl}
+                onRefreshFromWord={refreshFromWord}
+                refreshingFromWord={refreshingFromWord}
+              />
             </motion.div>
           </div>
 
@@ -550,18 +503,18 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
 
       {/* Feedback Modal */}
       {showFeedbackModal && (
-        <div className="fixed inset-0 bg-[#161B22]/80 flex items-center justify-center z-50 p-6">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-6">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#1E2328] border border-white/5 rounded-lg p-6 max-w-md w-full"
+            className="bg-[#242A30] border border-white/8 rounded-lg p-6 max-w-md w-full"
           >
-            <h3 className="text-base font-medium text-[#E6EDF3] mb-4">
+            <h3 className="text-lg font-semibold text-[rgba(255,255,255,0.88)] mb-4">
               {pendingDecision === 'approve' ? 'Approve Contract' : 'Reject Contract'}
             </h3>
 
             <div className="mb-4">
-              <label className="block text-sm text-[#8B949E] mb-2">
+              <label className="block text-sm font-medium text-[rgba(255,255,255,0.62)] mb-2">
                 Feedback {pendingDecision === 'reject' && <span className="text-[#F85149]">*</span>}
               </label>
               <textarea
@@ -569,11 +522,11 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                 onChange={(e) => setFeedback(e.target.value)}
                 placeholder={
                   pendingDecision === 'approve'
-                    ? 'Optional comments...'
-                    : 'Reason for rejection...'
+                    ? 'Optional comments or notes...'
+                    : 'Please explain why you are rejecting this contract...'
                 }
                 rows={4}
-                className="w-full px-3 py-2 bg-[#161B22] border border-white/10 rounded text-[#E6EDF3] text-sm focus:outline-none focus:border-[#58A6FF] resize-none placeholder:text-[#484F58]"
+                className="w-full px-3 py-2 bg-[#1B1F24] border border-white/8 rounded-lg text-[rgba(255,255,255,0.88)] text-sm focus:outline-none focus:border-[#58A6FF] resize-none placeholder:text-[rgba(255,255,255,0.4)]"
               />
             </div>
 
@@ -583,17 +536,17 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                   setShowFeedbackModal(false);
                   setPendingDecision(null);
                 }}
-                className="flex-1 px-4 py-2 text-sm text-[#8B949E] hover:text-[#E6EDF3] transition-colors"
+                className="flex-1 px-4 py-2 text-sm bg-white/5 text-[rgba(255,255,255,0.62)] rounded-lg hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={submitDecision}
                 disabled={submitting || (pendingDecision === 'reject' && !feedback.trim())}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded transition-colors disabled:opacity-50 ${
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
                   pendingDecision === 'approve'
                     ? 'bg-[#238636] hover:bg-[#2ea043] text-white'
-                    : 'text-[#F85149] hover:bg-[#F85149]/10'
+                    : 'bg-[#F85149]/15 border border-[#F85149]/30 text-[#F85149] hover:bg-[#F85149]/25'
                 }`}
               >
                 {submitting ? 'Submitting...' : pendingDecision === 'approve' ? 'Approve' : 'Reject'}
@@ -603,19 +556,35 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
         </div>
       )}
 
-      {/* Success State - minimal toast */}
+      {/* Success State Overlay */}
       {decision && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           className="fixed bottom-6 right-6 z-50"
         >
-          <div className="px-4 py-2 rounded bg-[#1E2328] border border-white/5 text-sm">
-            {decision === 'approve' ? (
-              <span className="text-[#3FB950]">Approved</span>
-            ) : (
-              <span className="text-[#F85149]">Rejected</span>
-            )}
+          <div className={`px-4 py-3 rounded-lg shadow-lg bg-[#242A30] border ${
+            decision === 'approve'
+              ? 'border-[#238636]/50'
+              : 'border-[#F85149]/50'
+          }`}>
+            <div className="flex items-center gap-2">
+              {decision === 'approve' ? (
+                <>
+                  <svg className="w-5 h-5 text-[#3FB950]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-[rgba(255,255,255,0.88)] font-medium text-sm">Contract Approved</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 text-[#F85149]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span className="text-[rgba(255,255,255,0.88)] font-medium text-sm">Contract Rejected</span>
+                </>
+              )}
+            </div>
           </div>
         </motion.div>
       )}

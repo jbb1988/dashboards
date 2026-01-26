@@ -226,15 +226,41 @@ export async function getFileContent(fileId: string): Promise<ArrayBuffer | null
 
   try {
     // Use /content endpoint which streams file directly via Graph API
+    // The Graph client returns a ReadableStream for /content endpoints
+    let stream: ReadableStream | null = null;
+
     if (driveId) {
-      return await client
+      stream = await client
         .api(`/drives/${driveId}/items/${fileId}/content`)
         .get();
     } else if (userEmail) {
-      return await client
+      stream = await client
         .api(`/users/${userEmail}/drive/items/${fileId}/content`)
         .get();
     }
+
+    if (!stream) return null;
+
+    // Convert ReadableStream to ArrayBuffer
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+
+    // Combine chunks into single ArrayBuffer
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return result.buffer;
   } catch (error) {
     console.error('Failed to get file content via /content endpoint:', error);
   }
