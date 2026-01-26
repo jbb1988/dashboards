@@ -157,15 +157,24 @@ export async function getFileInfo(fileId: string): Promise<{
 }> {
   const client = getGraphClient();
   const driveId = process.env.ONEDRIVE_DRIVE_ID;
+  const userEmail = process.env.ONEDRIVE_USER_EMAIL;
 
-  if (!driveId) {
-    throw new Error('ONEDRIVE_DRIVE_ID not configured');
+  let result;
+
+  if (driveId) {
+    result = await client
+      .api(`/drives/${driveId}/items/${fileId}`)
+      .select('name,webUrl,@microsoft.graph.downloadUrl,size,lastModifiedDateTime')
+      .get();
+  } else if (userEmail) {
+    // Use user's drive when no drive ID is configured
+    result = await client
+      .api(`/users/${userEmail}/drive/items/${fileId}`)
+      .select('name,webUrl,@microsoft.graph.downloadUrl,size,lastModifiedDateTime')
+      .get();
+  } else {
+    throw new Error('Neither ONEDRIVE_DRIVE_ID nor ONEDRIVE_USER_EMAIL configured');
   }
-
-  const result = await client
-    .api(`/drives/${driveId}/items/${fileId}`)
-    .select('name,webUrl,@microsoft.graph.downloadUrl,size,lastModifiedDateTime')
-    .get();
 
   return {
     name: result.name,

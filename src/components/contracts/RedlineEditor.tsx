@@ -101,10 +101,17 @@ const ApproverComment = Mark.create({
 // Helper to convert redline markup to HTML
 function formatRedlinesToHTML(text: string): string {
   return text
+    // Handle HTML tags from diff-match-patch (must come first before other replacements)
+    .replace(/<del>([\s\S]*?)<\/del>/g,
+      '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>')
+    .replace(/<ins>([\s\S]*?)<\/ins>/g,
+      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>')
+    // Handle custom markup formats
     .replace(/\[strikethrough\]([\s\S]*?)\[\/strikethrough\]/g,
       '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>')
     .replace(/\[underline\]([\s\S]*?)\[\/underline\]/g,
       '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>')
+    // Handle markdown-style syntax
     .replace(/~~([\s\S]*?)~~/g,
       '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>')
     .replace(/\+\+([\s\S]*?)\+\+/g,
@@ -160,6 +167,11 @@ interface RedlineEditorProps {
   onChange?: (html: string) => void;
   readOnly?: boolean;
   contractName?: string;
+  // OneDrive integration
+  onedriveEmbedUrl?: string | null;
+  onedriveWebUrl?: string | null;
+  onRefreshFromWord?: () => void;
+  refreshingFromWord?: boolean;
 }
 
 export default function RedlineEditor({
@@ -168,6 +180,10 @@ export default function RedlineEditor({
   onChange,
   readOnly = false,
   contractName = 'Contract',
+  onedriveEmbedUrl,
+  onedriveWebUrl,
+  onRefreshFromWord,
+  refreshingFromWord = false,
 }: RedlineEditorProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -274,11 +290,11 @@ export default function RedlineEditor({
   return (
     <div
       ref={scrollContainerRef}
-      className="h-[calc(100vh-60px)] overflow-y-auto bg-[#0B1220]"
+      className="h-[calc(100vh-60px)] overflow-y-auto bg-[#1B1F24]"
     >
       {/* Sticky toolbar - sticks within the scroll container */}
       {!readOnly && (
-        <div className="sticky top-0 z-20 bg-[#0B1220]">
+        <div className="sticky top-0 z-20 bg-[#1B1F24]">
           <EditorToolbar
             editor={editor}
             onAddComment={handleAddComment}
@@ -286,13 +302,17 @@ export default function RedlineEditor({
             showDownload={hasContent}
             zoomLevel={zoomLevel}
             onZoomChange={setZoomLevel}
+            onedriveEmbedUrl={onedriveEmbedUrl}
+            onedriveWebUrl={onedriveWebUrl}
+            onRefreshFromWord={onRefreshFromWord}
+            refreshingFromWord={refreshingFromWord}
           />
         </div>
       )}
 
       {/* Editor content */}
       <div
-        className={`bg-[#0B1220] ${!readOnly ? 'cursor-text' : ''} overflow-x-auto`}
+        className={`bg-[#1B1F24] ${!readOnly ? 'cursor-text' : ''} overflow-x-auto`}
         onClick={handleEditorClick}
       >
         <div
@@ -308,7 +328,7 @@ export default function RedlineEditor({
 
       {/* Read-only toolbar with zoom and download */}
       {readOnly && hasContent && (
-        <div className="sticky bottom-0 bg-[#0B1220] border-t border-white/10 px-4 py-2 flex items-center justify-between">
+        <div className="sticky bottom-0 bg-[#1B1F24] border-t border-white/10 px-4 py-2 flex items-center justify-between">
           {/* Zoom Controls */}
           <div className="flex items-center gap-2">
             <button

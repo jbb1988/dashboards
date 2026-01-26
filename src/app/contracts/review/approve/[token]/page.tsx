@@ -11,7 +11,7 @@ import { ActivityLogEntry } from '@/components/contracts/ActivityLog';
 // Dynamically import RedlineEditor to avoid SSR issues with TipTap
 const RedlineEditor = dynamic(
   () => import('@/components/contracts/RedlineEditor'),
-  { ssr: false, loading: () => <div className="h-full bg-[#0B1220] animate-pulse rounded" /> }
+  { ssr: false, loading: () => <div className="h-full bg-[#1B1F24] animate-pulse rounded" /> }
 );
 
 interface Document {
@@ -112,6 +112,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const [discussionComments, setDiscussionComments] = useState<DiscussionComment[]>([]);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject' | null>(null);
+  const [refreshingFromWord, setRefreshingFromWord] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -350,13 +351,46 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
     }
   }, []);
 
+  // Refresh content from OneDrive Word document
+  const refreshFromWord = useCallback(async () => {
+    if (!review?.id) return;
+
+    setRefreshingFromWord(true);
+    try {
+      const response = await fetch('/api/contracts/review/refresh-from-onedrive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewId: review.id }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to refresh from Word');
+      }
+
+      const data = await response.json();
+
+      // Update the review with new redlined text
+      setReview(prev => prev ? {
+        ...prev,
+        redlinedText: data.redlinedText,
+      } : null);
+
+    } catch (err) {
+      console.error('Error refreshing from Word:', err);
+      alert(err instanceof Error ? err.message : 'Failed to refresh from Word');
+    } finally {
+      setRefreshingFromWord(false);
+    }
+  }, [review?.id]);
+
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0B1220] flex items-center justify-center">
+      <div className="min-h-screen bg-[#1B1F24] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#38BDF8] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#8FA3BF]">Loading approval request...</p>
+          <div className="w-12 h-12 border-4 border-[#58A6FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[rgba(255,255,255,0.62)]">Loading approval request...</p>
         </div>
       </div>
     );
@@ -365,13 +399,13 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0B1220] flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-[#151F2E] border border-red-500/30 rounded-lg p-8 text-center">
-          <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="min-h-screen bg-[#1B1F24] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-[#242A30] border border-[#F85149]/30 rounded-lg p-8 text-center">
+          <svg className="w-16 h-16 text-[#F85149] mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <h1 className="text-xl font-bold text-white mb-2">Unable to Load Approval</h1>
-          <p className="text-[#8FA3BF] text-sm">{error}</p>
+          <h1 className="text-xl font-semibold text-[rgba(255,255,255,0.88)] mb-2">Unable to Load Approval</h1>
+          <p className="text-[rgba(255,255,255,0.62)] text-sm">{error}</p>
         </div>
       </div>
     );
@@ -384,7 +418,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const mainSidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
-    <div className="min-h-screen bg-[#0B1220]">
+    <div className="min-h-screen bg-[#1B1F24]">
       {/* Main Navigation Sidebar (Left) */}
       <Sidebar
         isCollapsed={sidebarCollapsed}
@@ -421,7 +455,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
         {/* Main Content: Document + Context Sidebar */}
         <div className="flex-1 flex overflow-hidden">
           {/* Document Viewer Area - aligned left */}
-          <div className="flex-1 overflow-auto bg-[#0B1220]">
+          <div className="flex-1 overflow-auto bg-[#1B1F24]">
             {/* Document Container */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -429,41 +463,6 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
               ref={editorRef}
               className="min-h-[calc(100vh-60px)] relative"
             >
-              {/* Word Document Actions - only show if OneDrive URL is available */}
-              {review.onedriveEmbedUrl && (
-                <div className="absolute top-4 left-4 z-50 flex flex-col gap-2">
-                  <div className="flex gap-2">
-                    <a
-                      href={review.onedriveEmbedUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-4 py-2 bg-[#2B579A] hover:bg-[#1E3F6F] text-white text-sm font-medium rounded-lg shadow-lg transition-colors"
-                    >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M21.17 3.25q.33 0 .59.25.24.24.24.58v15.84q0 .34-.24.58-.26.25-.59.25H7.83q-.33 0-.59-.25-.24-.24-.24-.58V17H2.83q-.33 0-.59-.24-.24-.25-.24-.59V7.83q0-.33.24-.59.26-.24.59-.24H7V4.08q0-.34.24-.58.26-.25.59-.25h13.34M7 13.06l1.18 2.22h1.79L8 12.06l1.93-3.17H8.22l-1.15 2.07h-.05l-1.14-2.07H4.09l1.9 3.18-2 3.22h1.78l1.24-2.23h.04M20 17V5H8v2h4.17q.33 0 .59.24.24.26.24.59v8.34q0 .33-.24.59-.26.24-.59.24H8v2h12z"/>
-                      </svg>
-                      Open & Edit in Word
-                    </a>
-                    {review.onedriveWebUrl && (
-                      <a
-                        href={review.onedriveWebUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#8FA3BF] hover:text-white text-sm font-medium rounded-lg border border-white/10 transition-colors"
-                        title="Download Word document"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </a>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-[#8FA3BF]/70 max-w-[280px]">
-                    Edit in Word Online. Changes auto-save. Return here to approve and send to client.
-                  </p>
-                </div>
-              )}
-
               {/* Redline Editor - text-based view */}
               <RedlineEditor
                 initialContent={review.redlinedText}
@@ -471,6 +470,10 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                 onChange={handleEditorChange}
                 readOnly={!!decision}
                 contractName={review.contractName}
+                onedriveEmbedUrl={review.onedriveEmbedUrl}
+                onedriveWebUrl={review.onedriveWebUrl}
+                onRefreshFromWord={refreshFromWord}
+                refreshingFromWord={refreshingFromWord}
               />
             </motion.div>
           </div>
@@ -504,15 +507,15 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#151F2E] border border-white/10 rounded-lg p-6 max-w-md w-full"
+            className="bg-[#242A30] border border-white/8 rounded-lg p-6 max-w-md w-full"
           >
-            <h3 className="text-lg font-bold text-white mb-4">
+            <h3 className="text-lg font-semibold text-[rgba(255,255,255,0.88)] mb-4">
               {pendingDecision === 'approve' ? 'Approve Contract' : 'Reject Contract'}
             </h3>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-[#8FA3BF] mb-2">
-                Feedback {pendingDecision === 'reject' && <span className="text-red-400">*</span>}
+              <label className="block text-sm font-medium text-[rgba(255,255,255,0.62)] mb-2">
+                Feedback {pendingDecision === 'reject' && <span className="text-[#F85149]">*</span>}
               </label>
               <textarea
                 value={feedback}
@@ -523,7 +526,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                     : 'Please explain why you are rejecting this contract...'
                 }
                 rows={4}
-                className="w-full px-3 py-2 bg-[#0B1220] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-[#38BDF8] resize-none"
+                className="w-full px-3 py-2 bg-[#1B1F24] border border-white/8 rounded-lg text-[rgba(255,255,255,0.88)] text-sm focus:outline-none focus:border-[#58A6FF] resize-none placeholder:text-[rgba(255,255,255,0.4)]"
               />
             </div>
 
@@ -533,7 +536,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                   setShowFeedbackModal(false);
                   setPendingDecision(null);
                 }}
-                className="flex-1 px-4 py-2 text-sm bg-white/5 text-[#8FA3BF] rounded-lg hover:bg-white/10 transition-colors"
+                className="flex-1 px-4 py-2 text-sm bg-white/5 text-[rgba(255,255,255,0.62)] rounded-lg hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
@@ -542,8 +545,8 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                 disabled={submitting || (pendingDecision === 'reject' && !feedback.trim())}
                 className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
                   pendingDecision === 'approve'
-                    ? 'bg-gradient-to-r from-[#22C55E] to-[#16A34A] text-white hover:opacity-90'
-                    : 'bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30'
+                    ? 'bg-[#238636] hover:bg-[#2ea043] text-white'
+                    : 'bg-[#F85149]/15 border border-[#F85149]/30 text-[#F85149] hover:bg-[#F85149]/25'
                 }`}
               >
                 {submitting ? 'Submitting...' : pendingDecision === 'approve' ? 'Approve' : 'Reject'}
@@ -560,25 +563,25 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
           animate={{ opacity: 1 }}
           className="fixed bottom-6 right-6 z-50"
         >
-          <div className={`px-4 py-3 rounded-lg shadow-lg ${
+          <div className={`px-4 py-3 rounded-lg shadow-lg bg-[#242A30] border ${
             decision === 'approve'
-              ? 'bg-green-500/20 border border-green-500/30'
-              : 'bg-red-500/20 border border-red-500/30'
+              ? 'border-[#238636]/50'
+              : 'border-[#F85149]/50'
           }`}>
             <div className="flex items-center gap-2">
               {decision === 'approve' ? (
                 <>
-                  <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-5 h-5 text-[#3FB950]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-green-400 font-medium text-sm">Contract Approved</span>
+                  <span className="text-[rgba(255,255,255,0.88)] font-medium text-sm">Contract Approved</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-5 h-5 text-[#F85149]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                  <span className="text-red-400 font-medium text-sm">Contract Rejected</span>
+                  <span className="text-[rgba(255,255,255,0.88)] font-medium text-sm">Contract Rejected</span>
                 </>
               )}
             </div>
