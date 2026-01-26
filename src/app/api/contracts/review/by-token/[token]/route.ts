@@ -1,5 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import DiffMatchPatch from 'diff-match-patch';
+
+/**
+ * Generate redline HTML with <del> and <ins> tags from two text versions
+ */
+function generateRedlineHtml(originalText: string, modifiedText: string): string {
+  const dmp = new DiffMatchPatch();
+  const diffs = dmp.diff_main(originalText, modifiedText);
+  dmp.diff_cleanupSemantic(diffs);
+
+  let html = '';
+  for (const [op, text] of diffs) {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+
+    if (op === -1) {
+      html += `<del>${escaped}</del>`;
+    } else if (op === 1) {
+      html += `<ins>${escaped}</ins>`;
+    } else {
+      html += escaped;
+    }
+  }
+
+  return html;
+}
 
 export async function GET(
   request: NextRequest,
@@ -115,6 +144,25 @@ export async function GET(
       .eq('review_id', review.id)
       .order('created_at', { ascending: true });
 
+    // Regenerate redline HTML if missing <del> tags but we have original and modified text
+    let redlinedText = review.redlined_text;
+    const hasDelTags = redlinedText?.includes('<del>');
+    const hasOriginal = review.original_text && review.original_text.length > 0;
+    const hasModified = review.modified_text && review.modified_text.length > 0;
+
+    if (!hasDelTags && hasOriginal && hasModified && review.original_text !== review.modified_text) {
+      console.log('Regenerating redline HTML on-the-fly (missing <del> tags)');
+      console.log('original_text length:', review.original_text.length);
+      console.log('modified_text length:', review.modified_text.length);
+      try {
+        redlinedText = generateRedlineHtml(review.original_text, review.modified_text);
+        console.log('Generated redline has <del>:', redlinedText.includes('<del>'));
+        console.log('Generated redline has <ins>:', redlinedText.includes('<ins>'));
+      } catch (diffError) {
+        console.error('Failed to regenerate redline:', diffError);
+      }
+    }
+
     // Return review data with documents, comments, and OneDrive info
     return NextResponse.json({
       id: review.id,
@@ -126,7 +174,7 @@ export async function GET(
       summary: review.summary || [],
       reviewerNotes: review.reviewer_notes || null,
       originalText: review.original_text,
-      redlinedText: review.redlined_text,
+      redlinedText: redlinedText,
       modifiedText: review.modified_text,
       approvalStatus: review.approval_status,
       approverEditedText: review.approver_edited_text || null,
