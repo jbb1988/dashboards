@@ -1378,7 +1378,7 @@ export default function App() {
   // Insert all section changes into Word document using Track Changes
   // NEW: Uses heading-based finding and targeted find/replace pairs
   const insertAllChanges = async () => {
-    if (!analysisResult || analysisResult.sections.length === 0) {
+    if (!analysisResult || !analysisResult.sections || analysisResult.sections.length === 0) {
       setError('No changes to insert');
       return;
     }
@@ -1505,7 +1505,8 @@ export default function App() {
       }
     } catch (err) {
       console.error('Insert all changes error:', err);
-      setError('Failed to insert changes. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Failed to insert changes: ${errorMessage}`);
     } finally {
       setIsApplyingChange(false);
     }
@@ -1667,7 +1668,8 @@ export default function App() {
       });
     } catch (err) {
       console.error('Insert section error:', err);
-      setError('Failed to apply change');
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Failed to apply change: ${errorMessage}`);
     } finally {
       setIsApplyingChange(false);
     }
