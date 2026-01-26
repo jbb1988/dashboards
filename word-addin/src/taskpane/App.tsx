@@ -1044,6 +1044,66 @@ export default function App() {
     });
   }, []);
 
+  // Get the document as base64 for OneDrive upload
+  const getDocumentAsBase64 = useCallback((): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Use Office.context.document.getFileAsync to get the actual .docx file
+      Office.context.document.getFileAsync(
+        Office.FileType.Compressed, // Gets .docx format
+        { sliceSize: 4194304 }, // 4MB chunks (max allowed)
+        async (result) => {
+          if (result.status === Office.AsyncResultStatus.Failed) {
+            console.error('Failed to get document file:', result.error);
+            resolve(''); // Return empty string on failure (non-blocking)
+            return;
+          }
+
+          try {
+            const file = result.value;
+            const sliceCount = file.sliceCount;
+            const slices: Uint8Array[] = [];
+
+            // Read all slices
+            for (let i = 0; i < sliceCount; i++) {
+              const slice = await new Promise<Uint8Array>((resolveSlice, rejectSlice) => {
+                file.getSliceAsync(i, (sliceResult) => {
+                  if (sliceResult.status === Office.AsyncResultStatus.Failed) {
+                    rejectSlice(new Error('Failed to get slice'));
+                    return;
+                  }
+                  resolveSlice(new Uint8Array(sliceResult.value.data));
+                });
+              });
+              slices.push(slice);
+            }
+
+            // Close the file
+            file.closeAsync();
+
+            // Combine all slices into a single array
+            const totalLength = slices.reduce((sum, s) => sum + s.length, 0);
+            const combined = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const slice of slices) {
+              combined.set(slice, offset);
+              offset += slice.length;
+            }
+
+            // Convert to base64
+            const base64 = btoa(
+              combined.reduce((data, byte) => data + String.fromCharCode(byte), '')
+            );
+
+            resolve(base64);
+          } catch (err) {
+            console.error('Error processing document file:', err);
+            resolve(''); // Return empty string on failure (non-blocking)
+          }
+        }
+      );
+    });
+  }, []);
+
   // Save current document state to history
   // This captures the ACTUAL document with only the changes the user inserted
   const saveToHistory = async () => {
@@ -1062,8 +1122,11 @@ export default function App() {
 
     try {
       // Read the CURRENT Word document text (with user's applied changes)
-      const currentDocumentText = await getDocumentText();
-      const documentName = await getDocumentName();
+      const [currentDocumentText, documentName, documentFile] = await Promise.all([
+        getDocumentText(),
+        getDocumentName(),
+        getDocumentAsBase64(), // Get actual .docx file for OneDrive upload
+      ]);
 
       // Get linked contract info
       const selectedContractData = contracts.find(c => c.id === selectedContract);
@@ -1095,6 +1158,7 @@ export default function App() {
           modifiedText: currentDocumentText,  // Current state of the document
           summary: summary,
           status: 'draft',
+          documentFile: documentFile || undefined, // Include document file for OneDrive upload
         }),
       });
 

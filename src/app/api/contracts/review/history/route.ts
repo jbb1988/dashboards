@@ -5,6 +5,7 @@ import {
   deleteContractReview,
   ContractReview,
 } from '@/lib/supabase';
+import { uploadToOneDrive, isGraphConfigured, OneDriveUploadResult } from '@/lib/microsoft-graph';
 
 /**
  * GET /api/contracts/review/history
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
       modifiedText,
       summary,
       status = 'draft',
+      documentFile, // Base64 encoded document file
     } = body;
 
     if (!provisionName || !originalText || !redlinedText) {
@@ -78,6 +80,30 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: provisionName, originalText, redlinedText' },
         { status: 400 }
       );
+    }
+
+    // Handle OneDrive upload if document file is provided
+    let onedriveInfo: OneDriveUploadResult | null = null;
+
+    if (documentFile && isGraphConfigured()) {
+      try {
+        // Create a sanitized filename from provision name
+        const sanitizedName = provisionName.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+        const timestamp = Date.now();
+        const fileName = `${sanitizedName}_${timestamp}.docx`;
+
+        // Convert base64 to buffer
+        const fileBuffer = Buffer.from(documentFile, 'base64');
+
+        // Upload to OneDrive
+        onedriveInfo = await uploadToOneDrive(fileName, fileBuffer);
+        console.log('Document uploaded to OneDrive:', onedriveInfo.fileId);
+      } catch (uploadError) {
+        // Log the error but continue - OneDrive upload is optional
+        console.error('OneDrive upload failed (continuing without it):', uploadError);
+      }
+    } else if (documentFile && !isGraphConfigured()) {
+      console.log('Document file provided but Microsoft Graph not configured - skipping OneDrive upload');
     }
 
     const review: Omit<ContractReview, 'id' | 'created_at' | 'updated_at'> = {
@@ -89,6 +115,13 @@ export async function POST(request: NextRequest) {
       modified_text: modifiedText || null,
       summary: summary || [],
       status,
+      // OneDrive integration fields
+      onedrive_file_id: onedriveInfo?.fileId || undefined,
+      onedrive_web_url: onedriveInfo?.webUrl || undefined,
+      onedrive_embed_url: onedriveInfo?.embedUrl || undefined,
+      document_versions: onedriveInfo
+        ? [{ version: 1, savedAt: new Date().toISOString(), fileId: onedriveInfo.fileId }]
+        : undefined,
     };
 
     let created;
@@ -118,6 +151,8 @@ export async function POST(request: NextRequest) {
         provisionName: created.provision_name,
         createdAt: created.created_at,
         status: created.status,
+        onedriveFileId: created.onedrive_file_id,
+        onedriveEmbedUrl: created.onedrive_embed_url,
       },
     });
   } catch (error) {

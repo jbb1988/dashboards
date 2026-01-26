@@ -2464,6 +2464,16 @@ export interface ContractReview {
   token_expires_at?: string;
   submitted_by_email?: string;
   submitted_at?: string;
+  // OneDrive integration fields
+  onedrive_file_id?: string;
+  onedrive_web_url?: string;
+  onedrive_embed_url?: string;
+  document_versions?: Array<{
+    version: number;
+    savedAt: string;
+    savedBy?: string;
+    fileId?: string;
+  }>;
 }
 
 /**

@@ -115,7 +115,7 @@ export async function GET(
       .eq('review_id', review.id)
       .order('created_at', { ascending: true });
 
-    // Return review data with documents and comments
+    // Return review data with documents, comments, and OneDrive info
     return NextResponse.json({
       id: review.id,
       contractId: review.contract_id,
@@ -132,6 +132,11 @@ export async function GET(
       approverEditedText: review.approver_edited_text || null,
       activityLog: review.activity_log || [],
       riskScores: review.risk_scores || null,
+      // OneDrive integration fields for embedded document editing
+      onedriveFileId: review.onedrive_file_id || null,
+      onedriveWebUrl: review.onedrive_web_url || null,
+      onedriveEmbedUrl: review.onedrive_embed_url || null,
+      documentVersions: review.document_versions || [],
       documents: documents.map(doc => ({
         id: doc.id,
         fileName: doc.file_name,

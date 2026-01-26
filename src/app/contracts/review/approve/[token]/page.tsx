@@ -48,6 +48,13 @@ interface RiskScores {
   }>;
 }
 
+interface DocumentVersion {
+  version: number;
+  savedAt: string;
+  savedBy?: string;
+  fileId?: string;
+}
+
 interface ReviewData {
   id: string;
   contractId?: string;
@@ -67,6 +74,11 @@ interface ReviewData {
   activityLog?: ActivityLogEntry[];
   riskScores?: RiskScores | null;
   documents: Document[];
+  // OneDrive integration fields
+  onedriveFileId?: string | null;
+  onedriveWebUrl?: string | null;
+  onedriveEmbedUrl?: string | null;
+  documentVersions?: DocumentVersion[];
 }
 
 type ContextTab = 'summary' | 'activity' | 'documents' | 'annotations' | 'discussion';
@@ -100,6 +112,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const [discussionComments, setDiscussionComments] = useState<DiscussionComment[]>([]);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject' | null>(null);
+  const [showEmbeddedEditor, setShowEmbeddedEditor] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -415,15 +428,53 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               ref={editorRef}
-              className="min-h-[calc(100vh-60px)]"
+              className="min-h-[calc(100vh-60px)] relative"
             >
-              <RedlineEditor
-                initialContent={review.redlinedText}
-                approverEditedContent={review.approverEditedText}
-                onChange={handleEditorChange}
-                readOnly={!!decision}
-                contractName={review.contractName}
-              />
+              {/* View Toggle - only show if OneDrive embed is available */}
+              {review.onedriveEmbedUrl && (
+                <div className="absolute top-4 right-4 z-10 flex gap-2 bg-[#151F2E]/90 backdrop-blur-sm p-1 rounded-lg border border-white/10">
+                  <button
+                    onClick={() => setShowEmbeddedEditor(false)}
+                    className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                      !showEmbeddedEditor
+                        ? 'bg-[#38BDF8] text-white'
+                        : 'text-[#8FA3BF] hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    Text View
+                  </button>
+                  <button
+                    onClick={() => setShowEmbeddedEditor(true)}
+                    className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                      showEmbeddedEditor
+                        ? 'bg-[#38BDF8] text-white'
+                        : 'text-[#8FA3BF] hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    Word Editor
+                  </button>
+                </div>
+              )}
+
+              {/* Embedded Word Editor or Redline Editor */}
+              {showEmbeddedEditor && review.onedriveEmbedUrl ? (
+                <div className="w-full h-[calc(100vh-60px)] bg-white">
+                  <iframe
+                    src={review.onedriveEmbedUrl}
+                    className="w-full h-full border-0"
+                    title="Word Document Editor"
+                    allow="clipboard-read; clipboard-write"
+                  />
+                </div>
+              ) : (
+                <RedlineEditor
+                  initialContent={review.redlinedText}
+                  approverEditedContent={review.approverEditedText}
+                  onChange={handleEditorChange}
+                  readOnly={!!decision}
+                  contractName={review.contractName}
+                />
+              )}
             </motion.div>
           </div>
 
