@@ -214,6 +214,34 @@ function constructEmbedUrl(shareUrl: string): string {
 }
 
 /**
+ * Get file content directly from OneDrive
+ * Fallback method when downloadUrl is not available
+ * Uses the /content endpoint to stream file directly
+ * @param fileId - The OneDrive file ID
+ */
+export async function getFileContent(fileId: string): Promise<ArrayBuffer | null> {
+  const client = getGraphClient();
+  const driveId = process.env.ONEDRIVE_DRIVE_ID;
+  const userEmail = process.env.ONEDRIVE_USER_EMAIL;
+
+  try {
+    // Use /content endpoint which streams file directly via Graph API
+    if (driveId) {
+      return await client
+        .api(`/drives/${driveId}/items/${fileId}/content`)
+        .get();
+    } else if (userEmail) {
+      return await client
+        .api(`/users/${userEmail}/drive/items/${fileId}/content`)
+        .get();
+    }
+  } catch (error) {
+    console.error('Failed to get file content via /content endpoint:', error);
+  }
+  return null;
+}
+
+/**
  * Check if Microsoft Graph is properly configured
  * @returns true if all required env vars are present
  */
