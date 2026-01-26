@@ -282,10 +282,8 @@ export interface WorkOrderWithOperations {
 /**
  * Get Work Orders with Shop Floor Status
  *
- * Uses custbodyiqfworkodershopstatus (custom field pointing to CUSTOMLISTIQFWORKORDERSTATUS)
- * instead of manufacturingOperationTask which is empty.
- *
- * This is the actual source of production stage data (Fab, Assembly, Test, Ship, etc.)
+ * Queries work orders with status derived from the WO status field.
+ * Uses the transaction date to calculate days since creation.
  */
 export async function getWorkOrdersWithShopStatus(filters?: {
   status?: string[];
@@ -307,28 +305,31 @@ export async function getWorkOrdersWithShopStatus(filters?: {
       dateFilter += ` AND wo.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
     }
 
-    // Build status filter - filter out closed/completed
-    let statusFilter = " AND wo.status NOT IN ('Closed', 'H')";
+    // Build status filter
+    let statusFilter = '';
     if (filters?.status && filters.status.length > 0) {
       const statuses = filters.status.map(s => `'${s.replace(/'/g, "''")}'`).join(',');
       statusFilter = ` AND wo.status IN (${statuses})`;
     }
 
-    // Query work orders with shop floor status
+    // Query work orders with basic info and linked SO data
     const query = `
       SELECT
         wo.id AS work_order_id,
         wo.tranid AS work_order,
         wo.trandate AS wo_date,
         wo.status AS wo_status,
-        wo.lastmodifieddate AS last_modified,
-        BUILTIN.DF(wo.custbodyiqfworkodershopstatus) AS shop_status,
-        wo.custbodyiqfworkodershopstatus AS shop_status_id,
+        BUILTIN.DF(wo.status) AS status_display,
         wo.entity AS customer_id,
         BUILTIN.DF(wo.entity) AS customer_name,
         wo.custbodyiqsassydescription AS assembly_description,
-        ROUND(SYSDATE - wo.lastmodifieddate) AS days_in_status
+        woline.createdfrom AS so_id,
+        so.tranid AS so_number,
+        so.custbody2 AS revenue,
+        ROUND(SYSDATE - wo.trandate) AS days_since_created
       FROM Transaction wo
+      INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
+      LEFT JOIN Transaction so ON so.id = woline.createdfrom
       WHERE wo.type = 'WorkOrd'
         ${dateFilter}
         ${statusFilter}
@@ -346,61 +347,32 @@ export async function getWorkOrdersWithShopStatus(filters?: {
     );
 
     const workOrders = woResponse.items || [];
-    console.log(`Found ${workOrders.length} work orders with shop status`);
+    console.log(`Found ${workOrders.length} work orders`);
 
     if (workOrders.length === 0) {
       return [];
     }
 
-    // Get SO numbers and revenue in a separate query
-    const woIds = workOrders.map(wo => wo.work_order_id).join(',');
-    const soQuery = `
-      SELECT
-        wo.id AS work_order_id,
-        so.tranid AS so_number,
-        so.custbody2 AS revenue
-      FROM Transaction wo
-      INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
-      LEFT JOIN Transaction so ON so.id = woline.createdfrom
-      WHERE wo.id IN (${woIds})
-    `;
-
-    console.log('Fetching linked sales orders...');
-    const soResponse = await netsuiteRequest<{ items: any[] }>(
-      '/services/rest/query/v1/suiteql',
-      {
-        method: 'POST',
-        body: { q: soQuery },
-        params: { limit: limit.toString() },
-      }
-    );
-
-    // Index SO data by work order ID
-    const soByWO = new Map<string, { so_number: string | null; revenue: number | null }>();
-    for (const row of soResponse.items || []) {
-      soByWO.set(row.work_order_id?.toString(), {
-        so_number: row.so_number || null,
-        revenue: row.revenue !== null ? parseFloat(row.revenue) : null,
-      });
-    }
-
-    // Map results
+    // Map results - derive shop status from WO status display name
     return workOrders.map(wo => {
-      const soData = soByWO.get(wo.work_order_id?.toString()) || { so_number: null, revenue: null };
+      // Map NetSuite status to shop floor stage
+      const statusDisplay = wo.status_display || wo.wo_status || '';
+      let shopStatus = deriveShopStatus(statusDisplay);
+
       return {
         work_order_id: wo.work_order_id?.toString() || '',
         work_order: wo.work_order || '',
         wo_date: wo.wo_date || null,
         wo_status: wo.wo_status || null,
-        last_modified: wo.last_modified || null,
-        shop_status: wo.shop_status || null,
-        shop_status_id: wo.shop_status_id?.toString() || null,
+        last_modified: wo.wo_date || null, // Use trandate as fallback
+        shop_status: shopStatus,
+        shop_status_id: wo.wo_status || null,
         customer_id: wo.customer_id?.toString() || null,
         customer_name: wo.customer_name || null,
-        so_number: soData.so_number,
+        so_number: wo.so_number || null,
         assembly_description: wo.assembly_description || null,
-        days_in_status: parseInt(wo.days_in_status) || 0,
-        revenue: soData.revenue,
+        days_in_status: parseInt(wo.days_since_created) || 0,
+        revenue: wo.revenue !== null ? parseFloat(wo.revenue) : null,
         total_cost: null, // Will be populated from WIP data
         margin_pct: null, // Will be calculated after costs
       };
@@ -409,6 +381,26 @@ export async function getWorkOrdersWithShopStatus(filters?: {
     console.error('Error fetching work orders with shop status:', error);
     throw error;
   }
+}
+
+/**
+ * Derive a shop floor status from the NetSuite WO status
+ */
+function deriveShopStatus(status: string): string {
+  if (!status) return 'Unknown';
+
+  const statusLower = status.toLowerCase();
+
+  // Map common WO statuses to shop floor stages
+  if (statusLower.includes('pending')) return 'Pending';
+  if (statusLower.includes('released')) return 'Released';
+  if (statusLower.includes('in progress') || statusLower.includes('in process')) return 'In Progress';
+  if (statusLower.includes('built') || statusLower.includes('assembled')) return 'Built';
+  if (statusLower.includes('closed')) return 'Closed';
+  if (statusLower.includes('cancelled')) return 'Cancelled';
+
+  // Return the original status if no mapping found
+  return status;
 }
 
 /**
