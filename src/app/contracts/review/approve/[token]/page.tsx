@@ -432,7 +432,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
             >
               {/* View Toggle - only show if OneDrive embed is available */}
               {review.onedriveEmbedUrl && (
-                <div className="absolute top-4 right-4 z-10 flex gap-2 bg-[#151F2E]/90 backdrop-blur-sm p-1 rounded-lg border border-white/10">
+                <div className="absolute top-4 left-4 z-50 flex gap-2 bg-[#151F2E] p-2 rounded-lg border-2 border-[#38BDF8] shadow-lg">
                   <button
                     onClick={() => setShowEmbeddedEditor(false)}
                     className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
