@@ -100,6 +100,16 @@ const ApproverComment = Mark.create({
 
 // Helper to convert redline markup to HTML
 function formatRedlinesToHTML(text: string): string {
+  // Debug: Log incoming content to check for del/ins tags
+  const hasDelTags = text.includes('<del') || text.includes('&lt;del');
+  const hasInsTags = text.includes('<ins') || text.includes('&lt;ins');
+  console.log('formatRedlinesToHTML input:', {
+    length: text.length,
+    hasDelTags,
+    hasInsTags,
+    preview: text.substring(0, 500)
+  });
+
   // First, decode any HTML entities that might have escaped the tags
   let processed = text
     .replace(/&lt;del&gt;/gi, '<del>')
@@ -129,6 +139,16 @@ function formatRedlinesToHTML(text: string): string {
   if (!processed.includes('<br>') && !processed.includes('<p>')) {
     processed = processed.replace(/\n/g, '<br>');
   }
+
+  // Debug: Log output to verify conversion
+  const hasAiStrike = processed.includes('data-ai-strike');
+  const hasAiInsert = processed.includes('data-ai-insert');
+  console.log('formatRedlinesToHTML output:', {
+    length: processed.length,
+    hasAiStrike,
+    hasAiInsert,
+    preview: processed.substring(0, 500)
+  });
 
   return processed;
 }
