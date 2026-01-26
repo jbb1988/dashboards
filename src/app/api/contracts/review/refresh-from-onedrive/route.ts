@@ -223,37 +223,44 @@ export async function POST(request: NextRequest) {
 
     let buffer: ArrayBuffer | null = null;
 
-    // Try to get download URL first (faster for large files)
-    try {
-      const fileInfo = await getFileInfo(review.onedrive_file_id);
-      console.log('File info retrieved, hasDownloadUrl:', !!fileInfo?.downloadUrl);
-
-      if (fileInfo?.downloadUrl) {
-        try {
-          const response = await fetch(fileInfo.downloadUrl);
-          if (response.ok) {
-            buffer = await response.arrayBuffer();
-            console.log('Downloaded file via downloadUrl');
-          } else {
-            console.log('Download via downloadUrl failed:', response.status);
-          }
-        } catch (fetchError) {
-          console.log('Fetch via downloadUrl failed, trying fallback');
-        }
-      }
-    } catch (graphError) {
-      console.log('getFileInfo failed, trying fallback:', graphError);
-    }
-
-    // Fallback: Use direct content endpoint if downloadUrl failed
-    if (!buffer && getFileContent) {
+    // Use direct /content endpoint FIRST for freshness (avoids CDN caching issues)
+    // The downloadUrl from @microsoft.graph.downloadUrl can return stale cached content
+    if (getFileContent) {
       try {
+        console.log('Fetching file via /content endpoint (fresh)...');
         buffer = await getFileContent(review.onedrive_file_id);
         if (buffer) {
-          console.log('Downloaded file via /content endpoint fallback');
+          console.log('Downloaded file via /content endpoint, size:', buffer.byteLength);
         }
       } catch (contentError) {
-        console.error('Content endpoint fallback failed:', contentError);
+        console.error('/content endpoint failed:', contentError);
+      }
+    }
+
+    // Fallback: Use downloadUrl if /content endpoint failed
+    if (!buffer) {
+      try {
+        const fileInfo = await getFileInfo(review.onedrive_file_id);
+        console.log('File info retrieved, hasDownloadUrl:', !!fileInfo?.downloadUrl);
+
+        if (fileInfo?.downloadUrl) {
+          try {
+            // Add cache-busting header
+            const response = await fetch(fileInfo.downloadUrl, {
+              headers: { 'Cache-Control': 'no-cache' }
+            });
+            if (response.ok) {
+              buffer = await response.arrayBuffer();
+              console.log('Downloaded file via downloadUrl fallback');
+            } else {
+              console.log('Download via downloadUrl failed:', response.status);
+            }
+          } catch (fetchError) {
+            console.log('Fetch via downloadUrl failed:', fetchError);
+          }
+        }
+      } catch (graphError) {
+        console.log('getFileInfo failed:', graphError);
       }
     }
 
