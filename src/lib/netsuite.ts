@@ -5,13 +5,14 @@
 
 import crypto from 'crypto';
 
-// NetSuite configuration
+// NetSuite configuration - use getters for lazy evaluation
+// This allows env vars to be loaded after module initialization (e.g., by dotenv)
 const config = {
-  accountId: process.env.NETSUITE_ACCOUNT_ID || '',
-  consumerKey: process.env.NETSUITE_CONSUMER_KEY || '',
-  consumerSecret: process.env.NETSUITE_CONSUMER_SECRET || '',
-  tokenId: process.env.NETSUITE_TOKEN_ID || '',
-  tokenSecret: process.env.NETSUITE_TOKEN_SECRET || '',
+  get accountId() { return process.env.NETSUITE_ACCOUNT_ID || ''; },
+  get consumerKey() { return process.env.NETSUITE_CONSUMER_KEY || ''; },
+  get consumerSecret() { return process.env.NETSUITE_CONSUMER_SECRET || ''; },
+  get tokenId() { return process.env.NETSUITE_TOKEN_ID || ''; },
+  get tokenSecret() { return process.env.NETSUITE_TOKEN_SECRET || ''; },
 };
 
 /**

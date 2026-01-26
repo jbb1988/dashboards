@@ -59,38 +59,39 @@ export async function getInventoryBalances(filters?: {
   lowStockOnly?: boolean;
   limit?: number;
 }): Promise<InventoryItemRecord[]> {
-  const { limit = 2000 } = filters || {};
+  const { limit = 1000 } = filters || {}; // NetSuite max is 1000
 
-  // Build item type filter
-  let typeFilter = "AND item.type IN ('InvtPart', 'Assembly')";
+  // Build item type filter - use itemtype field (not type)
+  let typeFilter = "AND item.itemtype IN ('InvtPart', 'Assembly')";
   if (filters?.itemType && filters.itemType.length > 0) {
     const types = filters.itemType.map(t => `'${t.replace(/'/g, "''")}'`).join(',');
-    typeFilter = ` AND item.type IN (${types})`;
+    typeFilter = ` AND item.itemtype IN (${types})`;
   }
 
-  // Build location filter
+  // Build location filter (uses InventoryBalance.location)
   let locationFilter = '';
   if (filters?.locationId) {
     locationFilter = ` AND ib.location = '${filters.locationId.replace(/'/g, "''")}'`;
   }
 
-  // Note: InventoryBalance may not exist in all NetSuite setups
-  // Fallback to Item table with inventory fields
+  // Use InventoryBalance table for actual stock quantities
+  // Item table quantityonhand is often 0; InventoryBalance has real data
   const query = `
     SELECT
       item.id,
       item.itemid,
       item.displayname,
-      item.type AS item_type,
-      COALESCE(item.quantityonhand, 0) AS quantity_on_hand,
-      COALESCE(item.quantityavailable, 0) AS quantity_available,
+      item.itemtype AS item_type,
+      COALESCE(ib.quantityonhand, 0) AS quantity_on_hand,
+      COALESCE(ib.quantityavailable, 0) AS quantity_available,
       COALESCE(item.quantitybackordered, 0) AS quantity_backordered,
       COALESCE(item.averagecost, item.lastpurchaseprice, item.cost, 0) AS unit_cost,
       item.reorderpoint,
       item.preferredstocklevel,
-      item.location AS location_id,
-      BUILTIN.DF(item.location) AS location_name
+      ib.location AS location_id,
+      BUILTIN.DF(ib.location) AS location_name
     FROM Item item
+    LEFT JOIN InventoryBalance ib ON item.id = ib.item
     WHERE item.isinactive = 'F'
       ${typeFilter}
       ${locationFilter}
