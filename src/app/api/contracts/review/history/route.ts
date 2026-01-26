@@ -5,7 +5,18 @@ import {
   deleteContractReview,
   ContractReview,
 } from '@/lib/supabase';
-import { uploadToOneDrive, isGraphConfigured, OneDriveUploadResult } from '@/lib/microsoft-graph';
+
+// Dynamic import to avoid build issues if Graph SDK isn't configured
+let uploadToOneDrive: ((fileName: string, fileContent: Buffer) => Promise<{ fileId: string; webUrl: string; embedUrl: string }>) | null = null;
+let isGraphConfigured: (() => boolean) | null = null;
+
+try {
+  const graphModule = require('@/lib/microsoft-graph');
+  uploadToOneDrive = graphModule.uploadToOneDrive;
+  isGraphConfigured = graphModule.isGraphConfigured;
+} catch {
+  console.log('Microsoft Graph module not available - OneDrive integration disabled');
+}
 
 /**
  * GET /api/contracts/review/history
@@ -83,9 +94,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle OneDrive upload if document file is provided
-    let onedriveInfo: OneDriveUploadResult | null = null;
+    let onedriveInfo: { fileId: string; webUrl: string; embedUrl: string } | null = null;
 
-    if (documentFile && isGraphConfigured()) {
+    if (documentFile && isGraphConfigured && isGraphConfigured() && uploadToOneDrive) {
       try {
         // Create a sanitized filename from provision name
         const sanitizedName = provisionName.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
@@ -102,7 +113,7 @@ export async function POST(request: NextRequest) {
         // Log the error but continue - OneDrive upload is optional
         console.error('OneDrive upload failed (continuing without it):', uploadError);
       }
-    } else if (documentFile && !isGraphConfigured()) {
+    } else if (documentFile) {
       console.log('Document file provided but Microsoft Graph not configured - skipping OneDrive upload');
     }
 
