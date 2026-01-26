@@ -429,20 +429,38 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
               ref={editorRef}
               className="min-h-[calc(100vh-60px)] relative"
             >
-              {/* Open in Word Online button - only show if OneDrive URL is available */}
+              {/* Word Document Actions - only show if OneDrive URL is available */}
               {review.onedriveEmbedUrl && (
-                <div className="absolute top-4 left-4 z-50">
-                  <a
-                    href={review.onedriveEmbedUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 bg-[#2B579A] hover:bg-[#1E3F6F] text-white text-sm font-medium rounded-lg shadow-lg transition-colors"
-                  >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M21.17 3.25q.33 0 .59.25.24.24.24.58v15.84q0 .34-.24.58-.26.25-.59.25H7.83q-.33 0-.59-.25-.24-.24-.24-.58V17H2.83q-.33 0-.59-.24-.24-.25-.24-.59V7.83q0-.33.24-.59.26-.24.59-.24H7V4.08q0-.34.24-.58.26-.25.59-.25h13.34M7 13.06l1.18 2.22h1.79L8 12.06l1.93-3.17H8.22l-1.15 2.07h-.05l-1.14-2.07H4.09l1.9 3.18-2 3.22h1.78l1.24-2.23h.04M20 17V5H8v2h4.17q.33 0 .59.24.24.26.24.59v8.34q0 .33-.24.59-.26.24-.59.24H8v2h12z"/>
-                    </svg>
-                    Edit in Word Online
-                  </a>
+                <div className="absolute top-4 left-4 z-50 flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <a
+                      href={review.onedriveEmbedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 bg-[#2B579A] hover:bg-[#1E3F6F] text-white text-sm font-medium rounded-lg shadow-lg transition-colors"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M21.17 3.25q.33 0 .59.25.24.24.24.58v15.84q0 .34-.24.58-.26.25-.59.25H7.83q-.33 0-.59-.25-.24-.24-.24-.58V17H2.83q-.33 0-.59-.24-.24-.25-.24-.59V7.83q0-.33.24-.59.26-.24.59-.24H7V4.08q0-.34.24-.58.26-.25.59-.25h13.34M7 13.06l1.18 2.22h1.79L8 12.06l1.93-3.17H8.22l-1.15 2.07h-.05l-1.14-2.07H4.09l1.9 3.18-2 3.22h1.78l1.24-2.23h.04M20 17V5H8v2h4.17q.33 0 .59.24.24.26.24.59v8.34q0 .33-.24.59-.26.24-.59.24H8v2h12z"/>
+                      </svg>
+                      Open & Edit in Word
+                    </a>
+                    {review.onedriveWebUrl && (
+                      <a
+                        href={review.onedriveWebUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 bg-[#151F2E] hover:bg-[#1E293B] text-[#8FA3BF] hover:text-white text-sm font-medium rounded-lg border border-white/10 transition-colors"
+                        title="Download Word document"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-[#8FA3BF]/70 max-w-[280px]">
+                    Edit in Word Online. Changes auto-save. Return here to approve and send to client.
+                  </p>
                 </div>
               )}
 
