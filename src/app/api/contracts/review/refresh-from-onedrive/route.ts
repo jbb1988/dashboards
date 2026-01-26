@@ -111,10 +111,7 @@ export async function POST(request: NextRequest) {
     let fileInfo;
     try {
       fileInfo = await getFileInfo(review.onedrive_file_id);
-      console.log('File info retrieved:', {
-        name: fileInfo?.name,
-        hasDownloadUrl: !!fileInfo?.downloadUrl
-      });
+      console.log('File info retrieved, hasDownloadUrl:', !!fileInfo?.downloadUrl);
     } catch (graphError) {
       console.error('Graph API error:', graphError);
       return NextResponse.json(
