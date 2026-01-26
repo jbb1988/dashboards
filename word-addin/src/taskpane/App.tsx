@@ -1506,7 +1506,8 @@ export default function App() {
     } catch (err) {
       console.error('Insert all changes error:', err);
       const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(`Failed to insert changes: ${errorMessage}`);
+      // Show detailed error for debugging
+      setError(`Failed to insert changes: ${errorMessage || 'Unknown error. Check console for details.'}`);
     } finally {
       setIsApplyingChange(false);
     }
@@ -1669,7 +1670,7 @@ export default function App() {
     } catch (err) {
       console.error('Insert section error:', err);
       const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(`Failed to apply change: ${errorMessage}`);
+      setError(`Failed to apply change: ${errorMessage || 'Unknown error. Check console for details.'}`);
     } finally {
       setIsApplyingChange(false);
     }
@@ -2143,7 +2144,8 @@ export default function App() {
       });
     } catch (err) {
       console.error('Apply change error:', err);
-      setError('Failed to apply change. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Failed to apply change: ${errorMessage || 'Unknown error. Check console for details.'}`);
     } finally {
       setIsApplyingChange(false);
     }

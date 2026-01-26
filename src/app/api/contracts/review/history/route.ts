@@ -6,6 +6,7 @@ import {
   ContractReview,
 } from '@/lib/supabase';
 import DiffMatchPatch from 'diff-match-patch';
+import JSZip from 'jszip';
 
 // Dynamic import to avoid build issues if Graph SDK isn't configured
 let uploadToOneDrive: ((fileName: string, fileContent: Buffer) => Promise<{ fileId: string; webUrl: string; embedUrl: string }>) | null = null;
@@ -57,6 +58,126 @@ function generateRedlineHtml(originalText: string, modifiedText: string): string
   }
 
   return html;
+}
+
+/**
+ * Escape HTML special characters
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Extract text content from Word XML runs (<w:r> elements containing <w:t> text)
+ */
+function extractTextFromRuns(xml: string): string {
+  const textMatches = xml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+  return textMatches
+    .map(match => {
+      const textMatch = match.match(/<w:t[^>]*>([^<]*)<\/w:t>/);
+      return textMatch ? textMatch[1] : '';
+    })
+    .join('');
+}
+
+/**
+ * Process a paragraph's XML to extract text with tracked changes
+ * Returns HTML with <del> and <ins> tags for tracked changes
+ */
+function processParagraphWithTrackedChanges(paraXml: string): string {
+  let result = '';
+
+  // Process the paragraph sequentially to preserve order
+  // Look for: <w:del>, <w:ins>, and regular <w:r> (runs)
+  const regex = /<w:del\b[^>]*>([\s\S]*?)<\/w:del>|<w:ins\b[^>]*>([\s\S]*?)<\/w:ins>|<w:r\b(?![^>]*w:rsidDel)[^>]*>[\s\S]*?<\/w:r>/g;
+
+  let match;
+  while ((match = regex.exec(paraXml)) !== null) {
+    if (match[0].startsWith('<w:del')) {
+      // Deletion - wrap in <del> tag
+      const deletedText = extractTextFromRuns(match[1]);
+      if (deletedText) {
+        result += `<del>${escapeHtml(deletedText)}</del>`;
+      }
+    } else if (match[0].startsWith('<w:ins')) {
+      // Insertion - wrap in <ins> tag
+      const insertedText = extractTextFromRuns(match[2]);
+      if (insertedText) {
+        result += `<ins>${escapeHtml(insertedText)}</ins>`;
+      }
+    } else {
+      // Regular run
+      const runText = extractTextFromRuns(match[0]);
+      if (runText) {
+        result += escapeHtml(runText);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract text with tracked changes from a Word document (OOXML)
+ * Parses the document.xml to find <w:del> and <w:ins> elements
+ * Returns HTML with <del> and <ins> tags
+ */
+async function extractWithTrackedChanges(buffer: Buffer): Promise<{
+  html: string;
+  hasTrackedChanges: boolean;
+}> {
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file('word/document.xml')?.async('string');
+
+  if (!documentXml) {
+    throw new Error('Invalid Word document - no document.xml found');
+  }
+
+  // Debug: Log raw OOXML info
+  console.log('=== OOXML Extraction Debug ===');
+  console.log('documentXml length:', documentXml.length);
+
+  // Check if document has any tracked changes
+  const hasDeletedContent = documentXml.includes('<w:del');
+  const hasInsertedContent = documentXml.includes('<w:ins');
+  const hasTrackedChanges = hasDeletedContent || hasInsertedContent;
+
+  console.log('hasDeletedContent (<w:del):', hasDeletedContent);
+  console.log('hasInsertedContent (<w:ins):', hasInsertedContent);
+
+  // Find and log first w:del and w:ins elements if they exist
+  const firstDelMatch = documentXml.match(/<w:del[^>]*>[\s\S]{0,200}/);
+  const firstInsMatch = documentXml.match(/<w:ins[^>]*>[\s\S]{0,200}/);
+  if (firstDelMatch) console.log('First w:del sample:', firstDelMatch[0]);
+  if (firstInsMatch) console.log('First w:ins sample:', firstInsMatch[0]);
+
+  let html = '';
+
+  // Extract paragraphs from the document body
+  const bodyMatch = documentXml.match(/<w:body[^>]*>([\s\S]*)<\/w:body>/);
+  if (!bodyMatch) {
+    return { html: '', hasTrackedChanges: false };
+  }
+
+  const bodyContent = bodyMatch[1];
+
+  // Find all paragraphs
+  const paragraphs = bodyContent.match(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g) || [];
+
+  for (const para of paragraphs) {
+    const paraHtml = processParagraphWithTrackedChanges(para);
+    if (paraHtml.trim()) {
+      html += paraHtml + '<br>';
+    }
+  }
+
+  // Clean up consecutive <br> tags
+  html = html.replace(/(<br>)+/g, '<br>').replace(/<br>$/, '');
+
+  return { html, hasTrackedChanges };
 }
 
 /**
@@ -158,15 +279,57 @@ export async function POST(request: NextRequest) {
       console.log('Document file provided but Microsoft Graph not configured - skipping OneDrive upload');
     }
 
-    // Generate redline HTML if we have both original and modified text
+    // Generate redline HTML
+    // Priority: 1. Extract from document OOXML (preserves Word's tracked changes)
+    //           2. Generate diff from original vs modified text
+    //           3. Use provided redlinedText as fallback
     let redlineHtml = redlinedText;
-    if (originalText && modifiedText && originalText !== modifiedText) {
+
+    // Try to extract tracked changes from the document file (if provided)
+    console.log('=== History API POST ===');
+    console.log('documentFile provided:', !!documentFile);
+    console.log('documentFile length:', documentFile?.length || 0);
+
+    if (documentFile) {
       try {
-        redlineHtml = generateRedlineHtml(originalText, modifiedText);
-      } catch (diffError) {
-        console.error('Failed to generate redline HTML:', diffError);
-        // Fall back to plain text
-        redlineHtml = redlinedText;
+        const fileBuffer = Buffer.from(documentFile, 'base64');
+        console.log('fileBuffer length:', fileBuffer.length);
+        const trackedChangesResult = await extractWithTrackedChanges(fileBuffer);
+
+        const hasDel = trackedChangesResult.html.includes('<del>');
+        const hasIns = trackedChangesResult.html.includes('<ins>');
+
+        console.log('OOXML extraction result - hasDel:', hasDel, 'hasIns:', hasIns);
+
+        // Only use OOXML if it has BOTH deletions and insertions
+        // (Office JS API often only records insertions, not deletions)
+        if (hasDel && hasIns && trackedChangesResult.html) {
+          // Document has proper tracked changes - use the OOXML-extracted HTML
+          redlineHtml = trackedChangesResult.html;
+          console.log('Using tracked changes from document OOXML (has both del and ins)');
+        } else if (hasIns && !hasDel) {
+          // Only insertions - Office JS API limitation, use diff instead
+          console.log('OOXML has insertions but no deletions - using diff instead');
+        } else {
+          console.log('No tracked changes in document, falling back to diff');
+        }
+      } catch (extractError) {
+        console.log('OOXML extraction failed, falling back to diff:', extractError);
+      }
+    }
+
+    // If we didn't get tracked changes from OOXML, generate diff from text
+    if (!redlineHtml.includes('<del>') && !redlineHtml.includes('<ins>')) {
+      if (originalText && modifiedText && originalText !== modifiedText) {
+        try {
+          redlineHtml = generateRedlineHtml(originalText, modifiedText);
+          console.log('Generated redline from diff');
+          console.log('redlineHtml has <del>:', redlineHtml.includes('<del>'));
+          console.log('redlineHtml has <ins>:', redlineHtml.includes('<ins>'));
+        } catch (diffError) {
+          console.error('Failed to generate redline HTML:', diffError);
+          redlineHtml = redlinedText;
+        }
       }
     }
 
