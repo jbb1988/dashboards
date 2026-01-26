@@ -294,18 +294,18 @@ export async function getWorkOrderOperations(filters?: {
         wo.entity AS customer_id,
         BUILTIN.DF(wo.entity) AS customer_name,
         mot.operationsequence AS operation_sequence,
-        mot.operationname AS operation_name,
+        mot.title AS operation_name,
         mot.status,
-        mot.startdate AS start_date,
+        mot.startdatetime AS start_date,
         mot.enddate AS end_date,
         mot.completedquantity AS completed_quantity,
         mot.inputquantity AS input_quantity,
-        BUILTIN.DF(mot.workcenter) AS work_center,
+        BUILTIN.DF(mot.manufacturingworkcenter) AS work_center,
         mot.setuptime AS estimated_time,
         mot.actualsetuptime AS actual_time,
         mot.runrate AS labor_cost,
-        mot.machinerunrate AS machine_cost
-      FROM ManufacturingOperationTask mot
+        mot.machineresources AS machine_cost
+      FROM manufacturingOperationTask mot
       INNER JOIN Transaction wo ON mot.workorder = wo.id
       ${whereClause}
       ORDER BY wo.tranid, mot.operationsequence
@@ -420,16 +420,16 @@ export async function getWorkOrdersWithOperations(filters?: {
       SELECT
         mot.workorder AS work_order_id,
         mot.operationsequence AS operation_sequence,
-        mot.operationname AS operation_name,
+        mot.title AS operation_name,
         mot.status,
-        mot.startdate AS start_date,
+        mot.startdatetime AS start_date,
         mot.enddate AS end_date,
         mot.completedquantity AS completed_quantity,
         mot.inputquantity AS input_quantity,
-        BUILTIN.DF(mot.workcenter) AS work_center,
+        BUILTIN.DF(mot.manufacturingworkcenter) AS work_center,
         mot.setuptime AS estimated_time,
         mot.actualsetuptime AS actual_time
-      FROM ManufacturingOperationTask mot
+      FROM manufacturingOperationTask mot
       WHERE mot.workorder IN (${woIds})
       ORDER BY mot.workorder, mot.operationsequence
     `;

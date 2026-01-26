@@ -74,24 +74,24 @@ export async function getInventoryBalances(filters?: {
     locationFilter = ` AND ib.location = '${filters.locationId.replace(/'/g, "''")}'`;
   }
 
-  // Use InventoryBalance table for actual stock quantities
-  // Item table quantityonhand is often 0; InventoryBalance has real data
+  // Use aggregateItemLocation for inventory quantities (has reorderpoint, quantityonhand, etc.)
+  // Join with Item table for item details
   const query = `
     SELECT
       item.id,
       item.itemid,
       item.displayname,
       item.itemtype AS item_type,
-      COALESCE(ib.quantityonhand, 0) AS quantity_on_hand,
-      COALESCE(ib.quantityavailable, 0) AS quantity_available,
-      COALESCE(item.quantitybackordered, 0) AS quantity_backordered,
-      COALESCE(item.averagecost, item.lastpurchaseprice, item.cost, 0) AS unit_cost,
-      item.reorderpoint,
-      item.preferredstocklevel,
-      ib.location AS location_id,
-      BUILTIN.DF(ib.location) AS location_name
+      COALESCE(ail.quantityonhand, 0) AS quantity_on_hand,
+      COALESCE(ail.quantityavailable, 0) AS quantity_available,
+      COALESCE(ail.quantitybackordered, 0) AS quantity_backordered,
+      COALESCE(ail.averagecostmli, item.averagecost, item.lastpurchaseprice, item.cost, 0) AS unit_cost,
+      ail.reorderpoint,
+      ail.preferredstocklevel,
+      ail.location AS location_id,
+      BUILTIN.DF(ail.location) AS location_name
     FROM Item item
-    LEFT JOIN InventoryBalance ib ON item.id = ib.item
+    INNER JOIN aggregateItemLocation ail ON item.id = ail.item
     WHERE item.isinactive = 'F'
       ${typeFilter}
       ${locationFilter}
