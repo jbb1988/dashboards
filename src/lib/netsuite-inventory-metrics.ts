@@ -59,7 +59,7 @@ export async function getInventoryBalances(filters?: {
   lowStockOnly?: boolean;
   limit?: number;
 }): Promise<InventoryItemRecord[]> {
-  const { limit = 1000 } = filters || {}; // NetSuite max is 1000
+  const { limit = 999 } = filters || {}; // NetSuite max is 1000
 
   // Build item type filter - use itemtype field (not type)
   let typeFilter = "AND item.itemtype IN ('InvtPart', 'Assembly')";
