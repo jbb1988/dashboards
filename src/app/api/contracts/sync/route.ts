@@ -33,6 +33,21 @@ interface ConflictInfo {
 }
 
 /**
+ * Ensure contract_type is always a valid array of strings
+ */
+function normalizeContractType(contractType: any): string[] {
+  if (!contractType) return [];
+  if (Array.isArray(contractType)) {
+    return contractType.filter(t => typeof t === 'string');
+  }
+  if (typeof contractType === 'string') {
+    // If it's a single string, wrap in array
+    return contractType ? [contractType] : [];
+  }
+  return [];
+}
+
+/**
  * Transform Salesforce opportunity to Supabase contract format
  */
 function transformToContract(opp: any): Contract {
@@ -45,7 +60,7 @@ function transformToContract(opp: any): Contract {
     status: opp.status,
     status_group: opp.statusGroup,
     sales_stage: opp.salesStage || '',
-    contract_type: opp.contractType || [],
+    contract_type: normalizeContractType(opp.contractType),
     close_date: opp.closeDate || null,
     award_date: opp.awardDate || null,
     contract_date: opp.contractDate || null,

@@ -76,13 +76,14 @@ export default function ConflictResolutionModal({
 }: ConflictResolutionModalProps) {
   const [resolutions, setResolutions] = useState<Record<string, 'use_salesforce' | 'keep_local'>>({});
 
-  // Reset resolutions when modal opens or conflicts change
+  // Reset resolutions only when modal opens (not on every conflicts reference change)
   useEffect(() => {
     if (isOpen) {
-      console.log('ConflictResolutionModal: Resetting resolutions for', conflicts.length, 'conflicts');
+      console.log('ConflictResolutionModal: Modal opened, resetting resolutions for', conflicts.length, 'conflicts');
       setResolutions({});
     }
-  }, [isOpen, conflicts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // Only depend on isOpen, not conflicts (which changes reference on re-render)
 
   const handleResolutionChange = (contractId: string, action: 'use_salesforce' | 'keep_local') => {
     console.log('ConflictResolutionModal: Setting resolution for', contractId, 'to', action);
