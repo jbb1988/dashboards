@@ -220,7 +220,7 @@ async function testFulfillmentQuery() {
     );
 
     console.log('Response:', JSON.stringify(response, null, 2));
-    console.log(`\nFound ${response.items?.length || 0} fulfillments (${response.totalResults} total)`);
+    console.log(`\nFound ${response.items?.length || 0} fulfillments (${(response as any).totalResults || 'N/A'} total)`);
   } catch (error) {
     console.error('Error:', error);
   }
