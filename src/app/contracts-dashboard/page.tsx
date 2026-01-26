@@ -1608,21 +1608,36 @@ export default function ContractsDashboard() {
     setIsSyncing(true);
 
     try {
-      // Process each resolution
+      // Collect all salesforceIds for contracts where user chose 'use_salesforce'
+      const salesforceIdsToSync: string[] = [];
+
       for (const resolution of resolutions) {
         if (resolution.action === 'use_salesforce') {
-          // Clear pending status - accept Salesforce values
-          // The next sync will overwrite with SF values
-          await fetch('/api/contracts/sync-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contractId: resolution.contractId,
-              status: 'synced',
-            })
-          });
+          // Look up the salesforceId from the conflicts array
+          const conflict = conflicts.find(c => c.contractId === resolution.contractId);
+          if (conflict?.salesforceId) {
+            salesforceIdsToSync.push(conflict.salesforceId);
+          }
         }
         // If 'keep_local', do nothing - keep pending status for later push
+      }
+
+      // Batch update all contracts that should accept Salesforce values
+      if (salesforceIdsToSync.length > 0) {
+        console.log('Updating sync status for salesforceIds:', salesforceIdsToSync);
+        const response = await fetch('/api/contracts/sync-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            salesforceIds: salesforceIdsToSync,
+            status: 'synced',
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update sync status');
+        }
       }
 
       // After clearing statuses, retry the sync
