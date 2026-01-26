@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCw, Filter, AlertCircle } from 'lucide-react';
+import { RefreshCw, Filter, AlertCircle, AlertTriangle, TrendingUp, Clock, DollarSign, Package } from 'lucide-react';
 import { KPICard, AnimatedCounter, KPIIcons, KPICardSkeleton, TableRowSkeleton, colors } from '@/components/mars-ui';
 import WIPTable from './WIPTable';
 
@@ -36,6 +36,10 @@ interface WorkOrderWithOperations {
   revenue: number | null;
   total_cost: number | null;
   margin_pct: number | null;
+  // New shop status fields
+  shop_status?: string | null;
+  shop_status_id?: string | null;
+  days_in_status?: number;
 }
 
 interface KPIData {
@@ -46,6 +50,8 @@ interface KPIData {
   readyToShip: number;
   avgMargin: number | null;
   totalCost: number;
+  revenueAtRisk?: number;
+  stageDistribution?: Record<string, number>;
 }
 
 interface APIResponse {
@@ -72,6 +78,7 @@ export default function WIPOperationsDashboard() {
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showStuckOnly, setShowStuckOnly] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -122,20 +129,64 @@ export default function WIPOperationsDashboard() {
     fetchData();
   };
 
-  // Filter data based on search term (client-side)
+  // Filter data based on search term and stuck filter (client-side)
   const filteredData = data.filter(wo => {
+    // Apply stuck filter
+    if (showStuckOnly) {
+      const days = wo.days_in_status ?? wo.days_in_current_op ?? 0;
+      if (days <= 7) return false;
+    }
+
+    // Apply search filter
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (
       wo.work_order.toLowerCase().includes(term) ||
       (wo.customer_name || '').toLowerCase().includes(term) ||
       (wo.so_number || '').toLowerCase().includes(term) ||
-      (wo.assembly_description || '').toLowerCase().includes(term)
+      (wo.assembly_description || '').toLowerCase().includes(term) ||
+      (wo.shop_status || '').toLowerCase().includes(term)
     );
+  });
+
+  // Get stuck WOs for attention section
+  const stuckWOs = data.filter(wo => {
+    const days = wo.days_in_status ?? wo.days_in_current_op ?? 0;
+    return days > 7;
   });
 
   return (
     <div className="space-y-6">
+      {/* Attention Required Banner */}
+      {!loading && stuckWOs.length > 0 && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-red-500/20 rounded-lg">
+              <AlertTriangle className="w-6 h-6 text-red-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-400">
+                Attention Required
+              </h3>
+              <p className="text-red-400/80 mt-1">
+                <span className="font-semibold">{stuckWOs.length} work orders</span> stuck for more than 7 days,
+                representing <span className="font-semibold">{formatCurrency(kpis?.revenueAtRisk || 0)}</span> revenue at risk
+              </p>
+              <button
+                onClick={() => setShowStuckOnly(!showStuckOnly)}
+                className="mt-3 px-4 py-1.5 text-sm bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
+              >
+                {showStuckOnly ? 'Show All WOs' : 'View Stuck WOs Only'}
+              </button>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-red-400">{stuckWOs.length}</div>
+              <div className="text-sm text-red-400/60">stuck WOs</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters Row */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
@@ -143,7 +194,7 @@ export default function WIPOperationsDashboard() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search WO#, Customer, SO#..."
+              placeholder="Search WO#, Customer, Stage..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -162,6 +213,20 @@ export default function WIPOperationsDashboard() {
             <option value="WorkOrd:D">Released</option>
             <option value="WorkOrd:C">Closed</option>
           </select>
+
+          {/* Stuck Filter Toggle */}
+          {stuckWOs.length > 0 && (
+            <button
+              onClick={() => setShowStuckOnly(!showStuckOnly)}
+              className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                showStuckOnly
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  : 'bg-white/[0.03] text-gray-400 border border-white/[0.08] hover:bg-white/[0.05]'
+              }`}
+            >
+              Stuck Only ({stuckWOs.length})
+            </button>
+          )}
         </div>
 
         {/* Refresh Button */}
@@ -183,18 +248,6 @@ export default function WIPOperationsDashboard() {
             <div>
               <p className="text-red-400 font-medium">Error Loading Data</p>
               <p className="text-red-400/70 text-sm mt-1">{error}</p>
-              {error.includes('permission') && (
-                <div className="mt-3 p-3 bg-red-500/10 rounded-md">
-                  <p className="text-xs text-red-400/80">
-                    Required NetSuite Permissions:
-                  </p>
-                  <ul className="text-xs text-red-400/60 mt-1 space-y-1">
-                    <li>- Lists {'>'} Manufacturing {'>'} Manufacturing Operation Task - View</li>
-                    <li>- Lists {'>'} Manufacturing {'>'} Manufacturing Routing - View</li>
-                    <li>- Setup {'>'} SuiteQL - Full</li>
-                  </ul>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -228,25 +281,47 @@ export default function WIPOperationsDashboard() {
               delay={0.1}
             />
             <KPICard
-              title="Operations Behind"
+              title="Stuck (>7 days)"
               value={<AnimatedCounter value={kpis.operationsBehind} />}
-              subtitle={`${kpis.avgDaysInOp} avg days in op`}
+              subtitle={kpis.revenueAtRisk ? `${formatCurrency(kpis.revenueAtRisk)} at risk` : 'Revenue at risk'}
               icon={KPIIcons.alert}
-              color={kpis.operationsBehind > 0 ? colors.accent.amber : colors.accent.cyan}
+              color={kpis.operationsBehind > 0 ? colors.accent.red : colors.accent.green}
               badge={kpis.operationsBehind > 0 ? kpis.operationsBehind : undefined}
               delay={0.2}
             />
             <KPICard
-              title="Ready to Ship"
-              value={<AnimatedCounter value={kpis.readyToShip} />}
-              subtitle="At final operation"
-              icon={KPIIcons.checkCircle}
-              color={colors.accent.green}
+              title="Avg Days in Stage"
+              value={kpis.avgDaysInOp.toFixed(1)}
+              subtitle={kpis.readyToShip > 0 ? `${kpis.readyToShip} ready to ship` : 'Days in current stage'}
+              icon={KPIIcons.clock}
+              color={kpis.avgDaysInOp > 7 ? colors.accent.amber : colors.accent.cyan}
               delay={0.3}
             />
           </>
         ) : null}
       </div>
+
+      {/* Stage Distribution Summary */}
+      {!loading && kpis?.stageDistribution && Object.keys(kpis.stageDistribution).length > 0 && (
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-400 mb-3">Stage Distribution</h3>
+          <div className="flex flex-wrap gap-3">
+            {Object.entries(kpis.stageDistribution)
+              .sort((a, b) => b[1] - a[1])
+              .map(([stage, count]) => (
+                <div
+                  key={stage}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] rounded-lg"
+                >
+                  <span className="text-gray-300">{stage || 'Unknown'}</span>
+                  <span className="px-2 py-0.5 bg-white/[0.08] rounded text-sm text-gray-400">
+                    {count}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Data Table */}
       <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
@@ -258,6 +333,7 @@ export default function WIPOperationsDashboard() {
               {!loading && (
                 <span className="ml-2 text-sm font-normal text-gray-500">
                   ({filteredData.length} {filteredData.length === 1 ? 'order' : 'orders'})
+                  {showStuckOnly && ' - showing stuck only'}
                 </span>
               )}
             </h2>
@@ -278,9 +354,9 @@ export default function WIPOperationsDashboard() {
             </div>
             <p className="text-gray-400">No work orders found</p>
             <p className="text-gray-600 text-sm mt-1">
-              {searchTerm || statusFilter
+              {searchTerm || statusFilter || showStuckOnly
                 ? 'Try adjusting your filters'
-                : 'Work orders with operations will appear here'}
+                : 'Work orders will appear here'}
             </p>
           </div>
         ) : (

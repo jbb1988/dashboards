@@ -210,9 +210,32 @@ export async function getWIPReportSummary(filters?: {
 }
 
 // =============================================================================
-// MANUFACTURING OPERATIONS (Work Order Routing)
+// WIP OPERATIONS - SHOP FLOOR STATUS
 // =============================================================================
 
+/**
+ * Work Order with Shop Floor Status
+ * Uses custbodyiqfworkodershopstatus (custom field) instead of manufacturingOperationTask
+ */
+export interface WorkOrderWithShopStatus {
+  work_order_id: string;
+  work_order: string;
+  wo_date: string | null;
+  wo_status: string | null;
+  last_modified: string | null;
+  shop_status: string | null;
+  shop_status_id: string | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  so_number: string | null;
+  assembly_description: string | null;
+  days_in_status: number;
+  revenue: number | null;
+  total_cost: number | null;
+  margin_pct: number | null;
+}
+
+// Legacy interfaces for backwards compatibility
 export interface WorkOrderOperation {
   work_order_id: string;
   work_order: string;
@@ -250,18 +273,149 @@ export interface WorkOrderWithOperations {
   revenue: number | null;
   total_cost: number | null;
   margin_pct: number | null;
+  // New fields for shop status
+  shop_status?: string | null;
+  shop_status_id?: string | null;
+  days_in_status?: number;
 }
 
 /**
- * Query Manufacturing Operations (Work Order Routing)
+ * Get Work Orders with Shop Floor Status
  *
- * Each Work Order can have routing operations (Op 10, Op 20, etc.) that represent
- * actual production stages tracked in ManufacturingOperationTask.
+ * Uses custbodyiqfworkodershopstatus (custom field pointing to CUSTOMLISTIQFWORKORDERSTATUS)
+ * instead of manufacturingOperationTask which is empty.
  *
- * NOTE: Requires NetSuite role permissions:
- * - Lists > Manufacturing > Manufacturing Operation Task → View
- * - Lists > Manufacturing > Manufacturing Routing → View
- * - Setup > SuiteQL → Full
+ * This is the actual source of production stage data (Fab, Assembly, Test, Ship, etc.)
+ */
+export async function getWorkOrdersWithShopStatus(filters?: {
+  status?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+}): Promise<WorkOrderWithShopStatus[]> {
+  const { limit = 500 } = filters || {};
+
+  try {
+    // Build date filter
+    let dateFilter = '';
+    if (filters?.dateFrom) {
+      const [y, m, d] = filters.dateFrom.split('-');
+      dateFilter += ` AND wo.trandate >= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+    }
+    if (filters?.dateTo) {
+      const [y, m, d] = filters.dateTo.split('-');
+      dateFilter += ` AND wo.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+    }
+
+    // Build status filter - filter out closed/completed
+    let statusFilter = " AND wo.status NOT IN ('Closed', 'H')";
+    if (filters?.status && filters.status.length > 0) {
+      const statuses = filters.status.map(s => `'${s.replace(/'/g, "''")}'`).join(',');
+      statusFilter = ` AND wo.status IN (${statuses})`;
+    }
+
+    // Query work orders with shop floor status
+    const query = `
+      SELECT
+        wo.id AS work_order_id,
+        wo.tranid AS work_order,
+        wo.trandate AS wo_date,
+        wo.status AS wo_status,
+        wo.lastmodifieddate AS last_modified,
+        BUILTIN.DF(wo.custbodyiqfworkodershopstatus) AS shop_status,
+        wo.custbodyiqfworkodershopstatus AS shop_status_id,
+        wo.entity AS customer_id,
+        BUILTIN.DF(wo.entity) AS customer_name,
+        wo.custbodyiqsassydescription AS assembly_description,
+        ROUND(SYSDATE - wo.lastmodifieddate) AS days_in_status
+      FROM Transaction wo
+      WHERE wo.type = 'WorkOrd'
+        ${dateFilter}
+        ${statusFilter}
+      ORDER BY wo.trandate DESC
+    `;
+
+    console.log('Fetching work orders with shop status...');
+    const woResponse = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: query },
+        params: { limit: limit.toString() },
+      }
+    );
+
+    const workOrders = woResponse.items || [];
+    console.log(`Found ${workOrders.length} work orders with shop status`);
+
+    if (workOrders.length === 0) {
+      return [];
+    }
+
+    // Get SO numbers and revenue in a separate query
+    const woIds = workOrders.map(wo => wo.work_order_id).join(',');
+    const soQuery = `
+      SELECT
+        wo.id AS work_order_id,
+        so.tranid AS so_number,
+        so.custbody2 AS revenue
+      FROM Transaction wo
+      INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
+      LEFT JOIN Transaction so ON so.id = woline.createdfrom
+      WHERE wo.id IN (${woIds})
+    `;
+
+    console.log('Fetching linked sales orders...');
+    const soResponse = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: soQuery },
+        params: { limit: limit.toString() },
+      }
+    );
+
+    // Index SO data by work order ID
+    const soByWO = new Map<string, { so_number: string | null; revenue: number | null }>();
+    for (const row of soResponse.items || []) {
+      soByWO.set(row.work_order_id?.toString(), {
+        so_number: row.so_number || null,
+        revenue: row.revenue !== null ? parseFloat(row.revenue) : null,
+      });
+    }
+
+    // Map results
+    return workOrders.map(wo => {
+      const soData = soByWO.get(wo.work_order_id?.toString()) || { so_number: null, revenue: null };
+      return {
+        work_order_id: wo.work_order_id?.toString() || '',
+        work_order: wo.work_order || '',
+        wo_date: wo.wo_date || null,
+        wo_status: wo.wo_status || null,
+        last_modified: wo.last_modified || null,
+        shop_status: wo.shop_status || null,
+        shop_status_id: wo.shop_status_id?.toString() || null,
+        customer_id: wo.customer_id?.toString() || null,
+        customer_name: wo.customer_name || null,
+        so_number: soData.so_number,
+        assembly_description: wo.assembly_description || null,
+        days_in_status: parseInt(wo.days_in_status) || 0,
+        revenue: soData.revenue,
+        total_cost: null, // Will be populated from WIP data
+        margin_pct: null, // Will be calculated after costs
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching work orders with shop status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Query Manufacturing Operations (Work Order Routing) - LEGACY
+ *
+ * NOTE: This queries manufacturingOperationTask which may be EMPTY for your organization.
+ * Consider using getWorkOrdersWithShopStatus() which uses custbodyiqfworkodershopstatus instead.
  */
 export async function getWorkOrderOperations(filters?: {
   workOrder?: string;
