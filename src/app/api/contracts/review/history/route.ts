@@ -5,6 +5,7 @@ import {
   deleteContractReview,
   ContractReview,
 } from '@/lib/supabase';
+import DiffMatchPatch from 'diff-match-patch';
 
 // Dynamic import to avoid build issues if Graph SDK isn't configured
 let uploadToOneDrive: ((fileName: string, fileContent: Buffer) => Promise<{ fileId: string; webUrl: string; embedUrl: string }>) | null = null;
@@ -16,6 +17,46 @@ try {
   isGraphConfigured = graphModule.isGraphConfigured;
 } catch {
   console.log('Microsoft Graph module not available - OneDrive integration disabled');
+}
+
+/**
+ * Generate HTML with redline markup from original and modified text
+ * Uses diff-match-patch for word-level comparison
+ */
+function generateRedlineHtml(originalText: string, modifiedText: string): string {
+  const dmp = new DiffMatchPatch();
+
+  // Normalize text
+  const normalizedOriginal = originalText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const normalizedModified = modifiedText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+
+  // Get diffs
+  const diffs = dmp.diff_main(normalizedOriginal, normalizedModified);
+  dmp.diff_cleanupSemantic(diffs);
+
+  // Convert to HTML with del/ins tags
+  let html = '';
+  for (const [op, text] of diffs) {
+    // Escape HTML entities
+    const escapedText = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+
+    if (op === 0) {
+      // Equal - no markup
+      html += escapedText;
+    } else if (op === -1) {
+      // Deletion - red strikethrough
+      html += `<del>${escapedText}</del>`;
+    } else {
+      // Insertion - green underline
+      html += `<ins>${escapedText}</ins>`;
+    }
+  }
+
+  return html;
 }
 
 /**
@@ -117,12 +158,24 @@ export async function POST(request: NextRequest) {
       console.log('Document file provided but Microsoft Graph not configured - skipping OneDrive upload');
     }
 
+    // Generate redline HTML if we have both original and modified text
+    let redlineHtml = redlinedText;
+    if (originalText && modifiedText && originalText !== modifiedText) {
+      try {
+        redlineHtml = generateRedlineHtml(originalText, modifiedText);
+      } catch (diffError) {
+        console.error('Failed to generate redline HTML:', diffError);
+        // Fall back to plain text
+        redlineHtml = redlinedText;
+      }
+    }
+
     const review: Omit<ContractReview, 'id' | 'created_at' | 'updated_at'> = {
       contract_id: contractId || null,
       contract_name: contractName || null,
       provision_name: provisionName,
       original_text: originalText,
-      redlined_text: redlinedText,
+      redlined_text: redlineHtml,
       modified_text: modifiedText || null,
       summary: summary || [],
       status,
