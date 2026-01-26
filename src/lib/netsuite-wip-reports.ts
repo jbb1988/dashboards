@@ -209,6 +209,334 @@ export async function getWIPReportSummary(filters?: {
   }
 }
 
+// =============================================================================
+// MANUFACTURING OPERATIONS (Work Order Routing)
+// =============================================================================
+
+export interface WorkOrderOperation {
+  work_order_id: string;
+  work_order: string;
+  customer_id: string | null;
+  customer_name: string | null;
+  operation_sequence: number;
+  operation_name: string;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  completed_quantity: number | null;
+  input_quantity: number | null;
+  work_center: string | null;
+  estimated_time: number | null;
+  actual_time: number | null;
+  labor_cost: number | null;
+  machine_cost: number | null;
+}
+
+export interface WorkOrderWithOperations {
+  work_order_id: string;
+  work_order: string;
+  wo_date: string | null;
+  status: string | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  so_number: string | null;
+  assembly_description: string | null;
+  operations: WorkOrderOperation[];
+  current_operation: WorkOrderOperation | null;
+  total_operations: number;
+  completed_operations: number;
+  percent_complete: number;
+  days_in_current_op: number | null;
+  revenue: number | null;
+  total_cost: number | null;
+  margin_pct: number | null;
+}
+
+/**
+ * Query Manufacturing Operations (Work Order Routing)
+ *
+ * Each Work Order can have routing operations (Op 10, Op 20, etc.) that represent
+ * actual production stages tracked in ManufacturingOperationTask.
+ *
+ * NOTE: Requires NetSuite role permissions:
+ * - Lists > Manufacturing > Manufacturing Operation Task → View
+ * - Lists > Manufacturing > Manufacturing Routing → View
+ * - Setup > SuiteQL → Full
+ */
+export async function getWorkOrderOperations(filters?: {
+  workOrder?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<WorkOrderOperation[]> {
+  try {
+    let whereClause = "WHERE wo.type = 'WorkOrd'";
+
+    if (filters?.workOrder) {
+      whereClause += ` AND wo.tranid = '${filters.workOrder.replace(/'/g, "''")}'`;
+    }
+    if (filters?.status) {
+      whereClause += ` AND mot.status = '${filters.status.replace(/'/g, "''")}'`;
+    }
+    if (filters?.dateFrom) {
+      const [y, m, d] = filters.dateFrom.split('-');
+      whereClause += ` AND wo.trandate >= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+    }
+    if (filters?.dateTo) {
+      const [y, m, d] = filters.dateTo.split('-');
+      whereClause += ` AND wo.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+    }
+
+    const query = `
+      SELECT
+        wo.id AS work_order_id,
+        wo.tranid AS work_order,
+        wo.entity AS customer_id,
+        BUILTIN.DF(wo.entity) AS customer_name,
+        mot.operationsequence AS operation_sequence,
+        mot.operationname AS operation_name,
+        mot.status,
+        mot.startdate AS start_date,
+        mot.enddate AS end_date,
+        mot.completedquantity AS completed_quantity,
+        mot.inputquantity AS input_quantity,
+        BUILTIN.DF(mot.workcenter) AS work_center,
+        mot.setuptime AS estimated_time,
+        mot.actualsetuptime AS actual_time,
+        mot.runrate AS labor_cost,
+        mot.machinerunrate AS machine_cost
+      FROM ManufacturingOperationTask mot
+      INNER JOIN Transaction wo ON mot.workorder = wo.id
+      ${whereClause}
+      ORDER BY wo.tranid, mot.operationsequence
+    `;
+
+    const response = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: query },
+        params: { limit: '5000' },
+      }
+    );
+
+    return (response.items || []).map(row => ({
+      work_order_id: row.work_order_id?.toString() || '',
+      work_order: row.work_order || '',
+      customer_id: row.customer_id?.toString() || null,
+      customer_name: row.customer_name || null,
+      operation_sequence: parseInt(row.operation_sequence) || 0,
+      operation_name: row.operation_name || '',
+      status: row.status || '',
+      start_date: row.start_date || null,
+      end_date: row.end_date || null,
+      completed_quantity: row.completed_quantity !== null ? parseFloat(row.completed_quantity) : null,
+      input_quantity: row.input_quantity !== null ? parseFloat(row.input_quantity) : null,
+      work_center: row.work_center || null,
+      estimated_time: row.estimated_time !== null ? parseFloat(row.estimated_time) : null,
+      actual_time: row.actual_time !== null ? parseFloat(row.actual_time) : null,
+      labor_cost: row.labor_cost !== null ? parseFloat(row.labor_cost) : null,
+      machine_cost: row.machine_cost !== null ? parseFloat(row.machine_cost) : null,
+    }));
+  } catch (error) {
+    console.error('Error fetching work order operations:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get Work Orders with Operations - Combined view
+ *
+ * Fetches work orders and their manufacturing operations, combining with WIP cost data
+ * for a complete operational dashboard view.
+ */
+export async function getWorkOrdersWithOperations(filters?: {
+  status?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+}): Promise<WorkOrderWithOperations[]> {
+  const { limit = 500 } = filters || {};
+
+  try {
+    // Build date filter
+    let dateFilter = '';
+    if (filters?.dateFrom) {
+      const [y, m, d] = filters.dateFrom.split('-');
+      dateFilter += ` AND wo.trandate >= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+    }
+    if (filters?.dateTo) {
+      const [y, m, d] = filters.dateTo.split('-');
+      dateFilter += ` AND wo.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
+    }
+
+    // Build status filter (for active WOs)
+    let statusFilter = '';
+    if (filters?.status && filters.status.length > 0) {
+      const statuses = filters.status.map(s => `'${s.replace(/'/g, "''")}'`).join(',');
+      statusFilter = ` AND wo.status IN (${statuses})`;
+    }
+
+    // First, fetch work orders with basic info
+    const woQuery = `
+      SELECT
+        wo.id AS work_order_id,
+        wo.tranid AS work_order,
+        wo.trandate AS wo_date,
+        wo.status,
+        wo.entity AS customer_id,
+        BUILTIN.DF(wo.entity) AS customer_name,
+        so.tranid AS so_number,
+        wo.custbodyiqsassydescription AS assembly_description
+      FROM Transaction wo
+      INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
+      LEFT JOIN Transaction so ON so.id = woline.createdfrom
+      WHERE wo.type = 'WorkOrd'
+        ${dateFilter}
+        ${statusFilter}
+      ORDER BY wo.trandate DESC
+    `;
+
+    console.log('Fetching work orders for operations dashboard...');
+    const woResponse = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: woQuery },
+        params: { limit: limit.toString() },
+      }
+    );
+
+    const workOrders = woResponse.items || [];
+    console.log(`Found ${workOrders.length} work orders`);
+
+    if (workOrders.length === 0) {
+      return [];
+    }
+
+    // Fetch all operations for these work orders
+    const woIds = workOrders.map(wo => `'${wo.work_order_id}'`).join(',');
+    const opsQuery = `
+      SELECT
+        mot.workorder AS work_order_id,
+        mot.operationsequence AS operation_sequence,
+        mot.operationname AS operation_name,
+        mot.status,
+        mot.startdate AS start_date,
+        mot.enddate AS end_date,
+        mot.completedquantity AS completed_quantity,
+        mot.inputquantity AS input_quantity,
+        BUILTIN.DF(mot.workcenter) AS work_center,
+        mot.setuptime AS estimated_time,
+        mot.actualsetuptime AS actual_time
+      FROM ManufacturingOperationTask mot
+      WHERE mot.workorder IN (${woIds})
+      ORDER BY mot.workorder, mot.operationsequence
+    `;
+
+    console.log('Fetching operations for work orders...');
+    const opsResponse = await netsuiteRequest<{ items: any[] }>(
+      '/services/rest/query/v1/suiteql',
+      {
+        method: 'POST',
+        body: { q: opsQuery },
+        params: { limit: '10000' },
+      }
+    );
+
+    const operations = opsResponse.items || [];
+    console.log(`Found ${operations.length} operations`);
+
+    // Group operations by work order
+    const operationsByWO = new Map<string, WorkOrderOperation[]>();
+    for (const op of operations) {
+      const woId = op.work_order_id?.toString() || '';
+      if (!operationsByWO.has(woId)) {
+        operationsByWO.set(woId, []);
+      }
+      operationsByWO.get(woId)!.push({
+        work_order_id: woId,
+        work_order: '', // Will be filled from WO data
+        customer_id: null,
+        customer_name: null,
+        operation_sequence: parseInt(op.operation_sequence) || 0,
+        operation_name: op.operation_name || '',
+        status: op.status || '',
+        start_date: op.start_date || null,
+        end_date: op.end_date || null,
+        completed_quantity: op.completed_quantity !== null ? parseFloat(op.completed_quantity) : null,
+        input_quantity: op.input_quantity !== null ? parseFloat(op.input_quantity) : null,
+        work_center: op.work_center || null,
+        estimated_time: op.estimated_time !== null ? parseFloat(op.estimated_time) : null,
+        actual_time: op.actual_time !== null ? parseFloat(op.actual_time) : null,
+        labor_cost: null,
+        machine_cost: null,
+      });
+    }
+
+    // Combine work orders with their operations
+    const result: WorkOrderWithOperations[] = workOrders.map(wo => {
+      const woId = wo.work_order_id?.toString() || '';
+      const woOps = operationsByWO.get(woId) || [];
+
+      // Calculate metrics
+      const totalOps = woOps.length;
+      const completedOps = woOps.filter(op =>
+        op.status === 'COMPLETE' || op.status === 'Complete' || op.status === 'Completed'
+      ).length;
+      const percentComplete = totalOps > 0 ? Math.round((completedOps / totalOps) * 100) : 0;
+
+      // Find current operation (highest sequence that's in progress or first pending)
+      const inProgressOps = woOps.filter(op =>
+        op.status === 'IN_PROGRESS' || op.status === 'In Progress' || op.status === 'InProgress'
+      );
+      const pendingOps = woOps.filter(op =>
+        op.status === 'PENDING' || op.status === 'Pending' || op.status === 'Not Started'
+      );
+
+      const currentOp = inProgressOps.length > 0
+        ? inProgressOps.reduce((a, b) => a.operation_sequence > b.operation_sequence ? a : b)
+        : pendingOps.length > 0
+          ? pendingOps.reduce((a, b) => a.operation_sequence < b.operation_sequence ? a : b)
+          : null;
+
+      // Calculate days in current operation
+      let daysInCurrentOp: number | null = null;
+      if (currentOp?.start_date) {
+        const startDate = new Date(currentOp.start_date);
+        const today = new Date();
+        daysInCurrentOp = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      }
+
+      return {
+        work_order_id: woId,
+        work_order: wo.work_order || '',
+        wo_date: wo.wo_date || null,
+        status: wo.status || null,
+        customer_id: wo.customer_id?.toString() || null,
+        customer_name: wo.customer_name || null,
+        so_number: wo.so_number || null,
+        assembly_description: wo.assembly_description || null,
+        operations: woOps,
+        current_operation: currentOp,
+        total_operations: totalOps,
+        completed_operations: completedOps,
+        percent_complete: percentComplete,
+        days_in_current_op: daysInCurrentOp,
+        revenue: null, // Will be populated from WIP summary if available
+        total_cost: null,
+        margin_pct: null,
+      };
+    });
+
+    console.log(`Returning ${result.length} work orders with operations`);
+    return result;
+  } catch (error) {
+    console.error('Error fetching work orders with operations:', error);
+    throw error;
+  }
+}
+
 /**
  * Query WIP Report Detailed (Search ID: 1963)
  * Shows itemized line-by-line cost detail
