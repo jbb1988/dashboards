@@ -93,6 +93,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!review.original_text) {
+      return NextResponse.json(
+        { error: 'No original text found for this review' },
+        { status: 400 }
+      );
+    }
+
     if (!getFileInfo) {
       return NextResponse.json(
         { error: 'Microsoft Graph not configured' },
@@ -101,12 +108,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the download URL from OneDrive
-    const fileInfo = await getFileInfo(review.onedrive_file_id);
+    let fileInfo;
+    try {
+      fileInfo = await getFileInfo(review.onedrive_file_id);
+      console.log('File info retrieved:', {
+        name: fileInfo?.name,
+        hasDownloadUrl: !!fileInfo?.downloadUrl
+      });
+    } catch (graphError) {
+      console.error('Graph API error:', graphError);
+      return NextResponse.json(
+        { error: `Failed to get file info: ${graphError instanceof Error ? graphError.message : 'Unknown error'}` },
+        { status: 500 }
+      );
+    }
+
+    if (!fileInfo || !fileInfo.downloadUrl) {
+      return NextResponse.json(
+        { error: 'Could not get download URL from OneDrive. The file may have been moved or deleted.' },
+        { status: 500 }
+      );
+    }
 
     // Download the file
     const response = await fetch(fileInfo.downloadUrl);
     if (!response.ok) {
-      throw new Error('Failed to download file from OneDrive');
+      console.error('Download failed:', response.status, response.statusText);
+      throw new Error(`Failed to download file from OneDrive: ${response.status}`);
     }
 
     const buffer = await response.arrayBuffer();
