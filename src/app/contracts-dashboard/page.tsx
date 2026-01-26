@@ -1023,6 +1023,13 @@ export default function ContractsDashboard() {
     salesforceId: string;
   } | null>(null);
 
+  // Salesforce changes notification state
+  const [sfChangesNotification, setSfChangesNotification] = useState<{
+    show: boolean;
+    changedCount: number;
+    conflictCount: number;
+  } | null>(null);
+
   // All tasks for showing icons in pipeline rows
   const [allTasks, setAllTasks] = useState<Array<{
     id: string;
@@ -1110,6 +1117,32 @@ export default function ContractsDashboard() {
     }
   }, [data?.contracts, fetchSfSyncPending]);
 
+  // Check for Salesforce changes (without applying them)
+  const checkForSalesforceChanges = useCallback(async () => {
+    try {
+      console.log('Checking for Salesforce changes...');
+      const response = await fetch('/api/contracts/sync?preview=true');
+      if (response.ok) {
+        const result = await response.json();
+        const changedCount = (result.updatedCount || 0) + (result.newCount || 0);
+        const conflictCount = result.conflicts?.length || 0;
+
+        if (changedCount > 0 || conflictCount > 0) {
+          console.log(`Salesforce changes detected: ${changedCount} changes, ${conflictCount} conflicts`);
+          setSfChangesNotification({
+            show: true,
+            changedCount,
+            conflictCount,
+          });
+        }
+        return { changedCount, conflictCount };
+      }
+    } catch (err) {
+      console.error('Failed to check for SF changes:', err);
+    }
+    return { changedCount: 0, conflictCount: 0 };
+  }, []);
+
   // Hourly auto-sync polling
   useEffect(() => {
     if (!autoSyncEnabled) return;
@@ -1120,7 +1153,9 @@ export default function ContractsDashboard() {
       console.log('Auto-sync: Checking for Salesforce changes...');
 
       try {
-        // Fetch pending syncs (contracts with changes FROM Salesforce)
+        // Check for changes from Salesforce and notify user
+        await checkForSalesforceChanges();
+        // Also fetch local pending syncs
         await fetchSfSyncPending();
         setLastAutoSync(new Date());
       } catch (error) {
@@ -1128,12 +1163,13 @@ export default function ContractsDashboard() {
       }
     }, SYNC_INTERVAL);
 
-    // Initial sync on mount
+    // Initial check on mount
+    checkForSalesforceChanges();
     fetchSfSyncPending();
     setLastAutoSync(new Date());
 
     return () => clearInterval(syncInterval);
-  }, [autoSyncEnabled, fetchSfSyncPending]);
+  }, [autoSyncEnabled, fetchSfSyncPending, checkForSalesforceChanges]);
 
   // Push pending changes to Salesforce
   const handlePushToSalesforce = useCallback(async () => {
@@ -2129,7 +2165,7 @@ export default function ContractsDashboard() {
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
       {/* Background - subtle gradient for depth */}
-      <div className="fixed inset-0 bg-gradient-to-b from-[#121C2B] via-[#0F1722] to-[#0F1722]" />
+      <div className="fixed inset-0 bg-gradient-to-b from-[#121C2B] via-[#0F1722] to-[#0F1722] z-0" />
 
       {/* Main Content - offset by sidebar width */}
       <motion.div
@@ -3279,6 +3315,53 @@ export default function ContractsDashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Salesforce Changes Notification */}
+      <AnimatePresence>
+        {sfChangesNotification && sfChangesNotification.show && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-6 right-6 z-[70]"
+          >
+            <div className="flex items-center gap-3 px-4 py-3 bg-[#1E293B] border border-cyan-500/30 rounded-lg shadow-xl max-w-sm">
+              <div className="flex-shrink-0">
+                <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-white text-sm font-medium">Salesforce Changes Detected</p>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  {sfChangesNotification.changedCount > 0 && `${sfChangesNotification.changedCount} contract${sfChangesNotification.changedCount > 1 ? 's' : ''} updated`}
+                  {sfChangesNotification.changedCount > 0 && sfChangesNotification.conflictCount > 0 && ', '}
+                  {sfChangesNotification.conflictCount > 0 && `${sfChangesNotification.conflictCount} conflict${sfChangesNotification.conflictCount > 1 ? 's' : ''}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSfChangesNotification(null);
+                    handleRefresh();
+                  }}
+                  className="px-3 py-1.5 bg-cyan-500 text-black text-sm font-medium rounded hover:bg-cyan-400 transition-colors"
+                >
+                  Sync Now
+                </button>
+                <button
+                  onClick={() => setSfChangesNotification(null)}
+                  className="p-1 text-[#64748B] hover:text-white transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </motion.div>
         )}

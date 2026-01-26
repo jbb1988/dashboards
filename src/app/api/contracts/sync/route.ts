@@ -262,19 +262,105 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET - Check sync status and return current contracts from Supabase
+ * With ?preview=true, checks for changes without applying them (for polling/notifications)
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const isPreview = searchParams.get('preview') === 'true';
+
     // Get current contracts from Supabase
     const contracts = await getContracts();
+    const existingContractsMap = new Map<string, any>();
+    contracts.forEach(contract => {
+      if (contract.salesforce_id) {
+        existingContractsMap.set(contract.salesforce_id, contract);
+      }
+    });
 
     // Get current Salesforce opportunities for comparison
     let salesforceCount = 0;
+    let opportunities: any[] = [];
     try {
-      const opportunities = await getContractOpportunities();
+      opportunities = await getContractOpportunities();
       salesforceCount = opportunities.length;
     } catch (err) {
       console.error('Could not fetch Salesforce data:', err);
+    }
+
+    // If preview mode, check for changes and conflicts without applying
+    if (isPreview && opportunities.length > 0) {
+      const normalizeDate = (date: string | null | undefined): string | null => {
+        if (!date) return null;
+        return date.substring(0, 10);
+      };
+
+      let updatedCount = 0;
+      let newCount = 0;
+      const conflicts: ConflictInfo[] = [];
+
+      for (const opp of opportunities) {
+        const existing = existingContractsMap.get(opp.id);
+
+        if (existing) {
+          // Check for conflicts (pending local changes with different SF values)
+          if (existing.sf_sync_status === 'pending') {
+            const hasDateConflict =
+              normalizeDate(existing.award_date) !== normalizeDate(opp.awardDate || null) ||
+              normalizeDate(existing.contract_date) !== normalizeDate(opp.contractDate || null) ||
+              normalizeDate(existing.deliver_date) !== normalizeDate(opp.deliverDate || null) ||
+              normalizeDate(existing.install_date) !== normalizeDate(opp.installDate || null) ||
+              normalizeDate(existing.cash_date) !== normalizeDate(opp.cashDate || null);
+
+            if (hasDateConflict) {
+              conflicts.push({
+                contractId: existing.id,
+                contractName: existing.name,
+                salesforceId: opp.id,
+                localValues: {
+                  awardDate: existing.award_date,
+                  contractDate: existing.contract_date,
+                  deliverDate: existing.deliver_date,
+                  installDate: existing.install_date,
+                  cashDate: existing.cash_date,
+                },
+                salesforceValues: {
+                  awardDate: opp.awardDate || null,
+                  contractDate: opp.contractDate || null,
+                  deliverDate: opp.deliverDate || null,
+                  installDate: opp.installDate || null,
+                  cashDate: opp.cashDate || null,
+                },
+                pendingFields: existing.sf_sync_pending_fields || {},
+              });
+            }
+          }
+
+          // Check for updates (any field changes from SF)
+          const awardDateChanged = normalizeDate(existing.award_date) !== normalizeDate(opp.awardDate || null);
+          const contractDateChanged = normalizeDate(existing.contract_date) !== normalizeDate(opp.contractDate || null);
+          const deliverDateChanged = normalizeDate(existing.deliver_date) !== normalizeDate(opp.deliverDate || null);
+          const installDateChanged = normalizeDate(existing.install_date) !== normalizeDate(opp.installDate || null);
+          const cashDateChanged = normalizeDate(existing.cash_date) !== normalizeDate(opp.cashDate || null);
+          const valueChanged = existing.value !== (opp.value || 0);
+          const statusChanged = !existing.manual_status_override && existing.status !== opp.status;
+
+          if (awardDateChanged || contractDateChanged || deliverDateChanged || installDateChanged || cashDateChanged || valueChanged || statusChanged) {
+            updatedCount++;
+          }
+        } else {
+          newCount++;
+        }
+      }
+
+      return NextResponse.json({
+        status: 'preview',
+        updatedCount,
+        newCount,
+        conflicts: conflicts.length > 0 ? conflicts : undefined,
+        supabaseContracts: contracts.length,
+        salesforceOpportunities: salesforceCount,
+      });
     }
 
     return NextResponse.json({
@@ -289,6 +375,7 @@ export async function GET() {
         : null,
       actions: {
         sync: 'POST /api/contracts/sync - Sync Salesforce to Supabase',
+        preview: 'GET /api/contracts/sync?preview=true - Check for changes without applying',
       },
     });
 

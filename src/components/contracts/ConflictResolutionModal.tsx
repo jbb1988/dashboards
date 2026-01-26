@@ -110,7 +110,7 @@ export default function ConflictResolutionModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55]"
             onClick={onCancel}
           />
 
@@ -119,7 +119,8 @@ export default function ConflictResolutionModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl max-h-[90vh] bg-[#0F172A] border border-white/10 rounded-xl shadow-2xl z-50 flex flex-col"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl max-h-[90vh] bg-[#0F172A] border border-white/10 rounded-xl shadow-2xl z-[60] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="p-6 border-b border-white/10">
