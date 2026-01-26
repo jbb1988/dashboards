@@ -268,8 +268,18 @@ export async function POST(request: NextRequest) {
     let newRedlineHtml: string;
     let extractedText: string;
 
+    console.log('=== Refresh from OneDrive Debug ===');
+    console.log('Buffer size:', buffer.byteLength);
+    console.log('Original text length:', review.original_text.length);
+    console.log('Original text preview:', review.original_text.substring(0, 200));
+
     try {
       const trackedChangesResult = await extractWithTrackedChanges(buffer);
+
+      console.log('Tracked changes result - hasTrackedChanges:', trackedChangesResult.hasTrackedChanges);
+      console.log('Tracked changes HTML length:', trackedChangesResult.html.length);
+      console.log('Tracked changes HTML has <del>:', trackedChangesResult.html.includes('<del>'));
+      console.log('Tracked changes HTML has <ins>:', trackedChangesResult.html.includes('<ins>'));
 
       if (trackedChangesResult.hasTrackedChanges && trackedChangesResult.html) {
         // Use tracked changes HTML directly - this preserves the actual Word revisions
@@ -282,12 +292,18 @@ export async function POST(request: NextRequest) {
         // No tracked changes - fall back to diff-match-patch comparison
         console.log('No tracked changes found, using diff-match-patch fallback');
         extractedText = await extractTextFromDocx(buffer);
+        console.log('Extracted text length:', extractedText.length);
+        console.log('Extracted text preview:', extractedText.substring(0, 200));
+        console.log('Texts are equal:', review.original_text.trim() === extractedText.trim());
         newRedlineHtml = generateRedlineHtml(review.original_text, extractedText);
+        console.log('Generated redline has <del>:', newRedlineHtml.includes('<del>'));
+        console.log('Generated redline has <ins>:', newRedlineHtml.includes('<ins>'));
       }
     } catch (ooxmlError) {
       // OOXML parsing failed - fall back to diff-match-patch
       console.log('OOXML parsing failed, using diff-match-patch fallback:', ooxmlError);
       extractedText = await extractTextFromDocx(buffer);
+      console.log('Extracted text length:', extractedText.length);
       newRedlineHtml = generateRedlineHtml(review.original_text, extractedText);
     }
 
