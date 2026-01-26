@@ -47,3 +47,33 @@ select option {
   background: #0d1d35;
   color: white;
 }
+
+/* Redline Editor Marks - ensures visibility regardless of TipTap styling */
+span[data-ai-strike],
+del {
+  color: #f87171 !important;
+  text-decoration: line-through !important;
+}
+
+span[data-ai-insert],
+ins {
+  color: #4ade80 !important;
+  text-decoration: underline !important;
+}
+
+span[data-approver-strike] {
+  color: #60A5FA !important;
+  text-decoration: line-through !important;
+}
+
+span[data-approver-insert] {
+  color: #60A5FA !important;
+  text-decoration: underline !important;
+}
+
+span[data-approver-comment] {
+  background-color: rgba(250, 204, 21, 0.3) !important;
+  padding: 0 2px;
+  border-radius: 2px;
+  cursor: pointer;
+}

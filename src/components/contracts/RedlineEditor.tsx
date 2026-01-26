@@ -100,11 +100,19 @@ const ApproverComment = Mark.create({
 
 // Helper to convert redline markup to HTML
 function formatRedlinesToHTML(text: string): string {
-  return text
-    // Handle HTML tags from diff-match-patch (must come first before other replacements)
-    .replace(/<del>([\s\S]*?)<\/del>/g,
+  // First, decode any HTML entities that might have escaped the tags
+  let processed = text
+    .replace(/&lt;del&gt;/gi, '<del>')
+    .replace(/&lt;\/del&gt;/gi, '</del>')
+    .replace(/&lt;ins&gt;/gi, '<ins>')
+    .replace(/&lt;\/ins&gt;/gi, '</ins>');
+
+  // Handle HTML tags from diff-match-patch (must come first before other replacements)
+  // Use more flexible regex that allows for attributes on the tags
+  processed = processed
+    .replace(/<del[^>]*>([\s\S]*?)<\/del>/gi,
       '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>')
-    .replace(/<ins>([\s\S]*?)<\/ins>/g,
+    .replace(/<ins[^>]*>([\s\S]*?)<\/ins>/gi,
       '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>')
     // Handle custom markup formats
     .replace(/\[strikethrough\]([\s\S]*?)\[\/strikethrough\]/g,
@@ -115,8 +123,14 @@ function formatRedlinesToHTML(text: string): string {
     .replace(/~~([\s\S]*?)~~/g,
       '<span data-ai-strike style="color: #f87171; text-decoration: line-through;">$1</span>')
     .replace(/\+\+([\s\S]*?)\+\+/g,
-      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>')
-    .replace(/\n/g, '<br>');
+      '<span data-ai-insert style="color: #4ade80; text-decoration: underline;">$1</span>');
+
+  // Convert newlines to <br> (but only if not already HTML)
+  if (!processed.includes('<br>') && !processed.includes('<p>')) {
+    processed = processed.replace(/\n/g, '<br>');
+  }
+
+  return processed;
 }
 
 // Generate HTML document for download
@@ -189,7 +203,11 @@ export default function RedlineEditor({
   const [zoomLevel, setZoomLevel] = useState(100);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const contentToUse = approverEditedContent || formatRedlinesToHTML(initialContent);
+  // Process both approver edited content and initial content through formatRedlinesToHTML
+  // This ensures any <del>/<ins> tags are properly converted regardless of source
+  const contentToUse = approverEditedContent
+    ? formatRedlinesToHTML(approverEditedContent)
+    : formatRedlinesToHTML(initialContent);
 
   const editor = useEditor({
     extensions: [
@@ -254,8 +272,10 @@ export default function RedlineEditor({
 
   useEffect(() => {
     if (editor && approverEditedContent) {
-      editor.commands.setContent(approverEditedContent);
-      extractComments(approverEditedContent);
+      // Also process approver content through formatRedlinesToHTML to handle any <del>/<ins> tags
+      const formattedContent = formatRedlinesToHTML(approverEditedContent);
+      editor.commands.setContent(formattedContent);
+      extractComments(formattedContent);
     }
   }, [editor, approverEditedContent, extractComments]);
 
