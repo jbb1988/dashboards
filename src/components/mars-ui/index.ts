@@ -1,21 +1,23 @@
 /**
- * MARS Design System - Component Library
+ * MARS Design System - Apple Pro Dark UI
  *
- * A unified design system combining patterns from:
- * - Mind-Muscle Admin (component structure, card variants)
- * - MARS Pipeline (KPI cards, stage colors, animations)
+ * 3-Level Elevation System:
+ * - L0: Base canvas with luminous radial gradient
+ * - L1: Content surfaces (cards, tables, panels)
+ * - L2: Active/focus surfaces (toolbars, modals, popovers)
  *
  * Usage:
  * ```tsx
- * import { Card, KPICard, Badge, ProgressBar } from '@/components/mars-ui';
+ * import { elevation, colors, KPICard, DashboardBackground } from '@/components/mars-ui';
  * ```
  */
 
 // =============================================================================
-// DESIGN TOKENS
+// DESIGN TOKENS - Apple Pro Elevation System
 // =============================================================================
 
 export {
+  elevation,
   colors,
   shadows,
   spacing,
@@ -26,6 +28,7 @@ export {
   getStatusClasses,
   getGlowShadow,
   getAccentColor,
+  getElevationStyle,
 } from './tokens';
 
 // =============================================================================

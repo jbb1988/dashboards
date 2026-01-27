@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { tokens, colors, shadows } from './tokens';
+import { elevation, colors, shadows } from './tokens';
 
 // =============================================================================
 // TYPES
@@ -33,14 +33,14 @@ export interface KPICardProps {
   trendLabel?: string;
   /** Optional badge count (e.g., for notifications) */
   badge?: number;
-  /** Enable gradient background effect (Mind-Muscle style) */
-  gradient?: boolean;
-  /** Glow intensity for the card */
-  glowIntensity?: 'none' | 'subtle' | 'strong';
   /** Invert trend color logic (e.g., for cost where down=good, up=bad) */
   invertTrendColor?: boolean;
   /** Tooltip text to show on hover */
   tooltip?: string;
+  /** @deprecated - Always uses Apple Pro L1 surface now */
+  gradient?: boolean;
+  /** @deprecated - Glow is now automatic */
+  glowIntensity?: 'none' | 'subtle' | 'strong';
 }
 
 // =============================================================================
@@ -83,16 +83,17 @@ export function AnimatedCounter({
 // =============================================================================
 
 /**
- * KPICard Component - Executive Command Center Design
+ * KPICard Component - Apple Pro L1 Surface Design
  *
- * A beautiful, interactive metric card with:
- * - Left accent bar in custom color
- * - Icon with colored background
+ * A luminous metric card with:
+ * - L1 surface gradient background
+ * - 30px 90px ambient shadow
+ * - Inner highlight (inset 0 1px)
+ * - Left accent bar with glow
+ * - Icon with colored background micro-pill
  * - Large value display
  * - Subtitle
  * - Optional trend indicator
- * - Click-to-filter functionality
- * - Framer Motion animations
  *
  * @example
  * ```tsx
@@ -101,7 +102,7 @@ export function AnimatedCounter({
  *   value={<AnimatedCounter value={125000} prefix="$" />}
  *   subtitle="This quarter"
  *   icon={<DollarIcon />}
- *   color="#30A46C"
+ *   color={colors.accent.green}
  *   trend="up"
  *   trendLabel="+12%"
  *   onClick={() => filterBy('revenue')}
@@ -120,28 +121,11 @@ export function KPICard({
   trend,
   trendLabel,
   badge,
-  gradient = true,
-  glowIntensity = 'subtle',
   invertTrendColor = false,
   tooltip,
+  gradient: _gradient,        // Deprecated - ignored
+  glowIntensity: _glowIntensity, // Deprecated - ignored
 }: KPICardProps) {
-  // Gradient styling inspired by Mind-Muscle project
-  const getGradientStyle = () => {
-    if (!gradient) return {};
-    const glowStrength = {
-      none: '0',
-      subtle: '0.1',
-      strong: '0.2',
-    }[glowIntensity];
-    return {
-      background: `linear-gradient(135deg, ${color}15 0%, #1B1F39 50%, #151821 100%)`,
-      borderColor: `${color}30`,
-      boxShadow: `0 8px 32px ${color}${glowStrength === '0.2' ? '30' : glowStrength === '0.1' ? '20' : '00'}, inset 0 1px 0 ${color}15`,
-    };
-  };
-
-  const gradientStyle = getGradientStyle();
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -149,49 +133,51 @@ export function KPICard({
       transition={{ delay, duration: 0.5 }}
       whileHover={{
         y: -2,
-        boxShadow: gradient
-          ? `0 16px 40px ${color}25, 0 0 30px ${color}15`
-          : `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${color}15`,
+        boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${color}20`,
       }}
       whileTap={{ scale: 0.995 }}
       onClick={onClick}
-      className={`
-        relative overflow-hidden rounded-xl p-5 cursor-pointer transition-all duration-150
-        ${gradient ? '' : `${tokens.bg.card} border ${tokens.border.subtle} ${tokens.shadow.card}`}
-        ${isActive
-          ? `${tokens.bg.elevated} shadow-[0_8px_24px_rgba(0,0,0,0.4),0_0_20px_${color}15]`
-          : `hover:${tokens.bg.elevated} hover:border-white/[0.1]`
-        }
-      `}
-      style={gradient ? { ...gradientStyle, border: `1px solid ${color}30` } : undefined}
+      className="relative overflow-hidden cursor-pointer transition-all duration-150"
+      style={{
+        background: elevation.L1.background,
+        boxShadow: isActive
+          ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${color}20, inset 0 1px 0 rgba(255,255,255,0.10)`
+          : elevation.L1.shadow,
+        borderRadius: elevation.L1.radius,
+        padding: '20px',
+      }}
     >
-      {/* Specular highlight (top edge) - only for gradient variant */}
-      {gradient && (
-        <div
-          className="absolute top-0 left-0 right-0 h-[1px]"
-          style={{
-            background: `linear-gradient(90deg, transparent 10%, ${color}40 50%, transparent 90%)`,
-          }}
-        />
-      )}
-
-      {/* Left accent bar - always visible */}
+      {/* Left accent bar with glow */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
-        style={{ background: gradient ? `linear-gradient(180deg, ${color} 0%, ${color}60 100%)` : color }}
+        className="absolute left-0 top-0 bottom-0 w-[2px]"
+        style={{
+          background: `linear-gradient(180deg, ${color} 0%, ${color}60 100%)`,
+          boxShadow: `0 0 12px ${color}60`,
+          borderRadius: `${elevation.L1.radius} 0 0 ${elevation.L1.radius}`,
+        }}
       />
 
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-1">
-          <span className={`text-[12px] font-semibold ${tokens.text.muted} uppercase tracking-[0.08em]`}>
+          <span
+            className="text-[12px] font-semibold uppercase tracking-[0.05em]"
+            style={{ color: colors.text.secondary }}
+          >
             {title}
           </span>
           {tooltip && (
             <div className="group relative">
-              <svg className="w-3.5 h-3.5 text-gray-500 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3.5 h-3.5 cursor-help" style={{ color: colors.text.muted }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <div className="absolute left-0 top-6 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 shadow-xl border border-gray-700">
+              <div
+                className="absolute left-0 top-6 w-64 p-2 text-xs rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10"
+                style={{
+                  background: elevation.L2.background,
+                  boxShadow: elevation.L2.shadow,
+                  color: colors.text.primary,
+                }}
+              >
                 {tooltip}
               </div>
             </div>
@@ -199,16 +185,20 @@ export function KPICard({
         </div>
         {icon && (
           <div className="relative">
+            {/* Icon micro-pill */}
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              className="w-8 h-8 rounded-[10px] flex items-center justify-center"
               style={{ background: `${color}15` }}
             >
-              <span style={{ color }} className="opacity-60">
+              <span style={{ color, opacity: 0.8 }}>
                 {icon}
               </span>
             </div>
             {badge !== undefined && badge > 0 && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#EF4444] rounded-full flex items-center justify-center">
+              <div
+                className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center"
+                style={{ background: colors.accent.red }}
+              >
                 <span className="text-[9px] font-bold text-white">
                   {badge > 9 ? '9+' : badge}
                 </span>
@@ -218,21 +208,25 @@ export function KPICard({
         )}
       </div>
 
-      <div className={`text-[28px] font-semibold ${tokens.text.primary} mb-1 tracking-tight`}>
+      <div
+        className="text-[28px] font-semibold mb-1 tracking-tight"
+        style={{ color: colors.text.primary }}
+      >
         {value}
       </div>
 
       <div className="flex items-center justify-between">
-        <div className={`text-[13px] ${tokens.text.secondary}`}>{subtitle}</div>
+        <div className="text-[13px]" style={{ color: colors.text.secondary }}>{subtitle}</div>
         {trend && trendLabel && (
           <div
-            className={`flex items-center gap-1 text-[11px] font-medium ${
-              trend === 'up'
-                ? invertTrendColor ? 'text-[#EF4444]' : 'text-[#22C55E]'
+            className="flex items-center gap-1 text-[11px] font-semibold"
+            style={{
+              color: trend === 'up'
+                ? invertTrendColor ? colors.accent.red : colors.accent.green
                 : trend === 'down'
-                ? invertTrendColor ? 'text-[#22C55E]' : 'text-[#EF4444]'
-                : tokens.text.muted
-            }`}
+                ? invertTrendColor ? colors.accent.green : colors.accent.red
+                : colors.text.muted
+            }}
           >
             {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'} {trendLabel}
           </div>

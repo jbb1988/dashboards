@@ -1,14 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { colors } from './tokens';
+import { elevation, colors } from './tokens';
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
 export interface DashboardBackgroundProps {
-  /** Primary accent color for the glow (defaults to cyan) */
+  /** Primary accent color for the glow (defaults to blue) */
   accentColor?: string;
   /** Secondary glow color (defaults to blue) */
   secondaryColor?: string;
@@ -16,66 +16,57 @@ export interface DashboardBackgroundProps {
   showParticles?: boolean;
   /** Number of particles (default 15) */
   particleCount?: number;
-  /** Grid line opacity (default 0.03) */
-  gridOpacity?: number;
+  /** Use noise texture overlay (default false) */
+  useNoise?: boolean;
   /** Custom className for the container */
   className?: string;
 }
 
 // =============================================================================
-// GRID BACKGROUND COMPONENT
+// APPLE PRO L0 CANVAS COMPONENT
 // =============================================================================
 
 /**
- * GridBackground - Animated grid with gradient overlay and radial glows
+ * AppleProCanvas - Luminous radial gradient background
  *
- * This creates the premium A+ dashboard aesthetic with:
- * - Gradient overlay
- * - Subtle grid pattern
- * - Radial glow effects
+ * Creates the Apple Pro L0 base canvas with:
+ * - Radial gradient with blue luminosity
+ * - Optional noise texture
+ * - No grid lines (deleted per spec)
  */
-function GridBackground({
-  accentColor = colors.accent.cyan,
-  secondaryColor = colors.accent.blue,
-  gridOpacity = 0.03,
+function AppleProCanvas({
+  accentColor = colors.accent.blue,
+  useNoise = false,
 }: {
   accentColor?: string;
-  secondaryColor?: string;
-  gridOpacity?: number;
+  useNoise?: boolean;
 }) {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Base gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0F1722] via-[#0F1722]/95 to-[#0F1722]" />
-
-      {/* Animated grid */}
+      {/* L0 - Base Canvas: Luminous radial gradient */}
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage: `
-            linear-gradient(to right, rgba(56, 189, 248, ${gridOpacity}) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(56, 189, 248, ${gridOpacity}) 1px, transparent 1px)
-          `,
-          backgroundSize: '60px 60px',
+          background: useNoise ? elevation.L0.backgroundNoise : elevation.L0.background,
         }}
       />
 
-      {/* Primary radial glow (top) */}
+      {/* Primary radial glow (top-center) - enhanced luminosity */}
       <div
-        className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[600px] rounded-full blur-[120px]"
-        style={{ backgroundColor: `${secondaryColor}10` }}
+        className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/4 w-[1200px] h-[800px] rounded-full blur-[150px]"
+        style={{ backgroundColor: `${accentColor}15` }}
       />
 
-      {/* Secondary radial glow (bottom-left) */}
+      {/* Secondary ambient glow (bottom-left) */}
       <div
-        className="absolute bottom-0 left-1/4 w-[400px] h-[400px] rounded-full blur-[100px]"
+        className="absolute bottom-0 left-1/4 w-[500px] h-[500px] rounded-full blur-[120px]"
         style={{ backgroundColor: `${accentColor}08` }}
       />
 
       {/* Tertiary glow (right side) */}
       <div
-        className="absolute top-1/2 right-0 w-[300px] h-[500px] rounded-full blur-[100px]"
-        style={{ backgroundColor: `${secondaryColor}05` }}
+        className="absolute top-1/3 right-0 w-[400px] h-[600px] rounded-full blur-[120px]"
+        style={{ backgroundColor: `${accentColor}06` }}
       />
     </div>
   );
@@ -90,7 +81,7 @@ function GridBackground({
  */
 function FloatingParticles({
   count = 15,
-  color = colors.accent.cyan,
+  color = colors.accent.blue,
 }: {
   count?: number;
   color?: string;
@@ -127,38 +118,37 @@ function FloatingParticles({
 // =============================================================================
 
 /**
- * DashboardBackground - Premium animated background for dashboards
+ * DashboardBackground - Apple Pro L0 Canvas
  *
- * Creates the A+ visual foundation with:
- * - Multi-layer gradient background
- * - Subtle animated grid
- * - Radial glow effects
+ * Creates the luminous foundation with:
+ * - Radial gradient (1200px 800px) with blue luminosity
+ * - Multiple ambient glow layers
  * - Optional floating particles
+ * - Optional noise texture
  *
  * @example
  * ```tsx
- * <div className="min-h-screen bg-[#0F1722]">
- *   <DashboardBackground accentColor="#38BDF8" showParticles />
+ * <div className="min-h-screen relative">
+ *   <DashboardBackground />
  *   <div className="relative z-10">
- *     // Dashboard content here (background is fixed and covers entire viewport)
+ *     // Dashboard content here
  *   </div>
  * </div>
  * ```
  */
 export function DashboardBackground({
-  accentColor = colors.accent.cyan,
+  accentColor = colors.accent.blue,
   secondaryColor = colors.accent.blue,
   showParticles = false,
   particleCount = 15,
-  gridOpacity = 0.03,
+  useNoise = false,
   className = '',
 }: DashboardBackgroundProps) {
   return (
     <div className={`fixed inset-0 pointer-events-none z-0 ${className}`}>
-      <GridBackground
+      <AppleProCanvas
         accentColor={accentColor}
-        secondaryColor={secondaryColor}
-        gridOpacity={gridOpacity}
+        useNoise={useNoise}
       />
       {showParticles && (
         <FloatingParticles
@@ -176,32 +166,38 @@ export function DashboardBackground({
 
 /**
  * Pre-configured background variants for different dashboard types
+ * All use Apple Pro blue luminosity base with accent variations
  */
 export const backgroundPresets = {
-  /** Contracts - Blue/Cyan theme */
-  contracts: {
-    accentColor: colors.accent.cyan,
+  /** Default - Blue luminosity */
+  default: {
+    accentColor: colors.accent.blue,
     secondaryColor: colors.accent.blue,
   },
-  /** PM - Red/Orange warm theme */
-  pm: {
-    accentColor: '#E16259',
-    secondaryColor: '#F97316',
+  /** Contracts - Blue luminosity */
+  contracts: {
+    accentColor: colors.accent.blue,
+    secondaryColor: colors.accent.blue,
   },
-  /** Finance - Green theme */
+  /** PM - Amber accent */
+  pm: {
+    accentColor: colors.accent.amber,
+    secondaryColor: colors.accent.blue,
+  },
+  /** Finance - Green accent */
   finance: {
     accentColor: colors.accent.green,
-    secondaryColor: colors.accent.cyan,
+    secondaryColor: colors.accent.blue,
   },
-  /** Admin - Purple theme */
+  /** Admin - Purple accent */
   admin: {
     accentColor: colors.accent.purple,
     secondaryColor: colors.accent.blue,
   },
-  /** Guides - Cyan/Blue theme */
+  /** Guides - Blue luminosity */
   guides: {
-    accentColor: colors.accent.cyan,
-    secondaryColor: colors.accent.purple,
+    accentColor: colors.accent.blue,
+    secondaryColor: colors.accent.blue,
   },
 } as const;
 

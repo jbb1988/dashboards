@@ -1,65 +1,122 @@
 /**
- * MARS Design System - Unified Design Tokens
+ * MARS Design System - Apple Pro Dark UI Tokens
  *
- * Combined design language from Mind-Muscle Admin + MARS Pipeline
- * Key principles:
- * - 4-layer luminance model (neutral slate, not navy)
- * - Cards that float with real shadows
- * - Semantic color usage only
- * - Readable text at all levels
+ * 3-Level Elevation System:
+ * - L0: Base canvas with luminous radial gradient
+ * - L1: Content surfaces (cards, tables, panels)
+ * - L2: Active/focus surfaces (toolbars, modals, popovers)
+ *
+ * Key Principles:
+ * - No flat black backgrounds
+ * - Every elevated surface has inner highlight
+ * - Ambient shadows (30px 90px), no sharp shadows
+ * - Color accents appear within 3 seconds of use
+ * - Document visually "floats" off the page
+ * - UI reads as luminous, not matte
  */
 
 // =============================================================================
-// COLOR TOKENS
+// APPLE PRO ELEVATION TOKENS
+// =============================================================================
+
+export const elevation = {
+  // L0 - Base Canvas: Luminous radial gradient
+  L0: {
+    background: 'radial-gradient(1200px 800px at 50% -20%, rgba(90,130,255,0.22), rgba(10,14,20,0.98) 60%)',
+    // Alternative with noise texture (optional)
+    backgroundNoise: `
+      radial-gradient(1200px 800px at 50% -20%, rgba(90,130,255,0.22), rgba(10,14,20,0.98) 60%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E")
+    `,
+  },
+
+  // L1 - Content Surface: Cards, tables, panels
+  L1: {
+    background: 'linear-gradient(180deg, rgba(28,36,52,0.88), rgba(18,24,36,0.96))',
+    shadow: '0 30px 90px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.08)',
+    halo: 'drop-shadow(0 0 120px rgba(90,130,255,0.15))',
+    radius: '16px',
+  },
+
+  // L2 - Active/Focus Surface: Toolbars, modals, popovers
+  L2: {
+    background: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
+    shadow: '0 30px 90px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.10)',
+    radius: '18px',
+  },
+
+  // Hover state for L1 rows
+  hoverRow: 'rgba(255,255,255,0.06)',
+} as const;
+
+// =============================================================================
+// COLOR TOKENS - Apple Pro Accents
 // =============================================================================
 
 export const colors = {
-  // BACKGROUNDS - 4 luminance layers
+  // BACKGROUNDS - Deprecated flat colors, use elevation instead
   bg: {
-    app: '#0D0E12',        // Layer 1: Darkest - page background
-    section: '#16181D',    // Layer 2: Section panels
-    card: '#1E2028',       // Layer 3: Cards - visibly floats
-    elevated: '#262932',   // Layer 4: Expanded/focus states
-    hover: '#2E323D',      // Hover state
+    app: '#0D0E12',        // Fallback only - prefer elevation.L0
+    section: '#16181D',    // Deprecated - use elevation.L1
+    card: '#1E2028',       // Deprecated - use elevation.L1
+    elevated: '#262932',   // Deprecated - use elevation.L2
+    hover: '#2E323D',      // Deprecated - use elevation.hoverRow
     input: '#121316',      // Input backgrounds (recessed)
   },
 
-  // BORDERS - Structural, visible
+  // BORDERS - Minimal use, prefer borderless with shadows
   border: {
-    subtle: '#2A2D37',     // Barely visible
-    default: '#363A47',    // Standard borders
-    strong: '#464B5A',     // Expanded/focus states
-    focus: '#5B8DEF',      // Focus ring
+    subtle: 'rgba(255,255,255,0.06)',
+    default: 'rgba(255,255,255,0.08)',
+    strong: 'rgba(255,255,255,0.12)',
+    focus: 'rgba(90,130,255,0.95)',
   },
 
-  // TEXT - Readable at all levels
+  // TEXT - Apple Pro off-white hierarchy
   text: {
-    primary: '#F0F2F5',    // Near white
-    secondary: '#A8AEBB',  // Readable gray
-    muted: '#7C8291',      // De-emphasized
-    accent: '#5B8DEF',     // Links, actions
+    primary: 'rgba(235,240,255,0.92)',    // Main text
+    secondary: 'rgba(200,210,235,0.75)',  // Section headers
+    muted: 'rgba(200,210,235,0.50)',      // De-emphasized
+    accent: 'rgba(90,130,255,0.95)',      // Links, active states
   },
 
-  // ACCENT COLORS - Semantic meaning only
+  // ACCENT COLORS - Required, not optional
   accent: {
-    blue: '#5B8DEF',       // Primary actions, info
-    cyan: '#38BDF8',       // Analytics, stages
-    green: '#30A46C',      // Success, complete
-    amber: '#D4A72C',      // Warning, attention
-    red: '#E5484D',        // Danger, overdue
-    purple: '#8B5CF6',     // Analysis, special
-    orange: '#F97316',     // Revenue, costs
+    blue: 'rgba(90,130,255,0.95)',        // Primary actions, active state, focus glow
+    cyan: '#38BDF8',                       // Analytics, stages (legacy)
+    green: 'rgba(80,210,140,0.95)',       // Success, complete
+    amber: 'rgba(255,190,90,0.95)',       // Warning, attention (text only)
+    red: 'rgba(255,95,95,0.95)',          // Danger, errors (text only)
+    purple: '#8B5CF6',                     // Analysis, special
+    orange: '#F97316',                     // Revenue, costs
+  },
+
+  // Glow variants for accents
+  glow: {
+    blue: 'rgba(90,130,255,0.25)',
+    green: 'rgba(80,210,140,0.25)',
+    amber: 'rgba(255,190,90,0.25)',
+    red: 'rgba(255,95,95,0.25)',
   },
 } as const;
 
 // =============================================================================
-// SHADOW TOKENS
+// SHADOW TOKENS - Apple Pro depth system
 // =============================================================================
 
 export const shadows = {
-  card: '0 2px 8px rgba(0,0,0,0.35), 0 0 1px rgba(0,0,0,0.2)',
-  elevated: '0 4px 16px rgba(0,0,0,0.45), 0 0 1px rgba(0,0,0,0.25)',
-  inner: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+  // L1 ambient shadow (no sharp shadows)
+  L1: '0 30px 90px rgba(0,0,0,0.75)',
+  // L2 ambient shadow
+  L2: '0 30px 90px rgba(0,0,0,0.75)',
+  // Inner highlight (mandatory on all elevated surfaces)
+  innerHighlight: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+  innerHighlightStrong: 'inset 0 1px 0 rgba(255,255,255,0.10)',
+  // Document halo
+  halo: 'drop-shadow(0 0 120px rgba(90,130,255,0.15))',
+  // Legacy
+  card: '0 30px 90px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.08)',
+  elevated: '0 30px 90px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.10)',
   glow: (color: string) => `0 8px 32px ${color}40, 0 0 20px ${color}25`,
 } as const;
 
@@ -77,19 +134,20 @@ export const spacing = {
 } as const;
 
 // =============================================================================
-// RADIUS TOKENS
+// RADIUS TOKENS - Apple Pro larger radii
 // =============================================================================
 
 export const radius = {
-  sm: '6px',
-  md: '8px',
-  lg: '12px',
-  xl: '16px',
+  sm: '10px',
+  md: '12px',
+  lg: '16px',
+  xl: '18px',
+  xxl: '20px',
   full: '9999px',
 } as const;
 
 // =============================================================================
-// TYPOGRAPHY TOKENS
+// TYPOGRAPHY TOKENS - Apple Pro heavier weight
 // =============================================================================
 
 export const typography = {
@@ -105,7 +163,7 @@ export const typography = {
     caption: '11px',
     tiny: '10px',
   },
-  // Font weights
+  // Font weights - heavier for Apple Pro
   weight: {
     normal: 400,
     medium: 500,
@@ -115,7 +173,7 @@ export const typography = {
   // Letter spacing
   tracking: {
     tight: '-0.02em',
-    normal: '0',
+    normal: '-0.01em',
     wide: '0.02em',
     wider: '0.05em',
   },
@@ -126,50 +184,50 @@ export const typography = {
 // =============================================================================
 
 export const tokens = {
-  // Background classes
+  // Background classes - use elevation system instead
   bg: {
-    app: 'bg-[#0D0E12]',
-    section: 'bg-[#16181D]',
-    card: 'bg-[#1E2028]',
-    elevated: 'bg-[#262932]',
-    hover: 'bg-[#2E323D]',
+    app: 'bg-[#0D0E12]',      // Fallback
+    section: 'bg-[#16181D]',  // Deprecated
+    card: 'bg-[#1E2028]',     // Deprecated
+    elevated: 'bg-[#262932]', // Deprecated
+    hover: 'bg-[#2E323D]',    // Deprecated
     input: 'bg-[#121316]',
   },
 
-  // Border classes
+  // Border classes - minimal use
   border: {
-    subtle: 'border-[#2A2D37]',
-    default: 'border-[#363A47]',
-    strong: 'border-[#464B5A]',
-    focus: 'border-[#5B8DEF]',
+    subtle: 'border-[rgba(255,255,255,0.06)]',
+    default: 'border-[rgba(255,255,255,0.08)]',
+    strong: 'border-[rgba(255,255,255,0.12)]',
+    focus: 'border-[rgba(90,130,255,0.95)]',
   },
 
-  // Text classes
+  // Text classes - Apple Pro off-white
   text: {
-    primary: 'text-[#F0F2F5]',
-    secondary: 'text-[#A8AEBB]',
-    muted: 'text-[#7C8291]',
-    accent: 'text-[#5B8DEF]',
+    primary: 'text-[rgba(235,240,255,0.92)]',
+    secondary: 'text-[rgba(200,210,235,0.75)]',
+    muted: 'text-[rgba(200,210,235,0.50)]',
+    accent: 'text-[rgba(90,130,255,0.95)]',
   },
 
-  // Shadow classes (inline style needed for complex shadows)
+  // Shadow classes
   shadow: {
-    card: 'shadow-[0_2px_8px_rgba(0,0,0,0.35),0_0_1px_rgba(0,0,0,0.2)]',
-    elevated: 'shadow-[0_4px_16px_rgba(0,0,0,0.45),0_0_1px_rgba(0,0,0,0.25)]',
-    inner: 'shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]',
+    card: 'shadow-[0_30px_90px_rgba(0,0,0,0.75)]',
+    elevated: 'shadow-[0_30px_90px_rgba(0,0,0,0.75)]',
+    inner: 'shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
   },
 
-  // Radius classes
+  // Radius classes - Apple Pro larger
   radius: {
-    sm: 'rounded-[6px]',
-    md: 'rounded-lg',
-    lg: 'rounded-xl',
-    xl: 'rounded-2xl',
+    sm: 'rounded-[10px]',
+    md: 'rounded-xl',
+    lg: 'rounded-2xl',
+    xl: 'rounded-[18px]',
     full: 'rounded-full',
-    // Aliases for backwards compatibility
-    card: 'rounded-xl',      // Same as lg
-    control: 'rounded-lg',   // Same as md
-    pill: 'rounded-full',    // Same as full
+    // Aliases
+    card: 'rounded-2xl',
+    control: 'rounded-xl',
+    pill: 'rounded-full',
   },
 
   // Spacing classes
@@ -178,31 +236,31 @@ export const tokens = {
     card: 'space-y-4',
   },
 
-  // Status colors (for semantic use)
+  // Status colors - Apple Pro accents
   status: {
     danger: {
-      dot: 'bg-[#E5484D]',
-      text: 'text-[#E5484D]',
-      bg: 'bg-[#E5484D]/10',
-      border: 'border-[#E5484D]/30',
+      dot: 'bg-[rgba(255,95,95,0.95)]',
+      text: 'text-[rgba(255,95,95,0.95)]',
+      bg: 'bg-[rgba(255,95,95,0.08)]',
+      border: 'border-[rgba(255,95,95,0.20)]',
     },
     warning: {
-      dot: 'bg-[#D4A72C]',
-      text: 'text-[#D4A72C]',
-      bg: 'bg-[#D4A72C]/10',
-      border: 'border-[#D4A72C]/30',
+      dot: 'bg-[rgba(255,190,90,0.95)]',
+      text: 'text-[rgba(255,190,90,0.95)]',
+      bg: 'bg-[rgba(255,190,90,0.08)]',
+      border: 'border-[rgba(255,190,90,0.20)]',
     },
     info: {
-      dot: 'bg-[#5B8DEF]',
-      text: 'text-[#5B8DEF]',
-      bg: 'bg-[#5B8DEF]/10',
-      border: 'border-[#5B8DEF]/30',
+      dot: 'bg-[rgba(90,130,255,0.95)]',
+      text: 'text-[rgba(90,130,255,0.95)]',
+      bg: 'bg-[rgba(90,130,255,0.08)]',
+      border: 'border-[rgba(90,130,255,0.20)]',
     },
     success: {
-      dot: 'bg-[#30A46C]',
-      text: 'text-[#30A46C]',
-      bg: 'bg-[#30A46C]/10',
-      border: 'border-[#30A46C]/30',
+      dot: 'bg-[rgba(80,210,140,0.95)]',
+      text: 'text-[rgba(80,210,140,0.95)]',
+      bg: 'bg-[rgba(80,210,140,0.08)]',
+      border: 'border-[rgba(80,210,140,0.20)]',
     },
     purple: {
       dot: 'bg-[#8B5CF6]',
@@ -300,4 +358,16 @@ export function getGlowShadow(color: string) {
  */
 export function getAccentColor(name: keyof typeof colors.accent) {
   return colors.accent[name];
+}
+
+/**
+ * Get elevation styles for a surface level
+ */
+export function getElevationStyle(level: 'L0' | 'L1' | 'L2') {
+  const el = elevation[level];
+  return {
+    background: el.background,
+    boxShadow: 'shadow' in el ? el.shadow : undefined,
+    borderRadius: 'radius' in el ? el.radius : undefined,
+  };
 }
