@@ -228,7 +228,7 @@ export default function WIPTable({ data }: WIPTableProps) {
                     <div className="flex-1 min-w-[150px] px-4 py-4">
                       {shopStatus ? (
                         <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStageColor(shopStatus)}`}>
-                          {shopStatus}
+                          {shopStatus}{wo.status ? ` (${wo.status})` : ''}
                         </span>
                       ) : (
                         <span className="text-gray-500">-</span>
