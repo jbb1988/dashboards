@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import {
   Plus,
   FileText,
@@ -16,8 +17,13 @@ import {
   CheckCircle,
   FileCheck,
 } from 'lucide-react';
-import DOMPurify from 'dompurify';
 import { elevation, colors } from '@/components/mars-ui/tokens';
+
+// Dynamically import RedlineEditor to avoid SSR issues with TipTap
+const RedlineEditor = dynamic(
+  () => import('@/components/contracts/RedlineEditor'),
+  { ssr: false, loading: () => <div className="h-full bg-[rgba(20,30,50,0.5)] animate-pulse rounded-xl" /> }
+);
 import type {
   Contract,
   ReviewResult,
@@ -436,15 +442,6 @@ export default function ContractCenterContent({
     e.preventDefault();
   }, []);
 
-  // Format redlines for display
-  const formatRedlines = (text: string): string => {
-    return text
-      .replace(/\[strikethrough\](.*?)\[\/strikethrough\]/g, '<del class="text-red-400 bg-red-500/20 line-through">$1</del>')
-      .replace(/\[underline\](.*?)\[\/underline\]/g, '<ins class="text-green-400 bg-green-500/20 underline no-underline">$1</ins>')
-      .replace(/~~(.*?)~~/g, '<del class="text-red-400 bg-red-500/20 line-through">$1</del>')
-      .replace(/\+\+(.*?)\+\+/g, '<ins class="text-green-400 bg-green-500/20 underline">$1</ins>');
-  };
-
   // ===========================================================================
   // RENDER
   // ===========================================================================
@@ -684,19 +681,12 @@ export default function ContractCenterContent({
           </div>
 
           {/* Document Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div
-              className="max-w-4xl mx-auto rounded-2xl p-8"
-              style={{
-                background: elevation.L1.background,
-                boxShadow: elevation.L1.shadow,
-              }}
-            >
-              <div
-                className="prose prose-invert max-w-none text-[14px] leading-relaxed"
-                dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(formatRedlines(currentResult.redlinedText || ''))
-                }}
+          <div className="flex-1 overflow-auto">
+            <div className="max-w-5xl mx-auto mt-10 mb-10 doc-surface min-h-[calc(100vh-200px)]">
+              <RedlineEditor
+                initialContent={currentResult.redlinedText}
+                readOnly={true}
+                contractName={contracts.find(c => c.id === selectedContract)?.name || provisionName || 'Contract Review'}
               />
             </div>
           </div>
@@ -731,27 +721,20 @@ export default function ContractCenterContent({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
-            {/* Show full redlined content if available */}
+          <div className="flex-1 overflow-auto">
+            {/* Show full redlined content using RedlineEditor if available */}
             {currentResult?.redlinedText ? (
-              <div
-                className="max-w-4xl mx-auto rounded-2xl p-8"
-                style={{
-                  background: elevation.L1.background,
-                  boxShadow: elevation.L1.shadow,
-                }}
-              >
-                <div
-                  className="prose prose-invert max-w-none text-[14px] leading-relaxed"
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(formatRedlines(currentResult.redlinedText || ''))
-                  }}
+              <div className="max-w-5xl mx-auto mt-10 mb-10 doc-surface min-h-[calc(100vh-200px)]">
+                <RedlineEditor
+                  initialContent={currentResult.redlinedText}
+                  readOnly={true}
+                  contractName={(selectedItem.data as Approval).contractName}
                 />
               </div>
             ) : (
               /* Fallback to summary if full text not available */
               <div
-                className="max-w-4xl mx-auto rounded-2xl p-8"
+                className="max-w-4xl mx-auto mt-10 mb-10 rounded-2xl p-8"
                 style={{
                   background: elevation.L1.background,
                   boxShadow: elevation.L1.shadow,
