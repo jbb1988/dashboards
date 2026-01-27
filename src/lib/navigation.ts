@@ -18,10 +18,10 @@ export interface Department {
   dashboards: DashboardItem[];
 }
 
-// Badge/data source color mapping
+// Badge/data source color mapping - colors match DataSourceIndicator
 export const badgeColors: Record<string, string> = {
-  Salesforce: 'bg-[#38BDF8]',
-  Asana: 'bg-[#E16259]',
+  Salesforce: 'bg-[#00A1E0]',
+  Asana: 'bg-[#F06A6A]',
   Excel: 'bg-[#22C55E]',
   Claude: 'bg-[#D97706]',
   NetSuite: 'bg-[#F97316]',
@@ -156,11 +156,11 @@ export function getSidebarGroups(): { name: string; dashboards: DashboardItem[] 
   return Object.entries(groups).map(([name, dashboards]) => ({ name, dashboards }));
 }
 
-// Data sources shown on home page
+// Data sources shown on home page - colors match DataSourceIndicator
 export const dataSources = [
-  { name: 'Salesforce', color: 'bg-[#38BDF8]' },
-  { name: 'Asana', color: 'bg-[#E16259]' },
-  { name: 'DocuSign', color: 'bg-[#FFD700]' },
+  { name: 'Salesforce', color: 'bg-[#00A1E0]' },
+  { name: 'Asana', color: 'bg-[#F06A6A]' },
+  { name: 'DocuSign', color: 'bg-[#FFCC00]' },
   { name: 'PandaDoc', color: 'bg-[#5BBB4E]' },
   { name: 'NetSuite', color: 'bg-[#F97316]' },
   { name: 'Smartsheet', color: 'bg-[#0073EA]' },

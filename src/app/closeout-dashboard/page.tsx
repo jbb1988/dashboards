@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, DataSourceIndicator } from '@/components/mars-ui';
 import ProfitabilityDashboard from './components/ProfitabilityDashboard';
 
 export default function CloseoutDashboard() {
@@ -33,6 +33,10 @@ export default function CloseoutDashboard() {
                   Financial Performance & Margin Analysis
                 </p>
               </div>
+              <DataSourceIndicator
+                source="netsuite"
+                lastUpdated={new Date().toISOString()}
+              />
             </div>
           </div>
         </header>

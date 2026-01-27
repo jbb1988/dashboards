@@ -4,7 +4,7 @@ import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, DataSourceIndicator } from '@/components/mars-ui';
 import OperationsCommandCenter from './components/OperationsCommandCenter';
 
 function OperationsContent() {
@@ -35,6 +35,10 @@ function OperationsContent() {
                   Order → Cash Visibility & Inventory Status
                 </p>
               </div>
+              <DataSourceIndicator
+                source="netsuite"
+                lastUpdated={new Date().toISOString()}
+              />
             </div>
           </div>
         </header>

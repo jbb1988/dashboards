@@ -283,7 +283,7 @@ export default function ManagementDashboard() {
               {/* Data Source Indicator */}
               <div className="flex items-center gap-3">
                 <DataSourceIndicator
-                  source="supabase"
+                  source="smartsheet"
                   lastUpdated={data?.lastSynced || null}
                   isSyncing={loading}
                 />
