@@ -276,16 +276,16 @@ export default function EditorToolbar({
 
       {/* Comment Input Popover */}
       {showCommentInput && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-[#2D343B] border border-white/15 rounded-lg shadow-xl p-3 w-80">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-[rgba(255,255,255,0.88)]">Add Comment</span>
+        <div className="absolute top-full left-4 mt-2 z-50 glass-panel rounded-xl shadow-2xl p-4 w-80">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-[rgba(255,255,255,0.92)]">Add Comment</span>
             <button
               type="button"
               onClick={() => {
                 setShowCommentInput(false);
                 setCommentText('');
               }}
-              className="text-[rgba(255,255,255,0.62)] hover:text-[rgba(255,255,255,0.88)]"
+              className="p-1 rounded-md text-[rgba(255,255,255,0.55)] hover:text-[rgba(255,255,255,0.88)] hover:bg-white/5 transition-all"
             >
               <X className="w-4 h-4" />
             </button>
@@ -297,16 +297,16 @@ export default function EditorToolbar({
             onChange={(e) => setCommentText(e.target.value)}
             onKeyDown={handleCommentKeyDown}
             placeholder="Enter your comment..."
-            className="w-full px-3 py-2 bg-[#1B1F24] border border-white/10 rounded text-[rgba(255,255,255,0.88)] text-sm focus:outline-none focus:border-[#58A6FF] placeholder:text-[rgba(255,255,255,0.4)]"
+            className="w-full px-3 py-2.5 bg-[var(--approval-bg-base)] border border-white/10 rounded-lg text-[rgba(255,255,255,0.88)] text-sm focus:outline-none focus:border-[#58A6FF] focus:ring-1 focus:ring-[#58A6FF]/30 placeholder:text-[rgba(255,255,255,0.35)] transition-all"
           />
-          <div className="flex justify-end gap-2 mt-2">
+          <div className="flex justify-end gap-2 mt-3">
             <button
               type="button"
               onClick={() => {
                 setShowCommentInput(false);
                 setCommentText('');
               }}
-              className="px-3 py-1 text-sm text-[rgba(255,255,255,0.62)] hover:text-[rgba(255,255,255,0.88)]"
+              className="px-3 py-1.5 text-sm font-medium text-[rgba(255,255,255,0.55)] hover:text-[rgba(255,255,255,0.88)] transition-colors"
             >
               Cancel
             </button>
@@ -314,7 +314,7 @@ export default function EditorToolbar({
               type="button"
               onClick={handleCommentSubmit}
               disabled={!commentText.trim()}
-              className="px-3 py-1 text-sm bg-[#58A6FF] text-white rounded hover:bg-[#58A6FF]/80 disabled:opacity-50"
+              className="px-4 py-1.5 text-sm font-medium bg-[#58A6FF] text-white rounded-lg hover:bg-[#58A6FF]/90 disabled:opacity-50 transition-colors shadow-sm"
             >
               Add
             </button>

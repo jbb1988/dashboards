@@ -11,7 +11,7 @@ import { ActivityLogEntry } from '@/components/contracts/ActivityLog';
 // Dynamically import RedlineEditor to avoid SSR issues with TipTap
 const RedlineEditor = dynamic(
   () => import('@/components/contracts/RedlineEditor'),
-  { ssr: false, loading: () => <div className="h-full bg-[#1B1F24] animate-pulse rounded" /> }
+  { ssr: false, loading: () => <div className="h-full bg-[var(--approval-bg-surface)] animate-pulse rounded-xl" /> }
 );
 
 interface Document {
@@ -559,29 +559,33 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
       {/* Success State Overlay */}
       {decision && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           className="fixed bottom-6 right-6 z-50"
         >
-          <div className={`px-4 py-3 rounded-lg shadow-lg bg-[#242A30] border ${
+          <div className={`px-5 py-3.5 rounded-xl shadow-2xl glass-panel ${
             decision === 'approve'
-              ? 'border-[#238636]/50'
-              : 'border-[#F85149]/50'
+              ? 'border-[#238636]/40'
+              : 'border-[#F85149]/40'
           }`}>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {decision === 'approve' ? (
                 <>
-                  <svg className="w-5 h-5 text-[#3FB950]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-[rgba(255,255,255,0.88)] font-medium text-sm">Contract Approved</span>
+                  <div className="w-7 h-7 rounded-full bg-[#3FB950]/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-[#3FB950]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-[rgba(255,255,255,0.92)] font-semibold text-sm">Contract Approved</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-5 h-5 text-[#F85149]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  <span className="text-[rgba(255,255,255,0.88)] font-medium text-sm">Contract Rejected</span>
+                  <div className="w-7 h-7 rounded-full bg-[#F85149]/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-[#F85149]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <span className="text-[rgba(255,255,255,0.92)] font-semibold text-sm">Contract Rejected</span>
                 </>
               )}
             </div>
