@@ -254,12 +254,41 @@ export default function ContractCommandCenter() {
     setContextPanelTab(null);
   }, []);
 
-  const handleSelectApproval = useCallback((approval: Approval) => {
+  const handleSelectApproval = useCallback(async (approval: Approval) => {
     setSelectedItem({ type: 'approval', id: approval.reviewId, data: approval });
     setContentMode('viewing-approval');
     setContextPanelTab('summary');
+    setCurrentResult(null); // Clear while loading
 
-    // Try to find the matching history item to load full review data
+    // Fetch from the by-token endpoint which properly regenerates redline HTML
+    if (approval.approvalToken) {
+      try {
+        const response = await fetch(`/api/contracts/review/by-token/${approval.approvalToken}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.id) {
+            setCurrentResult({
+              redlinedText: data.redlinedText || '',
+              originalText: data.originalText || '',
+              modifiedText: data.modifiedText || '',
+              summary: data.summary || approval.summary,
+              timestamp: data.submittedAt || approval.submittedAt,
+              riskScores: data.riskScores,
+            });
+            setProvisionName(data.provisionName || approval.provisionName || '');
+            if (data.contractId) {
+              setSelectedContract(data.contractId);
+            }
+            setLastReviewId(data.id);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch review by token:', err);
+      }
+    }
+
+    // Fallback: Try to find from history if token fetch failed
     const historyItem = history.find(h => h.id === approval.reviewId);
     if (historyItem?.originalText && historyItem?.redlinedText) {
       setCurrentResult({
@@ -274,9 +303,6 @@ export default function ContractCommandCenter() {
         setSelectedContract(historyItem.contractId);
       }
       setLastReviewId(historyItem.id);
-    } else {
-      // If no history item found, clear the result (approval view will show summary only)
-      setCurrentResult(null);
     }
   }, [history]);
 
