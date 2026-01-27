@@ -3,13 +3,38 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets, KPICard } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard, elevation, colors } from '@/components/mars-ui';
 import SmartProjectsTab from '@/components/SmartProjectsTab';
 import TaskDetailDrawer from '@/components/TaskDetailDrawer';
 import DocuSignDetailDrawer from '@/components/DocuSignDetailDrawer';
 import { ContinuousCalendar, CalendarEvent } from '@/components/calendar';
 
 type TabType = 'smart' | 'timeline' | 'mcc' | 'punchlist' | 'docusign';
+
+// Apple Pro Design Tokens - Local reference for inline styles
+const appleTokens = {
+  // Surfaces
+  surfaceL1: elevation.L1.background,
+  surfaceL2: elevation.L2.background,
+  // Shadows
+  shadowL1: elevation.L1.shadow,
+  shadowL2: elevation.L2.shadow,
+  radiusL1: elevation.L1.radius,
+  radiusL2: elevation.L2.radius,
+  hoverRow: elevation.hoverRow,
+  // Text
+  textPrimary: colors.text.primary,
+  textSecondary: colors.text.secondary,
+  textMuted: colors.text.muted,
+  textAccent: colors.text.accent,
+  // Accents
+  accentBlue: colors.accent.blue,
+  accentAmber: colors.accent.amber,
+  accentGreen: colors.accent.green,
+  accentRed: colors.accent.red,
+  accentPurple: colors.accent.purple,
+  accentCyan: colors.accent.cyan,
+};
 
 interface AsanaTask {
   gid: string;
@@ -85,24 +110,39 @@ function isDueSoon(dateStr: string | null): boolean {
   return diff >= 0 && diff <= 7;
 }
 
-// Tab Button
+// Tab Button - Apple Pro L2 toolbar micro-pill style
 function TabButton({ tab, activeTab, onClick, label, count, icon }: {
   tab: TabType; activeTab: TabType; onClick: (tab: TabType) => void; label: string; count?: number; icon: React.ReactNode;
 }) {
   const isActive = tab === activeTab;
   return (
-    <button onClick={() => onClick(tab)} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-150 font-medium text-[13px] ${isActive ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'text-[#8FA3BF] hover:bg-white/5 hover:text-[#CBD5E1]'}`}>
-      <span className={isActive ? 'text-[#E16259]' : 'text-[#64748B]'}>{icon}</span>
+    <button
+      onClick={() => onClick(tab)}
+      className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] transition-all duration-150 font-semibold text-[13px]"
+      style={{
+        background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
+        borderLeft: isActive ? `2px solid ${appleTokens.accentBlue}` : '2px solid transparent',
+        color: isActive ? appleTokens.textPrimary : appleTokens.textMuted,
+      }}
+    >
+      <span style={{ color: isActive ? appleTokens.accentBlue : appleTokens.textMuted }}>{icon}</span>
       {label}
-      {count !== undefined && <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-[#E16259]/20' : 'bg-white/5'}`}>{count}</span>}
+      {count !== undefined && (
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded-full"
+          style={{ background: isActive ? `${appleTokens.accentBlue}20` : 'rgba(255,255,255,0.06)' }}
+        >
+          {count}
+        </span>
+      )}
     </button>
   );
 }
 
-// Asana-style colors
+// Asana-style colors - mapped to Apple Pro accents
 const ASANA_COLORS = {
-  placeholder: '#F1BD6C', // Yellow
-  confirmed: '#7FBA7A',   // Green
+  placeholder: appleTokens.accentAmber,
+  confirmed: appleTokens.accentGreen,
 };
 
 // Helper to map AsanaTask to CalendarEvent
@@ -148,7 +188,7 @@ function getTaskStatus(task: AsanaTask): 'confirmed' | 'placeholder' | null {
   return null;
 }
 
-// Fortune 500 Tooltip - Solid, sophisticated, no blur
+// Apple Pro L2 Tooltip - Solid, sophisticated, ambient shadow
 function TaskTooltip({ task, position, onClose }: {
   task: AsanaTask;
   position: { x: number; y: number };
@@ -177,7 +217,7 @@ function TaskTooltip({ task, position, onClose }: {
   }
 
   const statusColor = taskStatus === 'confirmed' ? ASANA_COLORS.confirmed :
-                      taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : '#64748B';
+                      taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : appleTokens.textMuted;
 
   return (
     <motion.div
@@ -188,9 +228,16 @@ function TaskTooltip({ task, position, onClose }: {
       className="fixed z-[100] pointer-events-none"
       style={{ left: position.x, top: position.y - 8, transform: 'translateX(-50%) translateY(-100%)' }}
     >
-      <div className="bg-[#1A1F2E] border border-[#2D3748] rounded-lg shadow-lg shadow-black/20 p-4 min-w-[280px] max-w-[320px]">
+      <div
+        className="p-4 min-w-[280px] max-w-[320px]"
+        style={{
+          background: appleTokens.surfaceL2,
+          boxShadow: appleTokens.shadowL2,
+          borderRadius: appleTokens.radiusL2,
+        }}
+      >
         {/* Project Name */}
-        <div className="text-[14px] font-semibold text-white mb-3 leading-tight">
+        <div className="text-[14px] font-semibold mb-3 leading-tight" style={{ color: appleTokens.textPrimary }}>
           {task.name}
         </div>
 
@@ -198,7 +245,7 @@ function TaskTooltip({ task, position, onClose }: {
         <div className="flex items-center gap-2 mb-3">
           {taskStatus && (
             <span
-              className="text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded"
+              className="text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded-[8px]"
               style={{
                 backgroundColor: statusColor,
                 color: taskStatus === 'placeholder' ? '#1A1F2E' : 'white'
@@ -207,13 +254,16 @@ function TaskTooltip({ task, position, onClose }: {
               {taskStatus}
             </span>
           )}
-          <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded bg-[#2D3748] text-[#94A3B8]">
+          <span
+            className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded-[8px]"
+            style={{ background: 'rgba(255,255,255,0.06)', color: appleTokens.textSecondary }}
+          >
             {duration} {duration === 1 ? 'day' : 'days'}
           </span>
         </div>
 
         {/* Dates */}
-        <div className="text-[11px] text-[#64748B] mb-3">
+        <div className="text-[11px] mb-3" style={{ color: appleTokens.textMuted }}>
           {startDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           {endDate && startDate?.getTime() !== endDate?.getTime() && (
             <> → {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
@@ -224,37 +274,40 @@ function TaskTooltip({ task, position, onClose }: {
         </div>
 
         {/* Divider */}
-        <div className="h-px bg-[#2D3748] mb-3" />
+        <div className="h-px mb-3" style={{ background: 'rgba(255,255,255,0.06)' }} />
 
         {/* Assignee & Region */}
         <div className="mb-3">
-          <div className="text-[13px] text-white font-medium">
+          <div className="text-[13px] font-medium" style={{ color: appleTokens.textPrimary }}>
             {task.assignee?.name || 'Unassigned'}
           </div>
           {region && (
-            <div className="text-[12px] text-[#64748B]">{region}</div>
+            <div className="text-[12px]" style={{ color: appleTokens.textMuted }}>{region}</div>
           )}
         </div>
 
         {/* Progress Bar */}
         <div className="flex items-center gap-2">
-          <div className="flex-1 h-[3px] bg-[#2D3748] rounded-full overflow-hidden">
+          <div className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{ width: `${progress}%`, backgroundColor: statusColor }}
             />
           </div>
-          <span className="text-[10px] text-[#64748B] font-medium w-8 text-right">{progress}%</span>
+          <span className="text-[10px] font-medium w-8 text-right" style={{ color: appleTokens.textMuted }}>{progress}%</span>
         </div>
       </div>
 
       {/* Arrow pointer */}
-      <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 bg-[#1A1F2E] border-r border-b border-[#2D3748] transform rotate-45" />
+      <div
+        className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 transform rotate-45"
+        style={{ background: appleTokens.surfaceL2 }}
+      />
     </motion.div>
   );
 }
 
-// Gantt Bar Component with urgency styling
+// Gantt Bar Component with urgency styling - Apple Pro accents
 function GanttBar({
   task,
   startCol,
@@ -270,7 +323,7 @@ function GanttBar({
 }) {
   const taskStatus = getTaskStatus(task);
   const bgColor = taskStatus === 'confirmed' ? ASANA_COLORS.confirmed :
-                  taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : '#64748B';
+                  taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : appleTokens.textMuted;
 
   const overdue = isOverdue(task.dueOn);
   const dueSoon = isDueSoon(task.dueOn) && !overdue;
@@ -278,16 +331,17 @@ function GanttBar({
 
   return (
     <div
-      className={`absolute h-[22px] rounded cursor-pointer transition-all duration-100 flex items-center px-2 overflow-hidden group hover:brightness-110 hover:scale-[1.02]
-        ${overdue ? 'ring-2 ring-[#EF4444] ring-offset-1 ring-offset-[#151F2E]' : ''}
-        ${dueToday ? 'ring-2 ring-[#F59E0B] ring-offset-1 ring-offset-[#151F2E] animate-pulse' : ''}
-        ${dueSoon && !dueToday ? 'border-l-4 border-l-[#F59E0B]' : ''}
+      className={`absolute h-[22px] rounded-[8px] cursor-pointer transition-all duration-100 flex items-center px-2 overflow-hidden group hover:brightness-110 hover:scale-[1.02]
+        ${overdue ? `ring-2 ring-[${appleTokens.accentRed}] ring-offset-1 ring-offset-transparent` : ''}
+        ${dueToday ? `ring-2 ring-[${appleTokens.accentAmber}] ring-offset-1 ring-offset-transparent animate-pulse` : ''}
+        ${dueSoon && !dueToday ? `border-l-4` : ''}
       `}
       style={{
         left: `calc(${(startCol / 7) * 100}% + 4px)`,
         width: `calc(${(spanCols / 7) * 100}% - 8px)`,
         top: `${28 + row * 26}px`,
         backgroundColor: bgColor,
+        borderLeftColor: dueSoon && !dueToday ? appleTokens.accentAmber : undefined,
       }}
       onClick={() => onClick(task)}
     >
@@ -648,62 +702,100 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
     <div>
       {/* Stats with Confirmed and Placeholder */}
       <div className="grid grid-cols-6 gap-4 mb-6">
-        <KPICard title="Total Projects" value={data.stats.total} subtitle={`${tasksWithDates} scheduled`} color="#E16259" />
+        <KPICard title="Total Projects" value={data.stats.total} subtitle={`${tasksWithDates} scheduled`} color={appleTokens.accentBlue} />
         <KPICard title="Confirmed" value={confirmedCount} subtitle="Ready to go" color={ASANA_COLORS.confirmed} />
         <KPICard title="Placeholder" value={placeholderCount} subtitle="Tentative" color={ASANA_COLORS.placeholder} />
-        <KPICard title="Overdue" value={data.stats.overdue} subtitle="Need attention" color="#EF4444" />
-        <KPICard title="Next 7 Days" value={data.stats.dueSoon} subtitle="Due soon" color="#38BDF8" />
-        <KPICard title="Unassigned" value={data.stats.unassigned} subtitle="Need owner" color="#8B5CF6" />
+        <KPICard title="Overdue" value={data.stats.overdue} subtitle="Need attention" color={appleTokens.accentRed} />
+        <KPICard title="Next 7 Days" value={data.stats.dueSoon} subtitle="Due soon" color={appleTokens.accentCyan} />
+        <KPICard title="Unassigned" value={data.stats.unassigned} subtitle="Need owner" color={appleTokens.accentPurple} />
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4 mb-6 p-4 rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+      {/* Filters - L2 Toolbar */}
+      <div
+        className="flex items-center gap-4 mb-6 p-4"
+        style={{
+          background: appleTokens.surfaceL2,
+          boxShadow: appleTokens.shadowL2,
+          borderRadius: appleTokens.radiusL2,
+        }}
+      >
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-[#475569] uppercase">View:</span>
-          <button onClick={() => setViewMode('calendar')} className={`text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${viewMode === 'calendar' ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
+          <span className="text-[11px] font-semibold uppercase" style={{ color: appleTokens.textMuted }}>View:</span>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className="text-[11px] px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 transition-all"
+            style={{
+              background: viewMode === 'calendar' ? `${appleTokens.accentBlue}20` : 'rgba(255,255,255,0.05)',
+              borderLeft: viewMode === 'calendar' ? `2px solid ${appleTokens.accentBlue}` : '2px solid transparent',
+              color: viewMode === 'calendar' ? appleTokens.textPrimary : appleTokens.textMuted,
+            }}
+          >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             Calendar
           </button>
-          <button onClick={() => setViewMode('list')} className={`text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${viewMode === 'list' ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
+          <button
+            onClick={() => setViewMode('list')}
+            className="text-[11px] px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 transition-all"
+            style={{
+              background: viewMode === 'list' ? `${appleTokens.accentBlue}20` : 'rgba(255,255,255,0.05)',
+              borderLeft: viewMode === 'list' ? `2px solid ${appleTokens.accentBlue}` : '2px solid transparent',
+              color: viewMode === 'list' ? appleTokens.textPrimary : appleTokens.textMuted,
+            }}
+          >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
             List
           </button>
         </div>
         {viewMode === 'list' && (
           <>
-            <div className="h-4 w-px bg-white/10" />
+            <div className="h-4 w-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-[#475569] uppercase">Date Range:</span>
+              <span className="text-[11px] font-semibold uppercase" style={{ color: appleTokens.textMuted }}>Date Range:</span>
               {(['week', 'month', 'quarter', 'all'] as const).map(range => (
-                <button key={range} onClick={() => setDateRange(range)} className={`text-[11px] px-3 py-1.5 rounded-lg capitalize ${dateRange === range ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
+                <button
+                  key={range}
+                  onClick={() => setDateRange(range)}
+                  className="text-[11px] px-3 py-1.5 rounded-[10px] capitalize transition-all"
+                  style={{
+                    background: dateRange === range ? `${appleTokens.accentBlue}20` : 'rgba(255,255,255,0.05)',
+                    borderLeft: dateRange === range ? `2px solid ${appleTokens.accentBlue}` : '2px solid transparent',
+                    color: dateRange === range ? appleTokens.textPrimary : appleTokens.textMuted,
+                  }}
+                >
                   {range === 'all' ? 'All Time' : range}
                 </button>
               ))}
             </div>
           </>
         )}
-        <div className="h-4 w-px bg-white/10" />
+        <div className="h-4 w-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-[#475569] uppercase">Type:</span>
-          <select value={scheduleFilter} onChange={e => setScheduleFilter(e.target.value)} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white">
+          <span className="text-[11px] font-semibold uppercase" style={{ color: appleTokens.textMuted }}>Type:</span>
+          <select
+            value={scheduleFilter}
+            onChange={e => setScheduleFilter(e.target.value)}
+            className="text-[11px] px-3 py-1.5 rounded-[10px]"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: appleTokens.textPrimary }}
+          >
             <option value="all">All Types</option>
             {scheduleStatuses.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <div className="flex items-center gap-2 text-[10px]">
+          <div className="flex items-center gap-2 text-[10px]" style={{ color: appleTokens.textSecondary }}>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: ASANA_COLORS.confirmed }} /> Confirmed</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: ASANA_COLORS.placeholder }} /> Placeholder</span>
           </div>
-          <span className="text-[11px] text-[#64748B]">{calendarData.allTasks.length} tasks</span>
+          <span className="text-[11px]" style={{ color: appleTokens.textMuted }}>{calendarData.allTasks.length} tasks</span>
           {data?.project?.gid && (
             <>
-              <div className="h-4 w-px bg-white/10" />
+              <div className="h-4 w-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
               <a
                 href={`https://app.asana.com/0/${data.project.gid}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+                className="text-[11px] px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 transition-colors hover:bg-[#F06A6A]/10"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#F06A6A', border: '1px solid rgba(240,106,106,0.2)' }}
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -743,14 +835,25 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
       {viewMode === 'list' && (
         <>
           {Object.entries(groupedByDate).length === 0 ? (
-            <div className="text-center py-12 text-[#64748B]">No scheduled tasks in this date range</div>
+            <div className="text-center py-12" style={{ color: appleTokens.textMuted }}>No scheduled tasks in this date range</div>
           ) : (
             <div className="space-y-6">
               {Object.entries(groupedByDate).map(([week, tasks]) => (
-                <div key={week} className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-                  <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center justify-between">
-                    <span className="font-semibold text-[#EAF2FF] text-[14px]">Week of {week}</span>
-                    <span className="text-[11px] text-[#64748B]">{tasks.length} tasks</span>
+                <div
+                  key={week}
+                  className="overflow-hidden"
+                  style={{
+                    background: appleTokens.surfaceL1,
+                    boxShadow: appleTokens.shadowL1,
+                    borderRadius: appleTokens.radiusL1,
+                  }}
+                >
+                  <div
+                    className="px-5 py-3 flex items-center justify-between"
+                    style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+                  >
+                    <span className="font-semibold text-[14px]" style={{ color: appleTokens.textPrimary }}>Week of {week}</span>
+                    <span className="text-[11px]" style={{ color: appleTokens.textMuted }}>{tasks.length} tasks</span>
                   </div>
                   <div className="divide-y divide-white/[0.03]">
                     {tasks.map((task, idx) => {
@@ -762,7 +865,14 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
                                           taskStatus === 'placeholder' ? ASANA_COLORS.placeholder : null;
 
                       return (
-                        <div key={task.gid} onClick={() => handleTaskClick(task)} className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors cursor-pointer group`}>
+                        <div
+                          key={task.gid}
+                          onClick={() => handleTaskClick(task)}
+                          className="px-5 py-3 flex items-center gap-4 transition-colors cursor-pointer group"
+                          style={{ background: idx % 2 === 0 ? 'rgba(0,0,0,0.15)' : 'transparent' }}
+                          onMouseEnter={e => e.currentTarget.style.background = appleTokens.hoverRow}
+                          onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? 'rgba(0,0,0,0.15)' : 'transparent'}
+                        >
                           {/* Status Indicator */}
                           {statusColor && (
                             <div className="w-1 h-8 rounded-full" style={{ backgroundColor: statusColor }} />
@@ -770,25 +880,25 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
 
                           {/* Date */}
                           <div className="w-20 text-center">
-                            <div className={`text-[14px] font-semibold ${overdue ? 'text-[#EF4444]' : 'text-[#EAF2FF]'}`}>
+                            <div className="text-[14px] font-semibold" style={{ color: overdue ? appleTokens.accentRed : appleTokens.textPrimary }}>
                               {formatShortDate(task.startOn || task.dueOn)}
                             </div>
                             {task.startOn && task.dueOn && task.startOn !== task.dueOn && (
-                              <div className="text-[9px] text-[#64748B]">to {formatShortDate(task.dueOn)}</div>
+                              <div className="text-[9px]" style={{ color: appleTokens.textMuted }}>to {formatShortDate(task.dueOn)}</div>
                             )}
                           </div>
 
                           {/* Task Name */}
                           <div className="flex-1 min-w-0">
-                            <div className="text-[14px] text-[#EAF2FF] truncate group-hover:text-[#E16259]">{task.name}</div>
-                            <div className="text-[11px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
+                            <div className="text-[14px] truncate group-hover:text-[#E16259]" style={{ color: appleTokens.textPrimary }}>{task.name}</div>
+                            <div className="text-[11px]" style={{ color: appleTokens.textMuted }}>{task.assignee?.name || 'Unassigned'}</div>
                           </div>
 
                           {/* Status Badge with Asana colors */}
                           {taskStatus && (
                             <span
-                              className="text-[9px] px-2 py-1 rounded font-medium text-white"
-                              style={{ backgroundColor: statusColor || '#64748B' }}
+                              className="text-[9px] px-2 py-1 rounded-[8px] font-medium text-white"
+                              style={{ backgroundColor: statusColor || appleTokens.textMuted }}
                             >
                               {taskStatus === 'confirmed' ? 'Confirmed' : 'Placeholder'}
                             </span>
@@ -796,14 +906,14 @@ function TimelineTab({ data, loading, onTaskComplete }: { data: ProjectData | nu
 
                           {/* Schedule Status Badge */}
                           {scheduleStatus && !taskStatus && (
-                            <span className="text-[9px] px-2 py-1 rounded bg-[#64748B]/20 text-[#8FA3BF]">{scheduleStatus}</span>
+                            <span className="text-[9px] px-2 py-1 rounded-[8px]" style={{ background: 'rgba(255,255,255,0.06)', color: appleTokens.textSecondary }}>{scheduleStatus}</span>
                           )}
 
                           {/* Region */}
-                          {region && <span className="text-[11px] text-[#8FA3BF]">{region}</span>}
+                          {region && <span className="text-[11px]" style={{ color: appleTokens.textSecondary }}>{region}</span>}
 
                           {/* Arrow indicator */}
-                          <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-4 h-4 group-hover:text-[#E16259] transition-colors" style={{ color: appleTokens.textMuted }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </div>
@@ -948,7 +1058,7 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           title="Active MCCs"
           value={data.stats.incomplete}
           subtitle="Scheduled"
-          color="#38BDF8"
+          color={appleTokens.accentCyan}
           isActive={kpiFilter === 'active'}
           onClick={() => setKpiFilter(kpiFilter === 'active' ? 'all' : 'active')}
         />
@@ -956,7 +1066,7 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           title="Completed"
           value={data.stats.completed}
           subtitle="This period"
-          color="#22C55E"
+          color={appleTokens.accentGreen}
           isActive={kpiFilter === 'completed'}
           onClick={() => setKpiFilter(kpiFilter === 'completed' ? 'all' : 'completed')}
         />
@@ -964,7 +1074,7 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           title="Overdue"
           value={data.stats.overdue}
           subtitle="Past due date"
-          color="#EF4444"
+          color={appleTokens.accentRed}
           isActive={kpiFilter === 'overdue'}
           onClick={() => setKpiFilter(kpiFilter === 'overdue' ? 'all' : 'overdue')}
         />
@@ -972,51 +1082,85 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           title="This Month"
           value={thisMonthCount}
           subtitle="Scheduled"
-          color="#F59E0B"
+          color={appleTokens.accentAmber}
           isActive={kpiFilter === 'thisMonth'}
           onClick={() => setKpiFilter(kpiFilter === 'thisMonth' ? 'all' : 'thisMonth')}
         />
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4 mb-6 p-4 rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+      {/* Filters - L2 Toolbar */}
+      <div
+        className="flex items-center gap-4 mb-6 p-4"
+        style={{
+          background: appleTokens.surfaceL2,
+          boxShadow: appleTokens.shadowL2,
+          borderRadius: appleTokens.radiusL2,
+        }}
+      >
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-[#475569] uppercase">Region:</span>
-          <select value={regionFilter} onChange={e => setRegionFilter(e.target.value)} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white">
+          <span className="text-[11px] font-semibold uppercase" style={{ color: appleTokens.textMuted }}>Region:</span>
+          <select
+            value={regionFilter}
+            onChange={e => setRegionFilter(e.target.value)}
+            className="text-[11px] px-3 py-1.5 rounded-[10px]"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: appleTokens.textPrimary }}
+          >
             <option value="all">All Regions</option>
             {regions.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-[#475569] uppercase">Category:</span>
-          <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white">
+          <span className="text-[11px] font-semibold uppercase" style={{ color: appleTokens.textMuted }}>Category:</span>
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            className="text-[11px] px-3 py-1.5 rounded-[10px]"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: appleTokens.textPrimary }}
+          >
             <option value="all">All Categories</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-[#475569] uppercase">Year:</span>
-          <select value={yearFilter} onChange={e => setYearFilter(e.target.value)} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white">
+          <span className="text-[11px] font-semibold uppercase" style={{ color: appleTokens.textMuted }}>Year:</span>
+          <select
+            value={yearFilter}
+            onChange={e => setYearFilter(e.target.value)}
+            className="text-[11px] px-3 py-1.5 rounded-[10px]"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: appleTokens.textPrimary }}
+          >
             <option value="all">All Years</option>
             {years.map(y => <option key={y} value={y.toString()}>{y}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-[#475569] uppercase">Sort:</span>
+          <span className="text-[11px] font-semibold uppercase" style={{ color: appleTokens.textMuted }}>Sort:</span>
           {(['date', 'region', 'status'] as const).map(s => (
-            <button key={s} onClick={() => setSortBy(s)} className={`text-[11px] px-3 py-1.5 rounded-lg capitalize ${sortBy === s ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>{s}</button>
+            <button
+              key={s}
+              onClick={() => setSortBy(s)}
+              className="text-[11px] px-3 py-1.5 rounded-[10px] capitalize transition-all"
+              style={{
+                background: sortBy === s ? `${appleTokens.accentBlue}20` : 'rgba(255,255,255,0.05)',
+                borderLeft: sortBy === s ? `2px solid ${appleTokens.accentBlue}` : '2px solid transparent',
+                color: sortBy === s ? appleTokens.textPrimary : appleTokens.textMuted,
+              }}
+            >
+              {s}
+            </button>
           ))}
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-[11px] text-[#64748B]">{filteredTasks.length} MCCs</span>
+          <span className="text-[11px]" style={{ color: appleTokens.textMuted }}>{filteredTasks.length} MCCs</span>
           {data?.project?.gid && (
             <>
-              <div className="h-4 w-px bg-white/10" />
+              <div className="h-4 w-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
               <a
                 href={`https://app.asana.com/0/${data.project.gid}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+                className="text-[11px] px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 transition-colors hover:bg-[#F06A6A]/10"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#F06A6A', border: '1px solid rgba(240,106,106,0.2)' }}
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -1028,9 +1172,19 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
         </div>
       </div>
 
-      {/* MCC Table */}
-      <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-        <div className="grid gap-4 px-5 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-wider border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '100px 2fr 100px 100px 120px 100px 24px' }}>
+      {/* MCC Table - L1 Surface */}
+      <div
+        className="overflow-hidden"
+        style={{
+          background: appleTokens.surfaceL1,
+          boxShadow: appleTokens.shadowL1,
+          borderRadius: appleTokens.radiusL1,
+        }}
+      >
+        <div
+          className="grid gap-4 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider"
+          style={{ gridTemplateColumns: '100px 2fr 100px 100px 120px 100px 24px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)', color: appleTokens.textMuted }}
+        >
           <div>Dates</div>
           <div>MCC Name</div>
           <div>Region</div>
@@ -1050,39 +1204,46 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
             const dueSoon = isDueSoon(task.dueOn);
 
             return (
-              <div key={task.gid} onClick={() => setSelectedTask(task)} className={`grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors cursor-pointer group`} style={{ gridTemplateColumns: '100px 2fr 100px 100px 120px 100px 24px' }}>
+              <div
+                key={task.gid}
+                onClick={() => setSelectedTask(task)}
+                className="grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] transition-colors cursor-pointer group"
+                style={{ gridTemplateColumns: '100px 2fr 100px 100px 120px 100px 24px', background: idx % 2 === 0 ? 'rgba(0,0,0,0.15)' : 'transparent' }}
+                onMouseEnter={e => e.currentTarget.style.background = appleTokens.hoverRow}
+                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? 'rgba(0,0,0,0.15)' : 'transparent'}
+              >
                 {/* Dates */}
                 <div>
-                  <div className={`text-[12px] font-medium ${overdue ? 'text-[#EF4444]' : dueSoon ? 'text-[#F59E0B]' : 'text-[#EAF2FF]'}`}>
+                  <div className="text-[12px] font-medium" style={{ color: overdue ? appleTokens.accentRed : dueSoon ? appleTokens.accentAmber : appleTokens.textPrimary }}>
                     {formatShortDate(task.startOn)}
                   </div>
                   {task.dueOn && task.startOn !== task.dueOn && (
-                    <div className="text-[9px] text-[#64748B]">to {formatShortDate(task.dueOn)}</div>
+                    <div className="text-[9px]" style={{ color: appleTokens.textMuted }}>to {formatShortDate(task.dueOn)}</div>
                   )}
                 </div>
 
                 {/* Name */}
                 <div>
-                  <div className="text-[13px] text-[#EAF2FF] truncate group-hover:text-[#E16259]">{task.name}</div>
-                  {docuSign && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FFD700]/20 text-[#FFD700] mt-1 inline-block">DocuSign: {docuSign}</span>}
+                  <div className="text-[13px] truncate group-hover:text-[#E16259]" style={{ color: appleTokens.textPrimary }}>{task.name}</div>
+                  {docuSign && <span className="text-[9px] px-1.5 py-0.5 rounded-[6px] mt-1 inline-block" style={{ background: `${appleTokens.accentAmber}20`, color: appleTokens.accentAmber }}>DocuSign: {docuSign}</span>}
                 </div>
 
                 {/* Region */}
-                <div className="text-[11px] text-[#8FA3BF]">{region || '-'}</div>
+                <div className="text-[11px]" style={{ color: appleTokens.textSecondary }}>{region || '-'}</div>
 
                 {/* Category */}
-                <div className="text-[11px] text-[#8FA3BF]">{category || '-'}</div>
+                <div className="text-[11px]" style={{ color: appleTokens.textSecondary }}>{category || '-'}</div>
 
                 {/* Status */}
                 <div>
-                  {status && <span className="text-[9px] px-2 py-1 rounded bg-[#38BDF8]/20 text-[#38BDF8]">{status}</span>}
+                  {status && <span className="text-[9px] px-2 py-1 rounded-[8px]" style={{ background: `${appleTokens.accentCyan}20`, color: appleTokens.accentCyan }}>{status}</span>}
                 </div>
 
                 {/* Sales Lead */}
-                <div className="text-[11px] text-[#8FA3BF]">{salesLead || '-'}</div>
+                <div className="text-[11px]" style={{ color: appleTokens.textSecondary }}>{salesLead || '-'}</div>
 
                 {/* Arrow */}
-                <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 group-hover:text-[#E16259] transition-colors" style={{ color: appleTokens.textMuted }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -1108,7 +1269,7 @@ function MCCStatusTab({ data, loading, onTaskComplete }: { data: ProjectData | n
   );
 }
 
-// Punch List Tab
+// Punch List Tab - Apple Pro Design
 function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | null; loading: boolean; onTaskComplete?: (taskId: string, completed: boolean) => Promise<void> }) {
   const [kpiFilter, setKpiFilter] = useState<'all' | 'incomplete' | 'completed' | 'overdue' | 'unassigned'>('all');
   const [selectedTask, setSelectedTask] = useState<AsanaTask | null>(null);
@@ -1167,7 +1328,7 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           title="Incomplete"
           value={data.stats.incomplete}
           subtitle="Open items"
-          color="#38BDF8"
+          color={appleTokens.accentCyan}
           isActive={kpiFilter === 'incomplete'}
           onClick={() => setKpiFilter(kpiFilter === 'incomplete' ? 'all' : 'incomplete')}
         />
@@ -1175,7 +1336,7 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           title="Completed"
           value={data.stats.completed}
           subtitle={`${progress}% done`}
-          color="#22C55E"
+          color={appleTokens.accentGreen}
           isActive={kpiFilter === 'completed'}
           onClick={() => setKpiFilter(kpiFilter === 'completed' ? 'all' : 'completed')}
         />
@@ -1183,7 +1344,7 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           title="Overdue"
           value={data.stats.overdue}
           subtitle="Past due date"
-          color="#EF4444"
+          color={appleTokens.accentRed}
           isActive={kpiFilter === 'overdue'}
           onClick={() => setKpiFilter(kpiFilter === 'overdue' ? 'all' : 'overdue')}
         />
@@ -1191,7 +1352,7 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
           title="Unassigned"
           value={data.stats.unassigned}
           subtitle="Need owner"
-          color="#8B5CF6"
+          color={appleTokens.accentPurple}
           isActive={kpiFilter === 'unassigned'}
           onClick={() => setKpiFilter(kpiFilter === 'unassigned' ? 'all' : 'unassigned')}
         />
@@ -1204,7 +1365,8 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
             href={`https://app.asana.com/0/${data.project.gid}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+            className="text-[11px] px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 transition-colors hover:bg-[#F06A6A]/10"
+            style={{ background: 'rgba(255,255,255,0.05)', color: '#F06A6A', border: '1px solid rgba(240,106,106,0.2)' }}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -1214,23 +1376,44 @@ function PunchListTab({ data, loading, onTaskComplete }: { data: ProjectData | n
         )}
       </div>
 
-      {/* Grouped Tasks */}
+      {/* Grouped Tasks - L1 Surface */}
       {Object.entries(groupedTasks).map(([section, tasks]) => (
-        <div key={section} className="mb-4 rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-          <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center justify-between">
-            <span className="font-semibold text-[#EAF2FF] text-[13px]">{section}</span>
-            <span className="text-[10px] text-[#64748B]">{tasks.filter(t => t.completed).length}/{tasks.length}</span>
+        <div
+          key={section}
+          className="mb-4 overflow-hidden"
+          style={{
+            background: appleTokens.surfaceL1,
+            boxShadow: appleTokens.shadowL1,
+            borderRadius: appleTokens.radiusL1,
+          }}
+        >
+          <div
+            className="px-5 py-3 flex items-center justify-between"
+            style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <span className="font-semibold text-[13px]" style={{ color: appleTokens.textPrimary }}>{section}</span>
+            <span className="text-[10px]" style={{ color: appleTokens.textMuted }}>{tasks.filter(t => t.completed).length}/{tasks.length}</span>
           </div>
           <div className="divide-y divide-white/[0.03]">
             {tasks.map((task, idx) => (
-              <div key={task.gid} onClick={() => setSelectedTask(task)} className={`px-5 py-3 flex items-center gap-4 ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors cursor-pointer group`}>
-                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${task.completed ? 'bg-[#22C55E] border-[#22C55E]' : 'border-[#475569]'}`}>
+              <div
+                key={task.gid}
+                onClick={() => setSelectedTask(task)}
+                className="px-5 py-3 flex items-center gap-4 transition-colors cursor-pointer group"
+                style={{ background: idx % 2 === 0 ? 'rgba(0,0,0,0.15)' : 'transparent' }}
+                onMouseEnter={e => e.currentTarget.style.background = appleTokens.hoverRow}
+                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? 'rgba(0,0,0,0.15)' : 'transparent'}
+              >
+                <div
+                  className="w-4 h-4 rounded border-2 flex items-center justify-center"
+                  style={{ backgroundColor: task.completed ? appleTokens.accentGreen : 'transparent', borderColor: task.completed ? appleTokens.accentGreen : appleTokens.textMuted }}
+                >
                   {task.completed && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                 </div>
-                <div className={`flex-1 text-[13px] ${task.completed ? 'text-[#64748B] line-through' : 'text-[#EAF2FF] group-hover:text-[#E16259]'}`}>{task.name}</div>
-                <div className="text-[11px] text-[#8FA3BF]">{task.assignee?.name || <span className="text-[#475569]">Unassigned</span>}</div>
-                <div className={`text-[11px] ${isOverdue(task.dueOn) ? 'text-[#EF4444]' : 'text-[#64748B]'}`}>{formatShortDate(task.dueOn)}</div>
-                <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className={`flex-1 text-[13px] ${task.completed ? 'line-through' : 'group-hover:text-[#E16259]'}`} style={{ color: task.completed ? appleTokens.textMuted : appleTokens.textPrimary }}>{task.name}</div>
+                <div className="text-[11px]" style={{ color: appleTokens.textSecondary }}>{task.assignee?.name || <span style={{ color: appleTokens.textMuted }}>Unassigned</span>}</div>
+                <div className="text-[11px]" style={{ color: isOverdue(task.dueOn) ? appleTokens.accentRed : appleTokens.textMuted }}>{formatShortDate(task.dueOn)}</div>
+                <svg className="w-4 h-4 group-hover:text-[#E16259] transition-colors" style={{ color: appleTokens.textMuted }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -1302,11 +1485,11 @@ function DocuSignTab({ data, loading }: { data: DocuSignData | null; loading: bo
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': case 'signed': return '#22C55E';
-      case 'sent': case 'delivered': return '#F59E0B';
-      case 'created': return '#8B5CF6';
-      case 'declined': case 'voided': return '#EF4444';
-      default: return '#64748B';
+      case 'completed': case 'signed': return appleTokens.accentGreen;
+      case 'sent': case 'delivered': return appleTokens.accentAmber;
+      case 'created': return appleTokens.accentPurple;
+      case 'declined': case 'voided': return appleTokens.accentRed;
+      default: return appleTokens.textMuted;
     }
   };
 
@@ -1326,40 +1509,56 @@ function DocuSignTab({ data, loading }: { data: DocuSignData | null; loading: bo
     <div>
       {/* Stats */}
       <div className="grid grid-cols-5 gap-4 mb-6">
-        <KPICard title="Total Sent" value={data.stats.total} subtitle="All time" color="#FFD700" />
-        <KPICard title="Completed" value={data.stats.completed} subtitle="Signed" color="#22C55E" />
-        <KPICard title="Pending" value={data.stats.pending} subtitle="Awaiting signature" color="#F59E0B" />
-        <KPICard title="Declined" value={data.stats.declined} subtitle="Rejected" color="#EF4444" />
-        <KPICard title="Avg Days" value={data.stats.avgDaysToSign} subtitle="To sign" color="#38BDF8" />
+        <KPICard title="Total Sent" value={data.stats.total} subtitle="All time" color={appleTokens.accentAmber} />
+        <KPICard title="Completed" value={data.stats.completed} subtitle="Signed" color={appleTokens.accentGreen} />
+        <KPICard title="Pending" value={data.stats.pending} subtitle="Awaiting signature" color={appleTokens.accentAmber} />
+        <KPICard title="Declined" value={data.stats.declined} subtitle="Rejected" color={appleTokens.accentRed} />
+        <KPICard title="Avg Days" value={data.stats.avgDaysToSign} subtitle="To sign" color={appleTokens.accentCyan} />
       </div>
 
       {/* Status indicator */}
       <div className="mb-4 flex items-center gap-2 flex-wrap">
-        <span className={`w-2 h-2 rounded-full ${data.isLive ? 'bg-[#22C55E]' : 'bg-[#F59E0B]'}`} />
+        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: data.isLive ? appleTokens.accentGreen : appleTokens.accentAmber }} />
         {data.isLive ? (
-          <span className="text-[11px] text-[#22C55E]">Connected to DocuSign</span>
+          <span className="text-[11px]" style={{ color: appleTokens.accentGreen }}>Connected to DocuSign</span>
         ) : data.authError?.includes('consent') ? (
-          <span className="text-[11px] text-[#F59E0B]">
+          <span className="text-[11px]" style={{ color: appleTokens.accentAmber }}>
             Consent required -{' '}
             <a
               href={data.authError.split('at: ')[1]}
               target="_blank"
               rel="noopener noreferrer"
-              className="underline hover:text-[#FFD700]"
+              className="underline hover:brightness-125"
             >
               Click here to authorize DocuSign access
             </a>
           </span>
         ) : (
-          <span className="text-[11px] text-[#64748B]">Using demo data</span>
+          <span className="text-[11px]" style={{ color: appleTokens.textMuted }}>Using demo data</span>
         )}
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
-        <span className="text-[11px] font-semibold text-[#475569] uppercase">Status:</span>
+      {/* Filters - L2 Toolbar */}
+      <div
+        className="flex items-center gap-2 mb-6 flex-wrap p-4"
+        style={{
+          background: appleTokens.surfaceL2,
+          boxShadow: appleTokens.shadowL2,
+          borderRadius: appleTokens.radiusL2,
+        }}
+      >
+        <span className="text-[11px] font-semibold uppercase" style={{ color: appleTokens.textMuted }}>Status:</span>
         {['all', 'pending', 'completed', 'declined', 'acceptance'].map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)} className={`text-[11px] px-3 py-1.5 rounded-lg capitalize ${statusFilter === s ? 'bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/30' : 'bg-white/5 text-[#64748B] hover:text-white'}`}>
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className="text-[11px] px-3 py-1.5 rounded-[10px] capitalize transition-all"
+            style={{
+              background: statusFilter === s ? `${appleTokens.accentAmber}20` : 'rgba(255,255,255,0.05)',
+              borderLeft: statusFilter === s ? `2px solid ${appleTokens.accentAmber}` : '2px solid transparent',
+              color: statusFilter === s ? appleTokens.textPrimary : appleTokens.textMuted,
+            }}
+          >
             {s === 'all' ? 'All' : s}
           </button>
         ))}
@@ -1368,16 +1567,27 @@ function DocuSignTab({ data, loading }: { data: DocuSignData | null; loading: bo
             type="checkbox"
             checked={showVoided}
             onChange={(e) => setShowVoided(e.target.checked)}
-            className="w-3.5 h-3.5 rounded border-[#475569] bg-transparent text-[#FFD700] focus:ring-[#FFD700]/50"
+            className="w-3.5 h-3.5 rounded"
+            style={{ background: 'transparent', borderColor: appleTokens.textMuted }}
           />
-          <span className="text-[11px] text-[#64748B]">Show voided</span>
+          <span className="text-[11px]" style={{ color: appleTokens.textMuted }}>Show voided</span>
         </label>
-        <span className="ml-auto text-[11px] text-[#64748B]">{filteredEnvelopes.length} documents</span>
+        <span className="ml-auto text-[11px]" style={{ color: appleTokens.textMuted }}>{filteredEnvelopes.length} documents</span>
       </div>
 
-      {/* Envelope List */}
-      <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-        <div className="grid gap-4 px-5 py-2.5 text-[10px] font-semibold text-[#475569] uppercase tracking-wider border-b border-white/[0.06] bg-[#0F1722]" style={{ gridTemplateColumns: '2fr 90px 100px 100px 80px 24px' }}>
+      {/* Envelope List - L1 Surface */}
+      <div
+        className="overflow-hidden"
+        style={{
+          background: appleTokens.surfaceL1,
+          boxShadow: appleTokens.shadowL1,
+          borderRadius: appleTokens.radiusL1,
+        }}
+      >
+        <div
+          className="grid gap-4 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider"
+          style={{ gridTemplateColumns: '2fr 90px 100px 100px 80px 24px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)', color: appleTokens.textMuted }}
+        >
           <div>Document</div>
           <div>Status</div>
           <div>Sent</div>
@@ -1391,15 +1601,22 @@ function DocuSignTab({ data, loading }: { data: DocuSignData | null; loading: bo
             const label = getStatusLabel(envelope.status);
 
             return (
-              <div key={envelope.envelopeId} onClick={() => setSelectedEnvelope(envelope)} className={`grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] ${idx % 2 === 0 ? 'bg-[#0F1722]' : 'bg-[#151F2E]'} hover:bg-[#1E293B] transition-colors cursor-pointer group`} style={{ gridTemplateColumns: '2fr 90px 100px 100px 80px 24px' }}>
-                <div className="text-[13px] text-[#EAF2FF] truncate group-hover:text-[#FFD700]">{envelope.emailSubject}</div>
+              <div
+                key={envelope.envelopeId}
+                onClick={() => setSelectedEnvelope(envelope)}
+                className="grid gap-4 px-5 py-3 items-center border-b border-white/[0.04] transition-colors cursor-pointer group"
+                style={{ gridTemplateColumns: '2fr 90px 100px 100px 80px 24px', background: idx % 2 === 0 ? 'rgba(0,0,0,0.15)' : 'transparent' }}
+                onMouseEnter={e => e.currentTarget.style.background = appleTokens.hoverRow}
+                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? 'rgba(0,0,0,0.15)' : 'transparent'}
+              >
+                <div className="text-[13px] truncate" style={{ color: appleTokens.textPrimary }}>{envelope.emailSubject}</div>
                 <div>
-                  <span className="text-[10px] px-2 py-1 rounded font-medium" style={{ backgroundColor: `${color}20`, color }}>{label}</span>
+                  <span className="text-[10px] px-2 py-1 rounded-[8px] font-medium" style={{ backgroundColor: `${color}20`, color }}>{label}</span>
                 </div>
-                <div className="text-[11px] text-[#8FA3BF]">{formatDate(envelope.sentDateTime || null)}</div>
-                <div className="text-[11px] text-[#8FA3BF]">{formatDate(envelope.completedDateTime || envelope.declinedDateTime || null)}</div>
-                <div className="text-[11px] text-[#8FA3BF]">{envelope.sender?.userName?.split(' ')[0] || '-'}</div>
-                <svg className="w-4 h-4 text-[#475569] group-hover:text-[#FFD700] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="text-[11px]" style={{ color: appleTokens.textSecondary }}>{formatDate(envelope.sentDateTime || null)}</div>
+                <div className="text-[11px]" style={{ color: appleTokens.textSecondary }}>{formatDate(envelope.completedDateTime || envelope.declinedDateTime || null)}</div>
+                <div className="text-[11px]" style={{ color: appleTokens.textSecondary }}>{envelope.sender?.userName?.split(' ')[0] || '-'}</div>
+                <svg className="w-4 h-4 group-hover:brightness-125 transition-colors" style={{ color: appleTokens.textMuted }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -1421,13 +1638,16 @@ function DocuSignTab({ data, loading }: { data: DocuSignData | null; loading: bo
   );
 }
 
-// Loading State
+// Loading State - Apple Pro styling
 function LoadingState() {
   return (
     <div className="flex items-center justify-center py-20">
       <div className="text-center">
-        <div className="w-10 h-10 border-2 border-[#E16259]/20 border-t-[#E16259] rounded-full animate-spin mx-auto mb-4" />
-        <div className="text-[#8FA3BF]">Loading data...</div>
+        <div
+          className="w-10 h-10 border-2 rounded-full animate-spin mx-auto mb-4"
+          style={{ borderColor: `${appleTokens.accentBlue}20`, borderTopColor: appleTokens.accentBlue }}
+        />
+        <div style={{ color: appleTokens.textSecondary }}>Loading data...</div>
       </div>
     </div>
   );
@@ -1518,7 +1738,7 @@ export default function PMDashboard() {
   const isLoading = Object.values(loading).some(l => l);
 
   return (
-    <div className="min-h-screen bg-[#0F1722] relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden" style={{ background: '#0A0E14' }}>
       <DashboardBackground {...backgroundPresets.pm} />
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
@@ -1527,22 +1747,33 @@ export default function PMDashboard() {
         animate={{ marginLeft: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
       >
-        {/* Header - Solid background, no blur */}
-        <header className="border-b border-white/[0.06] bg-[#0F1722] shadow-[0_4px_12px_rgba(0,0,0,0.3)] sticky top-0 z-50">
+        {/* Header - L2 Surface */}
+        <header
+          className="sticky top-0 z-50"
+          style={{
+            background: appleTokens.surfaceL2,
+            boxShadow: appleTokens.shadowL2,
+          }}
+        >
           <div className="max-w-[1600px] mx-auto px-8 py-5">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-[20px] font-semibold text-white">Project Management</h1>
-                <p className="text-[12px] text-[#8FA3BF] mt-1">Asana + DocuSign Integration</p>
+                <h1 className="text-[20px] font-semibold" style={{ color: appleTokens.textPrimary }}>Project Management</h1>
+                <p className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Asana + DocuSign Integration</p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <div className="text-[11px] text-[#475569] flex items-center gap-2 justify-end">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
+                  <div className="text-[11px] flex items-center gap-2 justify-end" style={{ color: appleTokens.textMuted }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: appleTokens.accentGreen }} />
                     {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString()}` : 'Loading...'}
                   </div>
                 </div>
-                <button onClick={handleRefresh} disabled={isLoading} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors disabled:opacity-50">
+                <button
+                  onClick={handleRefresh}
+                  disabled={isLoading}
+                  className="p-2 rounded-[10px] transition-colors disabled:opacity-50"
+                  style={{ background: 'rgba(255,255,255,0.05)', color: appleTokens.textMuted }}
+                >
                   <svg className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
@@ -1550,7 +1781,7 @@ export default function PMDashboard() {
               </div>
             </div>
 
-            {/* Tabs */}
+            {/* Tabs - L2 Toolbar micro-pills */}
             <div className="flex items-center gap-2 mt-4">
               <TabButton tab="smart" activeTab={activeTab} onClick={setActiveTab} label="Smart View" count={timelineData?.stats.incomplete} icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>} />
               <TabButton tab="timeline" activeTab={activeTab} onClick={setActiveTab} label="Calendar" count={timelineData?.stats.incomplete} icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} />

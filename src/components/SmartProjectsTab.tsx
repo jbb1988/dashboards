@@ -3,6 +3,26 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TaskDetailDrawer from '@/components/TaskDetailDrawer';
+import { elevation, colors } from '@/components/mars-ui';
+
+// Apple Pro Design Tokens - Local reference
+const appleTokens = {
+  surfaceL1: elevation.L1.background,
+  surfaceL2: elevation.L2.background,
+  shadowL1: elevation.L1.shadow,
+  shadowL2: elevation.L2.shadow,
+  radiusL1: elevation.L1.radius,
+  radiusL2: elevation.L2.radius,
+  hoverRow: elevation.hoverRow,
+  textPrimary: colors.text.primary,
+  textSecondary: colors.text.secondary,
+  textMuted: colors.text.muted,
+  accentBlue: colors.accent.blue,
+  accentAmber: colors.accent.amber,
+  accentGreen: colors.accent.green,
+  accentRed: colors.accent.red,
+  accentCyan: colors.accent.cyan,
+};
 
 // Types
 interface AsanaTask {
@@ -72,13 +92,13 @@ function isDueThisWeek(dateStr: string | null): boolean {
   return date >= now && date <= weekFromNow;
 }
 
-// Colors
+// Colors - Apple Pro accents
 const COLORS = {
-  confirmed: '#7FBA7A',
-  placeholder: '#F1BD6C',
+  confirmed: appleTokens.accentGreen,
+  placeholder: appleTokens.accentAmber,
 };
 
-// Smart View Tab Button
+// Smart View Tab Button - Apple Pro L2 micro-pill style
 function ViewTab({ view, activeView, onClick, label, count, icon }: {
   view: SmartView;
   activeView: SmartView;
@@ -91,16 +111,20 @@ function ViewTab({ view, activeView, onClick, label, count, icon }: {
   return (
     <button
       onClick={() => onClick(view)}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200 font-medium text-[13px] ${
-        isActive
-          ? 'bg-[#E16259]/20 text-[#E16259] border border-[#E16259]/30 shadow-[0_0_12px_rgba(225,98,89,0.15)]'
-          : 'text-[#8FA3BF] hover:bg-white/5 hover:text-white'
-      }`}
+      className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] transition-all duration-200 font-semibold text-[13px]"
+      style={{
+        background: isActive ? `${appleTokens.accentBlue}20` : 'transparent',
+        borderLeft: isActive ? `2px solid ${appleTokens.accentBlue}` : '2px solid transparent',
+        color: isActive ? appleTokens.textPrimary : appleTokens.textMuted,
+      }}
     >
-      <span className={isActive ? 'text-[#E16259]' : 'text-[#64748B]'}>{icon}</span>
+      <span style={{ color: isActive ? appleTokens.accentBlue : appleTokens.textMuted }}>{icon}</span>
       {label}
       {count !== undefined && count > 0 && (
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-[#E16259]/30' : 'bg-white/10'}`}>
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded-full"
+          style={{ background: isActive ? `${appleTokens.accentBlue}30` : 'rgba(255,255,255,0.06)' }}
+        >
           {count}
         </span>
       )}
@@ -108,7 +132,7 @@ function ViewTab({ view, activeView, onClick, label, count, icon }: {
   );
 }
 
-// Task Row Component - Clickable
+// Task Row Component - Apple Pro L1 surface hover
 function TaskRow({
   task,
   onClick,
@@ -127,7 +151,10 @@ function TaskRow({
   return (
     <div
       onClick={onClick}
-      className="px-5 py-3.5 flex items-center gap-4 hover:bg-[#1E293B] transition-colors cursor-pointer group"
+      className="px-5 py-3.5 flex items-center gap-4 transition-colors cursor-pointer group"
+      style={{ background: 'transparent' }}
+      onMouseEnter={e => e.currentTarget.style.background = appleTokens.hoverRow}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
       {/* Status Indicator */}
       {statusColor && (
@@ -136,23 +163,26 @@ function TaskRow({
 
       {/* Date */}
       <div className="w-20 text-center">
-        <div className={`text-[13px] font-semibold ${overdue ? 'text-[#EF4444]' : dueThisWeek ? 'text-[#F59E0B]' : 'text-white'}`}>
+        <div
+          className="text-[13px] font-semibold"
+          style={{ color: overdue ? appleTokens.accentRed : dueThisWeek ? appleTokens.accentAmber : appleTokens.textPrimary }}
+        >
           {formatShortDate(task.startOn || task.dueOn)}
         </div>
       </div>
 
       {/* Task Name */}
       <div className="flex-1 min-w-0">
-        <div className="text-[13px] text-white truncate group-hover:text-[#E16259] transition-colors">{task.name}</div>
-        <div className="text-[10px] text-[#64748B]">{task.assignee?.name || 'Unassigned'}</div>
+        <div className="text-[13px] truncate group-hover:brightness-125 transition-colors" style={{ color: appleTokens.textPrimary }}>{task.name}</div>
+        <div className="text-[10px]" style={{ color: appleTokens.textMuted }}>{task.assignee?.name || 'Unassigned'}</div>
       </div>
 
       {/* Status Badge */}
       {showStatus && taskStatus && (
         <span
-          className="text-[9px] px-2 py-1 rounded font-medium"
+          className="text-[9px] px-2 py-1 rounded-[8px] font-medium"
           style={{
-            backgroundColor: statusColor || '#64748B',
+            backgroundColor: statusColor || appleTokens.textMuted,
             color: taskStatus === 'placeholder' ? '#1A1F2E' : 'white'
           }}
         >
@@ -161,17 +191,17 @@ function TaskRow({
       )}
 
       {/* Region */}
-      {region && <span className="text-[10px] text-[#8FA3BF]">{region}</span>}
+      {region && <span className="text-[10px]" style={{ color: appleTokens.textSecondary }}>{region}</span>}
 
       {/* Arrow */}
-      <svg className="w-4 h-4 text-[#475569] group-hover:text-[#E16259] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-4 h-4 group-hover:brightness-125 transition-colors" style={{ color: appleTokens.textMuted }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
       </svg>
     </div>
   );
 }
 
-// Collapsible Status Group
+// Collapsible Status Group - Apple Pro L1 Surface
 function StatusGroup({
   title,
   tasks,
@@ -186,23 +216,33 @@ function StatusGroup({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   const statusColor = title.includes('Confirm') ? COLORS.confirmed :
-                      title.includes('Placeholder') ? COLORS.placeholder : '#64748B';
+                      title.includes('Placeholder') ? COLORS.placeholder : appleTokens.textMuted;
 
   return (
-    <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
+    <div
+      className="overflow-hidden"
+      style={{
+        background: appleTokens.surfaceL1,
+        boxShadow: appleTokens.shadowL1,
+        borderRadius: appleTokens.radiusL1,
+      }}
+    >
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-5 py-3.5 flex items-center justify-between bg-[#0F1722] border-b border-white/[0.06] hover:bg-[#1E293B] transition-colors"
+        className="w-full px-5 py-3.5 flex items-center justify-between transition-colors"
+        style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        onMouseEnter={e => e.currentTarget.style.background = appleTokens.hoverRow}
+        onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
       >
         <div className="flex items-center gap-3">
           <span className="w-3 h-3 rounded" style={{ backgroundColor: statusColor }} />
-          <span className="font-semibold text-[14px] text-white">{title}</span>
-          <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">
+          <span className="font-semibold text-[14px]" style={{ color: appleTokens.textPrimary }}>{title}</span>
+          <span className="text-[11px] px-2 py-0.5 rounded-[8px]" style={{ color: appleTokens.textSecondary, background: 'rgba(255,255,255,0.06)' }}>
             {tasks.length} projects
           </span>
         </div>
         <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <svg className="w-5 h-5 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5" style={{ color: appleTokens.textMuted }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </motion.div>
@@ -354,8 +394,11 @@ export default function SmartProjectsTab({
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-[#E16259]/20 border-t-[#E16259] rounded-full animate-spin mx-auto mb-4" />
-          <div className="text-[#8FA3BF]">Loading projects...</div>
+          <div
+            className="w-10 h-10 border-2 rounded-full animate-spin mx-auto mb-4"
+            style={{ borderColor: `${appleTokens.accentBlue}20`, borderTopColor: appleTokens.accentBlue }}
+          />
+          <div style={{ color: appleTokens.textSecondary }}>Loading projects...</div>
         </div>
       </div>
     );
@@ -363,80 +406,112 @@ export default function SmartProjectsTab({
 
   return (
     <div>
-      {/* Stats Bar */}
+      {/* Stats Bar - L1 Surfaces */}
       <div className="grid grid-cols-5 gap-4 mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          whileHover={{ y: -2, boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(225,98,89,0.1)' }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${appleTokens.accentBlue}20` }}
           onClick={() => setActiveView('all')}
-          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'all' ? 'border-2 border-[#E16259] ring-2 ring-[#E16259]/20' : 'border border-white/[0.06]'}`}
+          className="relative overflow-hidden cursor-pointer transition-all p-5"
+          style={{
+            background: appleTokens.surfaceL1,
+            boxShadow: activeView === 'all' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${appleTokens.accentBlue}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            borderRadius: appleTokens.radiusL1,
+          }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[#E16259]" />
-          <div className="text-[11px] font-medium text-[#64748B] mb-2">Active Projects</div>
-          <div className="text-[28px] font-semibold text-white">{data.stats.incomplete}</div>
-          <div className="text-[12px] text-[#8FA3BF] mt-1">In progress</div>
+          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentBlue} 0%, ${appleTokens.accentBlue}60 100%)`, boxShadow: `0 0 12px ${appleTokens.accentBlue}60` }} />
+          <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Active Projects</div>
+          <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{data.stats.incomplete}</div>
+          <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>In progress</div>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          whileHover={{ y: -2, boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(239,68,68,0.1)' }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${appleTokens.accentRed}20` }}
           onClick={() => setActiveView('needs_attention')}
-          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'needs_attention' ? 'border-2 border-[#EF4444] ring-2 ring-[#EF4444]/20' : 'border border-white/[0.06]'}`}
+          className="relative overflow-hidden cursor-pointer transition-all p-5"
+          style={{
+            background: appleTokens.surfaceL1,
+            boxShadow: activeView === 'needs_attention' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${appleTokens.accentRed}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            borderRadius: appleTokens.radiusL1,
+          }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[#EF4444]" />
-          <div className="text-[11px] font-medium text-[#64748B] mb-2">Needs Attention</div>
-          <div className="text-[28px] font-semibold text-white">{stats.needsAttention}</div>
-          <div className="text-[12px] text-[#8FA3BF] mt-1">Action required</div>
+          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentRed} 0%, ${appleTokens.accentRed}60 100%)`, boxShadow: `0 0 12px ${appleTokens.accentRed}60` }} />
+          <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Needs Attention</div>
+          <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.needsAttention}</div>
+          <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Action required</div>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          whileHover={{ y: -2, boxShadow: '0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(56,189,248,0.1)' }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${appleTokens.accentCyan}20` }}
           onClick={() => setActiveView('this_week')}
-          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'this_week' ? 'border-2 border-[#38BDF8] ring-2 ring-[#38BDF8]/20' : 'border border-white/[0.06]'}`}
+          className="relative overflow-hidden cursor-pointer transition-all p-5"
+          style={{
+            background: appleTokens.surfaceL1,
+            boxShadow: activeView === 'this_week' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${appleTokens.accentCyan}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            borderRadius: appleTokens.radiusL1,
+          }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[#38BDF8]" />
-          <div className="text-[11px] font-medium text-[#64748B] mb-2">This Week</div>
-          <div className="text-[28px] font-semibold text-white">{stats.thisWeek}</div>
-          <div className="text-[12px] text-[#8FA3BF] mt-1">Upcoming</div>
+          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentCyan} 0%, ${appleTokens.accentCyan}60 100%)`, boxShadow: `0 0 12px ${appleTokens.accentCyan}60` }} />
+          <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>This Week</div>
+          <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.thisWeek}</div>
+          <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Upcoming</div>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          whileHover={{ y: -2, boxShadow: `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${COLORS.confirmed}20` }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${COLORS.confirmed}20` }}
           onClick={() => setActiveView('confirmed')}
-          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'confirmed' ? 'border-2 border-[#7FBA7A] ring-2 ring-[#7FBA7A]/20' : 'border border-white/[0.06]'}`}
+          className="relative overflow-hidden cursor-pointer transition-all p-5"
+          style={{
+            background: appleTokens.surfaceL1,
+            boxShadow: activeView === 'confirmed' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${COLORS.confirmed}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            borderRadius: appleTokens.radiusL1,
+          }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl" style={{ backgroundColor: COLORS.confirmed }} />
-          <div className="text-[11px] font-medium text-[#64748B] mb-2">Confirmed</div>
-          <div className="text-[28px] font-semibold text-white">{stats.confirmed}</div>
-          <div className="text-[12px] text-[#8FA3BF] mt-1">Ready to go</div>
+          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${COLORS.confirmed} 0%, ${COLORS.confirmed}60 100%)`, boxShadow: `0 0 12px ${COLORS.confirmed}60` }} />
+          <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Confirmed</div>
+          <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.confirmed}</div>
+          <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Ready to go</div>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          whileHover={{ y: -2, boxShadow: `0 12px 32px rgba(0,0,0,0.4), 0 0 20px ${COLORS.placeholder}20` }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${COLORS.placeholder}20` }}
           onClick={() => setActiveView('placeholder')}
-          className={`relative overflow-hidden rounded-xl p-5 bg-[#151F2E] shadow-[0_8px_24px_rgba(0,0,0,0.35)] cursor-pointer transition-all ${activeView === 'placeholder' ? 'border-2 border-[#F1BD6C] ring-2 ring-[#F1BD6C]/20' : 'border border-white/[0.06]'}`}
+          className="relative overflow-hidden cursor-pointer transition-all p-5"
+          style={{
+            background: appleTokens.surfaceL1,
+            boxShadow: activeView === 'placeholder' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${COLORS.placeholder}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            borderRadius: appleTokens.radiusL1,
+          }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl" style={{ backgroundColor: COLORS.placeholder }} />
-          <div className="text-[11px] font-medium text-[#64748B] mb-2">Placeholder</div>
-          <div className="text-[28px] font-semibold text-white">{stats.placeholder}</div>
-          <div className="text-[12px] text-[#8FA3BF] mt-1">Tentative</div>
+          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${COLORS.placeholder} 0%, ${COLORS.placeholder}60 100%)`, boxShadow: `0 0 12px ${COLORS.placeholder}60` }} />
+          <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Placeholder</div>
+          <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.placeholder}</div>
+          <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Tentative</div>
         </motion.div>
       </div>
 
-      {/* Search + View Tabs */}
-      <div className="flex items-center justify-between mb-6 p-4 rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
+      {/* Search + View Tabs - L2 Toolbar */}
+      <div
+        className="flex items-center justify-between mb-6 p-4"
+        style={{
+          background: appleTokens.surfaceL2,
+          boxShadow: appleTokens.shadowL2,
+          borderRadius: appleTokens.radiusL2,
+        }}
+      >
         <div className="flex items-center gap-2">
           <ViewTab
             view="needs_attention"
@@ -490,7 +565,7 @@ export default function SmartProjectsTab({
         <div className="flex items-center gap-3">
           {/* Search */}
           <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: appleTokens.textMuted }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -498,12 +573,18 @@ export default function SmartProjectsTab({
               placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10 py-2 text-[13px] rounded-lg bg-[#0F1722] border border-white/[0.06] text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#E16259]/50 focus:ring-1 focus:ring-[#E16259]/20 w-64"
+              className="pl-10 pr-10 py-2 text-[13px] rounded-[10px] w-64 focus:outline-none"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                color: appleTokens.textPrimary,
+              }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#64748B] hover:text-white transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors"
+                style={{ color: appleTokens.textMuted }}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -517,7 +598,8 @@ export default function SmartProjectsTab({
               href={`https://app.asana.com/0/${data.project.gid}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[11px] px-3 py-2 rounded-lg bg-white/5 text-[#F06A6A] hover:bg-[#F06A6A]/10 border border-[#F06A6A]/20 flex items-center gap-1.5 transition-colors"
+              className="text-[11px] px-3 py-2 rounded-[10px] flex items-center gap-1.5 transition-colors hover:bg-[#F06A6A]/10"
+              style={{ background: 'rgba(255,255,255,0.05)', color: '#F06A6A', border: '1px solid rgba(240,106,106,0.2)' }}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -540,21 +622,35 @@ export default function SmartProjectsTab({
             transition={{ duration: 0.15 }}
           >
             {needsAttentionTasks.length === 0 ? (
-              <div className="text-center py-16 rounded-xl bg-[#151F2E] border border-white/[0.06]">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#22C55E]/10 flex items-center justify-center">
+              <div
+                className="text-center py-16"
+                style={{
+                  background: appleTokens.surfaceL1,
+                  boxShadow: appleTokens.shadowL1,
+                  borderRadius: appleTokens.radiusL1,
+                }}
+              >
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: `${appleTokens.accentGreen}15` }}>
                   <svg className="w-8 h-8 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <div className="text-[16px] font-medium text-white mb-1">All caught up!</div>
-                <div className="text-[13px] text-[#8FA3BF]">No projects need immediate attention</div>
+                <div className="text-[16px] font-medium mb-1" style={{ color: appleTokens.textPrimary }}>All caught up!</div>
+                <div className="text-[13px]" style={{ color: appleTokens.textSecondary }}>No projects need immediate attention</div>
               </div>
             ) : (
-              <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
-                  <span className="w-3 h-3 rounded bg-[#EF4444]" />
-                  <span className="font-semibold text-[14px] text-white">Projects Needing Attention</span>
-                  <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{needsAttentionTasks.length} projects</span>
+              <div
+                className="overflow-hidden"
+                style={{
+                  background: appleTokens.surfaceL1,
+                  boxShadow: appleTokens.shadowL1,
+                  borderRadius: appleTokens.radiusL1,
+                }}
+              >
+                <div className="px-5 py-3 flex items-center gap-3" style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span className="w-3 h-3 rounded" style={{ background: appleTokens.accentRed }} />
+                  <span className="font-semibold text-[14px]" style={{ color: appleTokens.textPrimary }}>Projects Needing Attention</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-[8px]" style={{ color: appleTokens.textSecondary, background: 'rgba(255,255,255,0.06)' }}>{needsAttentionTasks.length} projects</span>
                 </div>
                 <div className="divide-y divide-white/[0.04]">
                   {needsAttentionTasks.map((task) => (
@@ -576,16 +672,30 @@ export default function SmartProjectsTab({
             transition={{ duration: 0.15 }}
           >
             {thisWeekTasks.length === 0 ? (
-              <div className="text-center py-16 rounded-xl bg-[#151F2E] border border-white/[0.06]">
-                <div className="text-[16px] font-medium text-white mb-1">No projects this week</div>
-                <div className="text-[13px] text-[#8FA3BF]">Nothing scheduled for the next 7 days</div>
+              <div
+                className="text-center py-16"
+                style={{
+                  background: appleTokens.surfaceL1,
+                  boxShadow: appleTokens.shadowL1,
+                  borderRadius: appleTokens.radiusL1,
+                }}
+              >
+                <div className="text-[16px] font-medium mb-1" style={{ color: appleTokens.textPrimary }}>No projects this week</div>
+                <div className="text-[13px]" style={{ color: appleTokens.textSecondary }}>Nothing scheduled for the next 7 days</div>
               </div>
             ) : (
-              <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
-                  <span className="w-3 h-3 rounded bg-[#38BDF8]" />
-                  <span className="font-semibold text-[14px] text-white">Projects Due This Week</span>
-                  <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{thisWeekTasks.length} projects</span>
+              <div
+                className="overflow-hidden"
+                style={{
+                  background: appleTokens.surfaceL1,
+                  boxShadow: appleTokens.shadowL1,
+                  borderRadius: appleTokens.radiusL1,
+                }}
+              >
+                <div className="px-5 py-3 flex items-center gap-3" style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span className="w-3 h-3 rounded" style={{ background: appleTokens.accentCyan }} />
+                  <span className="font-semibold text-[14px]" style={{ color: appleTokens.textPrimary }}>Projects Due This Week</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-[8px]" style={{ color: appleTokens.textSecondary, background: 'rgba(255,255,255,0.06)' }}>{thisWeekTasks.length} projects</span>
                 </div>
                 <div className="divide-y divide-white/[0.04]">
                   {thisWeekTasks.map((task) => (
@@ -631,11 +741,18 @@ export default function SmartProjectsTab({
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
           >
-            <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-              <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
-                <span className="w-3 h-3 rounded bg-[#E16259]" />
-                <span className="font-semibold text-[14px] text-white">All Active Projects</span>
-                <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{allTasks.length} projects</span>
+            <div
+              className="overflow-hidden"
+              style={{
+                background: appleTokens.surfaceL1,
+                boxShadow: appleTokens.shadowL1,
+                borderRadius: appleTokens.radiusL1,
+              }}
+            >
+              <div className="px-5 py-3 flex items-center gap-3" style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span className="w-3 h-3 rounded" style={{ background: appleTokens.accentBlue }} />
+                <span className="font-semibold text-[14px]" style={{ color: appleTokens.textPrimary }}>All Active Projects</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-[8px]" style={{ color: appleTokens.textSecondary, background: 'rgba(255,255,255,0.06)' }}>{allTasks.length} projects</span>
               </div>
               <div className="max-h-[600px] overflow-y-auto divide-y divide-white/[0.04]">
                 {allTasks.map((task) => (
@@ -656,16 +773,30 @@ export default function SmartProjectsTab({
             transition={{ duration: 0.15 }}
           >
             {confirmedTasks.length === 0 ? (
-              <div className="text-center py-16 rounded-xl bg-[#151F2E] border border-white/[0.06]">
-                <div className="text-[16px] font-medium text-white mb-1">No confirmed projects</div>
-                <div className="text-[13px] text-[#8FA3BF]">No projects have been confirmed yet</div>
+              <div
+                className="text-center py-16"
+                style={{
+                  background: appleTokens.surfaceL1,
+                  boxShadow: appleTokens.shadowL1,
+                  borderRadius: appleTokens.radiusL1,
+                }}
+              >
+                <div className="text-[16px] font-medium mb-1" style={{ color: appleTokens.textPrimary }}>No confirmed projects</div>
+                <div className="text-[13px]" style={{ color: appleTokens.textSecondary }}>No projects have been confirmed yet</div>
               </div>
             ) : (
-              <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
+              <div
+                className="overflow-hidden"
+                style={{
+                  background: appleTokens.surfaceL1,
+                  boxShadow: appleTokens.shadowL1,
+                  borderRadius: appleTokens.radiusL1,
+                }}
+              >
+                <div className="px-5 py-3 flex items-center gap-3" style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <span className="w-3 h-3 rounded" style={{ backgroundColor: COLORS.confirmed }} />
-                  <span className="font-semibold text-[14px] text-white">Confirmed Projects</span>
-                  <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{confirmedTasks.length} projects</span>
+                  <span className="font-semibold text-[14px]" style={{ color: appleTokens.textPrimary }}>Confirmed Projects</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-[8px]" style={{ color: appleTokens.textSecondary, background: 'rgba(255,255,255,0.06)' }}>{confirmedTasks.length} projects</span>
                 </div>
                 <div className="divide-y divide-white/[0.04]">
                   {confirmedTasks.map((task) => (
@@ -687,16 +818,30 @@ export default function SmartProjectsTab({
             transition={{ duration: 0.15 }}
           >
             {placeholderTasks.length === 0 ? (
-              <div className="text-center py-16 rounded-xl bg-[#151F2E] border border-white/[0.06]">
-                <div className="text-[16px] font-medium text-white mb-1">No placeholder projects</div>
-                <div className="text-[13px] text-[#8FA3BF]">No tentative projects found</div>
+              <div
+                className="text-center py-16"
+                style={{
+                  background: appleTokens.surfaceL1,
+                  boxShadow: appleTokens.shadowL1,
+                  borderRadius: appleTokens.radiusL1,
+                }}
+              >
+                <div className="text-[16px] font-medium mb-1" style={{ color: appleTokens.textPrimary }}>No placeholder projects</div>
+                <div className="text-[13px]" style={{ color: appleTokens.textSecondary }}>No tentative projects found</div>
               </div>
             ) : (
-              <div className="rounded-xl bg-[#151F2E] border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
-                <div className="px-5 py-3 bg-[#0F1722] border-b border-white/[0.06] flex items-center gap-3">
+              <div
+                className="overflow-hidden"
+                style={{
+                  background: appleTokens.surfaceL1,
+                  boxShadow: appleTokens.shadowL1,
+                  borderRadius: appleTokens.radiusL1,
+                }}
+              >
+                <div className="px-5 py-3 flex items-center gap-3" style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <span className="w-3 h-3 rounded" style={{ backgroundColor: COLORS.placeholder }} />
-                  <span className="font-semibold text-[14px] text-white">Placeholder Projects</span>
-                  <span className="text-[11px] text-[#8FA3BF] bg-white/5 px-2 py-0.5 rounded">{placeholderTasks.length} projects</span>
+                  <span className="font-semibold text-[14px]" style={{ color: appleTokens.textPrimary }}>Placeholder Projects</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-[8px]" style={{ color: appleTokens.textSecondary, background: 'rgba(255,255,255,0.06)' }}>{placeholderTasks.length} projects</span>
                 </div>
                 <div className="divide-y divide-white/[0.04]">
                   {placeholderTasks.map((task) => (
