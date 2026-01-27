@@ -127,10 +127,16 @@ export async function getSalesOrderAging(filters?: {
   }
 
   // Query with line-level aggregation for manufacturing vs deferred values
-  // Classification by item class OR item's income account:
-  // - Manufacturing (401x-404x): Test Bench equipment, components, install/training
-  // - Deferred (405x, 408x-418x): M3 Software, MCC maintenance, deferred revenue
-  // Note: Sales order lines may not have class set, so we also check item's incomeaccount
+  // Classification by item's income account:
+  // - Manufacturing (physical goods to ship):
+  //   * 401x-404x: Test Bench equipment, components, install/training
+  //   * 414x: Diversified Products (strainers, meter testing, valve keys)
+  //   * 407x: TB Service parts
+  // - Deferred (software/maintenance - stays open for years):
+  //   * 405x: M3 Software licenses
+  //   * 408x-409x: M3 renewals/upgrades
+  //   * 410x-411x: MCC maintenance contracts
+  //   * 418x: Deferred revenue
   const query = `
     SELECT
       so.id,
@@ -150,30 +156,26 @@ export async function getSalesOrderAging(filters?: {
       SELECT
         tl.transaction AS so_id,
         SUM(CASE
-          WHEN c.fullname LIKE '%Test Bench%'
-               OR tl.class = 1
-               OR ia.acctnumber LIKE '401%'
+          WHEN ia.acctnumber LIKE '401%'
                OR ia.acctnumber LIKE '402%'
                OR ia.acctnumber LIKE '403%'
                OR ia.acctnumber LIKE '404%'
-          THEN NVL(tl.amount, 0)
+               OR ia.acctnumber LIKE '407%'
+               OR ia.acctnumber LIKE '414%'
+          THEN ABS(NVL(tl.amount, 0))
           ELSE 0
         END) AS manufacturing_value,
         SUM(CASE
-          WHEN c.fullname LIKE '%MCC%'
-               OR c.fullname LIKE '%M3%'
-               OR c.fullname LIKE '%Laser%'
-               OR ia.acctnumber LIKE '405%'
+          WHEN ia.acctnumber LIKE '405%'
                OR ia.acctnumber LIKE '408%'
                OR ia.acctnumber LIKE '409%'
                OR ia.acctnumber LIKE '410%'
                OR ia.acctnumber LIKE '411%'
                OR ia.acctnumber LIKE '418%'
-          THEN NVL(tl.amount, 0)
+          THEN ABS(NVL(tl.amount, 0))
           ELSE 0
         END) AS deferred_value
       FROM TransactionLine tl
-      LEFT JOIN Classification c ON c.id = tl.class
       LEFT JOIN Item i ON i.id = tl.item
       LEFT JOIN Account ia ON ia.id = i.incomeaccount
       WHERE tl.mainline = 'F'
