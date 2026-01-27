@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import { DEFAULT_PINNED_ROUTES } from '@/lib/navigation';
 
 interface Dashboard {
   name: string;
@@ -80,13 +81,8 @@ export function SidebarCustomizeModal({
   };
 
   const handleReset = () => {
-    // Reset to defaults (same as API defaults)
-    setPinnedRoutes([
-      '/contracts/review',
-      '/contracts-dashboard',
-      '/pm-dashboard',
-      '/operations',
-    ]);
+    // Reset to defaults from shared config
+    setPinnedRoutes([...DEFAULT_PINNED_ROUTES]);
     setError(null);
   };
 

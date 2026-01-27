@@ -63,6 +63,13 @@ const displayDepartments = departments.filter(dept => dept.name !== 'Administrat
 // Department card component
 function DepartmentCard({ department, delay }: { department: Department; delay: number }) {
   const hasDashboards = department.dashboards.length > 0;
+  const gradientStyle = {
+    background: `linear-gradient(to bottom right, ${department.gradient.from}, ${department.gradient.to})`,
+  };
+  const accentStyle = {
+    background: `linear-gradient(to right, ${department.gradient.from}, ${department.gradient.to})`,
+    opacity: 0.6,
+  };
 
   return (
     <motion.div
@@ -72,12 +79,12 @@ function DepartmentCard({ department, delay }: { department: Department; delay: 
       className="group relative bg-[#151E2C]/80 backdrop-blur-sm border border-[#1E293B] rounded-2xl overflow-hidden"
     >
       {/* Top accent line */}
-      <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${department.color} opacity-60`} />
+      <div className="absolute top-0 left-0 right-0 h-[2px]" style={accentStyle} />
 
       {/* Department Header */}
       <div className="p-5 border-b border-[#1E293B]/50">
         <div className="flex items-center gap-3">
-          <div className={`p-2.5 rounded-xl bg-gradient-to-br ${department.color} shadow-lg`}>
+          <div className="p-2.5 rounded-xl shadow-lg" style={gradientStyle}>
             <span className="text-white">{getDepartmentIcon(department.icon)}</span>
           </div>
           <h3 className="text-lg font-semibold text-white">{department.name}</h3>

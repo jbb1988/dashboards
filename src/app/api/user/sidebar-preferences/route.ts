@@ -7,14 +7,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { DEFAULT_PINNED_ROUTES } from '@/lib/navigation';
 
 // Default pinned dashboards (excluding Home which is always first)
-const DEFAULT_PINNED_DASHBOARDS = [
-  '/contracts/review',
-  '/contracts-dashboard',
-  '/pm-dashboard',
-  '/operations',
-];
+const DEFAULT_PINNED_DASHBOARDS = DEFAULT_PINNED_ROUTES;
 
 // Maximum number of custom pinned dashboards (excluding Home)
 const MAX_PINNED_DASHBOARDS = 4;
