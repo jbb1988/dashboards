@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Package, Clock, DollarSign, AlertTriangle } from 'lucide-react';
 
 interface SalesOrder {
   id: string;
@@ -33,6 +33,31 @@ interface OrdersTabProps {
   fulfillments: any[];
 }
 
+// Sales Order Status mapping
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
+  'A': { label: 'Pending Approval', color: '#64748B', bg: 'rgba(100, 116, 139, 0.15)' },
+  'B': { label: 'Pending Fulfillment', color: '#38BDF8', bg: 'rgba(56, 189, 248, 0.15)' },
+  'C': { label: 'Partially Fulfilled', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)' },
+  'D': { label: 'Pending Billing', color: '#A78BFA', bg: 'rgba(167, 139, 250, 0.15)' },
+  'E': { label: 'Billed', color: '#22C55E', bg: 'rgba(34, 197, 94, 0.15)' },
+  'F': { label: 'Closed', color: '#6B7280', bg: 'rgba(107, 114, 128, 0.15)' },
+  'G': { label: 'Cancelled', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)' },
+};
+
+function getStatusInfo(status: string): { label: string; color: string; bg: string } {
+  // Check if it's a letter code
+  if (STATUS_MAP[status]) {
+    return STATUS_MAP[status];
+  }
+  // Check if it's already a description (e.g., "Pending Fulfillment")
+  const entry = Object.entries(STATUS_MAP).find(([_, v]) => v.label.toLowerCase() === status.toLowerCase());
+  if (entry) {
+    return entry[1];
+  }
+  // Default
+  return { label: status, color: '#64748B', bg: 'rgba(100, 116, 139, 0.15)' };
+}
+
 function formatCurrency(value: number): string {
   if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
   if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
@@ -60,18 +85,10 @@ function getAgingColor(days: number): string {
   return 'text-green-400';
 }
 
-function getAgingBadge(days: number): { bg: string; text: string } {
-  if (days > 90) return { bg: 'bg-red-500/20', text: 'text-red-400' };
-  if (days > 60) return { bg: 'bg-orange-500/20', text: 'text-orange-400' };
-  if (days > 30) return { bg: 'bg-amber-500/20', text: 'text-amber-400' };
-  return { bg: 'bg-green-500/20', text: 'text-green-400' };
-}
-
-// Grid: Order# | Customer | Date | Status | Amount | Age
-const GRID_COLS = '100px 1.5fr 90px 110px 100px 80px';
+type FilterType = 'all' | '0-30' | '31-60' | '61-90' | '90+';
 
 export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
-  const [filter, setFilter] = useState<'all' | '90+' | '61-90' | '31-60' | '0-30'>('all');
+  const [filter, setFilter] = useState<FilterType>('all');
 
   const filteredOrders = orders.filter(order => {
     if (filter === 'all') return true;
@@ -84,124 +101,192 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
 
   const sortedOrders = [...filteredOrders].sort((a, b) => b.days_open - a.days_open);
 
+  // Aging buckets config - ordered from newest to oldest (0-30 first)
+  const agingBuckets: { key: FilterType; label: string; icon: React.ReactNode; color: string; borderColor: string }[] = [
+    { key: '0-30', label: '0-30 Days', icon: <Clock className="w-4 h-4" />, color: 'text-green-400', borderColor: 'border-green-500/30' },
+    { key: '31-60', label: '31-60 Days', icon: <Clock className="w-4 h-4" />, color: 'text-amber-400', borderColor: 'border-amber-500/30' },
+    { key: '61-90', label: '61-90 Days', icon: <AlertTriangle className="w-4 h-4" />, color: 'text-orange-400', borderColor: 'border-orange-500/30' },
+    { key: '90+', label: '90+ Days', icon: <AlertCircle className="w-4 h-4" />, color: 'text-red-400', borderColor: 'border-red-500/30' },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4"
+      className="space-y-6"
     >
-      {/* Aging Distribution */}
+      {/* Aging Distribution Cards */}
       {aging && (
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
-          <h3 className="text-sm font-medium text-gray-400 mb-3">Order Aging Distribution</h3>
-          <div className="flex gap-2">
-            {[
-              { key: 'all', label: 'All', count: orders.length, color: 'white' },
-              { key: '0-30', label: '0-30d', count: aging['0-30'].count, value: aging['0-30'].value, color: 'green' },
-              { key: '31-60', label: '31-60d', count: aging['31-60'].count, value: aging['31-60'].value, color: 'amber' },
-              { key: '61-90', label: '61-90d', count: aging['61-90'].count, value: aging['61-90'].value, color: 'orange' },
-              { key: '90+', label: '90+d', count: aging['90+'].count, value: aging['90+'].value, color: 'red' },
-            ].map(bucket => (
+        <div className="grid grid-cols-5 gap-4">
+          {/* All Orders Card */}
+          <button
+            onClick={() => setFilter('all')}
+            className={`p-4 rounded-xl transition-all text-left ${
+              filter === 'all'
+                ? 'bg-[#1E3A5F] border border-blue-500/30 ring-1 ring-blue-500/20'
+                : 'bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04]'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Package className={`w-4 h-4 ${filter === 'all' ? 'text-blue-400' : 'text-gray-500'}`} />
+              <span className={`text-xs font-medium ${filter === 'all' ? 'text-blue-400' : 'text-gray-500'}`}>
+                All Orders
+              </span>
+            </div>
+            <div className={`text-2xl font-bold ${filter === 'all' ? 'text-white' : 'text-gray-300'}`}>
+              {orders.length}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {formatCurrency(orders.reduce((sum, o) => sum + o.total_amount, 0))}
+            </div>
+          </button>
+
+          {/* Aging Bucket Cards */}
+          {agingBuckets.map(bucket => {
+            const data = aging[bucket.key as keyof typeof aging];
+            const isActive = filter === bucket.key;
+
+            return (
               <button
                 key={bucket.key}
-                onClick={() => setFilter(bucket.key as any)}
-                className={`flex-1 p-3 rounded-lg transition-all ${
-                  filter === bucket.key
-                    ? `bg-${bucket.color}-500/20 border border-${bucket.color}-500/30`
-                    : 'bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.05]'
+                onClick={() => setFilter(bucket.key)}
+                className={`p-4 rounded-xl transition-all text-left ${
+                  isActive
+                    ? `bg-white/[0.05] border ${bucket.borderColor} ring-1 ring-white/10`
+                    : 'bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04]'
                 }`}
               >
-                <div className="text-xs text-gray-500 mb-1">{bucket.label}</div>
-                <div className={`text-lg font-semibold text-${bucket.color}-400`}>{bucket.count}</div>
-                {bucket.value !== undefined && (
-                  <div className="text-xs text-gray-500">{formatCurrency(bucket.value)}</div>
-                )}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={isActive ? bucket.color : 'text-gray-500'}>{bucket.icon}</span>
+                  <span className={`text-xs font-medium ${isActive ? bucket.color : 'text-gray-500'}`}>
+                    {bucket.label}
+                  </span>
+                </div>
+                <div className={`text-2xl font-bold ${isActive ? bucket.color : 'text-gray-300'}`}>
+                  {data?.count || 0}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {formatCurrency(data?.value || 0)}
+                </div>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Orders List */}
+      {/* Orders Table */}
       <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-white/[0.06] bg-white/[0.02] flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">
+        {/* Table Header */}
+        <div className="px-4 py-3 border-b border-white/[0.06] bg-white/[0.02] flex items-center justify-between">
+          <h2 className="text-base font-semibold text-white flex items-center gap-2">
             Open Orders
-            {filter !== 'all' && <span className="ml-2 text-sm font-normal text-gray-400">({filter})</span>}
+            {filter !== 'all' && (
+              <span className="text-xs font-normal px-2 py-0.5 rounded-md bg-white/[0.06] text-gray-400">
+                {filter}
+              </span>
+            )}
           </h2>
-          <span className="text-sm text-gray-400">{sortedOrders.length} orders</span>
+          <span className="text-sm text-gray-500">{sortedOrders.length} orders</span>
         </div>
 
-        {/* Header */}
-        <div
-          className="grid gap-4 px-4 py-3 border-b border-white/[0.06] text-xs font-semibold text-gray-500 uppercase tracking-wider"
-          style={{ gridTemplateColumns: GRID_COLS }}
-        >
-          <div>Order #</div>
-          <div>Customer</div>
-          <div>Date</div>
-          <div>Status</div>
-          <div className="text-right">Amount</div>
-          <div className="text-right">Age</div>
-        </div>
+        {/* Table */}
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-white/[0.06]">
+              <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Order</th>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+              <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Age</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                  Loading orders...
+                </td>
+              </tr>
+            ) : sortedOrders.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                  No orders found
+                </td>
+              </tr>
+            ) : (
+              sortedOrders.map((order, index) => {
+                const isOverdue = order.days_open > 90;
+                const statusInfo = getStatusInfo(order.status);
 
-        {/* Rows */}
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
-        ) : sortedOrders.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No orders found</div>
-        ) : (
-          sortedOrders.map((order, index) => {
-            const badge = getAgingBadge(order.days_open);
-            const isEven = index % 2 === 0;
-            const isOverdue = order.days_open > 90;
+                return (
+                  <motion.tr
+                    key={order.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(index * 0.02, 0.3) }}
+                    className={`border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors ${
+                      isOverdue ? 'bg-red-500/[0.03]' : ''
+                    }`}
+                  >
+                    {/* Order */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {isOverdue && <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                        <div>
+                          <p className="text-sm font-medium text-white">{order.tranid}</p>
+                          <p className="text-xs text-gray-500">{formatDate(order.trandate)}</p>
+                        </div>
+                      </div>
+                    </td>
 
-            return (
-              <motion.div
-                key={order.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(index * 0.015, 0.3) }}
-                className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.02] ${
-                  isOverdue ? 'bg-red-500/[0.03]' : isEven ? 'bg-[#151F2E]' : 'bg-[#131B28]'
-                }`}
-                style={{ gridTemplateColumns: GRID_COLS }}
-              >
-                {/* Order # */}
-                <div className="flex items-center gap-2">
-                  {isOverdue && <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
-                  <span className="font-medium text-white truncate">{order.tranid}</span>
-                </div>
+                    {/* Customer */}
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-gray-300 truncate max-w-[200px]" title={order.customer_name}>
+                        {order.customer_name || '-'}
+                      </p>
+                    </td>
 
-                {/* Customer */}
-                <div className="min-w-0">
-                  <span className="text-gray-300 truncate block">{order.customer_name}</span>
-                </div>
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      <span
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
+                        style={{
+                          backgroundColor: statusInfo.bg,
+                          color: statusInfo.color,
+                        }}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: statusInfo.color }}
+                        />
+                        {statusInfo.label}
+                      </span>
+                    </td>
 
-                {/* Date */}
-                <div className="text-gray-400 text-sm">{formatDate(order.trandate)}</div>
+                    {/* Amount */}
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-sm font-medium text-white tabular-nums">
+                        {formatCurrency(order.total_amount)}
+                      </span>
+                    </td>
 
-                {/* Status */}
-                <div>
-                  <span className="text-xs px-2 py-1 rounded bg-white/[0.06] text-gray-300 truncate block">
-                    {order.status}
-                  </span>
-                </div>
+                    {/* Age */}
+                    <td className="px-4 py-3 text-right">
+                      <span className={`text-sm tabular-nums ${getAgingColor(order.days_open)}`}>
+                        {order.days_open}d
+                      </span>
+                    </td>
+                  </motion.tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
 
-                {/* Amount */}
-                <div className="text-right">
-                  <span className="font-medium text-white">{formatCurrency(order.total_amount)}</span>
-                </div>
-
-                {/* Age */}
-                <div className="text-right">
-                  <span className={`text-sm ${getAgingColor(order.days_open)}`}>
-                    {order.days_open}d
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })
+        {sortedOrders.length > 50 && (
+          <div className="px-4 py-3 text-center text-gray-500 text-sm border-t border-white/[0.06]">
+            Showing {Math.min(sortedOrders.length, 50)} of {sortedOrders.length} orders
+          </div>
         )}
       </div>
     </motion.div>
