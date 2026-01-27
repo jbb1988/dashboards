@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Package, Clock, DollarSign, AlertTriangle, ChevronUp, ChevronDown, Wrench, FileText, Layers } from 'lucide-react';
+import { AlertCircle, Package, Clock, DollarSign, AlertTriangle, ChevronUp, ChevronDown, Wrench, FileText, Layers, ChevronRight } from 'lucide-react';
+import OrderDetailDrawer from './OrderDetailDrawer';
 
 interface SalesOrder {
   id: string;
@@ -90,14 +91,15 @@ type FilterType = 'all' | '0-30' | '31-60' | '61-90' | '90+';
 type OrderTypeFilter = 'all' | 'manufacturing' | 'deferred' | 'mixed';
 type SortField = 'order' | 'customer' | 'status' | 'amount' | 'mfg' | 'deferred' | 'age';
 
-// Grid columns: Alert | Order | Customer | Status | Mfg Value | Deferred | Age
-const GRID_COLS = '28px 1fr 1.5fr 140px 90px 90px 60px';
+// Grid columns: Alert | Order | Customer | Status | Mfg Value | Deferred | Age | Chevron
+const GRID_COLS = '28px 1fr 1.5fr 140px 90px 90px 50px 24px';
 
 export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
   const [filter, setFilter] = useState<FilterType>('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderTypeFilter>('all');
   const [sortBy, setSortBy] = useState<SortField>('age');
   const [sortDesc, setSortDesc] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -386,6 +388,7 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
           >
             Age<SortIndicator field="age" />
           </div>
+          <div></div>
         </div>
 
         {/* Rows */}
@@ -414,7 +417,8 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(index * 0.015, 0.3) }}
-                  className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.03] ${
+                  onClick={() => setSelectedOrder(order)}
+                  className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.05] cursor-pointer ${
                     isOverdue ? 'bg-red-500/[0.04]' : isWarning ? 'bg-orange-500/[0.02]' : isEven ? 'bg-[#151F2E]' : 'bg-[#131B28]'
                   }`}
                   style={{ gridTemplateColumns: GRID_COLS }}
@@ -501,6 +505,11 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
                       {order.days_open}d
                     </span>
                   </div>
+
+                  {/* Chevron */}
+                  <div className="flex justify-center">
+                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                  </div>
                 </motion.div>
               );
             })
@@ -513,6 +522,12 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
           </div>
         )}
       </div>
+
+      {/* Order Detail Drawer */}
+      <OrderDetailDrawer
+        order={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+      />
     </motion.div>
   );
 }
