@@ -1172,7 +1172,9 @@ export default function App() {
         throw new Error(errorData.error || 'Failed to save to history');
       }
 
+      const responseData = await response.json();
       setSavedToHistory(true);
+      setSavedReviewId(responseData.review?.id || null);
       setSuccessMessage(`Saved to history: ${historyProvisionName}`);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -1180,6 +1182,189 @@ export default function App() {
       console.error('Save to history error:', err);
     } finally {
       setIsSavingToHistory(false);
+    }
+  };
+
+  // Submit for approval - sends to admin for review
+  const submitForApproval = async (reviewId?: string) => {
+    const idToSubmit = reviewId || savedReviewId;
+
+    if (!user) {
+      setError('Please log in first');
+      return;
+    }
+
+    if (!idToSubmit) {
+      setError('No review saved yet. Please save to history first.');
+      return;
+    }
+
+    if (!analysisResult) {
+      setError('No analysis available');
+      return;
+    }
+
+    setIsSubmittingApproval(true);
+    setError(null);
+
+    try {
+      // Get contract name for the approval request
+      const documentName = await getDocumentName();
+      const selectedContractData = contracts.find(c => c.id === selectedContract);
+      const contractName = selectedContractData?.name || documentName;
+
+      // Generate summary preview from applied changes
+      const summaryPreview = analysisResult.sections
+        .filter(s => appliedSections.has(s.sectionTitle))
+        .map(s => `[${s.riskLevel?.toUpperCase()}] ${s.sectionTitle}: ${s.rationale || 'Modified'}`)
+        .slice(0, 5);
+
+      const token = localStorage.getItem('mars_token');
+      const response = await fetch(`${API_BASE}/api/contracts/review/request-approval`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reviewId: idToSubmit,
+          contractName: contractName,
+          submittedBy: user.email,
+          summaryPreview: summaryPreview,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to submit for approval');
+      }
+
+      const result = await response.json();
+      setSubmittedForApproval(true);
+      setSuccessMessage(`Submitted for approval! ${result.emailsSent || 0} admin(s) notified.`);
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit for approval');
+      console.error('Submit for approval error:', err);
+    } finally {
+      setIsSubmittingApproval(false);
+    }
+  };
+
+  // Save to history AND submit for approval in one step
+  const saveAndSubmitForApproval = async () => {
+    if (!user) {
+      setError('Please log in first');
+      return;
+    }
+
+    if (!analysisResult) {
+      setError('No analysis to save');
+      return;
+    }
+
+    setIsSavingToHistory(true);
+    setError(null);
+
+    try {
+      // Read the CURRENT Word document text (with user's applied changes)
+      const [currentDocumentText, documentName, documentFile] = await Promise.all([
+        getDocumentText(),
+        getDocumentName(),
+        getDocumentAsBase64(),
+      ]);
+
+      // Get linked contract info
+      const selectedContractData = contracts.find(c => c.id === selectedContract);
+      const historyProvisionName = selectedContractData?.name || documentName;
+
+      // Generate a simple diff summary based on what sections were applied
+      const appliedSummary = analysisResult.sections
+        .filter(s => appliedSections.has(s.sectionTitle))
+        .map(s => `[${s.sectionTitle}] ${s.rationale || 'Modified'}`);
+
+      const summary = appliedSummary.length > 0
+        ? appliedSummary
+        : ['No changes applied - document reviewed but unchanged'];
+
+      const token = localStorage.getItem('mars_token');
+
+      // First, save to history
+      const historyResponse = await fetch(`${API_BASE}/api/contracts/review/history`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          contractId: selectedContract || undefined,
+          contractName: selectedContractData?.name || undefined,
+          provisionName: historyProvisionName,
+          originalText: originalDocumentText,
+          redlinedText: currentDocumentText,
+          modifiedText: currentDocumentText,
+          summary: summary,
+          status: 'draft',
+          documentFile: documentFile || undefined,
+        }),
+      });
+
+      if (!historyResponse.ok) {
+        const errorData = await historyResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save to history');
+      }
+
+      const historyData = await historyResponse.json();
+      const reviewId = historyData.review?.id;
+
+      if (!reviewId) {
+        throw new Error('No review ID returned from save');
+      }
+
+      setSavedToHistory(true);
+      setSavedReviewId(reviewId);
+
+      // Now submit for approval
+      setIsSavingToHistory(false);
+      setIsSubmittingApproval(true);
+
+      const summaryPreview = analysisResult.sections
+        .filter(s => appliedSections.has(s.sectionTitle))
+        .map(s => `[${s.riskLevel?.toUpperCase()}] ${s.sectionTitle}: ${s.rationale || 'Modified'}`)
+        .slice(0, 5);
+
+      const approvalResponse = await fetch(`${API_BASE}/api/contracts/review/request-approval`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reviewId: reviewId,
+          contractName: selectedContractData?.name || documentName,
+          submittedBy: user.email,
+          summaryPreview: summaryPreview,
+        }),
+      });
+
+      if (!approvalResponse.ok) {
+        const errorData = await approvalResponse.json().catch(() => ({}));
+        // Still saved to history, just approval failed
+        setSuccessMessage(`Saved to history but approval submission failed: ${errorData.error || 'Unknown error'}`);
+        setTimeout(() => setSuccessMessage(null), 5000);
+        return;
+      }
+
+      const approvalResult = await approvalResponse.json();
+      setSubmittedForApproval(true);
+      setSuccessMessage(`Saved and submitted for approval! ${approvalResult.emailsSent || 0} admin(s) notified.`);
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save and submit');
+      console.error('Save and submit error:', err);
+    } finally {
+      setIsSavingToHistory(false);
+      setIsSubmittingApproval(false);
     }
   };
 
@@ -1195,6 +1380,8 @@ export default function App() {
     setAppliedSections(new Set()); // Clear applied sections on new analysis
     setAllChangesInserted(false);
     setSavedToHistory(false); // Reset history save state for new analysis
+    setSavedReviewId(null);
+    setSubmittedForApproval(false);
 
     try {
       const [documentText, documentName] = await Promise.all([
@@ -2341,32 +2528,52 @@ export default function App() {
       <FluentProvider theme={webDarkTheme}>
         <div style={styles.container}>
           <div style={styles.loginCard}>
-            <Shield24Regular style={{ fontSize: 48, color: '#0078D4' }} />
-            <Text size={500} weight="semibold">MARS Contract Review</Text>
-            <Text size={300} style={{ color: '#A0A0A0', textAlign: 'center' }}>
-              Sign in to analyze contracts and access the clause library
-            </Text>
+            <span style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.02em' }}>
+              MARS Contract Review
+            </span>
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.5 }}>
+              Sign in to analyze contracts
+            </span>
 
             {!showQuickLogin ? (
               <>
-                <Button
-                  appearance="primary"
-                  icon={<Person24Regular />}
+                <button
                   onClick={handleLogin}
-                  style={{ marginTop: 16, width: '100%' }}
+                  style={{
+                    marginTop: 12,
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'linear-gradient(180deg, rgba(88, 166, 255, 0.15) 0%, rgba(88, 166, 255, 0.08) 100%)',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: 'rgba(255,255,255,0.95)',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    letterSpacing: '-0.01em',
+                  }}
                 >
                   Sign in with Microsoft
-                </Button>
-                <Button
-                  appearance="subtle"
+                </button>
+                <button
                   onClick={() => setShowQuickLogin(true)}
-                  style={{ marginTop: 8 }}
+                  style={{
+                    marginTop: 4,
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px',
+                    color: 'rgba(255,255,255,0.45)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
                 >
                   Use email instead
-                </Button>
+                </button>
               </>
             ) : (
-              <div style={{ marginTop: 16, width: '100%' }}>
+              <div style={{ marginTop: 12, width: '100%' }}>
                 <input
                   type="email"
                   value={loginEmail}
@@ -2375,43 +2582,63 @@ export default function App() {
                   placeholder="Enter your email"
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    backgroundColor: '#374151',
-                    border: '1px solid #4B5563',
-                    borderRadius: 6,
-                    color: 'white',
+                    padding: '12px 14px',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: 'rgba(255,255,255,0.9)',
                     fontSize: 14,
                     marginBottom: 12,
                     boxSizing: 'border-box',
+                    outline: 'none',
                   }}
                 />
-                <Button
-                  appearance="primary"
+                <button
                   onClick={handleQuickLogin}
                   disabled={isLoggingIn}
                   style={{
                     width: '100%',
-                    opacity: isLoggingIn ? 0.7 : 1,
-                    transition: 'opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    padding: '12px 16px',
+                    background: isLoggingIn ? 'rgba(255,255,255,0.04)' : 'linear-gradient(180deg, rgba(88, 166, 255, 0.15) 0%, rgba(88, 166, 255, 0.08) 100%)',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: isLoggingIn ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.95)',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: isLoggingIn ? 'default' : 'pointer',
+                    fontFamily: 'inherit',
+                    letterSpacing: '-0.01em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
                   }}
-                  icon={isLoggingIn ? <PremiumSpinner size={14} color="rgba(255,255,255,0.6)" /> : undefined}
                 >
-                  {isLoggingIn ? 'Signing in' : 'Sign In'}
-                </Button>
-                <Button
-                  appearance="subtle"
+                  {isLoggingIn && <PremiumSpinner size={14} color="rgba(255,255,255,0.6)" />}
+                  {isLoggingIn ? 'Signing in...' : 'Sign In'}
+                </button>
+                <button
                   onClick={() => setShowQuickLogin(false)}
-                  style={{ marginTop: 8 }}
+                  style={{
+                    marginTop: 4,
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px',
+                    color: 'rgba(255,255,255,0.45)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
                 >
                   Back
-                </Button>
+                </button>
               </div>
             )}
 
             {error && (
-              <Text size={200} style={{ color: '#F87171', marginTop: 12 }}>
+              <span style={{ fontSize: 12, color: 'rgba(248, 113, 113, 0.9)', marginTop: 12, textAlign: 'center' }}>
                 {error}
-              </Text>
+              </span>
             )}
           </div>
         </div>
@@ -2422,13 +2649,12 @@ export default function App() {
   return (
     <FluentProvider theme={webDarkTheme}>
       <div style={styles.container}>
-        {/* Header */}
+        {/* Header - Compact Apple Pro style */}
         <div style={styles.header}>
-          <div style={styles.headerContent}>
-            <Shield24Regular />
-            <Text weight="semibold">MARS</Text>
-          </div>
-          <Text size={200} style={{ color: '#A0A0A0' }}>{user.email}</Text>
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.88)', letterSpacing: '-0.01em' }}>
+            MARS Contract Review
+          </span>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{user.email}</span>
         </div>
 
         {/* Error Display */}
@@ -2555,7 +2781,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Tabs - Minimal, text-only */}
         <TabList
           selectedValue={activeTab}
           onTabSelect={handleTabChange}
@@ -2563,15 +2789,21 @@ export default function App() {
         >
           <Tab
             value="analyze"
-            icon={<DocumentSearch24Regular style={{ color: activeTab === 'analyze' ? '#ffffff' : '#9d9d9d' }} />}
-            style={{ color: activeTab === 'analyze' ? '#ffffff' : '#9d9d9d' }}
+            style={{
+              color: activeTab === 'analyze' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+              fontWeight: activeTab === 'analyze' ? 500 : 400,
+              fontSize: 13,
+            }}
           >
             Analyze
           </Tab>
           <Tab
             value="clauses"
-            icon={<Library24Regular style={{ color: activeTab === 'clauses' ? '#ffffff' : '#9d9d9d' }} />}
-            style={{ color: activeTab === 'clauses' ? '#ffffff' : '#9d9d9d' }}
+            style={{
+              color: activeTab === 'clauses' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+              fontWeight: activeTab === 'clauses' ? 500 : 400,
+              fontSize: 13,
+            }}
           >
             Clauses
           </Tab>
@@ -2581,11 +2813,11 @@ export default function App() {
         <div style={styles.content}>
           {activeTab === 'analyze' && (
             <div style={styles.analyzeTab}>
-              {/* Contract Linking Section */}
+              {/* Contract Linking - Minimal */}
               <div style={styles.contractSection} ref={contractDropdownRef}>
-                <Text size={200} weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
-                  Link to Contract (Optional)
-                </Text>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 8, display: 'block' }}>
+                  Link to Contract
+                </span>
                 <div style={styles.contractDropdownContainer}>
                   <input
                     type="text"
@@ -2660,115 +2892,95 @@ export default function App() {
                 )}
               </div>
 
-              {/* Analyze Controls - Flat, Microsoft-native */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {/* Analysis Depth Toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Text size={200} style={{ color: '#808080', whiteSpace: 'nowrap' }}>Depth:</Text>
+              {/* Analyze Controls - Apple Pro style */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Analysis Depth - Minimal inline control */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Depth</span>
                   <select
                     value={riskLevelFilter}
                     onChange={(e) => setRiskLevelFilter(e.target.value as 'high' | 'medium' | 'all')}
                     disabled={isAnalyzing}
                     style={{
                       flex: 1,
-                      padding: '4px 8px',
-                      backgroundColor: '#242A30',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 4,
-                      color: 'rgba(255,255,255,0.88)',
+                      padding: '8px 12px',
+                      backgroundColor: 'rgba(255,255,255,0.04)',
+                      border: 'none',
+                      borderRadius: 6,
+                      color: 'rgba(255,255,255,0.75)',
                       fontSize: 12,
                       cursor: isAnalyzing ? 'default' : 'pointer',
+                      outline: 'none',
                     }}
                   >
                     <option value="high">High Risk Only</option>
-                    <option value="medium">Include Medium Risk</option>
-                    <option value="all">All Risks (Most Thorough)</option>
+                    <option value="medium">Medium + High Risk</option>
+                    <option value="all">All Risks</option>
                   </select>
                 </div>
 
-                {/* Button Row - Primary action emphasized */}
-                <div style={styles.analyzeButtons}>
-                  {/* Primary action - subtle emphasis */}
-                  <button
-                    onClick={analyzeDocument}
-                    disabled={isAnalyzing}
-                    style={{
-                      flex: 1,
-                      padding: '8px 16px',
-                      backgroundColor: isAnalyzing ? 'transparent' : 'rgba(88, 166, 255, 0.08)',
-                      border: '1px solid rgba(88, 166, 255, 0.25)',
-                      borderRadius: 4,
-                      color: isAnalyzing ? 'rgba(255,255,255,0.4)' : '#58A6FF',
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: isAnalyzing ? 'default' : 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    Analyze Document
-                  </button>
-                  {/* Secondary action - quieter */}
-                  <button
-                    onClick={analyzeSelection}
-                    disabled={isAnalyzing}
-                    title="Select text in Word and click to analyze just that section"
-                    style={{
-                      padding: '8px 12px',
-                      backgroundColor: 'transparent',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 4,
-                      color: isAnalyzing ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.62)',
-                      fontSize: 12,
-                      cursor: isAnalyzing ? 'default' : 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    Analyze Selection
-                  </button>
-                </div>
+                {/* Primary CTA - Analyze Document */}
+                <button
+                  onClick={analyzeDocument}
+                  disabled={isAnalyzing}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: isAnalyzing ? 'rgba(255,255,255,0.04)' : 'linear-gradient(180deg, rgba(88, 166, 255, 0.15) 0%, rgba(88, 166, 255, 0.08) 100%)',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: isAnalyzing ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: isAnalyzing ? 'default' : 'pointer',
+                    fontFamily: 'inherit',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
+                </button>
 
-                {/* Loading State - Full width progress bar + muted text */}
-                {isAnalyzing && (
-                  <div style={{ marginTop: 4 }}>
-                    {/* Thin indeterminate progress bar */}
-                    <div style={{
-                      width: '100%',
-                      height: 2,
-                      backgroundColor: 'rgba(255,255,255,0.06)',
-                      overflow: 'hidden',
-                      borderRadius: 1,
-                    }}>
-                      <div style={{
-                        width: '30%',
-                        height: '100%',
-                        backgroundColor: '#58A6FF',
-                        animation: 'premium-shimmer 2s ease-in-out infinite',
-                      }} />
-                    </div>
-                    <span style={{
-                      display: 'block',
-                      marginTop: 8,
-                      fontSize: 12,
-                      color: 'rgba(255,255,255,0.5)',
-                    }}>
-                      Analyzing clauses...
-                    </span>
-                  </div>
-                )}
+                {/* Secondary action - Text only */}
+                <button
+                  onClick={analyzeSelection}
+                  disabled={isAnalyzing}
+                  title="Select text in Word first"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '4px 0',
+                    color: isAnalyzing ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.5)',
+                    fontSize: 12,
+                    cursor: isAnalyzing ? 'default' : 'pointer',
+                    fontFamily: 'inherit',
+                    textAlign: 'center',
+                  }}
+                >
+                  or analyze selected text only
+                </button>
               </div>
 
               {/* Analysis Results - Dashboard Style */}
               {analysisResult && (
                 <div style={styles.results}>
-                  {/* Risk Summary Bar */}
-                  {/* Results line - muted, informational */}
+                  {/* Risk Summary - Inline pills, reduced visual weight */}
                   <div style={styles.riskSummaryBar}>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Results:</span>
-                    <span style={{ fontSize: 11, color: '#F85149' }}>{analysisResult.riskScores?.summary?.high ?? 0} High</span>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>•</span>
-                    <span style={{ fontSize: 11, color: '#D29922' }}>{analysisResult.riskScores?.summary?.medium ?? 0} Medium</span>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>•</span>
-                    <span style={{ fontSize: 11, color: '#238636' }}>{analysisResult.riskScores?.summary?.low ?? 0} Low</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginRight: 4 }}>Found</span>
+                    {(analysisResult.riskScores?.summary?.high ?? 0) > 0 && (
+                      <span style={{ fontSize: 11, color: 'rgba(248, 81, 73, 0.85)', fontWeight: 500 }}>
+                        {analysisResult.riskScores?.summary?.high} high
+                      </span>
+                    )}
+                    {(analysisResult.riskScores?.summary?.medium ?? 0) > 0 && (
+                      <span style={{ fontSize: 11, color: 'rgba(210, 153, 34, 0.85)', fontWeight: 500 }}>
+                        {analysisResult.riskScores?.summary?.medium} medium
+                      </span>
+                    )}
+                    {(analysisResult.riskScores?.summary?.low ?? 0) > 0 && (
+                      <span style={{ fontSize: 11, color: 'rgba(35, 134, 54, 0.85)', fontWeight: 500 }}>
+                        {analysisResult.riskScores?.summary?.low} low
+                      </span>
+                    )}
                   </div>
 
                   {/* Insert All Changes - simple link style */}
@@ -2796,126 +3008,173 @@ export default function App() {
                     </span>
                   )}
 
-                  {/* Save to History Button - appears after any changes are inserted */}
-                  {appliedSections.size > 0 && !savedToHistory && (
-                    <button
-                      onClick={saveToHistory}
-                      disabled={isSavingToHistory}
-                      style={{
-                        width: '100%',
-                        padding: '10px 16px',
-                        marginTop: 8,
-                        backgroundColor: 'transparent',
-                        border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: 4,
-                        color: isSavingToHistory ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.88)',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        cursor: isSavingToHistory ? 'default' : 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      {isSavingToHistory ? 'Saving to History...' : 'Save to History (for Approval Workflow)'}
-                    </button>
+                  {/* Save/Submit Actions - Apple Pro style */}
+                  {appliedSections.size > 0 && !savedToHistory && !submittedForApproval && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                      {/* Primary: Submit for Approval */}
+                      <button
+                        onClick={saveAndSubmitForApproval}
+                        disabled={isSavingToHistory || isSubmittingApproval}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          background: (isSavingToHistory || isSubmittingApproval)
+                            ? 'rgba(255,255,255,0.04)'
+                            : 'linear-gradient(180deg, rgba(35, 134, 54, 0.25) 0%, rgba(35, 134, 54, 0.15) 100%)',
+                          border: 'none',
+                          borderRadius: 8,
+                          color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: (isSavingToHistory || isSubmittingApproval) ? 'default' : 'pointer',
+                          fontFamily: 'inherit',
+                          letterSpacing: '-0.01em',
+                        }}
+                      >
+                        {isSavingToHistory ? 'Saving...' : isSubmittingApproval ? 'Submitting...' : 'Submit for Approval'}
+                      </button>
+                      {/* Secondary: Text-only */}
+                      <button
+                        onClick={saveToHistory}
+                        disabled={isSavingToHistory || isSubmittingApproval}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: '4px 0',
+                          color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.5)',
+                          fontSize: 12,
+                          cursor: (isSavingToHistory || isSubmittingApproval) ? 'default' : 'pointer',
+                          fontFamily: 'inherit',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {isSavingToHistory ? 'Saving...' : 'or save to history only'}
+                      </button>
+                    </div>
                   )}
-                  {savedToHistory && (
-                    <span style={{ fontSize: 12, color: '#238636', padding: '8px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+
+                  {/* After saved to history but not yet submitted */}
+                  {savedToHistory && !submittedForApproval && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                      <span style={{ fontSize: 12, color: 'rgba(35, 134, 54, 0.85)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
+                        Saved to history
+                      </span>
+                      <button
+                        onClick={() => submitForApproval()}
+                        disabled={isSubmittingApproval}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          background: isSubmittingApproval
+                            ? 'rgba(255,255,255,0.04)'
+                            : 'linear-gradient(180deg, rgba(35, 134, 54, 0.25) 0%, rgba(35, 134, 54, 0.15) 100%)',
+                          border: 'none',
+                          borderRadius: 8,
+                          color: isSubmittingApproval ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: isSubmittingApproval ? 'default' : 'pointer',
+                          fontFamily: 'inherit',
+                          letterSpacing: '-0.01em',
+                        }}
+                      >
+                        {isSubmittingApproval ? 'Submitting...' : 'Submit for Approval'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* After submitted for approval */}
+                  {submittedForApproval && (
+                    <span style={{ fontSize: 12, color: 'rgba(35, 134, 54, 0.85)', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
-                      Saved to dashboard history
+                      Submitted for approval
                     </span>
                   )}
 
-                  {/* Modifications Section */}
+                  {/* Modifications - Flat editorial blocks */}
                   {(analysisResult.sections?.filter(s => !s.isNewSection).length ?? 0) > 0 && (
                     <div style={styles.sectionList}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.88)', marginBottom: 8, display: 'block', marginTop: 12 }}>
-                        Modifications ({analysisResult.sections?.filter(s => !s.isNewSection).length ?? 0})
+                      <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.5)', marginBottom: 16, display: 'block', marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Modifications
                       </span>
                       {(analysisResult.sections ?? []).filter(s => !s.isNewSection).map((section, index) => (
                         <div key={`mod-${section.sectionNumber}-${index}`} style={styles.sectionCard}>
-                          {/* Flat header: HIGH · INDEMNIFICATION    2 changes */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {/* Header: risk level (weight only) + title */}
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                             <span style={{
                               fontSize: 11,
                               fontWeight: 600,
-                              color: section.riskLevel === 'high' ? '#F85149' : section.riskLevel === 'medium' ? '#D29922' : '#238636',
+                              color: section.riskLevel === 'high' ? 'rgba(248, 81, 73, 0.85)' : section.riskLevel === 'medium' ? 'rgba(210, 153, 34, 0.85)' : 'rgba(35, 134, 54, 0.85)',
                               textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
+                              letterSpacing: '0.03em',
                             }}>
                               {section.riskLevel}
                             </span>
-                            <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                            <span style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.88)' }}>
+                            <span style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.01em' }}>
                               {section.sectionTitle || `Section ${section.sectionNumber}`}
                             </span>
-                            {section.changes && section.changes.length > 0 && (
-                              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 'auto' }}>
-                                {section.changes.length} change{section.changes.length !== 1 ? 's' : ''}
-                              </span>
-                            )}
                             {appliedSections.has(section.sectionTitle) && (
-                              <CheckmarkCircle24Filled style={{ color: '#238636', marginLeft: 'auto', width: 16, height: 16 }} />
+                              <CheckmarkCircle24Filled style={{ color: 'rgba(35, 134, 54, 0.8)', marginLeft: 'auto', width: 14, height: 14 }} />
                             )}
                           </div>
 
                           {/* Rationale */}
-                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', marginTop: 6, lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 8, lineHeight: 1.6 }}>
                             {section.rationale}
                           </div>
 
-                          {/* Redlines - clinical, not aggressive */}
+                          {/* Redlines - Apple diff style: subtle, inline */}
                           {section.changes && section.changes.length > 0 && !appliedSections.has(section.sectionTitle) && (
-                            <div style={{ marginTop: 10, paddingLeft: 0 }}>
-                              {section.changes.slice(0, 3).map((change, idx) => (
-                                <div key={idx} style={{ marginBottom: 6, fontSize: 12, lineHeight: 1.6 }}>
-                                  <span style={{ color: '#F85149', textDecoration: 'line-through', fontWeight: 400, opacity: 0.8 }}>
-                                    {change.find.substring(0, 80)}{change.find.length > 80 ? '...' : ''}
+                            <div style={{ marginTop: 12 }}>
+                              {section.changes.slice(0, 2).map((change, idx) => (
+                                <div key={idx} style={{ marginBottom: 8, fontSize: 12, lineHeight: 1.7, color: 'rgba(255,255,255,0.65)' }}>
+                                  <span style={{ color: 'rgba(248, 81, 73, 0.6)', textDecoration: 'line-through', fontWeight: 400 }}>
+                                    {change.find.substring(0, 60)}{change.find.length > 60 ? '...' : ''}
                                   </span>
-                                  <br />
-                                  <span style={{ color: '#238636', fontWeight: 400 }}>
-                                    → {change.replace.substring(0, 80)}{change.replace.length > 80 ? '...' : ''}
+                                  {' '}
+                                  <span style={{ color: 'rgba(35, 134, 54, 0.8)', fontWeight: 400 }}>
+                                    {change.replace.substring(0, 60)}{change.replace.length > 60 ? '...' : ''}
                                   </span>
                                 </div>
                               ))}
-                              {section.changes.length > 3 && (
-                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-                                  +{section.changes.length - 3} more changes
+                              {section.changes.length > 2 && (
+                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                                  +{section.changes.length - 2} more
                                 </span>
                               )}
                             </div>
                           )}
 
-                          {/* Actions - primary/secondary hierarchy */}
-                          <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingTop: 10 }}>
-                            {/* Primary action - brighter */}
+                          {/* Actions - inline text, minimal */}
+                          <div style={{ display: 'flex', gap: 20, marginTop: 14 }}>
                             <button
                               onClick={() => insertSingleSection(section)}
                               disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: appliedSections.has(section.sectionTitle) ? 'rgba(255,255,255,0.3)' : '#58A6FF',
+                                color: appliedSections.has(section.sectionTitle) ? 'rgba(255,255,255,0.3)' : 'rgba(88, 166, 255, 0.9)',
                                 fontSize: 12,
-                                fontWeight: appliedSections.has(section.sectionTitle) ? 400 : 500,
+                                fontWeight: 500,
                                 cursor: appliedSections.has(section.sectionTitle) ? 'default' : 'pointer',
                                 padding: 0,
                               }}
                             >
-                              {appliedSections.has(section.sectionTitle) ? 'Applied' : 'Apply Changes'}
+                              {appliedSections.has(section.sectionTitle) ? 'Applied' : 'Apply'}
                             </button>
-                            {/* Secondary actions - muted */}
                             <button
                               onClick={() => highlightSection(section)}
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: 'rgba(255,255,255,0.5)',
+                                color: 'rgba(255,255,255,0.4)',
                                 fontSize: 12,
                                 cursor: 'pointer',
                                 padding: 0,
                               }}
                             >
-                              Find in Doc
+                              Find
                             </button>
                             <button
                               onClick={() => reanalyzeClause(section.sectionTitle, section.originalText || '')}
@@ -2923,7 +3182,7 @@ export default function App() {
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: isAnalyzing ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)',
+                                color: isAnalyzing ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)',
                                 fontSize: 12,
                                 cursor: isAnalyzing ? 'default' : 'pointer',
                                 padding: 0,
@@ -2937,108 +3196,81 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* New Sections to Insert - Flat design */}
+                  {/* New Sections - With subtle left accent */}
                   {(analysisResult.sections?.filter(s => s.isNewSection).length ?? 0) > 0 && (
-                    <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.88)', display: 'block', marginBottom: 4 }}>
-                        New Sections ({analysisResult.sections?.filter(s => s.isNewSection).length ?? 0})
+                    <div style={{ marginTop: 24 }}>
+                      <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        New Sections
                       </span>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 12 }}>
-                        Position your cursor where you want to insert, then click the button
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 16 }}>
+                        Position cursor, then insert
                       </span>
                       {(analysisResult.sections ?? []).filter(s => s.isNewSection).map((section, index) => (
-                        <div key={`new-${index}`} style={styles.sectionCard}>
-                          {/* Flat header: NEW · LIMITATION OF LIABILITY */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color: '#58A6FF',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
-                            }}>
-                              NEW
-                            </span>
-                            <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                            <span style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.88)' }}>
+                        <div key={`new-${index}`} style={{ ...styles.sectionCard, borderLeft: '2px solid rgba(88, 166, 255, 0.4)', paddingLeft: 16 }}>
+                          {/* Header - No NEW badge, just title */}
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                            <span style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.01em' }}>
                               {section.sectionTitle}
                             </span>
                             {appliedSections.has(section.sectionTitle) && (
-                              <CheckmarkCircle24Filled style={{ color: '#238636', marginLeft: 'auto', width: 16, height: 16 }} />
+                              <CheckmarkCircle24Filled style={{ color: 'rgba(35, 134, 54, 0.8)', marginLeft: 'auto', width: 14, height: 14 }} />
                             )}
                           </div>
 
-                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', marginTop: 6, lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 8, lineHeight: 1.6 }}>
                             {section.rationale}
                           </div>
 
-                          {/* Full content preview - scrollable */}
+                          {/* Content preview - minimal */}
                           {section.revisedText && !appliedSections.has(section.sectionTitle) && (
-                            <div style={{ marginTop: 10 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Section content:</span>
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(section.revisedText);
-                                    setSuccessMessage('Copied to clipboard');
-                                    setTimeout(() => setSuccessMessage(null), 2000);
-                                  }}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#58A6FF',
-                                    fontSize: 11,
-                                    cursor: 'pointer',
-                                    padding: 0,
-                                  }}
-                                >
-                                  Copy
-                                </button>
-                              </div>
-                              <div style={styles.newSectionTextBox}>
-                                <span style={{ color: '#238636', whiteSpace: 'pre-wrap', fontSize: 11 }}>
-                                  {section.revisedText}
+                            <div style={{ marginTop: 12 }}>
+                              <div style={{
+                                padding: 12,
+                                backgroundColor: 'rgba(255,255,255,0.02)',
+                                borderRadius: 6,
+                                maxHeight: 120,
+                                overflowY: 'auto',
+                              }}>
+                                <span style={{ color: 'rgba(35, 134, 54, 0.75)', whiteSpace: 'pre-wrap', fontSize: 11, lineHeight: 1.6 }}>
+                                  {section.revisedText.substring(0, 300)}{section.revisedText.length > 300 ? '...' : ''}
                                 </span>
                               </div>
                             </div>
                           )}
 
-                          {/* Actions - flat text buttons */}
-                          {/* Actions - primary/secondary hierarchy */}
-                          <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingTop: 10 }}>
-                            {/* Primary action */}
+                          {/* Actions - inline text */}
+                          <div style={{ display: 'flex', gap: 20, marginTop: 14 }}>
                             <button
                               onClick={() => insertSingleSection(section)}
                               disabled={isApplyingChange || appliedSections.has(section.sectionTitle)}
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: appliedSections.has(section.sectionTitle) ? 'rgba(255,255,255,0.3)' : '#58A6FF',
+                                color: appliedSections.has(section.sectionTitle) ? 'rgba(255,255,255,0.3)' : 'rgba(88, 166, 255, 0.9)',
                                 fontSize: 12,
-                                fontWeight: appliedSections.has(section.sectionTitle) ? 400 : 500,
+                                fontWeight: 500,
                                 cursor: appliedSections.has(section.sectionTitle) ? 'default' : 'pointer',
                                 padding: 0,
                               }}
                             >
-                              {appliedSections.has(section.sectionTitle) ? 'Inserted' : 'Insert at Cursor'}
+                              {appliedSections.has(section.sectionTitle) ? 'Inserted' : 'Insert'}
                             </button>
-                            {/* Secondary action */}
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(section.revisedText);
-                                setSuccessMessage('Copied to clipboard');
+                                setSuccessMessage('Copied');
                                 setTimeout(() => setSuccessMessage(null), 2000);
                               }}
                               style={{
                                 background: 'none',
                                 border: 'none',
-                                color: '#707070',
+                                color: 'rgba(255,255,255,0.4)',
                                 fontSize: 12,
                                 cursor: 'pointer',
                                 padding: 0,
                               }}
                             >
-                              Copy Text
+                              Copy
                             </button>
                           </div>
                         </div>
@@ -3046,16 +3278,16 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Summary List */}
+                  {/* Summary List - Minimal */}
                   {(analysisResult.summary?.length ?? 0) > 0 && (
                     <div style={styles.summaryList}>
-                      <Text weight="semibold" style={{ marginBottom: 8, display: 'block' }}>
-                        Summary of Changes:
-                      </Text>
+                      <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.5)', marginBottom: 12, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Summary
+                      </span>
                       {analysisResult.summary?.map((item, idx) => (
-                        <Text key={idx} size={200} style={{ display: 'block', marginBottom: 4, color: 'rgba(255,255,255,0.62)' }}>
-                          • {item}
-                        </Text>
+                        <span key={idx} style={{ display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.6 }}>
+                          {item}
+                        </span>
                       ))}
                     </div>
                   )}
@@ -3407,80 +3639,84 @@ export default function App() {
 // - Primary text: rgba(255,255,255,0.88)
 // - Secondary text: rgba(255,255,255,0.62)
 const styles: Record<string, React.CSSProperties> = {
+  // APPLE PRO DESIGN - Dark, minimal, editorial
   container: {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    backgroundColor: '#1B1F24',
+    background: 'linear-gradient(180deg, #141719 0%, #1a1d20 100%)',
     color: 'rgba(255,255,255,0.88)',
-    fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif',
     fontSize: 13,
-    lineHeight: 1.4,
+    lineHeight: 1.5,
+    letterSpacing: '-0.01em',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '10px 16px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    backgroundColor: '#1B1F24',
+    padding: '12px 16px',
+    height: 48,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    // No border - separation through spacing
   },
   headerContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   errorBanner: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    padding: '8px 16px',
-    backgroundColor: 'rgba(248, 81, 73, 0.1)',
-    borderBottom: '1px solid rgba(248, 81, 73, 0.2)',
-    color: '#F85149',
+    padding: '10px 16px',
+    backgroundColor: 'rgba(248, 81, 73, 0.06)',
+    color: 'rgba(248, 81, 73, 0.9)',
     fontSize: 12,
   },
   tabs: {
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    backgroundColor: '#1F2328',
-    padding: '0 8px',
+    backgroundColor: 'transparent',
+    padding: '0 16px',
+    // No border
   },
   content: {
     flex: 1,
     overflow: 'auto',
-    padding: '12px 16px',
-    backgroundColor: '#1B1F24',
+    padding: '16px',
+    // No background override - inherits gradient
   },
   loginCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
-    padding: 24,
+    gap: 20,
+    padding: 32,
     margin: 'auto',
     maxWidth: 280,
   },
   analyzeTab: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
+    gap: 16,
   },
   results: {
     display: 'flex',
     flexDirection: 'column',
     gap: 0,
-    marginTop: 12,
+    marginTop: 16,
   },
   scoreCard: {
-    padding: 12,
+    padding: '0 0 16px 0',
+    // No background, no border - spacing only
   },
   scoreContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   summaryCard: {
-    padding: 12,
+    padding: '0 0 16px 0',
+    // No background, no border
   },
   riskHeader: {
     display: 'flex',
@@ -3510,29 +3746,27 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 0,
   },
   clauseCard: {
-    padding: '14px 0',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    marginBottom: 2,
+    padding: '16px 0',
+    // No border - separation through spacing
   },
   clauseText: {
-    padding: '6px 0',
-    color: 'rgba(255,255,255,0.62)',
+    padding: '8px 0',
+    color: 'rgba(255,255,255,0.55)',
     fontSize: 12,
-    lineHeight: 1.5,
+    lineHeight: 1.6,
   },
   clauseActions: {
     display: 'flex',
-    gap: 8,
-    paddingTop: 8,
+    gap: 12,
+    paddingTop: 10,
   },
   successBanner: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    padding: '8px 16px',
-    backgroundColor: 'rgba(35, 134, 54, 0.1)',
-    borderBottom: '1px solid rgba(35, 134, 54, 0.2)',
-    color: '#238636',
+    padding: '10px 16px',
+    backgroundColor: 'rgba(35, 134, 54, 0.06)',
+    color: 'rgba(35, 134, 54, 0.9)',
     fontSize: 12,
   },
   previewOverlay: {
@@ -3541,7 +3775,8 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3549,16 +3784,16 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 16,
   },
   previewPanel: {
-    backgroundColor: '#242A30',
-    padding: 16,
+    background: 'linear-gradient(180deg, rgba(30, 32, 36, 0.98) 0%, rgba(26, 28, 32, 0.98) 100%)',
+    padding: 20,
     maxWidth: 400,
     maxHeight: '85vh',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 6,
+    gap: 16,
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 12,
   },
   diffView: {
     display: 'flex',
@@ -3571,13 +3806,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 4,
   },
   diffText: {
-    padding: 10,
-    backgroundColor: '#1B1F24',
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.02)',
     maxHeight: 120,
     overflowY: 'auto',
-    border: '1px solid rgba(255,255,255,0.06)',
     fontSize: 12,
-    borderRadius: 4,
+    borderRadius: 6,
+    lineHeight: 1.6,
   },
   diffArrow: {
     textAlign: 'center',
@@ -3591,10 +3826,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
   },
   matchSelector: {
-    padding: 10,
-    backgroundColor: '#1B1F24',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: 4,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 6,
   },
   matchList: {
     display: 'flex',
@@ -3609,17 +3843,16 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 4,
   },
   locationBox: {
-    padding: 8,
-    backgroundColor: '#1B1F24',
-    borderLeft: '2px solid #D29922',
-    borderRadius: 2,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderLeft: '2px solid rgba(210, 153, 34, 0.5)',
+    borderRadius: 4,
   },
   fixItSection: {
-    padding: 10,
-    backgroundColor: 'rgba(35, 134, 54, 0.08)',
-    marginTop: 8,
-    border: '1px solid rgba(35, 134, 54, 0.2)',
-    borderRadius: 4,
+    padding: 12,
+    backgroundColor: 'rgba(35, 134, 54, 0.04)',
+    marginTop: 10,
+    borderRadius: 6,
   },
   fixItButtons: {
     display: 'flex',
@@ -3629,15 +3862,15 @@ const styles: Record<string, React.CSSProperties> = {
   riskSummaryBar: {
     display: 'flex',
     alignItems: 'center',
-    padding: '6px 0 10px 0',
-    gap: 12,
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    marginBottom: 12,
+    padding: '8px 0 16px 0',
+    gap: 16,
+    // No border - spacing only
   },
   riskBadgeLarge: {
-    fontSize: 12,
-    fontWeight: 400,
-    color: 'rgba(255,255,255,0.62)',
+    fontSize: 11,
+    fontWeight: 500,
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: '0.02em',
   },
   sectionList: {
     display: 'flex',
@@ -3645,9 +3878,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 0,
   },
   sectionCard: {
-    padding: '16px 0',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    marginBottom: 2,
+    padding: '20px 0',
+    // No border - separation through vertical spacing
   },
   sectionHeader: {
     display: 'flex',
@@ -3657,17 +3889,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sectionActions: {
     display: 'flex',
-    gap: 8,
-    marginTop: 10,
-    paddingTop: 8,
+    gap: 16,
+    marginTop: 12,
   },
   summaryList: {
-    marginTop: 12,
-    padding: '12px 0',
-    borderTop: '1px solid rgba(255,255,255,0.06)',
+    marginTop: 16,
+    padding: '16px 0 0 0',
+    // No border
   },
   contractSection: {
-    marginBottom: 12,
+    marginBottom: 16,
     position: 'relative',
   },
   contractDropdownContainer: {
@@ -3677,10 +3908,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   contractInput: {
     width: '100%',
-    padding: '8px 32px 8px 10px',
-    backgroundColor: '#242A30',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 4,
+    padding: '10px 32px 10px 12px',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    border: 'none',
+    borderRadius: 8,
     color: 'rgba(255,255,255,0.88)',
     fontSize: 13,
     outline: 'none',
@@ -3701,10 +3932,11 @@ const styles: Record<string, React.CSSProperties> = {
     top: '100%',
     left: 0,
     right: 0,
-    marginTop: 2,
-    backgroundColor: '#242A30',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 4,
+    marginTop: 4,
+    backgroundColor: 'rgba(30, 32, 36, 0.98)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 8,
     maxHeight: 200,
     overflowY: 'auto',
     zIndex: 100,
@@ -3735,8 +3967,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
-    paddingBottom: 6,
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    paddingBottom: 8,
+    // No border - spacing only
   },
   newSectionHeader: {
     display: 'flex',
@@ -3745,11 +3977,11 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 8,
   },
   newSectionPreview: {
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: '#1B1F24',
-    borderLeft: '2px solid #58A6FF',
-    borderRadius: 2,
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderLeft: '2px solid rgba(88, 166, 255, 0.4)',
+    borderRadius: 4,
   },
   newSectionFullContent: {
     marginTop: 8,
@@ -3763,18 +3995,18 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   newSectionTextBox: {
-    padding: 10,
-    backgroundColor: '#1B1F24',
-    borderLeft: '2px solid #58A6FF',
-    borderRadius: 2,
-    maxHeight: 200,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 6,
+    maxHeight: 150,
     overflowY: 'auto',
-    fontFamily: '"Consolas", "Courier New", monospace',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Mono", Consolas, monospace',
     fontSize: 11,
-    lineHeight: 1.5,
+    lineHeight: 1.6,
   },
   analyzeButtons: {
     display: 'flex',
+    flexDirection: 'column',
     gap: 8,
     width: '100%',
   },
