@@ -25,6 +25,10 @@ export interface SalesOrderAgingRecord {
   days_open: number;
   expected_ship_date: string | null;
   memo: string | null;
+  // Manufacturing vs Deferred Revenue breakdown
+  manufacturing_value: number;
+  deferred_value: number;
+  order_type: 'Manufacturing' | 'Deferred Only' | 'Mixed';
 }
 
 export interface FulfillmentRecord {
@@ -63,8 +67,13 @@ export interface OrderMetrics {
 // =============================================================================
 
 /**
- * Query Sales Orders with aging information
+ * Query Sales Orders with aging information and manufacturing vs deferred value breakdown
  * Returns open sales orders that are not Closed, Cancelled, or Billed
+ *
+ * Classification Logic (by account number):
+ * - Manufacturing (401x-404x): Test Bench equipment, components, install/training
+ * - Deferred/Software (405x, 408x-409x, 418x): M3 Software, deferred revenue
+ * - Maintenance (410x-411x): MCC services, TB service
  */
 export async function getSalesOrderAging(filters?: {
   status?: string[];
@@ -117,6 +126,10 @@ export async function getSalesOrderAging(filters?: {
     ageFilter = "AND so.trandate >= ADD_MONTHS(SYSDATE, -24)";
   }
 
+  // Query with line-level aggregation for manufacturing vs deferred values
+  // Manufacturing accounts: 401x-404x (Test Bench equipment, components, install/training)
+  // Deferred/Software accounts: 405x, 408x-409x, 418x (M3 Software, deferred revenue)
+  // Maintenance accounts: 410x-411x (MCC services, TB service)
   const query = `
     SELECT
       so.id,
@@ -128,8 +141,31 @@ export async function getSalesOrderAging(filters?: {
       so.total AS total_amount,
       ROUND(SYSDATE - so.trandate) AS days_open,
       so.shipdate AS expected_ship_date,
-      so.memo
+      so.memo,
+      NVL(line_agg.manufacturing_value, 0) AS manufacturing_value,
+      NVL(line_agg.deferred_value, 0) AS deferred_value
     FROM Transaction so
+    LEFT JOIN (
+      SELECT
+        tl.transaction AS so_id,
+        SUM(CASE
+          WHEN a.acctnumber LIKE '401%' OR a.acctnumber LIKE '402%'
+               OR a.acctnumber LIKE '403%' OR a.acctnumber LIKE '404%'
+          THEN NVL(tl.amount, 0)
+          ELSE 0
+        END) AS manufacturing_value,
+        SUM(CASE
+          WHEN a.acctnumber LIKE '405%' OR a.acctnumber LIKE '408%'
+               OR a.acctnumber LIKE '409%' OR a.acctnumber LIKE '410%'
+               OR a.acctnumber LIKE '411%' OR a.acctnumber LIKE '418%'
+          THEN NVL(tl.amount, 0)
+          ELSE 0
+        END) AS deferred_value
+      FROM TransactionLine tl
+      LEFT JOIN Account a ON a.id = tl.account
+      WHERE tl.mainline = 'F'
+      GROUP BY tl.transaction
+    ) line_agg ON line_agg.so_id = so.id
     WHERE so.type = 'SalesOrd'
       ${statusFilter}
       ${testFilter}
@@ -140,7 +176,7 @@ export async function getSalesOrderAging(filters?: {
   `;
 
   try {
-    console.log('Fetching sales order aging...');
+    console.log('Fetching sales order aging with manufacturing/deferred breakdown...');
 
     const response = await netsuiteRequest<{ items: any[]; hasMore: boolean }>(
       '/services/rest/query/v1/suiteql',
@@ -151,20 +187,45 @@ export async function getSalesOrderAging(filters?: {
       }
     );
 
-    const records: SalesOrderAgingRecord[] = (response.items || []).map(row => ({
-      id: row.id?.toString() || '',
-      tranid: row.tranid || '',
-      trandate: row.trandate || '',
-      status: row.status || '',
-      customer_id: row.customer_id?.toString() || '',
-      customer_name: row.customer_name || '',
-      total_amount: parseFloat(row.total_amount) || 0,
-      days_open: parseInt(row.days_open) || 0,
-      expected_ship_date: row.expected_ship_date || null,
-      memo: row.memo || null,
-    }));
+    const records: SalesOrderAgingRecord[] = (response.items || []).map(row => {
+      const manufacturingValue = parseFloat(row.manufacturing_value) || 0;
+      const deferredValue = parseFloat(row.deferred_value) || 0;
 
-    console.log(`Fetched ${records.length} open sales orders`);
+      // Determine order type based on value breakdown
+      let orderType: 'Manufacturing' | 'Deferred Only' | 'Mixed';
+      if (manufacturingValue > 0 && deferredValue > 0) {
+        orderType = 'Mixed';
+      } else if (manufacturingValue > 0) {
+        orderType = 'Manufacturing';
+      } else {
+        orderType = 'Deferred Only';
+      }
+
+      return {
+        id: row.id?.toString() || '',
+        tranid: row.tranid || '',
+        trandate: row.trandate || '',
+        status: row.status || '',
+        customer_id: row.customer_id?.toString() || '',
+        customer_name: row.customer_name || '',
+        total_amount: parseFloat(row.total_amount) || 0,
+        days_open: parseInt(row.days_open) || 0,
+        expected_ship_date: row.expected_ship_date || null,
+        memo: row.memo || null,
+        manufacturing_value: manufacturingValue,
+        deferred_value: deferredValue,
+        order_type: orderType,
+      };
+    });
+
+    console.log(`Fetched ${records.length} open sales orders with value breakdown`);
+
+    // Log summary for debugging
+    const mfgOrders = records.filter(r => r.order_type === 'Manufacturing').length;
+    const deferredOrders = records.filter(r => r.order_type === 'Deferred Only').length;
+    const mixedOrders = records.filter(r => r.order_type === 'Mixed').length;
+    console.log(`Order types: ${mfgOrders} Manufacturing, ${deferredOrders} Deferred Only, ${mixedOrders} Mixed`);
+
     return records;
   } catch (error) {
     console.error('Error fetching sales order aging:', error);

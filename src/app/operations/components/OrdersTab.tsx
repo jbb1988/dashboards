@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Package, Clock, DollarSign, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
+import { AlertCircle, Package, Clock, DollarSign, AlertTriangle, ChevronUp, ChevronDown, Wrench, FileText, Layers } from 'lucide-react';
 
 interface SalesOrder {
   id: string;
@@ -14,6 +14,10 @@ interface SalesOrder {
   days_open: number;
   expected_ship_date: string | null;
   memo: string | null;
+  // Manufacturing vs Deferred Revenue breakdown
+  manufacturing_value: number;
+  deferred_value: number;
+  order_type: 'Manufacturing' | 'Deferred Only' | 'Mixed';
 }
 
 interface AgingBucket {
@@ -83,13 +87,15 @@ function getAgingColor(days: number): string {
 }
 
 type FilterType = 'all' | '0-30' | '31-60' | '61-90' | '90+';
-type SortField = 'order' | 'customer' | 'status' | 'amount' | 'age';
+type OrderTypeFilter = 'all' | 'manufacturing' | 'deferred' | 'mixed';
+type SortField = 'order' | 'customer' | 'status' | 'amount' | 'mfg' | 'deferred' | 'age';
 
-// Grid columns: Alert | Order | Customer | Status | Amount | Age
-const GRID_COLS = '28px 1fr 1.5fr 160px 100px 70px';
+// Grid columns: Alert | Order | Customer | Status | Mfg Value | Deferred | Age
+const GRID_COLS = '28px 1fr 1.5fr 140px 90px 90px 60px';
 
 export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderTypeFilter>('all');
   const [sortBy, setSortBy] = useState<SortField>('age');
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -98,11 +104,12 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
       setSortDesc(!sortDesc);
     } else {
       setSortBy(field);
-      setSortDesc(field === 'age' || field === 'amount'); // Default desc for age and amount
+      setSortDesc(field === 'age' || field === 'amount' || field === 'mfg' || field === 'deferred'); // Default desc for numeric fields
     }
   };
 
-  const filteredOrders = orders.filter(order => {
+  // First filter by aging bucket
+  const agingFilteredOrders = orders.filter(order => {
     if (filter === 'all') return true;
     if (filter === '90+') return order.days_open > 90;
     if (filter === '61-90') return order.days_open > 60 && order.days_open <= 90;
@@ -110,6 +117,27 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
     if (filter === '0-30') return order.days_open <= 30;
     return true;
   });
+
+  // Then filter by order type
+  const filteredOrders = agingFilteredOrders.filter(order => {
+    if (orderTypeFilter === 'all') return true;
+    if (orderTypeFilter === 'manufacturing') return order.order_type === 'Manufacturing' || order.order_type === 'Mixed';
+    if (orderTypeFilter === 'deferred') return order.order_type === 'Deferred Only';
+    if (orderTypeFilter === 'mixed') return order.order_type === 'Mixed';
+    return true;
+  });
+
+  // Calculate order type counts for badges
+  const orderTypeCounts = {
+    all: agingFilteredOrders.length,
+    manufacturing: agingFilteredOrders.filter(o => o.order_type === 'Manufacturing' || o.order_type === 'Mixed').length,
+    deferred: agingFilteredOrders.filter(o => o.order_type === 'Deferred Only').length,
+    mixed: agingFilteredOrders.filter(o => o.order_type === 'Mixed').length,
+  };
+
+  // Calculate value totals for the current type filter
+  const mfgTotal = filteredOrders.reduce((sum, o) => sum + (o.manufacturing_value || 0), 0);
+  const deferredTotal = filteredOrders.reduce((sum, o) => sum + (o.deferred_value || 0), 0);
 
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     let cmp = 0;
@@ -125,6 +153,12 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
         break;
       case 'amount':
         cmp = a.total_amount - b.total_amount;
+        break;
+      case 'mfg':
+        cmp = (a.manufacturing_value || 0) - (b.manufacturing_value || 0);
+        break;
+      case 'deferred':
+        cmp = (a.deferred_value || 0) - (b.deferred_value || 0);
         break;
       case 'age':
         cmp = a.days_open - b.days_open;
@@ -215,6 +249,83 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
         </div>
       )}
 
+      {/* Order Type Filter Row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Order Type:</span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setOrderTypeFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+              orderTypeFilter === 'all'
+                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                : 'bg-white/[0.02] text-gray-400 border border-white/[0.06] hover:bg-white/[0.04]'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            All Types
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-white/10 text-[10px]">
+              {orderTypeCounts.all}
+            </span>
+          </button>
+          <button
+            onClick={() => setOrderTypeFilter('manufacturing')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+              orderTypeFilter === 'manufacturing'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                : 'bg-white/[0.02] text-gray-400 border border-white/[0.06] hover:bg-white/[0.04]'
+            }`}
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            Manufacturing
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-white/10 text-[10px]">
+              {orderTypeCounts.manufacturing}
+            </span>
+          </button>
+          <button
+            onClick={() => setOrderTypeFilter('deferred')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+              orderTypeFilter === 'deferred'
+                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                : 'bg-white/[0.02] text-gray-400 border border-white/[0.06] hover:bg-white/[0.04]'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Deferred Only
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-white/10 text-[10px]">
+              {orderTypeCounts.deferred}
+            </span>
+          </button>
+          <button
+            onClick={() => setOrderTypeFilter('mixed')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+              orderTypeFilter === 'mixed'
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : 'bg-white/[0.02] text-gray-400 border border-white/[0.06] hover:bg-white/[0.04]'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Mixed
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-white/10 text-[10px]">
+              {orderTypeCounts.mixed}
+            </span>
+          </button>
+        </div>
+
+        {/* Value Summary */}
+        <div className="ml-auto flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <Wrench className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-gray-500">Mfg:</span>
+            <span className="text-emerald-400 font-medium">{formatCurrency(mfgTotal)}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-gray-500">Deferred:</span>
+            <span className="text-purple-400 font-medium">{formatCurrency(deferredTotal)}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Orders List */}
       <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
         {/* Header */}
@@ -257,9 +368,17 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
           </div>
           <div
             className="text-right cursor-pointer hover:text-gray-300 transition-colors"
-            onClick={() => handleSort('amount')}
+            onClick={() => handleSort('mfg')}
+            title="Manufacturing value (equipment, components, install)"
           >
-            Amount<SortIndicator field="amount" />
+            Mfg<SortIndicator field="mfg" />
+          </div>
+          <div
+            className="text-right cursor-pointer hover:text-gray-300 transition-colors"
+            onClick={() => handleSort('deferred')}
+            title="Deferred revenue (software, maintenance)"
+          >
+            Deferred<SortIndicator field="deferred" />
           </div>
           <div
             className="text-right cursor-pointer hover:text-gray-300 transition-colors"
@@ -286,6 +405,8 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
               const isWarning = order.days_open > 60 && order.days_open <= 90;
               const statusInfo = getStatusInfo(order.status);
               const isEven = index % 2 === 0;
+              const hasMfg = (order.manufacturing_value || 0) > 0;
+              const hasDeferred = (order.deferred_value || 0) > 0;
 
               return (
                 <motion.div
@@ -298,10 +419,23 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
                   }`}
                   style={{ gridTemplateColumns: GRID_COLS }}
                 >
-                  {/* Alert Icon */}
-                  <div className="flex justify-center">
-                    {isOverdue && <AlertCircle className="w-4 h-4 text-red-400" />}
-                    {isWarning && !isOverdue && <AlertTriangle className="w-4 h-4 text-orange-400" />}
+                  {/* Alert/Type Icon */}
+                  <div className="flex justify-center" title={
+                    isOverdue ? 'Overdue (90+ days)' :
+                    isWarning ? 'Warning (61-90 days)' :
+                    order.order_type
+                  }>
+                    {isOverdue ? (
+                      <AlertCircle className="w-4 h-4 text-red-400" />
+                    ) : isWarning ? (
+                      <AlertTriangle className="w-4 h-4 text-orange-400" />
+                    ) : order.order_type === 'Deferred Only' ? (
+                      <FileText className="w-4 h-4 text-purple-400" />
+                    ) : order.order_type === 'Mixed' ? (
+                      <Layers className="w-4 h-4 text-amber-400" />
+                    ) : (
+                      <Wrench className="w-4 h-4 text-emerald-400" />
+                    )}
                   </div>
 
                   {/* Order */}
@@ -325,7 +459,7 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
                   {/* Status */}
                   <div>
                     <span
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
                       style={{
                         backgroundColor: statusInfo.bg,
                         color: statusInfo.color,
@@ -339,11 +473,26 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
                     </span>
                   </div>
 
-                  {/* Amount */}
+                  {/* Manufacturing Value */}
                   <div className="text-right">
-                    <span className="text-sm font-medium text-white tabular-nums">
-                      {formatCurrency(order.total_amount)}
-                    </span>
+                    {hasMfg ? (
+                      <span className="text-sm font-medium text-emerald-400 tabular-nums">
+                        {formatCurrency(order.manufacturing_value)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-600">-</span>
+                    )}
+                  </div>
+
+                  {/* Deferred Value */}
+                  <div className="text-right">
+                    {hasDeferred ? (
+                      <span className="text-sm font-medium text-purple-400 tabular-nums">
+                        {formatCurrency(order.deferred_value)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-600">-</span>
+                    )}
                   </div>
 
                   {/* Age */}
