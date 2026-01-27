@@ -314,6 +314,8 @@ export async function getWorkOrdersWithShopStatus(filters?: {
 
     // Query work orders with SO join for revenue
     // Revenue = so.foreigntotal (NOT custbody2 which doesn't exist)
+    // IMPORTANT: Filter so.type = 'SalesOrd' because createdfrom can also point to parent Work Orders
+    // For child WOs, traverse up to parent WO then to its SO
     const query = `
       SELECT
         wo.id,
@@ -324,14 +326,18 @@ export async function getWorkOrdersWithShopStatus(filters?: {
         wo.entity,
         BUILTIN.DF(wo.entity) AS customername,
         wo.custbodyiqsassydescription,
-        so.tranid AS sonumber,
-        so.foreigntotal AS revenue,
-        so.totalcostestimate AS estcost,
-        so.estgrossprofitpercent AS estmargin,
+        COALESCE(so.tranid, parentso.tranid) AS sonumber,
+        COALESCE(so.foreigntotal, parentso.foreigntotal) AS revenue,
+        COALESCE(so.totalcostestimate, parentso.totalcostestimate) AS estcost,
+        COALESCE(so.estgrossprofitpercent, parentso.estgrossprofitpercent) AS estmargin,
+        COALESCE(BUILTIN.DF(so.entity), BUILTIN.DF(parentso.entity), BUILTIN.DF(wo.entity)) AS customername2,
         ROUND(SYSDATE - wo.trandate) AS daysopen
       FROM Transaction wo
       LEFT JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
-      LEFT JOIN Transaction so ON so.id = woline.createdfrom
+      LEFT JOIN Transaction so ON so.id = woline.createdfrom AND so.type = 'SalesOrd'
+      LEFT JOIN Transaction parentwo ON parentwo.id = woline.createdfrom AND parentwo.type = 'WorkOrd'
+      LEFT JOIN TransactionLine parentwoline ON parentwoline.transaction = parentwo.id AND parentwoline.mainline = 'T'
+      LEFT JOIN Transaction parentso ON parentso.id = parentwoline.createdfrom AND parentso.type = 'SalesOrd'
       WHERE wo.type = 'WorkOrd'
         ${dateFilter}
         ${statusFilter}
@@ -368,6 +374,9 @@ export async function getWorkOrdersWithShopStatus(filters?: {
       const estCost = wo.estcost != null ? parseFloat(wo.estcost) : null;
       const estMargin = wo.estmargin != null ? parseFloat(wo.estmargin) * 100 : null; // Convert to percentage
 
+      // Use customername2 (from SO) as fallback for customer name
+      const customerName = wo.customername || wo.customername2 || null;
+
       return {
         work_order_id: String(wo.id || ''),
         work_order: wo.tranid || '',
@@ -377,7 +386,7 @@ export async function getWorkOrdersWithShopStatus(filters?: {
         shop_status: shopStatus,
         shop_status_id: wo.status || null,
         customer_id: wo.entity ? String(wo.entity) : null,
-        customer_name: wo.customername || null,
+        customer_name: customerName,
         so_number: wo.sonumber || null,
         assembly_description: wo.custbodyiqsassydescription || null,
         days_in_status: parseInt(wo.daysopen) || 0,

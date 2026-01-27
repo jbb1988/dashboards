@@ -75,8 +75,8 @@ export default function WIPOperationsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Filters
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  // Filters - Default to active statuses (exclude Closed)
+  const [statusFilter, setStatusFilter] = useState<string>('A,B,D');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showStuckOnly, setShowStuckOnly] = useState(false);
 
