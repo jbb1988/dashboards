@@ -453,8 +453,8 @@ export default function InventoryTab({
                   >
                     {/* Item */}
                     <div className="min-w-0">
-                      <span className="font-medium text-white truncate block">{item.item_id}</span>
-                      <span className="text-xs text-gray-500 truncate block">{item.display_name}</span>
+                      <span className="font-medium text-white truncate block">{item.display_name}</span>
+                      <span className="text-xs text-gray-500 truncate block">{item.item_id}</span>
                     </div>
 
                     {/* On Hand */}
@@ -590,8 +590,8 @@ export default function InventoryTab({
                   >
                     {/* Item */}
                     <div className="min-w-0">
-                      <span className="font-medium text-white truncate block">{item.item_id}</span>
-                      <span className="text-xs text-gray-500 truncate block">{item.display_name}</span>
+                      <span className="font-medium text-white truncate block">{item.display_name}</span>
+                      <span className="text-xs text-gray-500 truncate block">{item.item_id}</span>
                     </div>
 
                     {/* Shortage */}

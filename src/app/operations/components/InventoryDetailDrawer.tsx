@@ -151,13 +151,13 @@ export default function InventoryDetailDrawer({ item, onClose }: InventoryDetail
                       <RootCauseBadge cause={item.root_cause} />
                     </div>
 
-                    {/* Item ID */}
+                    {/* Item Name */}
                     <h2 className="text-xl font-semibold text-white mb-1">
-                      {item.item_id}
+                      {item.display_name}
                     </h2>
 
-                    {/* Item Name */}
-                    <p className="text-sm text-[#8FA3BF]">{item.display_name}</p>
+                    {/* Item ID */}
+                    <p className="text-sm text-[#8FA3BF]">{item.item_id}</p>
 
                     {/* Item Type & Location */}
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
