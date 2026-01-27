@@ -16,6 +16,8 @@ import {
   Clock,
   CheckCircle,
   FileCheck,
+  ArrowRight,
+  RotateCcw,
 } from 'lucide-react';
 import { elevation, colors } from '@/components/mars-ui/tokens';
 
@@ -37,6 +39,27 @@ import type {
 // =============================================================================
 // TYPES
 // =============================================================================
+
+interface SectionCompareResult {
+  sections: Array<{
+    sectionNumber: string;
+    sectionTitle: string;
+    status: 'unchanged' | 'changed' | 'added' | 'removed';
+    originalContent: string;
+    revisedContent: string;
+    changes: Array<{
+      type: 'equal' | 'insert' | 'delete';
+      value: string;
+    }>;
+  }>;
+  stats: {
+    totalSections: number;
+    unchangedSections: number;
+    changedSections: number;
+    addedSections: number;
+    removedSections: number;
+  };
+}
 
 interface ContractCenterContentProps {
   mode: CenterContentMode;
@@ -375,6 +398,19 @@ export default function ContractCenterContent({
   const [contractSearch, setContractSearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Compare Documents state
+  const [compareOriginalFile, setCompareOriginalFile] = useState<File | null>(null);
+  const [compareRevisedFile, setCompareRevisedFile] = useState<File | null>(null);
+  const [compareOriginalText, setCompareOriginalText] = useState<string | null>(null);
+  const [compareRevisedText, setCompareRevisedText] = useState<string | null>(null);
+  const [isExtractingOriginal, setIsExtractingOriginal] = useState(false);
+  const [isExtractingRevised, setIsExtractingRevised] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
+  const [compareResult, setCompareResult] = useState<SectionCompareResult | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const compareOriginalInputRef = useRef<HTMLInputElement>(null);
+  const compareRevisedInputRef = useRef<HTMLInputElement>(null);
+
   // Handle file upload
   const handleFileUpload = useCallback(async (file: File) => {
     onUploadFile(file);
@@ -440,6 +476,111 @@ export default function ContractCenterContent({
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+  }, []);
+
+  // Handle compare file upload
+  const handleCompareFileUpload = useCallback(async (file: File, type: 'original' | 'revised') => {
+    const setFile = type === 'original' ? setCompareOriginalFile : setCompareRevisedFile;
+    const setText = type === 'original' ? setCompareOriginalText : setCompareRevisedText;
+    const setExtracting = type === 'original' ? setIsExtractingOriginal : setIsExtractingRevised;
+
+    setFile(file);
+    setExtracting(true);
+    setText(null);
+    setCompareError(null);
+
+    try {
+      // Get signed upload URL
+      const signedUrlRes = await fetch(`/api/storage/upload?filename=${encodeURIComponent(file.name)}`);
+      if (!signedUrlRes.ok) {
+        const errData = await signedUrlRes.json();
+        throw new Error(errData.error || 'Failed to get upload URL');
+      }
+      const { signedUrl, storagePath } = await signedUrlRes.json();
+
+      // Upload to storage
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload file to storage');
+      }
+
+      // Process the file
+      const response = await fetch('/api/contracts/review/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath, originalFilename: file.name }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to extract text');
+      }
+
+      const data = await response.json();
+      setText(data.text);
+
+      // Cleanup
+      await fetch('/api/storage/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath }),
+      });
+    } catch (err) {
+      console.error('Compare file upload error:', err);
+      setFile(null);
+      setCompareError(err instanceof Error ? err.message : 'Failed to extract text from file');
+    } finally {
+      setExtracting(false);
+    }
+  }, []);
+
+  // Handle compare documents
+  const handleCompareDocuments = useCallback(async () => {
+    if (!compareOriginalText || !compareRevisedText) {
+      setCompareError('Please upload both documents');
+      return;
+    }
+
+    setIsComparing(true);
+    setCompareError(null);
+    setCompareResult(null);
+
+    try {
+      const response = await fetch('/api/contracts/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalText: compareOriginalText,
+          revisedText: compareRevisedText,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Comparison failed');
+      }
+
+      const data = await response.json();
+      setCompareResult(data.sectionResult);
+    } catch (err) {
+      setCompareError(err instanceof Error ? err.message : 'Comparison failed');
+    } finally {
+      setIsComparing(false);
+    }
+  }, [compareOriginalText, compareRevisedText]);
+
+  // Reset compare state
+  const handleResetCompare = useCallback(() => {
+    setCompareOriginalFile(null);
+    setCompareRevisedFile(null);
+    setCompareOriginalText(null);
+    setCompareRevisedText(null);
+    setCompareResult(null);
+    setCompareError(null);
   }, []);
 
   // ===========================================================================
@@ -592,23 +733,252 @@ export default function ContractCenterContent({
             )}
 
             {/* Compare Tab */}
-            {activeInputTab === 'compare' && (
-              <div className="mb-6 p-6 rounded-xl bg-[rgba(10,14,20,0.30)] border border-[rgba(255,255,255,0.06)]">
-                <div className="text-center">
-                  <GitCompare className="w-10 h-10 text-[rgba(200,210,235,0.40)] mx-auto mb-3" />
-                  <p className="text-[14px] text-[rgba(235,240,255,0.92)]">Document Comparison</p>
-                  <p className="text-[12px] text-[rgba(200,210,235,0.50)] mt-1">
-                    Upload two documents to compare changes
-                  </p>
-                  <p className="text-[11px] text-[rgba(200,210,235,0.40)] mt-3">
-                    Coming soon in this view
-                  </p>
+            {activeInputTab === 'compare' && !compareResult && (
+              <div className="mb-6 space-y-4">
+                {/* Two Upload Zones Side by Side */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Original Document Upload */}
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-[180ms] ${
+                      compareOriginalFile
+                        ? 'border-[rgba(255,190,90,0.50)] bg-[rgba(255,190,90,0.05)]'
+                        : 'border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,190,90,0.50)] hover:bg-[rgba(255,190,90,0.05)]'
+                    }`}
+                    onClick={() => compareOriginalInputRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files[0];
+                      if (file) handleCompareFileUpload(file, 'original');
+                    }}
+                  >
+                    <input
+                      ref={compareOriginalInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.doc,.txt"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleCompareFileUpload(file, 'original');
+                      }}
+                    />
+                    {isExtractingOriginal ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="w-8 h-8 text-[rgba(255,190,90,0.95)] animate-spin" />
+                        <p className="text-[12px] text-[rgba(200,210,235,0.60)]">Extracting...</p>
+                      </div>
+                    ) : compareOriginalFile ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <CheckCircle className="w-8 h-8 text-[rgba(255,190,90,0.95)]" />
+                        <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)] truncate max-w-full">
+                          {compareOriginalFile.name}
+                        </p>
+                        {compareOriginalText && (
+                          <p className="text-[11px] text-[rgba(200,210,235,0.50)]">
+                            {compareOriginalText.length.toLocaleString()} chars
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <Upload className="w-8 h-8 text-[rgba(200,210,235,0.40)]" />
+                        <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">Original Document</p>
+                        <p className="text-[11px] text-[rgba(200,210,235,0.50)]">PDF, DOC, DOCX, TXT</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Revised Document Upload */}
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-[180ms] ${
+                      compareRevisedFile
+                        ? 'border-[rgba(80,210,140,0.50)] bg-[rgba(80,210,140,0.05)]'
+                        : 'border-[rgba(255,255,255,0.12)] hover:border-[rgba(80,210,140,0.50)] hover:bg-[rgba(80,210,140,0.05)]'
+                    }`}
+                    onClick={() => compareRevisedInputRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files[0];
+                      if (file) handleCompareFileUpload(file, 'revised');
+                    }}
+                  >
+                    <input
+                      ref={compareRevisedInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.doc,.txt"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleCompareFileUpload(file, 'revised');
+                      }}
+                    />
+                    {isExtractingRevised ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="w-8 h-8 text-[rgba(80,210,140,0.95)] animate-spin" />
+                        <p className="text-[12px] text-[rgba(200,210,235,0.60)]">Extracting...</p>
+                      </div>
+                    ) : compareRevisedFile ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <CheckCircle className="w-8 h-8 text-[rgba(80,210,140,0.95)]" />
+                        <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)] truncate max-w-full">
+                          {compareRevisedFile.name}
+                        </p>
+                        {compareRevisedText && (
+                          <p className="text-[11px] text-[rgba(200,210,235,0.50)]">
+                            {compareRevisedText.length.toLocaleString()} chars
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <Upload className="w-8 h-8 text-[rgba(200,210,235,0.40)]" />
+                        <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">Revised Document</p>
+                        <p className="text-[11px] text-[rgba(200,210,235,0.50)]">PDF, DOC, DOCX, TXT</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compare Error */}
+                {compareError && (
+                  <div className="p-3 rounded-xl bg-[rgba(255,95,95,0.10)] border border-[rgba(255,95,95,0.25)]">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-[rgba(255,95,95,0.95)] flex-shrink-0 mt-0.5" />
+                      <p className="text-[13px] text-[rgba(255,95,95,0.95)]">{compareError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Compare Button */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCompareDocuments}
+                    disabled={!compareOriginalText || !compareRevisedText || isComparing}
+                    className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-[14px] transition-all duration-[180ms] disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      background: 'linear-gradient(180deg, rgba(139,92,246,0.40), rgba(139,92,246,0.25))',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 4px 20px rgba(139,92,246,0.35)',
+                      color: 'rgba(235,240,255,0.98)',
+                    }}
+                  >
+                    {isComparing ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Comparing...
+                      </>
+                    ) : (
+                      <>
+                        <GitCompare className="w-5 h-5" />
+                        Compare Documents
+                      </>
+                    )}
+                  </button>
+                  {(compareOriginalFile || compareRevisedFile) && (
+                    <button
+                      onClick={handleResetCompare}
+                      className="px-4 py-3.5 rounded-xl font-medium text-[14px] text-[rgba(200,210,235,0.75)] hover:text-[rgba(235,240,255,0.92)] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] transition-all duration-[180ms]"
+                    >
+                      <RotateCcw className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Playbook Selector */}
-            {playbooks.length > 0 && (
+            {/* Compare Results */}
+            {activeInputTab === 'compare' && compareResult && (
+              <div className="mb-6 space-y-4">
+                {/* Results Header */}
+                <div className="p-4 rounded-xl bg-[rgba(139,92,246,0.10)] border border-[rgba(139,92,246,0.25)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <GitCompare className="w-5 h-5 text-[rgba(139,92,246,0.95)]" />
+                      <span className="text-[14px] font-semibold text-[rgba(235,240,255,0.92)]">Comparison Results</span>
+                    </div>
+                    <button
+                      onClick={handleResetCompare}
+                      className="text-[12px] text-[rgba(200,210,235,0.60)] hover:text-[rgba(235,240,255,0.92)] transition-colors"
+                    >
+                      New Comparison
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-[12px]">
+                    <span className="text-[rgba(200,210,235,0.60)]">
+                      <span className="font-semibold text-[rgba(235,240,255,0.92)]">{compareResult.stats.totalSections}</span> sections
+                    </span>
+                    <span className="text-[rgba(80,210,140,0.95)]">
+                      <span className="font-semibold">{compareResult.stats.unchangedSections}</span> unchanged
+                    </span>
+                    <span className="text-[rgba(255,190,90,0.95)]">
+                      <span className="font-semibold">{compareResult.stats.changedSections}</span> changed
+                    </span>
+                    <span className="text-[rgba(90,130,255,0.95)]">
+                      <span className="font-semibold">{compareResult.stats.addedSections}</span> added
+                    </span>
+                    <span className="text-[rgba(255,95,95,0.95)]">
+                      <span className="font-semibold">{compareResult.stats.removedSections}</span> removed
+                    </span>
+                  </div>
+                </div>
+
+                {/* Section List */}
+                <div className="max-h-[400px] overflow-y-auto space-y-3">
+                  {compareResult.sections.map((section, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-xl border ${
+                        section.status === 'unchanged'
+                          ? 'bg-[rgba(80,210,140,0.05)] border-[rgba(80,210,140,0.15)]'
+                          : section.status === 'changed'
+                          ? 'bg-[rgba(255,190,90,0.05)] border-[rgba(255,190,90,0.15)]'
+                          : section.status === 'added'
+                          ? 'bg-[rgba(90,130,255,0.05)] border-[rgba(90,130,255,0.15)]'
+                          : 'bg-[rgba(255,95,95,0.05)] border-[rgba(255,95,95,0.15)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[13px] font-semibold text-[rgba(235,240,255,0.92)]">
+                          {section.sectionNumber}. {section.sectionTitle}
+                        </span>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                          section.status === 'unchanged'
+                            ? 'bg-[rgba(80,210,140,0.15)] text-[rgba(80,210,140,0.95)]'
+                            : section.status === 'changed'
+                            ? 'bg-[rgba(255,190,90,0.15)] text-[rgba(255,190,90,0.95)]'
+                            : section.status === 'added'
+                            ? 'bg-[rgba(90,130,255,0.15)] text-[rgba(90,130,255,0.95)]'
+                            : 'bg-[rgba(255,95,95,0.15)] text-[rgba(255,95,95,0.95)]'
+                        }`}>
+                          {section.status}
+                        </span>
+                      </div>
+                      {section.status !== 'unchanged' && section.changes.length > 0 && (
+                        <div className="text-[12px] leading-relaxed text-[rgba(200,210,235,0.75)] font-mono bg-[rgba(10,14,20,0.40)] p-3 rounded-lg overflow-x-auto">
+                          {section.changes.map((change, changeIdx) => (
+                            <span
+                              key={changeIdx}
+                              className={
+                                change.type === 'delete'
+                                  ? 'bg-[rgba(255,95,95,0.20)] text-[rgba(255,95,95,0.95)] line-through'
+                                  : change.type === 'insert'
+                                  ? 'bg-[rgba(80,210,140,0.20)] text-[rgba(80,210,140,0.95)]'
+                                  : ''
+                              }
+                            >
+                              {change.value}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Playbook Selector - only for paste/upload tabs */}
+            {activeInputTab !== 'compare' && playbooks.length > 0 && (
               <div className="mb-6">
                 <label className="block text-[12px] font-medium text-[rgba(200,210,235,0.75)] mb-2">
                   Playbook (optional)
@@ -626,7 +996,8 @@ export default function ContractCenterContent({
               </div>
             )}
 
-            {/* Analyze Button */}
+            {/* Analyze Button - only for paste/upload tabs */}
+            {activeInputTab !== 'compare' && (
             <button
               onClick={onAnalyze}
               disabled={isAnalyzing || (activeInputTab === 'paste' ? !inputText.trim() : !extractedText)}
@@ -649,6 +1020,7 @@ export default function ContractCenterContent({
                 </>
               )}
             </button>
+            )}
           </div>
         </div>
       )}
