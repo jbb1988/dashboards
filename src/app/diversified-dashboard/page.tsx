@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets, KPICard } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard, DataSourceIndicator } from '@/components/mars-ui';
 import {
   RevenueAreaChart,
   ClassBarChart,
@@ -1046,13 +1046,15 @@ export default function DiversifiedDashboard() {
               </div>
               <p className="text-[#64748B] mt-1">
                 Sales performance by class and customer
-                {data?.lastUpdated && (
-                  <span className="text-[#475569]"> · Last updated {new Date(data.lastUpdated).toLocaleString()}</span>
-                )}
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              <DataSourceIndicator
+                source="netsuite"
+                lastUpdated={data?.lastUpdated || null}
+                isSyncing={syncing || refreshing}
+              />
               <button
                 onClick={handleSync}
                 disabled={syncing}

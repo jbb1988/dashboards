@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets, KPICard, KPIIcons } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard, KPIIcons, DataSourceIndicator } from '@/components/mars-ui';
 import { FilterBar, PillarCard, InitiativeRow, InitiativeDetailDrawer, ChartsTab, BoardView, OwnerDetailDrawer } from '@/components/management';
 import { usePersistedFilters, FILTER_STORAGE_KEYS } from '@/hooks';
 
@@ -280,23 +280,23 @@ export default function ManagementDashboard() {
                 </div>
               </div>
 
-              {/* Sync Status */}
-              {data && (
-                <div className="flex items-center gap-3">
-                  <span className="text-[12px] text-[#64748B]">
-                    Last synced: {new Date(data.lastSynced).toLocaleTimeString()}
-                  </span>
-                  <button
-                    onClick={() => { setLoading(true); fetchData(); }}
-                    className="p-2 rounded-lg bg-[#1E293B] hover:bg-[#1E293B]/80 text-[#94A3B8] transition-colors"
-                    title="Refresh"
-                  >
-                    <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+              {/* Data Source Indicator */}
+              <div className="flex items-center gap-3">
+                <DataSourceIndicator
+                  source="supabase"
+                  lastUpdated={data?.lastSynced || null}
+                  isSyncing={loading}
+                />
+                <button
+                  onClick={() => { setLoading(true); fetchData(); }}
+                  className="p-2 rounded-lg bg-[#1E293B] hover:bg-[#1E293B]/80 text-[#94A3B8] transition-colors"
+                  title="Refresh"
+                >
+                  <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 

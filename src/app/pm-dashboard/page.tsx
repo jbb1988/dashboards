@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets, KPICard, elevation, colors } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard, elevation, colors, DataSourceIndicator } from '@/components/mars-ui';
 import SmartProjectsTab from '@/components/SmartProjectsTab';
 import TaskDetailDrawer from '@/components/TaskDetailDrawer';
 import DocuSignDetailDrawer from '@/components/DocuSignDetailDrawer';
@@ -1762,12 +1762,11 @@ export default function PMDashboard() {
                 <p className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Asana + DocuSign Integration</p>
               </div>
               <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <div className="text-[11px] flex items-center gap-2 justify-end" style={{ color: appleTokens.textMuted }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: appleTokens.accentGreen }} />
-                    {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString()}` : 'Loading...'}
-                  </div>
-                </div>
+                <DataSourceIndicator
+                  source={activeTab === 'docusign' ? 'docusign' : 'asana'}
+                  lastUpdated={activeTab === 'docusign' ? docusignData?.lastUpdated || null : lastUpdated}
+                  isSyncing={isLoading}
+                />
                 <button
                   onClick={handleRefresh}
                   disabled={isLoading}

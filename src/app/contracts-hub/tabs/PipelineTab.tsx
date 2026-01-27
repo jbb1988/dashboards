@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import ContractDetailDrawer, { Contract } from '@/components/contracts/ContractDetailDrawer';
+import { DataSourceIndicator } from '@/components/mars-ui';
 
 // Apple Pro Design Tokens
 const appleTokens = {
@@ -129,6 +130,15 @@ export default function PipelineTab() {
 
   return (
     <div className="space-y-6">
+      {/* Data Source Indicator */}
+      <div className="flex justify-end">
+        <DataSourceIndicator
+          source="salesforce"
+          lastUpdated={data?.lastUpdated || null}
+          isSyncing={loading}
+        />
+      </div>
+
       {/* L1 - KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
         {[

@@ -9,7 +9,7 @@ import { StageProgressCompact } from './components/StageProgressDots';
 import TaskBadge from './components/TaskBadge';
 import TasksTabSupabase from './components/TasksTabSupabase';
 import BundleModal from './components/BundleModal';
-import { DashboardBackground, backgroundPresets, KPICard, AnimatedCounter } from '@/components/mars-ui';
+import { DashboardBackground, backgroundPresets, KPICard, AnimatedCounter, DataSourceIndicator } from '@/components/mars-ui';
 import ContractDetailDrawer from '@/components/contracts/ContractDetailDrawer';
 import ConflictResolutionModal from '@/components/contracts/ConflictResolutionModal';
 import { usePersistedFilters, FILTER_STORAGE_KEYS } from '@/hooks';
@@ -2217,37 +2217,13 @@ export default function ContractsDashboard() {
                   </kbd>
                 </button>
 
-                <div className="text-right">
-                  <div className="text-sm text-gray-500 flex items-center gap-2 justify-end">
-                    <span className="w-2 h-2 rounded-full bg-[#00A1E0] animate-pulse" />
-                    Salesforce
-                  </div>
-                  <div className="text-white font-medium text-sm">
-                    Updated {(() => {
-                      const mins = Math.floor((Date.now() - new Date(data.lastUpdated).getTime()) / 60000);
-                      if (mins < 1) return 'just now';
-                      if (mins < 60) return `${mins} min ago`;
-                      const hours = Math.floor(mins / 60);
-                      if (hours < 24) return `${hours}h ago`;
-                      return `${Math.floor(hours / 24)}d ago`;
-                    })()}
-                  </div>
-                  {lastSyncTime && (
-                    <div className={`text-xs mt-1 ${(() => {
-                      const hours = Math.floor((Date.now() - new Date(lastSyncTime).getTime()) / 3600000);
-                      return hours > 24 ? 'text-yellow-500' : 'text-gray-500';
-                    })()}`}>
-                      Last sync: {(() => {
-                        const mins = Math.floor((Date.now() - new Date(lastSyncTime).getTime()) / 60000);
-                        if (mins < 1) return 'just now';
-                        if (mins < 60) return `${mins} min ago`;
-                        const hours = Math.floor(mins / 60);
-                        if (hours < 24) return `${hours}h ago`;
-                        return `${Math.floor(hours / 24)}d ago`;
-                      })()}
-                    </div>
-                  )}
-                </div>
+                <DataSourceIndicator
+                  source="salesforce"
+                  lastUpdated={data.lastUpdated}
+                  showSyncTime={!!lastSyncTime}
+                  lastSyncTime={lastSyncTime}
+                  isSyncing={isSyncing}
+                />
                 {/* Focus Mode Toggle */}
                 <div className="relative group">
                   <button

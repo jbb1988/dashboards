@@ -131,3 +131,13 @@ export {
   type SkeletonVariant,
   type SkeletonGroupProps,
 } from './Skeleton';
+
+// =============================================================================
+// DATA SOURCE INDICATOR COMPONENTS
+// =============================================================================
+
+export {
+  DataSourceIndicator,
+  type DataSourceIndicatorProps,
+  type DataSourceType,
+} from './DataSourceIndicator';
