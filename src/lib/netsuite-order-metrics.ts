@@ -127,9 +127,10 @@ export async function getSalesOrderAging(filters?: {
   }
 
   // Query with line-level aggregation for manufacturing vs deferred values
-  // Manufacturing accounts: 401x-404x (Test Bench equipment, components, install/training)
-  // Deferred/Software accounts: 405x, 408x-409x, 418x (M3 Software, deferred revenue)
-  // Maintenance accounts: 410x-411x (MCC services, TB service)
+  // Classification by item class OR item's income account:
+  // - Manufacturing (401x-404x): Test Bench equipment, components, install/training
+  // - Deferred (405x, 408x-418x): M3 Software, MCC maintenance, deferred revenue
+  // Note: Sales order lines may not have class set, so we also check item's incomeaccount
   const query = `
     SELECT
       so.id,
@@ -149,21 +150,34 @@ export async function getSalesOrderAging(filters?: {
       SELECT
         tl.transaction AS so_id,
         SUM(CASE
-          WHEN a.acctnumber LIKE '401%' OR a.acctnumber LIKE '402%'
-               OR a.acctnumber LIKE '403%' OR a.acctnumber LIKE '404%'
+          WHEN c.fullname LIKE '%Test Bench%'
+               OR tl.class = 1
+               OR ia.acctnumber LIKE '401%'
+               OR ia.acctnumber LIKE '402%'
+               OR ia.acctnumber LIKE '403%'
+               OR ia.acctnumber LIKE '404%'
           THEN NVL(tl.amount, 0)
           ELSE 0
         END) AS manufacturing_value,
         SUM(CASE
-          WHEN a.acctnumber LIKE '405%' OR a.acctnumber LIKE '408%'
-               OR a.acctnumber LIKE '409%' OR a.acctnumber LIKE '410%'
-               OR a.acctnumber LIKE '411%' OR a.acctnumber LIKE '418%'
+          WHEN c.fullname LIKE '%MCC%'
+               OR c.fullname LIKE '%M3%'
+               OR c.fullname LIKE '%Laser%'
+               OR ia.acctnumber LIKE '405%'
+               OR ia.acctnumber LIKE '408%'
+               OR ia.acctnumber LIKE '409%'
+               OR ia.acctnumber LIKE '410%'
+               OR ia.acctnumber LIKE '411%'
+               OR ia.acctnumber LIKE '418%'
           THEN NVL(tl.amount, 0)
           ELSE 0
         END) AS deferred_value
       FROM TransactionLine tl
-      LEFT JOIN Account a ON a.id = tl.account
+      LEFT JOIN Classification c ON c.id = tl.class
+      LEFT JOIN Item i ON i.id = tl.item
+      LEFT JOIN Account ia ON ia.id = i.incomeaccount
       WHERE tl.mainline = 'F'
+        AND tl.item IS NOT NULL
       GROUP BY tl.transaction
     ) line_agg ON line_agg.so_id = so.id
     WHERE so.type = 'SalesOrd'
