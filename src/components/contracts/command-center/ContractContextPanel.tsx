@@ -439,93 +439,118 @@ export default function ContractContextPanel({
 
               {/* Documents Tab */}
               {activeTab === 'documents' && (
-                <div className="space-y-4">
-                  {hasModifiedText ? (
-                    <>
-                      <button
-                        onClick={onDownloadRevised}
-                        disabled={isGeneratingDocx}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-[180ms] hover:bg-[rgba(255,255,255,0.04)]"
-                        style={{
-                          background: 'rgba(80,210,140,0.08)',
-                          border: '1px solid rgba(80,210,140,0.20)',
-                        }}
-                      >
-                        <div
-                          className="w-9 h-9 rounded-lg flex items-center justify-center"
-                          style={{ background: 'rgba(80,210,140,0.15)' }}
-                        >
-                          <Download className="w-4 h-4 text-[rgba(80,210,140,0.95)]" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">
-                            Revised Document
-                          </p>
-                          <p className="text-[11px] text-[rgba(200,210,235,0.50)]">
-                            DOCX with suggested changes
-                          </p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={onDownloadOriginal}
-                        disabled={isGeneratingDocx}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-[180ms] hover:bg-[rgba(255,255,255,0.04)]"
-                        style={{
-                          background: 'rgba(255,190,90,0.08)',
-                          border: '1px solid rgba(255,190,90,0.20)',
-                        }}
-                      >
-                        <div
-                          className="w-9 h-9 rounded-lg flex items-center justify-center"
-                          style={{ background: 'rgba(255,190,90,0.15)' }}
-                        >
-                          <Download className="w-4 h-4 text-[rgba(255,190,90,0.95)]" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">
-                            Original Document
-                          </p>
-                          <p className="text-[11px] text-[rgba(200,210,235,0.50)]">
-                            Plain DOCX for comparison
-                          </p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={onCopyText}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-[180ms] hover:bg-[rgba(255,255,255,0.04)]"
-                        style={{
-                          background: 'rgba(90,130,255,0.08)',
-                          border: '1px solid rgba(90,130,255,0.20)',
-                        }}
-                      >
-                        <div
-                          className="w-9 h-9 rounded-lg flex items-center justify-center"
-                          style={{ background: 'rgba(90,130,255,0.15)' }}
-                        >
-                          <Copy className="w-4 h-4 text-[rgba(90,130,255,0.95)]" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">
-                            Copy Redlined Text
-                          </p>
-                          <p className="text-[11px] text-[rgba(200,210,235,0.50)]">
-                            Copy to clipboard
-                          </p>
-                        </div>
-                      </button>
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Paperclip className="w-10 h-10 text-[rgba(200,210,235,0.30)] mx-auto mb-3" />
-                      <p className="text-[13px] text-[rgba(200,210,235,0.50)]">
-                        No documents available
+                <div className="space-y-6">
+                  {/* Related Documents Section */}
+                  <div>
+                    <h4 className="text-[12px] font-semibold text-[rgba(200,210,235,0.75)] mb-3">
+                      Related Documents
+                    </h4>
+                    <div
+                      className="p-4 rounded-xl text-center"
+                      style={{
+                        background: 'rgba(10,14,20,0.40)',
+                        border: '1px dashed rgba(255,255,255,0.10)',
+                      }}
+                    >
+                      <Paperclip className="w-8 h-8 text-[rgba(200,210,235,0.30)] mx-auto mb-2" />
+                      <p className="text-[12px] text-[rgba(200,210,235,0.50)]">
+                        No documents attached
                       </p>
-                      <p className="text-[11px] text-[rgba(200,210,235,0.40)] mt-1">
-                        Run an analysis to generate documents
+                      <p className="text-[10px] text-[rgba(200,210,235,0.40)] mt-1">
+                        Upload documents in the contract review
                       </p>
                     </div>
+                  </div>
+
+                  {/* Generated Documents Section */}
+                  {hasModifiedText && (
+                    <div>
+                      <h4 className="text-[12px] font-semibold text-[rgba(200,210,235,0.75)] mb-3">
+                        Generated Documents
+                      </h4>
+                      <div className="space-y-2">
+                        <button
+                          onClick={onDownloadRevised}
+                          disabled={isGeneratingDocx}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-[180ms] hover:bg-[rgba(255,255,255,0.04)]"
+                          style={{
+                            background: 'rgba(80,210,140,0.08)',
+                            border: '1px solid rgba(80,210,140,0.20)',
+                          }}
+                        >
+                          <div
+                            className="w-9 h-9 rounded-lg flex items-center justify-center"
+                            style={{ background: 'rgba(80,210,140,0.15)' }}
+                          >
+                            <Download className="w-4 h-4 text-[rgba(80,210,140,0.95)]" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">
+                              Revised Document
+                            </p>
+                            <p className="text-[11px] text-[rgba(200,210,235,0.50)]">
+                              DOCX with suggested changes
+                            </p>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={onDownloadOriginal}
+                          disabled={isGeneratingDocx}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-[180ms] hover:bg-[rgba(255,255,255,0.04)]"
+                          style={{
+                            background: 'rgba(255,190,90,0.08)',
+                            border: '1px solid rgba(255,190,90,0.20)',
+                          }}
+                        >
+                          <div
+                            className="w-9 h-9 rounded-lg flex items-center justify-center"
+                            style={{ background: 'rgba(255,190,90,0.15)' }}
+                          >
+                            <Download className="w-4 h-4 text-[rgba(255,190,90,0.95)]" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">
+                              Original Document
+                            </p>
+                            <p className="text-[11px] text-[rgba(200,210,235,0.50)]">
+                              Plain DOCX for comparison
+                            </p>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={onCopyText}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-[180ms] hover:bg-[rgba(255,255,255,0.04)]"
+                          style={{
+                            background: 'rgba(90,130,255,0.08)',
+                            border: '1px solid rgba(90,130,255,0.20)',
+                          }}
+                        >
+                          <div
+                            className="w-9 h-9 rounded-lg flex items-center justify-center"
+                            style={{ background: 'rgba(90,130,255,0.15)' }}
+                          >
+                            <Copy className="w-4 h-4 text-[rgba(90,130,255,0.95)]" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">
+                              Copy Redlined Text
+                            </p>
+                            <p className="text-[11px] text-[rgba(200,210,235,0.50)]">
+                              Copy to clipboard
+                            </p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty state when no documents at all */}
+                  {!hasModifiedText && (
+                    <p className="text-[11px] text-[rgba(200,210,235,0.40)] text-center">
+                      Complete an analysis to generate documents
+                    </p>
                   )}
                 </div>
               )}
@@ -533,8 +558,8 @@ export default function ContractContextPanel({
               {/* Actions Tab */}
               {activeTab === 'actions' && (
                 <div className="space-y-6">
-                  {/* Send for Approval Section */}
-                  {currentResult && (
+                  {/* Send for Approval Section - Only show for new reviews, not for items already sent */}
+                  {currentResult && selectedItem?.type !== 'approval' && (
                     <>
                       <div>
                         <label className="flex items-center gap-2 text-[rgba(90,130,255,0.95)] text-[12px] font-semibold mb-2">

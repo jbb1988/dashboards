@@ -710,78 +710,71 @@ export default function ContractCenterContent({
             className="flex-shrink-0 px-6 py-4 border-b border-[rgba(255,255,255,0.06)]"
             style={{ background: elevation.L2.background }}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    (selectedItem.data as Approval).approvalStatus === 'pending'
-                      ? 'bg-[rgba(255,190,90,0.95)]'
-                      : (selectedItem.data as Approval).approvalStatus === 'approved'
-                      ? 'bg-[rgba(80,210,140,0.95)]'
-                      : 'bg-[rgba(255,95,95,0.95)]'
-                  }`}
-                />
-                <div>
-                  <h2 className="text-[16px] font-semibold text-[rgba(235,240,255,0.92)]">
-                    {(selectedItem.data as Approval).contractName}
-                  </h2>
-                  <p className="text-[12px] text-[rgba(200,210,235,0.50)] mt-0.5">
-                    {(selectedItem.data as Approval).provisionName || 'Approval Request'}
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  (selectedItem.data as Approval).approvalStatus === 'pending'
+                    ? 'bg-[rgba(255,190,90,0.95)]'
+                    : (selectedItem.data as Approval).approvalStatus === 'approved'
+                    ? 'bg-[rgba(80,210,140,0.95)]'
+                    : 'bg-[rgba(255,95,95,0.95)]'
+                }`}
+              />
+              <div>
+                <h2 className="text-[16px] font-semibold text-[rgba(235,240,255,0.92)]">
+                  {(selectedItem.data as Approval).contractName}
+                </h2>
+                <p className="text-[12px] text-[rgba(200,210,235,0.50)] mt-0.5">
+                  {(selectedItem.data as Approval).provisionName || 'Approval Request'} · Submitted {new Date((selectedItem.data as Approval).submittedAt).toLocaleDateString()} by {(selectedItem.data as Approval).submittedBy}
+                </p>
               </div>
-              {(selectedItem.data as Approval).approvalToken && (
-                <a
-                  href={`/contracts/review/approve/${(selectedItem.data as Approval).approvalToken}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium transition-all duration-[180ms]"
-                  style={{
-                    background: 'rgba(90,130,255,0.15)',
-                    color: 'rgba(90,130,255,0.95)',
-                  }}
-                >
-                  Open Full Review
-                </a>
-              )}
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6">
-            <div
-              className="max-w-4xl mx-auto rounded-2xl p-8"
-              style={{
-                background: elevation.L1.background,
-                boxShadow: elevation.L1.shadow,
-              }}
-            >
-              <h3 className="text-[14px] font-semibold text-[rgba(200,210,235,0.75)] mb-4">
-                Summary
-              </h3>
-              <div className="space-y-2">
-                {(selectedItem.data as Approval).summary.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[rgba(90,130,255,0.95)] mt-2 flex-shrink-0" />
-                    <p className="text-[13px] text-[rgba(235,240,255,0.85)]">{item}</p>
-                  </div>
-                ))}
+            {/* Show full redlined content if available */}
+            {currentResult?.redlinedText ? (
+              <div
+                className="max-w-4xl mx-auto rounded-2xl overflow-hidden"
+                style={{
+                  background: elevation.L1.background,
+                  boxShadow: elevation.L1.shadow,
+                }}
+              >
+                <div className="px-6 py-4 border-b border-[rgba(255,255,255,0.06)]">
+                  <h3 className="text-[14px] font-semibold text-[rgba(235,240,255,0.92)]">
+                    Contract Review
+                  </h3>
+                </div>
+                <div
+                  className="p-6 prose prose-sm prose-invert max-w-none text-[14px] leading-relaxed"
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(currentResult.redlinedText),
+                  }}
+                />
               </div>
-
-              <div className="mt-6 pt-6 border-t border-[rgba(255,255,255,0.06)]">
-                <div className="grid grid-cols-2 gap-4 text-[12px]">
-                  <div>
-                    <span className="text-[rgba(200,210,235,0.50)]">Submitted by</span>
-                    <p className="text-[rgba(235,240,255,0.92)] mt-0.5">{(selectedItem.data as Approval).submittedBy}</p>
-                  </div>
-                  <div>
-                    <span className="text-[rgba(200,210,235,0.50)]">Submitted</span>
-                    <p className="text-[rgba(235,240,255,0.92)] mt-0.5">
-                      {new Date((selectedItem.data as Approval).submittedAt).toLocaleDateString()}
-                    </p>
-                  </div>
+            ) : (
+              /* Fallback to summary if full text not available */
+              <div
+                className="max-w-4xl mx-auto rounded-2xl p-8"
+                style={{
+                  background: elevation.L1.background,
+                  boxShadow: elevation.L1.shadow,
+                }}
+              >
+                <h3 className="text-[14px] font-semibold text-[rgba(200,210,235,0.75)] mb-4">
+                  Summary
+                </h3>
+                <div className="space-y-2">
+                  {(selectedItem.data as Approval).summary.map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[rgba(90,130,255,0.95)] mt-2 flex-shrink-0" />
+                      <p className="text-[13px] text-[rgba(235,240,255,0.85)]">{item}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

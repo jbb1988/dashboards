@@ -258,7 +258,27 @@ export default function ContractCommandCenter() {
     setSelectedItem({ type: 'approval', id: approval.reviewId, data: approval });
     setContentMode('viewing-approval');
     setContextPanelTab('summary');
-  }, []);
+
+    // Try to find the matching history item to load full review data
+    const historyItem = history.find(h => h.id === approval.reviewId);
+    if (historyItem?.originalText && historyItem?.redlinedText) {
+      setCurrentResult({
+        redlinedText: historyItem.redlinedText,
+        originalText: historyItem.originalText,
+        modifiedText: historyItem.modifiedText || '',
+        summary: historyItem.summary || approval.summary,
+        timestamp: historyItem.createdAt,
+      });
+      setProvisionName(historyItem.provisionName || approval.provisionName || '');
+      if (historyItem.contractId) {
+        setSelectedContract(historyItem.contractId);
+      }
+      setLastReviewId(historyItem.id);
+    } else {
+      // If no history item found, clear the result (approval view will show summary only)
+      setCurrentResult(null);
+    }
+  }, [history]);
 
   const handleSelectHistory = useCallback((item: ReviewHistory) => {
     setSelectedItem({ type: 'history', id: item.id, data: item });
@@ -463,9 +483,22 @@ export default function ContractCommandCenter() {
   // COMPUTED VALUES
   // ===========================================================================
 
+  // Get review IDs that are pending approval to exclude from other sections
+  const pendingApprovalReviewIds = new Set(
+    approvals.filter(a => a.approvalStatus === 'pending').map(a => a.reviewId)
+  );
+
   const pendingApprovals = approvals.filter(a => a.approvalStatus === 'pending');
-  const inProgressReviews = history.filter(h => h.status === 'draft' || h.status === 'sent_to_boss');
-  const recentHistory = history.slice(0, 5);
+
+  // In Progress: Only drafts that haven't been sent for approval yet
+  const inProgressReviews = history.filter(h =>
+    h.status === 'draft' && !pendingApprovalReviewIds.has(h.id)
+  );
+
+  // Recent: Completed/approved items only (not drafts or pending approval)
+  const recentHistory = history
+    .filter(h => (h.status === 'approved' || h.status === 'sent_to_client') && !pendingApprovalReviewIds.has(h.id))
+    .slice(0, 5);
 
   // Filter based on search
   const filteredApprovals = searchQuery
