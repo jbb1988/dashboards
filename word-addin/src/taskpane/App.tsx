@@ -2833,36 +2833,33 @@ export default function App() {
           </div>
         )}
 
-        {/* Tabs - Apple Native segmented control style */}
+        {/* Tabs - Apple Pro L2 toolbar with micro-pills */}
         <div style={{
           display: 'flex',
           padding: '8px 12px',
-          background: 'rgba(255,255,255,0.02)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
         }}>
           <div style={{
             display: 'flex',
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: 10,
-            padding: 3,
-            gap: 2,
+            gap: 4,
           }}>
             <button
               onClick={() => setActiveTab('analyze')}
               style={{
                 padding: '8px 20px',
                 background: activeTab === 'analyze'
-                  ? 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%)'
+                  ? 'rgba(255,255,255,0.08)'
                   : 'transparent',
                 border: 'none',
-                borderRadius: 8,
-                color: activeTab === 'analyze' ? 'rgba(235, 240, 255, 0.95)' : 'rgba(235, 240, 255, 0.5)',
-                fontWeight: activeTab === 'analyze' ? 600 : 500,
+                borderLeft: activeTab === 'analyze' ? '2px solid rgba(90,130,255,0.95)' : '2px solid transparent',
+                borderRadius: 10,
+                color: activeTab === 'analyze' ? 'rgba(235,240,255,0.95)' : 'rgba(235,240,255,0.5)',
+                fontWeight: 600,
                 fontSize: 13,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
                 letterSpacing: '-0.01em',
-                boxShadow: activeTab === 'analyze' ? 'inset 0 1px 0 rgba(255,255,255,0.08)' : 'none',
                 transition: 'all 0.15s ease',
               }}
             >
@@ -2873,17 +2870,17 @@ export default function App() {
               style={{
                 padding: '8px 20px',
                 background: activeTab === 'clauses'
-                  ? 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%)'
+                  ? 'rgba(255,255,255,0.08)'
                   : 'transparent',
                 border: 'none',
-                borderRadius: 8,
-                color: activeTab === 'clauses' ? 'rgba(235, 240, 255, 0.95)' : 'rgba(235, 240, 255, 0.5)',
-                fontWeight: activeTab === 'clauses' ? 600 : 500,
+                borderLeft: activeTab === 'clauses' ? '2px solid rgba(90,130,255,0.95)' : '2px solid transparent',
+                borderRadius: 10,
+                color: activeTab === 'clauses' ? 'rgba(235,240,255,0.95)' : 'rgba(235,240,255,0.5)',
+                fontWeight: 600,
                 fontSize: 13,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
                 letterSpacing: '-0.01em',
-                boxShadow: activeTab === 'clauses' ? 'inset 0 1px 0 rgba(255,255,255,0.08)' : 'none',
                 transition: 'all 0.15s ease',
               }}
             >
@@ -3757,58 +3754,52 @@ export default function App() {
 
 // NO score circles - removed for flat design
 
-// Styles - Premium charcoal design system (2026 modern legal tooling)
-// Color tokens:
-// - Base background: #1B1F24 (charcoal)
-// - Raised surface: #242A30
-// - Header: #1B1F24
-// - Dividers: rgba(255,255,255,0.06)
-// - Primary text: rgba(255,255,255,0.88)
-// - Secondary text: rgba(255,255,255,0.62)
 // ===========================================
-// APPLE NATIVE DESIGN SYSTEM
-// Luminous backgrounds, floating surfaces, color accents, real depth
+// APPLE PRO DARK UI — ELEVATION IMPLEMENTATION
+// 3 levels: L0 (canvas), L1 (surface), L2 (focus)
 // ===========================================
 const styles: Record<string, React.CSSProperties> = {
-  // BASE CANVAS - Luminous deep blue-black with ambient glow
+  // L0 - BASE CANVAS: Luminous radial gradient
   container: {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
     background: `
-      radial-gradient(ellipse 1200px 600px at 50% -10%, rgba(60, 100, 220, 0.15), transparent 70%),
-      linear-gradient(180deg, #0a0e14 0%, #0d1117 50%, #0a0e14 100%)
+      radial-gradient(1200px 800px at 50% -20%, rgba(90,130,255,0.22), rgba(10,14,20,0.98) 60%)
     `,
-    color: 'rgba(235, 240, 255, 0.92)',
+    color: 'rgba(235,240,255,0.92)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif',
     fontSize: 13,
     lineHeight: 1.5,
     fontWeight: 400,
   },
-  // HEADER - Glass toolbar with material
+  // L2 - HEADER: Active/focus surface (toolbar)
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '10px 16px',
-    background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    backdropFilter: 'blur(12px)',
+    height: 52,
+    background: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
+    boxShadow: `
+      0 30px 90px rgba(0,0,0,0.75),
+      inset 0 1px 0 rgba(255,255,255,0.08)
+    `,
+    borderRadius: 0,
   },
   headerContent: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
   },
-  // BANNERS - With subtle glow
+  // BANNERS - Color accent text only (no fills)
   errorBanner: {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
     padding: '12px 16px',
-    background: 'linear-gradient(90deg, rgba(255, 69, 58, 0.15) 0%, rgba(255, 69, 58, 0.08) 100%)',
-    borderBottom: '1px solid rgba(255, 69, 58, 0.2)',
-    color: '#FF6961',
+    background: 'rgba(255,95,95,0.08)',
+    color: 'rgba(255,95,95,0.95)',
     fontSize: 13,
     fontWeight: 500,
   },
@@ -3817,28 +3808,25 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 10,
     padding: '12px 16px',
-    background: 'linear-gradient(90deg, rgba(52, 199, 89, 0.15) 0%, rgba(52, 199, 89, 0.08) 100%)',
-    borderBottom: '1px solid rgba(52, 199, 89, 0.2)',
-    color: '#34C759',
+    background: 'rgba(80,210,140,0.08)',
+    color: 'rgba(80,210,140,0.95)',
     fontSize: 13,
     fontWeight: 500,
   },
-  // TABS - Material toolbar
+  // L2 - TABS: Active/focus toolbar
   tabs: {
-    background: 'rgba(255,255,255,0.03)',
-    padding: '4px 12px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    background: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
+    padding: '6px 12px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
   },
-  // CONTENT - With subtle inner glow
+  // L0 - CONTENT: Base canvas with subtle ambient glow
   content: {
     flex: 1,
     overflow: 'auto',
     padding: '20px 16px',
-    background: `
-      radial-gradient(ellipse 600px 400px at 50% 0%, rgba(60, 100, 220, 0.06), transparent 60%)
-    `,
+    background: 'transparent',
   },
-  // LOGIN CARD - Floating luminous surface
+  // L2 - LOGIN CARD: Modal surface
   loginCard: {
     display: 'flex',
     flexDirection: 'column',
@@ -3847,13 +3835,11 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 32,
     margin: 'auto',
     maxWidth: 300,
-    background: 'linear-gradient(180deg, rgba(30, 40, 60, 0.6) 0%, rgba(18, 24, 36, 0.8) 100%)',
-    borderRadius: 20,
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
+    borderRadius: 18,
     boxShadow: `
-      0 24px 80px rgba(0, 0, 0, 0.6),
-      0 8px 32px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255,255,255,0.1)
+      0 30px 90px rgba(0,0,0,0.75),
+      inset 0 1px 0 rgba(255,255,255,0.10)
     `,
   },
   // ANALYZE TAB - Content container
@@ -3862,21 +3848,20 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 16,
   },
-  // RESULTS - Floating card surface
+  // L1 - RESULTS: Content surface with halo
   results: {
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
     marginTop: 16,
     padding: 16,
-    background: 'linear-gradient(180deg, rgba(30, 40, 60, 0.5) 0%, rgba(18, 24, 36, 0.7) 100%)',
+    background: 'linear-gradient(180deg, rgba(28,36,52,0.88), rgba(18,24,36,0.96))',
     borderRadius: 16,
-    border: '1px solid rgba(255,255,255,0.08)',
     boxShadow: `
-      0 20px 60px rgba(0, 0, 0, 0.5),
-      0 4px 20px rgba(0, 0, 0, 0.3),
+      0 30px 90px rgba(0,0,0,0.75),
       inset 0 1px 0 rgba(255,255,255,0.08)
     `,
+    filter: 'drop-shadow(0 0 120px rgba(90,130,255,0.15))',
   },
   scoreCard: {
     padding: '12px 0',
@@ -3917,18 +3902,17 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 8,
   },
-  // CLAUSE CARD - Floating item with hover glow
+  // L1 - CLAUSE CARD: Flat row with hover
   clauseCard: {
     padding: 16,
-    background: 'linear-gradient(180deg, rgba(40, 50, 70, 0.4) 0%, rgba(25, 32, 48, 0.6) 100%)',
+    background: 'linear-gradient(180deg, rgba(28,36,52,0.88), rgba(18,24,36,0.96))',
     borderRadius: 12,
-    border: '1px solid rgba(255,255,255,0.06)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
     transition: 'all 0.2s ease',
   },
   clauseText: {
     padding: '8px 0',
-    color: 'rgba(235, 240, 255, 0.7)',
+    color: 'rgba(235,240,255,0.75)',
     fontSize: 13,
     lineHeight: 1.6,
   },
@@ -3944,7 +3928,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0, 0, 0, 0.85)',
+    background: 'rgba(10,14,20,0.92)',
     backdropFilter: 'blur(20px)',
     display: 'flex',
     alignItems: 'center',
@@ -3952,9 +3936,9 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 1000,
     padding: 20,
   },
-  // PREVIEW PANEL - Floating modal
+  // L2 - PREVIEW PANEL: Modal surface
   previewPanel: {
-    background: 'linear-gradient(180deg, rgba(35, 45, 65, 0.95) 0%, rgba(20, 28, 42, 0.98) 100%)',
+    background: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
     padding: 24,
     maxWidth: 420,
     maxHeight: '85vh',
@@ -3962,12 +3946,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
-    borderRadius: 20,
-    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 18,
     boxShadow: `
-      0 40px 120px rgba(0, 0, 0, 0.8),
-      0 16px 48px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255,255,255,0.1)
+      0 30px 90px rgba(0,0,0,0.75),
+      inset 0 1px 0 rgba(255,255,255,0.10)
     `,
   },
   diffView: {
@@ -4022,37 +4004,36 @@ const styles: Record<string, React.CSSProperties> = {
   // LOCATION BOX - Amber accent
   locationBox: {
     padding: 14,
-    background: 'rgba(255, 159, 10, 0.08)',
-    borderLeft: '3px solid rgba(255, 159, 10, 0.6)',
-    borderRadius: 8,
+    background: 'rgba(255,190,90,0.08)',
+    borderLeft: '2px solid rgba(255,190,90,0.95)',
+    borderRadius: 12,
   },
-  // FIX SECTION - Green accent
+  // FIX SECTION - Green accent (text only, no fill)
   fixItSection: {
     padding: 14,
-    background: 'rgba(52, 199, 89, 0.08)',
+    background: 'rgba(80,210,140,0.06)',
     marginTop: 12,
-    borderRadius: 10,
-    border: '1px solid rgba(52, 199, 89, 0.15)',
+    borderRadius: 12,
   },
   fixItButtons: {
     display: 'flex',
     gap: 8,
     flexWrap: 'wrap',
   },
-  // RISK SUMMARY BAR - With color dots
+  // L1 - RISK SUMMARY BAR: Flat row
   riskSummaryBar: {
     display: 'flex',
     alignItems: 'center',
     padding: '12px 14px',
     gap: 16,
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: 10,
-    border: '1px solid rgba(255,255,255,0.05)',
+    background: 'linear-gradient(180deg, rgba(28,36,52,0.88), rgba(18,24,36,0.96))',
+    borderRadius: 12,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
   },
   riskBadgeLarge: {
     fontSize: 12,
     fontWeight: 600,
-    color: 'rgba(235, 240, 255, 0.8)',
+    color: 'rgba(200,210,235,0.75)',
   },
   // SECTION LIST
   sectionList: {
@@ -4060,13 +4041,12 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 10,
   },
-  // SECTION CARD - Floating with depth
+  // L1 - SECTION CARD: Flat row
   sectionCard: {
     padding: 16,
-    background: 'linear-gradient(180deg, rgba(40, 50, 70, 0.4) 0%, rgba(25, 32, 48, 0.6) 100%)',
-    borderRadius: 14,
-    border: '1px solid rgba(255,255,255,0.06)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+    background: 'linear-gradient(180deg, rgba(28,36,52,0.88), rgba(18,24,36,0.96))',
+    borderRadius: 16,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
   },
   sectionHeader: {
     display: 'flex',
@@ -4079,14 +4059,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
     marginTop: 14,
     paddingTop: 12,
-    borderTop: '1px solid rgba(255,255,255,0.06)',
   },
   summaryList: {
     marginTop: 16,
     padding: 16,
-    background: 'rgba(255,255,255,0.02)',
+    background: 'rgba(255,255,255,0.03)',
     borderRadius: 12,
-    border: '1px solid rgba(255,255,255,0.04)',
   },
   // CONTRACT SECTION
   contractSection: {
@@ -4098,14 +4076,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
   },
-  // CONTRACT INPUT - Glass material
+  // CONTRACT INPUT - Micro-pill style
   contractInput: {
     width: '100%',
     padding: '12px 36px 12px 14px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'rgba(255,255,255,0.08)',
+    border: 'none',
     borderRadius: 10,
-    color: 'rgba(235, 240, 255, 0.92)',
+    color: 'rgba(235,240,255,0.92)',
     fontSize: 13,
     fontWeight: 500,
     outline: 'none',
@@ -4116,45 +4094,44 @@ const styles: Record<string, React.CSSProperties> = {
     right: 10,
     background: 'rgba(255,255,255,0.1)',
     border: 'none',
-    color: 'rgba(235, 240, 255, 0.6)',
+    color: 'rgba(235,240,255,0.6)',
     cursor: 'pointer',
     fontSize: 12,
     padding: '4px 8px',
     borderRadius: 6,
     lineHeight: 1,
   },
-  // CONTRACT DROPDOWN - Floating panel
+  // L2 - CONTRACT DROPDOWN: Popover surface
   contractDropdown: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
     marginTop: 6,
-    background: 'linear-gradient(180deg, rgba(35, 45, 65, 0.98) 0%, rgba(25, 32, 48, 0.98) 100%)',
-    backdropFilter: 'blur(24px)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 12,
+    background: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
+    borderRadius: 16,
     maxHeight: 220,
     overflowY: 'auto',
     zIndex: 100,
     boxShadow: `
-      0 20px 60px rgba(0, 0, 0, 0.6),
-      0 8px 24px rgba(0, 0, 0, 0.4)
+      0 30px 90px rgba(0,0,0,0.75),
+      inset 0 1px 0 rgba(255,255,255,0.10)
     `,
   },
+  // Flat row item with hover
   contractOption: {
     width: '100%',
     textAlign: 'left',
     padding: '12px 14px',
     border: 'none',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
     background: 'none',
     cursor: 'pointer',
     display: 'block',
-    color: 'rgba(235, 240, 255, 0.88)',
+    color: 'rgba(235,240,255,0.92)',
     fontSize: 13,
     fontWeight: 500,
     transition: 'background 0.15s ease',
+    borderRadius: 12,
   },
   selectedContractBadge: {
     marginTop: 10,

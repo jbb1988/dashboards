@@ -2,8 +2,27 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { KPICard, AnimatedCounter, tokens } from '@/components/mars-ui';
 import ContractDetailDrawer, { Contract } from '@/components/contracts/ContractDetailDrawer';
+
+// Apple Pro Design Tokens
+const appleTokens = {
+  // L1 Surface
+  surfaceL1: 'linear-gradient(180deg, rgba(28,36,52,0.88), rgba(18,24,36,0.96))',
+  // L2 Surface
+  surfaceL2: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
+  // Shadows
+  shadowL1: '0 30px 90px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.08)',
+  shadowHalo: 'drop-shadow(0 0 120px rgba(90,130,255,0.15))',
+  // Text
+  textPrimary: 'rgba(235,240,255,0.92)',
+  textSecondary: 'rgba(200,210,235,0.75)',
+  textMuted: 'rgba(200,210,235,0.5)',
+  // Accents
+  accentBlue: 'rgba(90,130,255,0.95)',
+  accentAmber: 'rgba(255,190,90,0.95)',
+  accentGreen: 'rgba(80,210,140,0.95)',
+  accentRed: 'rgba(255,95,95,0.95)',
+};
 
 interface KPIs {
   totalPipeline: number;
@@ -27,13 +46,14 @@ function formatCurrency(value: number): string {
   return `$${value.toLocaleString()}`;
 }
 
+// Apple Pro accent-aligned status colors
 const statusColors: Record<string, string> = {
-  'Discussions Not Started': '#64748B',
-  'Initial Agreement Development': '#38BDF8',
-  'Review & Redlines': '#F59E0B',
+  'Discussions Not Started': 'rgba(200,210,235,0.6)',
+  'Initial Agreement Development': 'rgba(90,130,255,0.95)',
+  'Review & Redlines': 'rgba(255,190,90,0.95)',
   'Agreement Submission': '#A78BFA',
   'Approval & Signature': '#EC4899',
-  'PO Received': '#22C55E',
+  'PO Received': 'rgba(80,210,140,0.95)',
 };
 
 export default function PipelineTab() {
@@ -71,64 +91,90 @@ export default function PipelineTab() {
       <div className="space-y-6">
         <div className="grid grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className={`h-24 rounded-xl ${tokens.bg.card} animate-pulse`} />
+            <div
+              key={i}
+              className="h-24 rounded-2xl animate-pulse"
+              style={{
+                background: appleTokens.surfaceL1,
+                boxShadow: appleTokens.shadowL1,
+              }}
+            />
           ))}
         </div>
-        <div className={`h-96 rounded-xl ${tokens.bg.card} animate-pulse`} />
+        <div
+          className="h-96 rounded-2xl animate-pulse"
+          style={{
+            background: appleTokens.surfaceL1,
+            boxShadow: appleTokens.shadowL1,
+          }}
+        />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={`rounded-xl ${tokens.bg.card} border ${tokens.border.subtle} p-8 text-center`}>
-        <p className="text-red-400 mb-2">Error loading pipeline</p>
-        <p className="text-[#64748B] text-sm">{error}</p>
+      <div
+        className="rounded-2xl p-8 text-center"
+        style={{
+          background: appleTokens.surfaceL1,
+          boxShadow: appleTokens.shadowL1,
+        }}
+      >
+        <p style={{ color: appleTokens.accentRed }} className="mb-2">Error loading pipeline</p>
+        <p style={{ color: appleTokens.textMuted }} className="text-sm">{error}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
+      {/* L1 - KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <KPICard
-          title="Total Pipeline"
-          value={<AnimatedCounter value={data?.kpis.totalPipeline || 0} prefix="$" />}
-          subtitle={`${data?.kpis.totalCount || 0} contracts`}
-          color="#38BDF8"
-        />
-        <KPICard
-          title="Overdue"
-          value={<AnimatedCounter value={data?.kpis.overdueValue || 0} prefix="$" />}
-          subtitle={`${data?.kpis.overdueCount || 0} contracts`}
-          color="#EF4444"
-        />
-        <KPICard
-          title="Due in 30 Days"
-          value={<AnimatedCounter value={data?.kpis.dueNext30Value || 0} prefix="$" />}
-          subtitle={`${data?.kpis.dueNext30Count || 0} contracts`}
-          color="#F59E0B"
-        />
-        <KPICard
-          title="Average Value"
-          value={<AnimatedCounter value={data?.kpis.totalCount ? data.kpis.totalPipeline / data.kpis.totalCount : 0} prefix="$" />}
-          subtitle="per contract"
-          color="#22C55E"
-        />
+        {[
+          { title: 'Total Pipeline', value: data?.kpis.totalPipeline || 0, count: data?.kpis.totalCount || 0, color: appleTokens.accentBlue },
+          { title: 'Overdue', value: data?.kpis.overdueValue || 0, count: data?.kpis.overdueCount || 0, color: appleTokens.accentRed },
+          { title: 'Due in 30 Days', value: data?.kpis.dueNext30Value || 0, count: data?.kpis.dueNext30Count || 0, color: appleTokens.accentAmber },
+          { title: 'Average Value', value: data?.kpis.totalCount ? data.kpis.totalPipeline / data.kpis.totalCount : 0, count: null, color: appleTokens.accentGreen },
+        ].map((kpi, idx) => (
+          <div
+            key={idx}
+            className="p-5 rounded-2xl"
+            style={{
+              background: appleTokens.surfaceL1,
+              boxShadow: appleTokens.shadowL1,
+            }}
+          >
+            <p style={{ color: appleTokens.textSecondary }} className="text-xs font-semibold mb-2">{kpi.title}</p>
+            <p style={{ color: kpi.color }} className="text-2xl font-bold tabular-nums">{formatCurrency(kpi.value)}</p>
+            {kpi.count !== null && (
+              <p style={{ color: appleTokens.textMuted }} className="text-xs mt-1">{kpi.count} contracts</p>
+            )}
+            {kpi.count === null && (
+              <p style={{ color: appleTokens.textMuted }} className="text-xs mt-1">per contract</p>
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
+      {/* L2 - Filters Toolbar */}
+      <div
+        className="flex gap-2 flex-wrap p-2 rounded-xl"
+        style={{
+          background: appleTokens.surfaceL2,
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+        }}
+      >
         {['all', 'overdue', ...Object.keys(data?.statusBreakdown || {})].map((filter) => (
           <button
             key={filter}
             onClick={() => setActiveFilter(filter)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
-              activeFilter === filter
-                ? 'bg-[#1E3A5F] text-white'
-                : 'bg-[#1E293B] text-[#64748B] hover:text-white'
-            }`}
+            className="px-3 py-1.5 rounded-xl text-sm font-semibold transition-all"
+            style={{
+              background: activeFilter === filter ? 'rgba(255,255,255,0.08)' : 'transparent',
+              borderLeft: activeFilter === filter ? `2px solid ${appleTokens.accentBlue}` : '2px solid transparent',
+              color: activeFilter === filter ? appleTokens.textPrimary : appleTokens.textMuted,
+            }}
           >
             {filter === 'all' ? 'All Contracts' : filter === 'overdue' ? 'Overdue' : filter}
             {filter !== 'all' && filter !== 'overdue' && data?.statusBreakdown[filter] && (
@@ -140,16 +186,22 @@ export default function PipelineTab() {
         ))}
       </div>
 
-      {/* Contracts Table */}
-      <div className={`rounded-xl ${tokens.bg.card} border ${tokens.border.subtle} overflow-hidden`}>
+      {/* L1 - Contracts Table */}
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{
+          background: appleTokens.surfaceL1,
+          boxShadow: appleTokens.shadowL1,
+        }}
+      >
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/5">
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Contract</th>
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Value</th>
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Status</th>
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Days in Stage</th>
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Close Date</th>
+            <tr>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold tracking-wider" style={{ color: appleTokens.textSecondary }}>Contract</th>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold tracking-wider" style={{ color: appleTokens.textSecondary }}>Value</th>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold tracking-wider" style={{ color: appleTokens.textSecondary }}>Status</th>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold tracking-wider" style={{ color: appleTokens.textSecondary }}>Days in Stage</th>
+              <th className="text-left px-4 py-3 text-[11px] font-semibold tracking-wider" style={{ color: appleTokens.textSecondary }}>Close Date</th>
             </tr>
           </thead>
           <tbody>
@@ -160,40 +212,49 @@ export default function PipelineTab() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.02 }}
                 onClick={() => setSelectedContract(contract)}
-                className="border-b border-white/5 hover:bg-white/[0.02] cursor-pointer transition-colors"
+                className="cursor-pointer transition-colors"
+                style={{
+                  background: 'transparent',
+                }}
+                whileHover={{
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                }}
               >
                 <td className="px-4 py-3">
                   <div>
-                    <p className="text-[#EAF2FF] text-sm font-medium">{contract.name}</p>
+                    <p style={{ color: appleTokens.textPrimary }} className="text-sm font-medium">{contract.name}</p>
                     {contract.salesRep && (
-                      <p className="text-[#64748B] text-xs">{contract.salesRep}</p>
+                      <p style={{ color: appleTokens.textMuted }} className="text-xs">{contract.salesRep}</p>
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-[#EAF2FF] text-sm font-medium tabular-nums">
+                <td className="px-4 py-3 text-sm font-medium tabular-nums" style={{ color: appleTokens.textPrimary }}>
                   {formatCurrency(contract.value)}
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium"
                     style={{
-                      backgroundColor: `${statusColors[contract.status] || '#64748B'}20`,
-                      color: statusColors[contract.status] || '#64748B',
+                      backgroundColor: `${statusColors[contract.status] || appleTokens.textMuted}20`,
+                      color: statusColors[contract.status] || appleTokens.textMuted,
                     }}
                   >
                     <span
                       className="w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: statusColors[contract.status] || '#64748B' }}
+                      style={{ backgroundColor: statusColors[contract.status] || appleTokens.textMuted }}
                     />
                     {contract.status}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-sm tabular-nums ${contract.daysInStage > 30 ? 'text-red-400' : 'text-[#64748B]'}`}>
+                  <span
+                    className="text-sm tabular-nums"
+                    style={{ color: contract.daysInStage > 30 ? appleTokens.accentRed : appleTokens.textMuted }}
+                  >
                     {contract.daysInStage} days
                   </span>
                 </td>
-                <td className="px-4 py-3 text-[#64748B] text-sm">
+                <td className="px-4 py-3 text-sm" style={{ color: appleTokens.textMuted }}>
                   {contract.closeDate ? new Date(contract.closeDate).toLocaleDateString() : '-'}
                 </td>
               </motion.tr>
@@ -202,7 +263,7 @@ export default function PipelineTab() {
         </table>
 
         {filteredContracts.length > 20 && (
-          <div className="px-4 py-3 text-center text-[#64748B] text-sm border-t border-white/5">
+          <div className="px-4 py-3 text-center text-sm" style={{ color: appleTokens.textMuted }}>
             Showing 20 of {filteredContracts.length} contracts
           </div>
         )}

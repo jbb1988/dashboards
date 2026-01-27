@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
-import { DashboardBackground, backgroundPresets, tokens } from '@/components/mars-ui';
 
 // Lazy load tab content to improve initial load
 const PipelineTab = dynamic(() => import('./tabs/PipelineTab'), {
@@ -77,8 +76,8 @@ function TabLoadingState({ label }: { label: string }) {
   return (
     <div className="flex items-center justify-center h-64">
       <div className="text-center">
-        <div className="w-8 h-8 border-2 border-[#38BDF8] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-[#64748B] text-sm">{label}</p>
+        <div className="w-8 h-8 border-2 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-[var(--text-muted)] text-sm">{label}</p>
       </div>
     </div>
   );
@@ -87,11 +86,11 @@ function TabLoadingState({ label }: { label: string }) {
 function getBadgeColor(badge: string): string {
   switch (badge) {
     case 'Salesforce':
-      return 'bg-[#38BDF8]/20 text-[#38BDF8]';
+      return 'bg-[var(--accent-blue)]/20 text-[var(--accent-blue)]';
     case 'Claude':
       return 'bg-[#A855F7]/20 text-[#A855F7]';
     default:
-      return 'bg-[#64748B]/20 text-[#64748B]';
+      return 'bg-[var(--text-muted)]/20 text-[var(--text-muted)]';
   }
 }
 
@@ -118,7 +117,13 @@ function ContractsHubContent() {
 
   return (
     <>
-      <DashboardBackground {...backgroundPresets.contracts} />
+      {/* L0 - Base Canvas */}
+      <div
+        className="fixed inset-0 z-0"
+        style={{
+          background: 'radial-gradient(1200px 800px at 50% -20%, rgba(90,130,255,0.22), rgba(10,14,20,0.98) 60%)',
+        }}
+      />
       <Sidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
 
       <motion.main
@@ -129,26 +134,31 @@ function ContractsHubContent() {
         <div className="p-6">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-white mb-1">Contracts Hub</h1>
-            <p className="text-[#64748B] text-sm">Manage your contract pipeline, reviews, and obligations</p>
+            <h1 className="text-2xl font-semibold text-[rgba(235,240,255,0.92)] mb-1">Contracts Hub</h1>
+            <p className="text-[rgba(200,210,235,0.75)] text-sm">Manage your contract pipeline, reviews, and obligations</p>
           </div>
 
-          {/* Tab Navigation */}
-          <div className={`mb-6 rounded-xl ${tokens.bg.card} border ${tokens.border.subtle} p-1.5`}>
+          {/* L2 - Tab Navigation Toolbar */}
+          <div
+            className="mb-6 rounded-2xl p-1.5"
+            style={{
+              background: 'linear-gradient(180deg, rgba(36,46,66,0.92), rgba(22,30,44,0.98))',
+              boxShadow: '0 30px 90px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.08)',
+            }}
+          >
             <div className="flex gap-1">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`
-                    flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all
-                    ${activeTab === tab.id
-                      ? 'bg-[#1E3A5F] text-white'
-                      : 'text-[#64748B] hover:text-white hover:bg-[#1E293B]'
-                    }
-                  `}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    background: activeTab === tab.id ? 'rgba(255,255,255,0.08)' : 'transparent',
+                    borderLeft: activeTab === tab.id ? '2px solid rgba(90,130,255,0.95)' : '2px solid transparent',
+                    color: activeTab === tab.id ? 'rgba(235,240,255,0.95)' : 'rgba(235,240,255,0.5)',
+                  }}
                 >
-                  <span className={activeTab === tab.id ? 'text-[#38BDF8]' : ''}>{tab.icon}</span>
+                  <span style={{ color: activeTab === tab.id ? 'rgba(90,130,255,0.95)' : 'inherit' }}>{tab.icon}</span>
                   <span>{tab.label}</span>
                   {tab.badge && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${getBadgeColor(tab.badge)}`}>
