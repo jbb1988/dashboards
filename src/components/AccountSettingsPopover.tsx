@@ -12,6 +12,7 @@ interface AccountSettingsPopoverProps {
   userEmail: string;
   userRole: string;
   isCollapsed: boolean;
+  onCustomizeSidebar?: () => void;
 }
 
 // Color mapping for data sources (from Sidebar.tsx)
@@ -39,6 +40,7 @@ export function AccountSettingsPopover({
   userEmail,
   userRole,
   isCollapsed,
+  onCustomizeSidebar,
 }: AccountSettingsPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -129,8 +131,32 @@ export function AccountSettingsPopover({
             </div>
           </div>
 
-          {/* Sign Out Button */}
-          <div className="px-4 py-3">
+          {/* Actions Section */}
+          <div className="px-4 py-3 space-y-2">
+            {/* Customize Sidebar Button */}
+            {onCustomizeSidebar && (
+              <button
+                onClick={onCustomizeSidebar}
+                className="w-full px-3 py-2 text-[11px] text-[#8FA3BF] bg-[#1E293B] hover:bg-[#2A3544] rounded-md transition-colors duration-150 flex items-center justify-center gap-2"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h7"
+                  />
+                </svg>
+                Customize Sidebar
+              </button>
+            )}
+
+            {/* Sign Out Button */}
             <button
               onClick={handleSignOut}
               className="w-full px-3 py-2 text-[11px] text-[#8FA3BF] bg-[#1E293B] hover:bg-[#2A3544] rounded-md transition-colors duration-150 flex items-center justify-center gap-2"
