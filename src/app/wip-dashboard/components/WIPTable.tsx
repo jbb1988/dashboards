@@ -25,6 +25,8 @@ interface WorkOrderWithOperations {
   shop_status?: string | null;
   shop_status_id?: string | null;
   days_in_status?: number;
+  expected_completion?: string | null;
+  days_until_due?: number | null;
 }
 
 interface WIPTableProps {
@@ -67,8 +69,31 @@ function getMarginColor(margin: number | null): string {
   return 'text-red-400';
 }
 
-// Grid columns: Alert | WO# | Customer | Stage | Days | Revenue | Cost | Margin
-const GRID_COLS = '24px 1fr 1.5fr 120px 70px 90px 90px 70px';
+function getDueColor(daysUntilDue: number | null | undefined): string {
+  if (daysUntilDue === null || daysUntilDue === undefined) return 'text-gray-500';
+  if (daysUntilDue < 0) return 'text-red-400 font-semibold'; // Overdue
+  if (daysUntilDue <= 2) return 'text-amber-400'; // Due soon
+  if (daysUntilDue <= 7) return 'text-cyan-400';
+  return 'text-green-400';
+}
+
+function formatDueDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '-';
+  try {
+    // NetSuite format: "M/D/YYYY"
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
+// Grid columns: Alert | WO# | Customer | Stage | Days | Due | Revenue | Margin
+const GRID_COLS = '24px 1fr 1.5fr 110px 60px 80px 90px 70px';
 
 export default function WIPTable({ data }: WIPTableProps) {
   const [sortBy, setSortBy] = useState<'days' | 'revenue' | 'margin' | 'stage'>('days');
@@ -120,12 +145,12 @@ export default function WIPTable({ data }: WIPTableProps) {
           Stage<SortArrow col="stage" />
         </div>
         <div className="text-center cursor-pointer hover:text-gray-300" onClick={() => handleSort('days')}>
-          Days<SortArrow col="days" />
+          Age<SortArrow col="days" />
         </div>
+        <div className="text-center">Due</div>
         <div className="text-right cursor-pointer hover:text-gray-300" onClick={() => handleSort('revenue')}>
           Revenue<SortArrow col="revenue" />
         </div>
-        <div className="text-right">Cost</div>
         <div className="text-right cursor-pointer hover:text-gray-300" onClick={() => handleSort('margin')}>
           Margin<SortArrow col="margin" />
         </div>
@@ -183,10 +208,23 @@ export default function WIPTable({ data }: WIPTableProps) {
               </span>
             </div>
 
-            {/* Days */}
+            {/* Days (Age) */}
             <div className="text-center">
               {days !== null && days !== undefined ? (
                 <span className={daysColor}>{days}d</span>
+              ) : (
+                <span className="text-gray-500">-</span>
+              )}
+            </div>
+
+            {/* Due Date */}
+            <div className="text-center">
+              {wo.expected_completion ? (
+                <div>
+                  <span className={getDueColor(wo.days_until_due)}>
+                    {formatDueDate(wo.expected_completion)}
+                  </span>
+                </div>
               ) : (
                 <span className="text-gray-500">-</span>
               )}
@@ -196,13 +234,6 @@ export default function WIPTable({ data }: WIPTableProps) {
             <div className="text-right">
               <span className={wo.revenue ? 'text-gray-300' : 'text-gray-500'}>
                 {formatCurrency(wo.revenue)}
-              </span>
-            </div>
-
-            {/* Cost */}
-            <div className="text-right">
-              <span className={wo.total_cost ? 'text-gray-400' : 'text-gray-500'}>
-                {formatCurrency(wo.total_cost)}
               </span>
             </div>
 

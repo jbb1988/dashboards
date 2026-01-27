@@ -81,6 +81,9 @@ export async function GET(request: Request) {
       shop_status: wo.shop_status,
       shop_status_id: wo.shop_status_id,
       days_in_status: wo.days_in_status,
+      // Expected completion date from NetSuite enddate field
+      expected_completion: wo.expected_completion,
+      days_until_due: wo.days_until_due,
       // Legacy operation fields - now derived from shop status
       operations: [],
       current_operation: wo.shop_status ? {

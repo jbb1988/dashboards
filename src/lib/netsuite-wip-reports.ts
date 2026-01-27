@@ -230,6 +230,8 @@ export interface WorkOrderWithShopStatus {
   so_number: string | null;
   assembly_description: string | null;
   days_in_status: number;
+  expected_completion: string | null;
+  days_until_due: number | null;
   revenue: number | null;
   total_cost: number | null;
   margin_pct: number | null;
@@ -316,11 +318,13 @@ export async function getWorkOrdersWithShopStatus(filters?: {
     // Revenue = so.foreigntotal (NOT custbody2 which doesn't exist)
     // IMPORTANT: Filter so.type = 'SalesOrd' because createdfrom can also point to parent Work Orders
     // For child WOs, traverse up to parent WO then to its SO
+    // enddate = expected completion date for the work order
     const query = `
       SELECT
         wo.id,
         wo.tranid,
         wo.trandate,
+        wo.enddate,
         wo.status,
         BUILTIN.DF(wo.status) AS statusname,
         wo.entity,
@@ -331,7 +335,8 @@ export async function getWorkOrdersWithShopStatus(filters?: {
         COALESCE(so.totalcostestimate, parentso.totalcostestimate) AS estcost,
         COALESCE(so.estgrossprofitpercent, parentso.estgrossprofitpercent) AS estmargin,
         COALESCE(BUILTIN.DF(so.entity), BUILTIN.DF(parentso.entity), BUILTIN.DF(wo.entity)) AS customername2,
-        ROUND(SYSDATE - wo.trandate) AS daysopen
+        ROUND(SYSDATE - wo.trandate) AS daysopen,
+        ROUND(wo.enddate - SYSDATE) AS daysuntildue
       FROM Transaction wo
       LEFT JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
       LEFT JOIN Transaction so ON so.id = woline.createdfrom AND so.type = 'SalesOrd'
@@ -390,6 +395,8 @@ export async function getWorkOrdersWithShopStatus(filters?: {
         so_number: wo.sonumber || null,
         assembly_description: wo.custbodyiqsassydescription || null,
         days_in_status: parseInt(wo.daysopen) || 0,
+        expected_completion: wo.enddate || null,
+        days_until_due: wo.daysuntildue != null ? parseInt(wo.daysuntildue) : null,
         revenue: revenue,
         total_cost: estCost,
         margin_pct: estMargin,
