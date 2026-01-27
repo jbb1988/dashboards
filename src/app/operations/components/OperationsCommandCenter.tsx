@@ -6,7 +6,7 @@ import { KPICard, AnimatedCounter, KPIIcons, colors, KPICardSkeleton } from '@/c
 import { AlertToast } from '@/components/alerts';
 import OrdersTab from './OrdersTab';
 import InventoryTab from './InventoryTab';
-import Link from 'next/link';
+import WIPOperationsDashboard from '@/app/wip-dashboard/components/WIPOperationsDashboard';
 
 // =============================================================================
 // TYPES
@@ -62,8 +62,12 @@ function formatCurrency(value: number): string {
 // MAIN COMPONENT
 // =============================================================================
 
-export default function OperationsCommandCenter() {
-  const [activeTab, setActiveTab] = useState<TabId>('orders');
+interface OperationsCommandCenterProps {
+  initialTab?: TabId;
+}
+
+export default function OperationsCommandCenter({ initialTab = 'orders' }: OperationsCommandCenterProps) {
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null);
   const [inventoryMetrics, setInventoryMetrics] = useState<InventoryMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,8 +147,6 @@ export default function OperationsCommandCenter() {
       id: 'wip' as TabId,
       label: 'WIP Operations',
       badge: 0,
-      isLink: true,
-      href: '/wip-dashboard',
     },
   ];
 
@@ -275,33 +277,22 @@ export default function OperationsCommandCenter() {
       {/* Tab Navigation */}
       <div className="flex gap-2 border-b border-white/[0.06] pb-0">
         {tabs.map(tab => (
-          tab.isLink ? (
-            <Link
-              key={tab.id}
-              href={tab.href!}
-              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/[0.05] rounded-t-lg transition-all"
-            >
-              {tab.label}
-              <span className="ml-2 text-xs text-gray-500">→</span>
-            </Link>
-          ) : (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium transition-all rounded-t-lg ${
-                activeTab === tab.id
-                  ? 'bg-white/[0.1] text-white border-b-2 border-[#F97316]'
-                  : 'text-gray-400 hover:text-white hover:bg-white/[0.05]'
-              }`}
-            >
-              {tab.label}
-              {tab.badge > 0 && (
-                <span className="ml-2 px-1.5 py-0.5 bg-red-500/20 text-red-400 text-xs rounded">
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          )
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 text-sm font-medium transition-all rounded-t-lg ${
+              activeTab === tab.id
+                ? 'bg-white/[0.1] text-white border-b-2 border-[#F97316]'
+                : 'text-gray-400 hover:text-white hover:bg-white/[0.05]'
+            }`}
+          >
+            {tab.label}
+            {tab.badge > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-red-500/20 text-red-400 text-xs rounded">
+                {tab.badge}
+              </span>
+            )}
+          </button>
         ))}
       </div>
 
@@ -322,6 +313,9 @@ export default function OperationsCommandCenter() {
             backorderedItems={inventoryMetrics?.backorderedItems || []}
             valueByType={inventoryMetrics?.valueByType || {}}
           />
+        )}
+        {activeTab === 'wip' && (
+          <WIPOperationsDashboard />
         )}
       </div>
     </div>

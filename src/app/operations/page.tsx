@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
@@ -8,6 +9,8 @@ import OperationsCommandCenter from './components/OperationsCommandCenter';
 
 export default function OperationsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') as 'orders' | 'inventory' | 'wip' | null;
 
   const mainStyle = {
     marginLeft: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH,
@@ -37,7 +40,7 @@ export default function OperationsPage() {
         </header>
 
         <main className="max-w-[1600px] mx-auto px-8 py-6">
-          <OperationsCommandCenter />
+          <OperationsCommandCenter initialTab={initialTab || 'orders'} />
         </main>
       </motion.div>
     </div>
