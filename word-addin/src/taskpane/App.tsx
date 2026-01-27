@@ -833,6 +833,11 @@ export default function App() {
   const [originalDocumentText, setOriginalDocumentText] = useState<string>('');
   const [isSavingToHistory, setIsSavingToHistory] = useState(false);
   const [savedToHistory, setSavedToHistory] = useState(false);
+  const [savedReviewId, setSavedReviewId] = useState<string | null>(null);
+
+  // Submit for Approval state
+  const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
+  const [submittedForApproval, setSubmittedForApproval] = useState(false);
 
   // Preview and match selection state
   const [previewState, setPreviewState] = useState<PreviewState | null>(null);

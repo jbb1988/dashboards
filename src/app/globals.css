@@ -8,9 +8,9 @@
   --gold: #d4af37;
 
   /* Three-tier elevation system for Approval page */
-  --approval-bg-base: #0D1117;      /* Darker app background for more contrast */
-  --approval-bg-surface: #161B22;   /* Elevated document surface */
-  --approval-bg-panel: #21262D;     /* Sidebar/panels */
+  --approval-bg-base: #0D1117;      /* Deep dark background */
+  --approval-bg-surface: #161B22;   /* Document surface */
+  --approval-bg-panel: #1C2128;     /* Panels - subtle lift */
 }
 
 * {
@@ -27,24 +27,28 @@ body {
   color: white;
 }
 
-/* Custom scrollbar */
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar - minimal */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* Select dropdown dark styling */
@@ -53,7 +57,9 @@ select option {
   color: white;
 }
 
-/* Redline Editor Marks - ensures visibility regardless of TipTap styling */
+/* ═══════════════════════════════════════════════════════════════
+   REDLINE EDITOR MARKS
+   ═══════════════════════════════════════════════════════════════ */
 span[data-ai-strike],
 del {
   color: #f87171 !important;
@@ -77,66 +83,42 @@ span[data-approver-insert] {
 }
 
 span[data-approver-comment] {
-  background-color: rgba(250, 204, 21, 0.3) !important;
+  background-color: rgba(250, 204, 21, 0.25) !important;
   padding: 0 2px;
   border-radius: 2px;
   cursor: pointer;
 }
 
-/* Glassmorphism for approval panels */
+/* ═══════════════════════════════════════════════════════════════
+   APPROVAL PAGE SURFACES
+   No blur, no heavy shadows - depth via subtle edges and spacing
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Glass panel - NO BLUR, just semi-transparent dark surface */
 .glass-panel {
-  background: rgba(36, 42, 50, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-/* Document container with elevated card effect */
+/* Document container - elevated card */
 .doc-container {
+  background: var(--approval-bg-surface);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.04),
-    0 8px 40px rgba(0, 0, 0, 0.5),
-    0 0 80px -20px rgba(88, 166, 255, 0.06);
-  background: linear-gradient(180deg, #1A2028 0%, #161B22 100%);
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
-/* Summary card - clickable intelligence items */
-.summary-card {
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.summary-card:hover {
-  border-color: rgba(88, 166, 255, 0.25);
-  background: rgba(27, 31, 36, 0.8);
-  transform: translateX(3px);
-}
-
-.summary-card:active {
-  transform: translateX(1px);
-}
-
-/* Smooth scroll for anchor targets */
-html {
-  scroll-behavior: smooth;
-}
+/* ═══════════════════════════════════════════════════════════════
+   UTILITY ANIMATIONS
+   ═══════════════════════════════════════════════════════════════ */
 
 /* Highlight animation when scrolling to clause */
 @keyframes highlight-flash {
-  0% { background-color: rgba(88, 166, 255, 0.3); }
+  0% { background-color: rgba(88, 166, 255, 0.2); }
   100% { background-color: transparent; }
 }
 
 .highlight-flash {
-  animation: highlight-flash 1.5s ease-out;
-}
-
-/* Risk indicator pulse animation */
-@keyframes risk-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-.risk-indicator-high {
-  animation: risk-pulse 2s ease-in-out infinite;
+  animation: highlight-flash 1.2s ease-out;
 }
