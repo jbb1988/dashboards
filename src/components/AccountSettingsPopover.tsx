@@ -20,6 +20,7 @@ const dataSources = [
   { name: 'Salesforce', status: 'live' as const, icon: 'cloud' },
   { name: 'Asana', status: 'live' as const, icon: 'check-square' },
   { name: 'DocuSign', status: 'live' as const, icon: 'file-signature' },
+  { name: 'PandaDoc', status: 'live' as const, icon: 'document-check' },
   { name: 'NetSuite', status: 'live' as const, icon: 'database' },
   { name: 'Smartsheet', status: 'live' as const, icon: 'table' },
   { name: 'Excel', status: 'manual' as const, icon: 'file-spreadsheet' },
@@ -46,6 +47,12 @@ function DataSourceIcon({ type }: { type: string }) {
       return (
         <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+        </svg>
+      );
+    case 'document-check':
+      return (
+        <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9zm0 0v4.875c0 .621.504 1.125 1.125 1.125H16.5m-6.75 7.5l2.25 2.25 4.5-4.5" />
         </svg>
       );
     case 'database':

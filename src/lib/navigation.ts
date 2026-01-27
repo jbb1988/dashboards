@@ -161,6 +161,7 @@ export const dataSources = [
   { name: 'Salesforce', color: 'bg-[#38BDF8]' },
   { name: 'Asana', color: 'bg-[#E16259]' },
   { name: 'DocuSign', color: 'bg-[#FFD700]' },
+  { name: 'PandaDoc', color: 'bg-[#5BBB4E]' },
   { name: 'NetSuite', color: 'bg-[#F97316]' },
   { name: 'Smartsheet', color: 'bg-[#0073EA]' },
 ];

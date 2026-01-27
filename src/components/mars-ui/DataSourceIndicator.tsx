@@ -7,7 +7,7 @@ import { colors } from './tokens';
 // TYPES
 // =============================================================================
 
-export type DataSourceType = 'salesforce' | 'netsuite' | 'asana' | 'docusign' | 'supabase' | 'claude';
+export type DataSourceType = 'salesforce' | 'netsuite' | 'asana' | 'docusign' | 'pandadoc' | 'supabase' | 'claude';
 
 export interface DataSourceIndicatorProps {
   /** The data source type */
@@ -62,6 +62,15 @@ const sourceConfig: Record<DataSourceType, { label: string; color: string; icon:
     icon: (
       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
         <path d="M22 6.5l-10 7L2 6.5V5l10 7 10-7v1.5zM2 18V8l10 7 10-7v10H2z"/>
+      </svg>
+    ),
+  },
+  pandadoc: {
+    label: 'PandaDoc',
+    color: '#5BBB4E', // PandaDoc green
+    icon: (
+      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
       </svg>
     ),
   },
