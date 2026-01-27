@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ChevronRight } from 'lucide-react';
+import WIPDetailDrawer from './WIPDetailDrawer';
 
 interface WorkOrderWithOperations {
   work_order_id: string;
@@ -92,12 +93,13 @@ function formatDueDate(dateStr: string | null | undefined): string {
   }
 }
 
-// Grid columns: Alert | WO# | Customer | Stage | Days | Due | Revenue | Margin
-const GRID_COLS = '24px 1fr 1.5fr 110px 60px 80px 90px 70px';
+// Grid columns: Alert | WO# | Customer | Stage | Days | Due | Revenue | Margin | Chevron
+const GRID_COLS = '24px 1fr 1.5fr 110px 60px 80px 90px 60px 24px';
 
 export default function WIPTable({ data }: WIPTableProps) {
   const [sortBy, setSortBy] = useState<'days' | 'revenue' | 'margin' | 'stage'>('days');
   const [sortDesc, setSortDesc] = useState(false);
+  const [selectedWO, setSelectedWO] = useState<WorkOrderWithOperations | null>(null);
 
   const handleSort = (col: typeof sortBy) => {
     if (sortBy === col) {
@@ -154,6 +156,7 @@ export default function WIPTable({ data }: WIPTableProps) {
         <div className="text-right cursor-pointer hover:text-gray-300" onClick={() => handleSort('margin')}>
           Margin<SortArrow col="margin" />
         </div>
+        <div></div>
       </div>
 
       {/* Rows */}
@@ -171,7 +174,8 @@ export default function WIPTable({ data }: WIPTableProps) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: Math.min(index * 0.015, 0.3) }}
-            className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.02] ${
+            onClick={() => setSelectedWO(wo)}
+            className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.05] cursor-pointer ${
               isStuck ? 'bg-red-500/[0.03]' : isEven ? 'bg-[#151F2E]' : 'bg-[#131B28]'
             }`}
             style={{ gridTemplateColumns: GRID_COLS }}
@@ -243,6 +247,11 @@ export default function WIPTable({ data }: WIPTableProps) {
                 {hasValidCost && wo.margin_pct !== null ? `${wo.margin_pct.toFixed(0)}%` : '-'}
               </span>
             </div>
+
+            {/* Chevron */}
+            <div className="flex justify-center">
+              <ChevronRight className="w-4 h-4 text-gray-500" />
+            </div>
           </motion.div>
         );
       })}
@@ -253,6 +262,12 @@ export default function WIPTable({ data }: WIPTableProps) {
           No work orders found
         </div>
       )}
+
+      {/* WIP Detail Drawer */}
+      <WIPDetailDrawer
+        workOrder={selectedWO}
+        onClose={() => setSelectedWO(null)}
+      />
     </div>
   );
 }

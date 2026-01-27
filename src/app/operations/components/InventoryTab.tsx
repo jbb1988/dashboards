@@ -15,7 +15,9 @@ import {
   CheckCircle,
   Clock,
   ArrowUpRight,
+  ChevronRight,
 } from 'lucide-react';
+import InventoryDetailDrawer from './InventoryDetailDrawer';
 
 // =============================================================================
 // TYPES
@@ -106,8 +108,8 @@ function formatDate(dateStr: string | null): string {
 // GRID LAYOUTS
 // =============================================================================
 
-// Critical Items: Item | On Hand | Revenue Blocked | Orders Blocked | Root Cause | Owner | Next Action
-const CRITICAL_GRID = '1.2fr 80px 110px 90px 100px 80px 90px';
+// Critical Items: Item | On Hand | Revenue Blocked | Orders Blocked | Root Cause | Owner | Next Action | Chevron
+const CRITICAL_GRID = '1.2fr 80px 110px 90px 100px 80px 80px 24px';
 
 // Backorder Impact: Item | Shortage | Orders | Customers | Revenue | Expedite?
 const BACKORDER_GRID = '1.2fr 90px 80px 90px 110px 80px';
@@ -211,6 +213,7 @@ export default function InventoryTab({
   const [view, setView] = useState<'actions' | 'critical' | 'backorders' | 'value'>(
     actionItems.length > 0 ? 'actions' : 'critical'
   );
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
 
   // Calculate total value
   const totalValue = Object.values(valueByType).reduce((sum, v) => sum + v, 0);
@@ -412,6 +415,7 @@ export default function InventoryTab({
             <div>Root Cause</div>
             <div>Owner</div>
             <div>Next PO</div>
+            <div></div>
           </div>
 
           {/* Rows */}
@@ -441,7 +445,8 @@ export default function InventoryTab({
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(index * 0.015, 0.3) }}
-                    className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.02] ${
+                    onClick={() => setSelectedItem(item)}
+                    className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.05] cursor-pointer ${
                       isCritical ? 'bg-red-500/[0.03]' : isEven ? 'bg-[#151F2E]' : 'bg-[#131B28]'
                     }`}
                     style={{ gridTemplateColumns: CRITICAL_GRID }}
@@ -497,6 +502,11 @@ export default function InventoryTab({
                       ) : (
                         <span className="text-xs text-red-400">No PO</span>
                       )}
+                    </div>
+
+                    {/* Chevron */}
+                    <div className="flex justify-center">
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
                     </div>
                   </motion.div>
                 );
@@ -691,6 +701,12 @@ export default function InventoryTab({
           )}
         </div>
       )}
+
+      {/* Inventory Detail Drawer */}
+      <InventoryDetailDrawer
+        item={selectedItem}
+        onClose={() => setSelectedItem(null)}
+      />
     </motion.div>
   );
 }
