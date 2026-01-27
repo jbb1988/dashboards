@@ -406,7 +406,11 @@ async function callOpenRouterAPI(
     throw new Error('AI returned empty response');
   }
 
-  // Parse JSON from response
+  console.log('=== AI Response Debug ===');
+  console.log('Full content length:', fullContent.length);
+  console.log('Full content preview:', fullContent.substring(0, 500));
+
+  // Parse JSON from response - more robust extraction
   let jsonStr = fullContent.trim()
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
@@ -419,16 +423,19 @@ async function callOpenRouterAPI(
   const lastBrace = jsonStr.lastIndexOf('}');
 
   if (firstBrace === -1 || lastBrace <= firstBrace) {
+    console.error('No JSON braces found. Response:', jsonStr.substring(0, 1000));
     throw new Error('No JSON object found in response');
   }
 
   jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+  console.log('Extracted JSON length:', jsonStr.length);
 
   // Try parsing strategies
   let result: AIResponse;
   try {
     result = JSON.parse(jsonStr);
-  } catch {
+  } catch (firstError) {
+    console.log('First parse attempt failed:', firstError);
     // Try with escaped control characters
     try {
       const fixedJson = jsonStr
@@ -436,8 +443,29 @@ async function callOpenRouterAPI(
         .replace(/\r/g, '\\r')
         .replace(/\n/g, '\\n');
       result = JSON.parse(fixedJson);
-    } catch {
-      throw new Error('Could not parse JSON response');
+    } catch (secondError) {
+      console.log('Second parse attempt failed:', secondError);
+      // Try fixing common JSON issues
+      try {
+        // Fix unescaped quotes in strings, trailing commas, etc.
+        const sanitized = jsonStr
+          .replace(/,\s*}/g, '}')  // Remove trailing commas before }
+          .replace(/,\s*]/g, ']')  // Remove trailing commas before ]
+          .replace(/[\x00-\x1F\x7F]/g, ' '); // Replace control chars with space
+        result = JSON.parse(sanitized);
+        console.log('Third parse attempt succeeded after sanitization');
+      } catch (thirdError) {
+        console.error('All JSON parse attempts failed');
+        console.error('JSON preview:', jsonStr.substring(0, 500));
+        // Return empty result with error message instead of throwing
+        return {
+          edits: [],
+          newSections: [],
+          legacySections: [],
+          summary: ['AI returned invalid JSON response. Please try again.'],
+          error: 'Could not parse AI response',
+        };
+      }
     }
   }
 
