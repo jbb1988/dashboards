@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Package, Clock, DollarSign, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Package, Clock, DollarSign, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface SalesOrder {
   id: string;
@@ -45,16 +45,13 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
 };
 
 function getStatusInfo(status: string): { label: string; color: string; bg: string } {
-  // Check if it's a letter code
   if (STATUS_MAP[status]) {
     return STATUS_MAP[status];
   }
-  // Check if it's already a description (e.g., "Pending Fulfillment")
   const entry = Object.entries(STATUS_MAP).find(([_, v]) => v.label.toLowerCase() === status.toLowerCase());
   if (entry) {
     return entry[1];
   }
-  // Default
   return { label: status, color: '#64748B', bg: 'rgba(100, 116, 139, 0.15)' };
 }
 
@@ -86,9 +83,24 @@ function getAgingColor(days: number): string {
 }
 
 type FilterType = 'all' | '0-30' | '31-60' | '61-90' | '90+';
+type SortField = 'order' | 'customer' | 'status' | 'amount' | 'age';
+
+// Grid columns: Alert | Order | Customer | Status | Amount | Age
+const GRID_COLS = '28px 1fr 1.5fr 160px 100px 70px';
 
 export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [sortBy, setSortBy] = useState<SortField>('age');
+  const [sortDesc, setSortDesc] = useState(true);
+
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortDesc(!sortDesc);
+    } else {
+      setSortBy(field);
+      setSortDesc(field === 'age' || field === 'amount'); // Default desc for age and amount
+    }
+  };
 
   const filteredOrders = orders.filter(order => {
     if (filter === 'all') return true;
@@ -99,9 +111,38 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
     return true;
   });
 
-  const sortedOrders = [...filteredOrders].sort((a, b) => b.days_open - a.days_open);
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    let cmp = 0;
+    switch (sortBy) {
+      case 'order':
+        cmp = a.tranid.localeCompare(b.tranid);
+        break;
+      case 'customer':
+        cmp = (a.customer_name || '').localeCompare(b.customer_name || '');
+        break;
+      case 'status':
+        cmp = (a.status || '').localeCompare(b.status || '');
+        break;
+      case 'amount':
+        cmp = a.total_amount - b.total_amount;
+        break;
+      case 'age':
+        cmp = a.days_open - b.days_open;
+        break;
+    }
+    return sortDesc ? -cmp : cmp;
+  });
 
-  // Aging buckets config - ordered from newest to oldest (0-30 first)
+  const SortIndicator = ({ field }: { field: SortField }) => {
+    if (sortBy !== field) return null;
+    return sortDesc ? (
+      <ChevronDown className="w-3 h-3 inline ml-0.5" />
+    ) : (
+      <ChevronUp className="w-3 h-3 inline ml-0.5" />
+    );
+  };
+
+  // Aging buckets config
   const agingBuckets: { key: FilterType; label: string; icon: React.ReactNode; color: string; borderColor: string }[] = [
     { key: '0-30', label: '0-30 Days', icon: <Clock className="w-4 h-4" />, color: 'text-green-400', borderColor: 'border-green-500/30' },
     { key: '31-60', label: '31-60 Days', icon: <Clock className="w-4 h-4" />, color: 'text-amber-400', borderColor: 'border-amber-500/30' },
@@ -174,118 +215,152 @@ export default function OrdersTab({ loading, orders, aging }: OrdersTabProps) {
         </div>
       )}
 
-      {/* Orders Table */}
+      {/* Orders List */}
       <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
-        {/* Table Header */}
+        {/* Header */}
         <div className="px-4 py-3 border-b border-white/[0.06] bg-white/[0.02] flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            Open Orders
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-blue-400" />
+            <h2 className="text-base font-semibold text-white">Open Orders</h2>
             {filter !== 'all' && (
               <span className="text-xs font-normal px-2 py-0.5 rounded-md bg-white/[0.06] text-gray-400">
                 {filter}
               </span>
             )}
-          </h2>
+          </div>
           <span className="text-sm text-gray-500">{sortedOrders.length} orders</span>
         </div>
 
-        {/* Table */}
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-white/[0.06]">
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Order</th>
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
-              <th className="text-right px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Age</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
-                  Loading orders...
-                </td>
-              </tr>
-            ) : sortedOrders.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
-                  No orders found
-                </td>
-              </tr>
-            ) : (
-              sortedOrders.map((order, index) => {
-                const isOverdue = order.days_open > 90;
-                const statusInfo = getStatusInfo(order.status);
+        {/* Column Headers */}
+        <div
+          className="grid gap-4 px-4 py-3 border-b border-white/[0.06] text-xs font-semibold text-gray-500 uppercase tracking-wider"
+          style={{ gridTemplateColumns: GRID_COLS }}
+        >
+          <div></div>
+          <div
+            className="cursor-pointer hover:text-gray-300 transition-colors"
+            onClick={() => handleSort('order')}
+          >
+            Order<SortIndicator field="order" />
+          </div>
+          <div
+            className="cursor-pointer hover:text-gray-300 transition-colors"
+            onClick={() => handleSort('customer')}
+          >
+            Customer<SortIndicator field="customer" />
+          </div>
+          <div
+            className="cursor-pointer hover:text-gray-300 transition-colors"
+            onClick={() => handleSort('status')}
+          >
+            Status<SortIndicator field="status" />
+          </div>
+          <div
+            className="text-right cursor-pointer hover:text-gray-300 transition-colors"
+            onClick={() => handleSort('amount')}
+          >
+            Amount<SortIndicator field="amount" />
+          </div>
+          <div
+            className="text-right cursor-pointer hover:text-gray-300 transition-colors"
+            onClick={() => handleSort('age')}
+          >
+            Age<SortIndicator field="age" />
+          </div>
+        </div>
 
-                return (
-                  <motion.tr
-                    key={order.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(index * 0.02, 0.3) }}
-                    className={`border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors ${
-                      isOverdue ? 'bg-red-500/[0.03]' : ''
-                    }`}
-                  >
-                    {/* Order */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {isOverdue && <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
-                        <div>
-                          <p className="text-sm font-medium text-white">{order.tranid}</p>
-                          <p className="text-xs text-gray-500">{formatDate(order.trandate)}</p>
-                        </div>
-                      </div>
-                    </td>
+        {/* Rows */}
+        <div className="max-h-[600px] overflow-y-auto">
+          {loading ? (
+            <div className="p-8 text-center text-gray-500">Loading orders...</div>
+          ) : sortedOrders.length === 0 ? (
+            <div className="p-8 text-center">
+              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-3">
+                <Package className="w-6 h-6 text-green-400" />
+              </div>
+              <p className="text-gray-400">No orders found</p>
+            </div>
+          ) : (
+            sortedOrders.map((order, index) => {
+              const isOverdue = order.days_open > 90;
+              const isWarning = order.days_open > 60 && order.days_open <= 90;
+              const statusInfo = getStatusInfo(order.status);
+              const isEven = index % 2 === 0;
 
-                    {/* Customer */}
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-gray-300 truncate max-w-[200px]" title={order.customer_name}>
-                        {order.customer_name || '-'}
-                      </p>
-                    </td>
+              return (
+                <motion.div
+                  key={order.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(index * 0.015, 0.3) }}
+                  className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.03] ${
+                    isOverdue ? 'bg-red-500/[0.04]' : isWarning ? 'bg-orange-500/[0.02]' : isEven ? 'bg-[#151F2E]' : 'bg-[#131B28]'
+                  }`}
+                  style={{ gridTemplateColumns: GRID_COLS }}
+                >
+                  {/* Alert Icon */}
+                  <div className="flex justify-center">
+                    {isOverdue && <AlertCircle className="w-4 h-4 text-red-400" />}
+                    {isWarning && !isOverdue && <AlertTriangle className="w-4 h-4 text-orange-400" />}
+                  </div>
 
-                    {/* Status */}
-                    <td className="px-4 py-3">
+                  {/* Order */}
+                  <div className="min-w-0">
+                    <span className="font-medium text-white truncate block">{order.tranid}</span>
+                    <span className="text-[11px] text-gray-500 truncate block">{formatDate(order.trandate)}</span>
+                  </div>
+
+                  {/* Customer */}
+                  <div className="min-w-0">
+                    <span className="text-gray-300 truncate block" title={order.customer_name}>
+                      {order.customer_name || '-'}
+                    </span>
+                    {order.memo && (
+                      <span className="text-[11px] text-gray-500 truncate block" title={order.memo}>
+                        {order.memo}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium"
+                      style={{
+                        backgroundColor: statusInfo.bg,
+                        color: statusInfo.color,
+                      }}
+                    >
                       <span
-                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium"
-                        style={{
-                          backgroundColor: statusInfo.bg,
-                          color: statusInfo.color,
-                        }}
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: statusInfo.color }}
-                        />
-                        {statusInfo.label}
-                      </span>
-                    </td>
+                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: statusInfo.color }}
+                      />
+                      {statusInfo.label}
+                    </span>
+                  </div>
 
-                    {/* Amount */}
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-medium text-white tabular-nums">
-                        {formatCurrency(order.total_amount)}
-                      </span>
-                    </td>
+                  {/* Amount */}
+                  <div className="text-right">
+                    <span className="text-sm font-medium text-white tabular-nums">
+                      {formatCurrency(order.total_amount)}
+                    </span>
+                  </div>
 
-                    {/* Age */}
-                    <td className="px-4 py-3 text-right">
-                      <span className={`text-sm tabular-nums ${getAgingColor(order.days_open)}`}>
-                        {order.days_open}d
-                      </span>
-                    </td>
-                  </motion.tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                  {/* Age */}
+                  <div className="text-right">
+                    <span className={`text-sm tabular-nums ${getAgingColor(order.days_open)}`}>
+                      {order.days_open}d
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
+        </div>
 
         {sortedOrders.length > 50 && (
           <div className="px-4 py-3 text-center text-gray-500 text-sm border-t border-white/[0.06]">
-            Showing {Math.min(sortedOrders.length, 50)} of {sortedOrders.length} orders
+            Showing {sortedOrders.length} orders
           </div>
         )}
       </div>

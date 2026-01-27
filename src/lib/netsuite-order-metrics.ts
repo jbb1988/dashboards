@@ -93,10 +93,28 @@ export async function getSalesOrderAging(filters?: {
   }
 
   // Status filter - exclude closed/cancelled/billed by default
-  let statusFilter = "AND so.status NOT IN ('Closed', 'Cancelled', 'Billed', 'H', 'G')";
+  // NetSuite Sales Order status codes:
+  //   A = Pending Approval
+  //   B = Pending Fulfillment
+  //   C = Partially Fulfilled
+  //   D = Pending Billing
+  //   E = Billed
+  //   F = Closed
+  //   G = Cancelled
+  //   H = Undefined (legacy)
+  let statusFilter = "AND so.status NOT IN ('E', 'F', 'G', 'H', 'Billed', 'Closed', 'Cancelled')"; // Exclude: E=Billed, F=Closed, G=Cancelled, H=Undefined
   if (filters?.status && filters.status.length > 0) {
     const statuses = filters.status.map(s => `'${s.replace(/'/g, "''")}'`).join(',');
     statusFilter = ` AND so.status IN (${statuses})`;
+  }
+
+  // Exclude test orders (customer name contains TEST)
+  const testFilter = "AND UPPER(BUILTIN.DF(so.entity)) NOT LIKE '%TEST%'";
+
+  // Default: only show orders from last 2 years to filter out stale data
+  let ageFilter = '';
+  if (!filters?.dateFrom && !filters?.dateTo) {
+    ageFilter = "AND so.trandate >= ADD_MONTHS(SYSDATE, -24)";
   }
 
   const query = `
@@ -114,6 +132,8 @@ export async function getSalesOrderAging(filters?: {
     FROM Transaction so
     WHERE so.type = 'SalesOrd'
       ${statusFilter}
+      ${testFilter}
+      ${ageFilter}
       ${dateFilter}
       ${customerFilter}
     ORDER BY so.trandate
