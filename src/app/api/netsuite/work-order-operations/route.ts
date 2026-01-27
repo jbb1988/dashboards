@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
   getWorkOrdersWithShopStatus,
-  getWIPReportSummary,
   WorkOrderWithShopStatus,
 } from '@/lib/netsuite-wip-reports';
 
@@ -61,49 +60,9 @@ export async function GET(request: Request) {
       );
     }
 
-    // Optionally include WIP cost data
-    if (includeWIP && filteredWOs.length > 0) {
-      try {
-        console.log('Fetching WIP cost data...');
-        const wipData = await getWIPReportSummary({
-          dateFrom,
-          dateTo,
-        });
-
-        // Index WIP data by work order number
-        const wipByWO = new Map<string, { revenue: number; totalCost: number }>();
-        for (const wip of wipData) {
-          const existing = wipByWO.get(wip.work_order) || { revenue: 0, totalCost: 0 };
-          existing.revenue += wip.revenue || 0;
-          existing.totalCost += wip.total_cost || 0;
-          wipByWO.set(wip.work_order, existing);
-        }
-
-        // Merge WIP data into work orders
-        filteredWOs = filteredWOs.map(wo => {
-          const wip = wipByWO.get(wo.work_order);
-          if (wip) {
-            // Use WIP revenue if SO revenue not available
-            const revenue = wo.revenue || wip.revenue;
-            const marginPct = revenue > 0
-              ? ((revenue - wip.totalCost) / revenue) * 100
-              : null;
-            return {
-              ...wo,
-              revenue: revenue,
-              total_cost: wip.totalCost,
-              margin_pct: marginPct,
-            };
-          }
-          return wo;
-        });
-
-        console.log(`Merged WIP data for ${wipByWO.size} work orders`);
-      } catch (wipError) {
-        console.warn('Failed to fetch WIP data:', wipError);
-        // Continue without WIP data
-      }
-    }
+    // Revenue, cost, and margin now come directly from the SO join in the main query
+    // (using foreigntotal, totalcostestimate, and estgrossprofitpercent)
+    // No need to fetch separate WIP data
 
     // Calculate KPI totals
     const kpis = calculateKPIs(filteredWOs);

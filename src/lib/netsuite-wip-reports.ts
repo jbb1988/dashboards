@@ -282,8 +282,8 @@ export interface WorkOrderWithOperations {
 /**
  * Get Work Orders with Shop Floor Status
  *
- * Queries work orders with status derived from the WO status field.
- * Uses the transaction date to calculate days since creation.
+ * Queries work orders with status and linked SO/revenue data.
+ * Status values: A=Planned, B=Released, C=Built, D=In Process, H=Closed
  */
 export async function getWorkOrdersWithShopStatus(filters?: {
   status?: string[];
@@ -305,15 +305,15 @@ export async function getWorkOrdersWithShopStatus(filters?: {
       dateFilter += ` AND wo.trandate <= TO_DATE('${m}/${d}/${y}', 'MM/DD/YYYY')`;
     }
 
-    // Build status filter
+    // Build status filter - values are single letters: A, B, C, D, H
     let statusFilter = '';
     if (filters?.status && filters.status.length > 0) {
       const statuses = filters.status.map(s => `'${s.replace(/'/g, "''")}'`).join(',');
       statusFilter = ` AND wo.status IN (${statuses})`;
     }
 
-    // Query work orders - use simple column names to avoid mapping issues
-    // NetSuite SuiteQL returns lowercase column names
+    // Query work orders with SO join for revenue
+    // Revenue = so.foreigntotal (NOT custbody2 which doesn't exist)
     const query = `
       SELECT
         wo.id,
@@ -323,13 +323,14 @@ export async function getWorkOrdersWithShopStatus(filters?: {
         BUILTIN.DF(wo.status) AS statusname,
         wo.entity,
         BUILTIN.DF(wo.entity) AS customername,
-        wo.custbodyiqsassydescription AS assemblydesc,
-        woline.createdfrom AS soid,
+        wo.custbodyiqsassydescription,
         so.tranid AS sonumber,
-        so.custbody2 AS revenue,
+        so.foreigntotal AS revenue,
+        so.totalcostestimate AS estcost,
+        so.estgrossprofitpercent AS estmargin,
         ROUND(SYSDATE - wo.trandate) AS daysopen
       FROM Transaction wo
-      INNER JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
+      LEFT JOIN TransactionLine woline ON woline.transaction = wo.id AND woline.mainline = 'T'
       LEFT JOIN Transaction so ON so.id = woline.createdfrom
       WHERE wo.type = 'WorkOrd'
         ${dateFilter}
@@ -337,8 +338,8 @@ export async function getWorkOrdersWithShopStatus(filters?: {
       ORDER BY wo.trandate DESC
     `;
 
-    console.log('Fetching work orders with shop status...');
-    console.log('Query:', query);
+    console.log('Fetching work orders...');
+    console.log('Status filter:', filters?.status);
 
     const woResponse = await netsuiteRequest<{ items: any[] }>(
       '/services/rest/query/v1/suiteql',
@@ -352,38 +353,37 @@ export async function getWorkOrdersWithShopStatus(filters?: {
     const workOrders = woResponse.items || [];
     console.log(`Found ${workOrders.length} work orders`);
 
-    // Debug: log first row to see actual column names
-    if (workOrders.length > 0) {
-      console.log('Sample row keys:', Object.keys(workOrders[0]));
-      console.log('Sample row:', JSON.stringify(workOrders[0], null, 2));
-    }
-
     if (workOrders.length === 0) {
       return [];
     }
 
-    // Map results - use exact column names from query (lowercase)
+    // Map results - handle potentially missing fields
     return workOrders.map(wo => {
-      // Get status display name and derive shop status
-      const statusName = wo.statusname || wo.status || '';
-      const shopStatus = deriveShopStatus(statusName);
+      // Get status display name (e.g. "Work Order : Released") and extract stage
+      const statusName = wo.statusname || '';
+      const shopStatus = deriveShopStatus(statusName, wo.status);
+
+      // Parse financial data from SO
+      const revenue = wo.revenue != null ? parseFloat(wo.revenue) : null;
+      const estCost = wo.estcost != null ? parseFloat(wo.estcost) : null;
+      const estMargin = wo.estmargin != null ? parseFloat(wo.estmargin) * 100 : null; // Convert to percentage
 
       return {
-        work_order_id: wo.id?.toString() || '',
+        work_order_id: String(wo.id || ''),
         work_order: wo.tranid || '',
         wo_date: wo.trandate || null,
         wo_status: wo.status || null,
         last_modified: wo.trandate || null,
         shop_status: shopStatus,
         shop_status_id: wo.status || null,
-        customer_id: wo.entity?.toString() || null,
+        customer_id: wo.entity ? String(wo.entity) : null,
         customer_name: wo.customername || null,
         so_number: wo.sonumber || null,
-        assembly_description: wo.assemblydesc || null,
+        assembly_description: wo.custbodyiqsassydescription || null,
         days_in_status: parseInt(wo.daysopen) || 0,
-        revenue: wo.revenue !== null && wo.revenue !== undefined ? parseFloat(wo.revenue) : null,
-        total_cost: null,
-        margin_pct: null,
+        revenue: revenue,
+        total_cost: estCost,
+        margin_pct: estMargin,
       };
     });
   } catch (error) {
@@ -393,25 +393,28 @@ export async function getWorkOrdersWithShopStatus(filters?: {
 }
 
 /**
- * Derive a shop floor status from the NetSuite WO status name
+ * Derive a shop floor status from NetSuite WO status
+ * Status codes: A=Planned, B=Released, C=Built, D=In Process, H=Closed
  */
-function deriveShopStatus(status: string): string {
-  if (!status) return 'Unknown';
+function deriveShopStatus(statusName: string, statusCode: string): string {
+  // First try to extract from display name like "Work Order : Released"
+  if (statusName) {
+    const parts = statusName.split(':');
+    if (parts.length > 1) {
+      return parts[1].trim(); // Returns "Released", "In Process", etc.
+    }
+  }
 
-  const statusLower = status.toLowerCase();
+  // Fall back to mapping status codes
+  const codeMap: Record<string, string> = {
+    'A': 'Planned',
+    'B': 'Released',
+    'C': 'Built',
+    'D': 'In Process',
+    'H': 'Closed',
+  };
 
-  // Map NetSuite Work Order statuses to shop floor stages
-  // NetSuite WO statuses: Pending Build, Released, In Process, Built, Closed
-  if (statusLower.includes('pending')) return 'Pending Build';
-  if (statusLower.includes('released')) return 'Released';
-  if (statusLower.includes('in process') || statusLower.includes('in progress')) return 'In Process';
-  if (statusLower.includes('partially built')) return 'Partially Built';
-  if (statusLower.includes('built')) return 'Built';
-  if (statusLower.includes('closed')) return 'Closed';
-  if (statusLower.includes('cancelled')) return 'Cancelled';
-
-  // Return the original status if no mapping found
-  return status;
+  return codeMap[statusCode] || statusCode || 'Unknown';
 }
 
 /**

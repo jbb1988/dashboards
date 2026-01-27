@@ -209,9 +209,11 @@ export default function WIPOperationsDashboard() {
             className="px-4 py-2 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white focus:outline-none focus:border-white/20"
           >
             <option value="">All Statuses</option>
-            <option value="WorkOrd:A,WorkOrd:B">Active</option>
-            <option value="WorkOrd:D">Released</option>
-            <option value="WorkOrd:C">Closed</option>
+            <option value="A,B,D">Active (Planned/Released/In Process)</option>
+            <option value="B">Released</option>
+            <option value="D">In Process</option>
+            <option value="A">Planned</option>
+            <option value="C">Built</option>
           </select>
 
           {/* Stuck Filter Toggle */}
