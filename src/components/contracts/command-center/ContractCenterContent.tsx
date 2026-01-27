@@ -735,21 +735,16 @@ export default function ContractCenterContent({
             {/* Show full redlined content if available */}
             {currentResult?.redlinedText ? (
               <div
-                className="max-w-4xl mx-auto rounded-2xl overflow-hidden"
+                className="max-w-4xl mx-auto rounded-2xl p-8"
                 style={{
                   background: elevation.L1.background,
                   boxShadow: elevation.L1.shadow,
                 }}
               >
-                <div className="px-6 py-4 border-b border-[rgba(255,255,255,0.06)]">
-                  <h3 className="text-[14px] font-semibold text-[rgba(235,240,255,0.92)]">
-                    Contract Review
-                  </h3>
-                </div>
                 <div
-                  className="p-6 prose prose-sm prose-invert max-w-none text-[14px] leading-relaxed"
+                  className="prose prose-invert max-w-none text-[14px] leading-relaxed"
                   dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(currentResult.redlinedText),
+                    __html: DOMPurify.sanitize(formatRedlines(currentResult.redlinedText || ''))
                   }}
                 />
               </div>
