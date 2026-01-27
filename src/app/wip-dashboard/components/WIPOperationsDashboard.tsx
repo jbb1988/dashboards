@@ -75,10 +75,11 @@ export default function WIPOperationsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Filters - Default to active statuses (exclude Closed)
+  // Filters - Default to active statuses (exclude Closed) and recent WOs only
   const [statusFilter, setStatusFilter] = useState<string>('A,B,D');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showStuckOnly, setShowStuckOnly] = useState(false);
+  const [maxAgeDays, setMaxAgeDays] = useState<number | null>(90); // Default: only WOs from last 90 days
 
   const fetchData = async () => {
     try {
@@ -129,8 +130,14 @@ export default function WIPOperationsDashboard() {
     fetchData();
   };
 
-  // Filter data based on search term and stuck filter (client-side)
+  // Filter data based on search term, stuck filter, and age filter (client-side)
   const filteredData = data.filter(wo => {
+    // Apply max age filter (exclude stale WOs)
+    if (maxAgeDays !== null) {
+      const days = wo.days_in_status ?? wo.days_in_current_op ?? 0;
+      if (days > maxAgeDays) return false;
+    }
+
     // Apply stuck filter
     if (showStuckOnly) {
       const days = wo.days_in_status ?? wo.days_in_current_op ?? 0;
@@ -215,6 +222,19 @@ export default function WIPOperationsDashboard() {
             <option value="A">Planned (A)</option>
             <option value="C">Built (C)</option>
             <option value="H">Closed (H)</option>
+          </select>
+
+          {/* Age Filter - exclude stale WOs */}
+          <select
+            value={maxAgeDays === null ? 'all' : maxAgeDays.toString()}
+            onChange={(e) => setMaxAgeDays(e.target.value === 'all' ? null : parseInt(e.target.value))}
+            className="px-4 py-2 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white focus:outline-none focus:border-white/20"
+          >
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="180">Last 6 months</option>
+            <option value="365">Last year</option>
+            <option value="all">All time (incl. stale)</option>
           </select>
 
           {/* Stuck Filter Toggle */}
