@@ -418,7 +418,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const mainSidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
-    <div className="min-h-screen bg-[var(--approval-bg-base)]">
+    <div className="approval-canvas">
       {/* Main Navigation Sidebar (Left) */}
       <Sidebar
         isCollapsed={sidebarCollapsed}
@@ -429,7 +429,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
       <motion.div
         animate={{ marginLeft: mainSidebarWidth }}
         transition={{ duration: 0.2 }}
-        className="min-h-screen flex flex-col"
+        className="min-h-screen flex flex-col relative z-10"
       >
         {/* Header Bar */}
         <ApprovalHeader
@@ -454,15 +454,15 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
 
         {/* Main Content: Document + Context Sidebar */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Document Viewer Area - base layer background */}
-          <div className="flex-1 overflow-auto bg-[var(--approval-bg-base)]">
-            {/* Document Container - elevated card surface */}
+          {/* Document Viewer Area - luminous canvas background */}
+          <div className="flex-1 overflow-auto">
+            {/* Document Container - floating luminous card */}
             <motion.div
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
+              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
               ref={editorRef}
-              className="max-w-5xl mx-auto mt-8 mb-8 rounded-xl doc-container min-h-[calc(100vh-140px)]"
+              className="max-w-5xl mx-auto mt-10 mb-10 doc-surface min-h-[calc(100vh-160px)]"
             >
               {/* Redline Editor - text-based view */}
               <RedlineEditor
@@ -479,7 +479,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
             </motion.div>
           </div>
 
-          {/* Context Sidebar (Right) - wider */}
+          {/* Context Sidebar (Right) - tonal contrast rail */}
           <ApprovalContextSidebar
             activeTab={contextTab}
             onTabChange={handleContextTabChange}

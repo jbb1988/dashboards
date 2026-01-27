@@ -2649,12 +2649,36 @@ export default function App() {
   return (
     <FluentProvider theme={webDarkTheme}>
       <div style={styles.container}>
-        {/* Header - Compact Apple Pro style */}
+        {/* Header - Apple Native glass toolbar */}
         <div style={styles.header}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.88)', letterSpacing: '-0.01em' }}>
-            MARS Contract Review
-          </span>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{user.email}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 28,
+              height: 28,
+              borderRadius: 7,
+              background: 'linear-gradient(135deg, #0A84FF 0%, #0066CC 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(10, 132, 255, 0.4)',
+            }}>
+              <Shield24Regular style={{ width: 16, height: 16, color: '#fff' }} />
+            </div>
+            <span style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: 'rgba(235, 240, 255, 0.95)',
+              letterSpacing: '-0.02em',
+              textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+            }}>
+              MARS Contracts
+            </span>
+          </div>
+          <span style={{
+            fontSize: 11,
+            color: 'rgba(235, 240, 255, 0.5)',
+            fontWeight: 500,
+          }}>{user.email}</span>
         </div>
 
         {/* Error Display */}
@@ -2919,44 +2943,54 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Primary CTA - Analyze Document */}
+                {/* Primary CTA - Analyze Document - Electric Blue */}
                 <button
                   onClick={analyzeDocument}
                   disabled={isAnalyzing}
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
-                    background: isAnalyzing ? 'rgba(255,255,255,0.04)' : 'linear-gradient(180deg, rgba(88, 166, 255, 0.15) 0%, rgba(88, 166, 255, 0.08) 100%)',
+                    padding: '14px 20px',
+                    background: isAnalyzing
+                      ? 'rgba(255,255,255,0.04)'
+                      : 'linear-gradient(180deg, #0A84FF 0%, #0066CC 100%)',
                     border: 'none',
-                    borderRadius: 8,
-                    color: isAnalyzing ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)',
+                    borderRadius: 12,
+                    color: isAnalyzing ? 'rgba(255,255,255,0.35)' : '#ffffff',
                     fontSize: 14,
                     fontWeight: 600,
                     cursor: isAnalyzing ? 'default' : 'pointer',
                     fontFamily: 'inherit',
                     letterSpacing: '-0.01em',
+                    boxShadow: isAnalyzing
+                      ? 'none'
+                      : '0 4px 16px rgba(10, 132, 255, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+                    transition: 'all 0.2s ease',
                   }}
                 >
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze Document'}
+                  {isAnalyzing ? 'Analyzing...' : 'Analyze Full Document'}
                 </button>
 
-                {/* Secondary action - Text only */}
+                {/* Secondary action - Analyze Selection - Amber accent */}
                 <button
                   onClick={analyzeSelection}
                   disabled={isAnalyzing}
                   title="Select text in Word first"
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: '4px 0',
-                    color: isAnalyzing ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.5)',
-                    fontSize: 12,
+                    width: '100%',
+                    padding: '10px 16px',
+                    background: 'rgba(255, 159, 10, 0.1)',
+                    border: '1px solid rgba(255, 159, 10, 0.25)',
+                    borderRadius: 10,
+                    color: isAnalyzing ? 'rgba(255,255,255,0.3)' : '#FF9F0A',
+                    fontSize: 13,
+                    fontWeight: 500,
                     cursor: isAnalyzing ? 'default' : 'pointer',
                     fontFamily: 'inherit',
                     textAlign: 'center',
+                    transition: 'all 0.2s ease',
                   }}
                 >
-                  or analyze selected text only
+                  Analyze Selected Text Only
                 </button>
               </div>
 
@@ -3008,47 +3042,60 @@ export default function App() {
                     </span>
                   )}
 
-                  {/* Save/Submit Actions - Apple Pro style */}
+                  {/* Save/Submit Actions - Apple Native style */}
                   {appliedSections.size > 0 && !savedToHistory && !submittedForApproval && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                      {/* Primary: Submit for Approval */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, padding: 16, background: 'rgba(52, 199, 89, 0.06)', borderRadius: 14, border: '1px solid rgba(52, 199, 89, 0.12)' }}>
+                      {/* Primary: Submit for Approval - Apple Green */}
                       <button
                         onClick={saveAndSubmitForApproval}
                         disabled={isSavingToHistory || isSubmittingApproval}
                         style={{
                           width: '100%',
-                          padding: '12px 16px',
+                          padding: '14px 20px',
                           background: (isSavingToHistory || isSubmittingApproval)
                             ? 'rgba(255,255,255,0.04)'
-                            : 'linear-gradient(180deg, rgba(35, 134, 54, 0.25) 0%, rgba(35, 134, 54, 0.15) 100%)',
+                            : 'linear-gradient(180deg, #34C759 0%, #28A745 100%)',
                           border: 'none',
-                          borderRadius: 8,
-                          color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)',
-                          fontSize: 13,
+                          borderRadius: 12,
+                          color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.35)' : '#ffffff',
+                          fontSize: 14,
                           fontWeight: 600,
                           cursor: (isSavingToHistory || isSubmittingApproval) ? 'default' : 'pointer',
                           fontFamily: 'inherit',
                           letterSpacing: '-0.01em',
+                          boxShadow: (isSavingToHistory || isSubmittingApproval)
+                            ? 'none'
+                            : '0 4px 16px rgba(52, 199, 89, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
                         }}
                       >
+                        <Send24Regular style={{ width: 16, height: 16 }} />
                         {isSavingToHistory ? 'Saving...' : isSubmittingApproval ? 'Submitting...' : 'Submit for Approval'}
                       </button>
-                      {/* Secondary: Text-only */}
+                      {/* Secondary: Save to History */}
                       <button
                         onClick={saveToHistory}
                         disabled={isSavingToHistory || isSubmittingApproval}
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: '4px 0',
-                          color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.5)',
-                          fontSize: 12,
+                          width: '100%',
+                          padding: '10px 16px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: 10,
+                          color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.3)' : 'rgba(235, 240, 255, 0.7)',
+                          fontSize: 13,
+                          fontWeight: 500,
                           cursor: (isSavingToHistory || isSubmittingApproval) ? 'default' : 'pointer',
                           fontFamily: 'inherit',
                           textAlign: 'center',
+                          transition: 'all 0.2s ease',
                         }}
                       >
-                        {isSavingToHistory ? 'Saving...' : 'or save to history only'}
+                        {isSavingToHistory ? 'Saving...' : 'Save to History Only'}
                       </button>
                     </div>
                   )}
@@ -3638,53 +3685,80 @@ export default function App() {
 // - Dividers: rgba(255,255,255,0.06)
 // - Primary text: rgba(255,255,255,0.88)
 // - Secondary text: rgba(255,255,255,0.62)
+// ===========================================
+// APPLE NATIVE DESIGN SYSTEM
+// Luminous backgrounds, floating surfaces, color accents, real depth
+// ===========================================
 const styles: Record<string, React.CSSProperties> = {
-  // APPLE PRO DESIGN - Dark, minimal, editorial
+  // BASE CANVAS - Luminous deep blue-black with ambient glow
   container: {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    background: 'linear-gradient(180deg, #141719 0%, #1a1d20 100%)',
-    color: 'rgba(255,255,255,0.88)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif',
+    background: `
+      radial-gradient(ellipse 1200px 600px at 50% -10%, rgba(60, 100, 220, 0.15), transparent 70%),
+      linear-gradient(180deg, #0a0e14 0%, #0d1117 50%, #0a0e14 100%)
+    `,
+    color: 'rgba(235, 240, 255, 0.92)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif',
     fontSize: 13,
     lineHeight: 1.5,
-    letterSpacing: '-0.01em',
+    fontWeight: 400,
   },
+  // HEADER - Glass toolbar with material
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '12px 16px',
-    height: 48,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    // No border - separation through spacing
+    padding: '10px 16px',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    backdropFilter: 'blur(12px)',
   },
   headerContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
+  // BANNERS - With subtle glow
   errorBanner: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '10px 16px',
-    backgroundColor: 'rgba(248, 81, 73, 0.06)',
-    color: 'rgba(248, 81, 73, 0.9)',
-    fontSize: 12,
+    gap: 10,
+    padding: '12px 16px',
+    background: 'linear-gradient(90deg, rgba(255, 69, 58, 0.15) 0%, rgba(255, 69, 58, 0.08) 100%)',
+    borderBottom: '1px solid rgba(255, 69, 58, 0.2)',
+    color: '#FF6961',
+    fontSize: 13,
+    fontWeight: 500,
   },
+  successBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '12px 16px',
+    background: 'linear-gradient(90deg, rgba(52, 199, 89, 0.15) 0%, rgba(52, 199, 89, 0.08) 100%)',
+    borderBottom: '1px solid rgba(52, 199, 89, 0.2)',
+    color: '#34C759',
+    fontSize: 13,
+    fontWeight: 500,
+  },
+  // TABS - Material toolbar
   tabs: {
-    backgroundColor: 'transparent',
-    padding: '0 16px',
-    // No border
+    background: 'rgba(255,255,255,0.03)',
+    padding: '4px 12px',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
   },
+  // CONTENT - With subtle inner glow
   content: {
     flex: 1,
     overflow: 'auto',
-    padding: '16px',
-    // No background override - inherits gradient
+    padding: '20px 16px',
+    background: `
+      radial-gradient(ellipse 600px 400px at 50% 0%, rgba(60, 100, 220, 0.06), transparent 60%)
+    `,
   },
+  // LOGIN CARD - Floating luminous surface
   loginCard: {
     display: 'flex',
     flexDirection: 'column',
@@ -3692,22 +3766,40 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 20,
     padding: 32,
     margin: 'auto',
-    maxWidth: 280,
+    maxWidth: 300,
+    background: 'linear-gradient(180deg, rgba(30, 40, 60, 0.6) 0%, rgba(18, 24, 36, 0.8) 100%)',
+    borderRadius: 20,
+    border: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: `
+      0 24px 80px rgba(0, 0, 0, 0.6),
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255,255,255,0.1)
+    `,
   },
+  // ANALYZE TAB - Content container
   analyzeTab: {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
   },
+  // RESULTS - Floating card surface
   results: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 0,
+    gap: 12,
     marginTop: 16,
+    padding: 16,
+    background: 'linear-gradient(180deg, rgba(30, 40, 60, 0.5) 0%, rgba(18, 24, 36, 0.7) 100%)',
+    borderRadius: 16,
+    border: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: `
+      0 20px 60px rgba(0, 0, 0, 0.5),
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255,255,255,0.08)
+    `,
   },
   scoreCard: {
-    padding: '0 0 16px 0',
-    // No background, no border - spacing only
+    padding: '12px 0',
   },
   scoreContent: {
     display: 'flex',
@@ -3715,13 +3807,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
   },
   summaryCard: {
-    padding: '0 0 16px 0',
-    // No background, no border
+    padding: '12px 0',
   },
   riskHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   riskContent: {
     display: 'flex',
@@ -3730,173 +3821,194 @@ const styles: Record<string, React.CSSProperties> = {
     paddingTop: 8,
   },
   suggestion: {
-    padding: 8,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
+    padding: 12,
+    background: 'rgba(52, 199, 89, 0.08)',
+    borderRadius: 10,
+    border: '1px solid rgba(52, 199, 89, 0.15)',
   },
+  // CLAUSES TAB
   clausesTab: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 0,
+    gap: 8,
   },
   clauseList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 0,
+    gap: 8,
   },
+  // CLAUSE CARD - Floating item with hover glow
   clauseCard: {
-    padding: '16px 0',
-    // No border - separation through spacing
+    padding: 16,
+    background: 'linear-gradient(180deg, rgba(40, 50, 70, 0.4) 0%, rgba(25, 32, 48, 0.6) 100%)',
+    borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.06)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+    transition: 'all 0.2s ease',
   },
   clauseText: {
     padding: '8px 0',
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 12,
+    color: 'rgba(235, 240, 255, 0.7)',
+    fontSize: 13,
     lineHeight: 1.6,
   },
   clauseActions: {
     display: 'flex',
-    gap: 12,
-    paddingTop: 10,
+    gap: 16,
+    paddingTop: 12,
   },
-  successBanner: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '10px 16px',
-    backgroundColor: 'rgba(35, 134, 54, 0.06)',
-    color: 'rgba(35, 134, 54, 0.9)',
-    fontSize: 12,
-  },
+  // PREVIEW OVERLAY
   previewOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    backdropFilter: 'blur(8px)',
+    background: 'rgba(0, 0, 0, 0.85)',
+    backdropFilter: 'blur(20px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    padding: 16,
-  },
-  previewPanel: {
-    background: 'linear-gradient(180deg, rgba(30, 32, 36, 0.98) 0%, rgba(26, 28, 32, 0.98) 100%)',
     padding: 20,
-    maxWidth: 400,
+  },
+  // PREVIEW PANEL - Floating modal
+  previewPanel: {
+    background: 'linear-gradient(180deg, rgba(35, 45, 65, 0.95) 0%, rgba(20, 28, 42, 0.98) 100%)',
+    padding: 24,
+    maxWidth: 420,
     maxHeight: '85vh',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 12,
+    borderRadius: 20,
+    border: '1px solid rgba(255,255,255,0.1)',
+    boxShadow: `
+      0 40px 120px rgba(0, 0, 0, 0.8),
+      0 16px 48px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255,255,255,0.1)
+    `,
   },
   diffView: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 12,
   },
   diffSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 4,
+    gap: 6,
   },
   diffText: {
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    padding: 14,
+    background: 'rgba(255,255,255,0.04)',
     maxHeight: 120,
     overflowY: 'auto',
     fontSize: 12,
-    borderRadius: 6,
-    lineHeight: 1.6,
+    borderRadius: 10,
+    lineHeight: 1.7,
+    border: '1px solid rgba(255,255,255,0.06)',
   },
   diffArrow: {
     textAlign: 'center',
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.4)',
-    padding: '2px 0',
+    fontSize: 16,
+    color: 'rgba(100, 160, 255, 0.7)',
+    padding: '4px 0',
   },
   matchInfo: {
     display: 'flex',
-    gap: 8,
+    gap: 10,
     flexWrap: 'wrap',
   },
   matchSelector: {
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderRadius: 6,
+    padding: 14,
+    background: 'rgba(255,255,255,0.04)',
+    borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.06)',
   },
   matchList: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
+    gap: 8,
+    marginTop: 10,
   },
   previewActions: {
     display: 'flex',
-    gap: 8,
+    gap: 10,
     justifyContent: 'flex-end',
-    marginTop: 4,
+    marginTop: 8,
   },
+  // LOCATION BOX - Amber accent
   locationBox: {
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderLeft: '2px solid rgba(210, 153, 34, 0.5)',
-    borderRadius: 4,
+    padding: 14,
+    background: 'rgba(255, 159, 10, 0.08)',
+    borderLeft: '3px solid rgba(255, 159, 10, 0.6)',
+    borderRadius: 8,
   },
+  // FIX SECTION - Green accent
   fixItSection: {
-    padding: 12,
-    backgroundColor: 'rgba(35, 134, 54, 0.04)',
-    marginTop: 10,
-    borderRadius: 6,
+    padding: 14,
+    background: 'rgba(52, 199, 89, 0.08)',
+    marginTop: 12,
+    borderRadius: 10,
+    border: '1px solid rgba(52, 199, 89, 0.15)',
   },
   fixItButtons: {
     display: 'flex',
-    gap: 6,
+    gap: 8,
     flexWrap: 'wrap',
   },
+  // RISK SUMMARY BAR - With color dots
   riskSummaryBar: {
     display: 'flex',
     alignItems: 'center',
-    padding: '8px 0 16px 0',
+    padding: '12px 14px',
     gap: 16,
-    // No border - spacing only
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.05)',
   },
   riskBadgeLarge: {
-    fontSize: 11,
-    fontWeight: 500,
-    color: 'rgba(255,255,255,0.5)',
-    letterSpacing: '0.02em',
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'rgba(235, 240, 255, 0.8)',
   },
+  // SECTION LIST
   sectionList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 0,
+    gap: 10,
   },
+  // SECTION CARD - Floating with depth
   sectionCard: {
-    padding: '20px 0',
-    // No border - separation through vertical spacing
+    padding: 16,
+    background: 'linear-gradient(180deg, rgba(40, 50, 70, 0.4) 0%, rgba(25, 32, 48, 0.6) 100%)',
+    borderRadius: 14,
+    border: '1px solid rgba(255,255,255,0.06)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
   },
   sectionHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     flexWrap: 'wrap',
   },
   sectionActions: {
     display: 'flex',
     gap: 16,
-    marginTop: 12,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTop: '1px solid rgba(255,255,255,0.06)',
   },
   summaryList: {
     marginTop: 16,
-    padding: '16px 0 0 0',
-    // No border
+    padding: 16,
+    background: 'rgba(255,255,255,0.02)',
+    borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.04)',
   },
+  // CONTRACT SECTION
   contractSection: {
     marginBottom: 16,
     position: 'relative',
@@ -3906,88 +4018,100 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
   },
+  // CONTRACT INPUT - Glass material
   contractInput: {
     width: '100%',
-    padding: '10px 32px 10px 12px',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    border: 'none',
-    borderRadius: 8,
-    color: 'rgba(255,255,255,0.88)',
+    padding: '12px 36px 12px 14px',
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    color: 'rgba(235, 240, 255, 0.92)',
     fontSize: 13,
+    fontWeight: 500,
     outline: 'none',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
   },
   clearButton: {
     position: 'absolute',
-    right: 8,
-    background: 'none',
+    right: 10,
+    background: 'rgba(255,255,255,0.1)',
     border: 'none',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(235, 240, 255, 0.6)',
     cursor: 'pointer',
     fontSize: 12,
-    padding: 4,
+    padding: '4px 8px',
+    borderRadius: 6,
     lineHeight: 1,
   },
+  // CONTRACT DROPDOWN - Floating panel
   contractDropdown: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
-    marginTop: 4,
-    backgroundColor: 'rgba(30, 32, 36, 0.98)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 8,
-    maxHeight: 200,
+    marginTop: 6,
+    background: 'linear-gradient(180deg, rgba(35, 45, 65, 0.98) 0%, rgba(25, 32, 48, 0.98) 100%)',
+    backdropFilter: 'blur(24px)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    maxHeight: 220,
     overflowY: 'auto',
     zIndex: 100,
+    boxShadow: `
+      0 20px 60px rgba(0, 0, 0, 0.6),
+      0 8px 24px rgba(0, 0, 0, 0.4)
+    `,
   },
   contractOption: {
     width: '100%',
     textAlign: 'left',
-    padding: '8px 10px',
+    padding: '12px 14px',
     border: 'none',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid rgba(255,255,255,0.04)',
     background: 'none',
     cursor: 'pointer',
     display: 'block',
-    color: 'rgba(255,255,255,0.88)',
-    fontSize: 12,
+    color: 'rgba(235, 240, 255, 0.88)',
+    fontSize: 13,
+    fontWeight: 500,
+    transition: 'background 0.15s ease',
   },
   selectedContractBadge: {
-    marginTop: 8,
+    marginTop: 10,
   },
   changesList: {
-    marginTop: 8,
-    padding: '8px 0',
+    marginTop: 10,
+    padding: '10px 0',
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 8,
   },
   changeItem: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 2,
-    paddingBottom: 8,
-    // No border - spacing only
+    gap: 4,
+    paddingBottom: 10,
+    borderBottom: '1px solid rgba(255,255,255,0.04)',
   },
   newSectionHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    gap: 10,
+    marginBottom: 10,
   },
+  // NEW SECTION PREVIEW - Blue accent
   newSectionPreview: {
-    marginTop: 10,
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderLeft: '2px solid rgba(88, 166, 255, 0.4)',
-    borderRadius: 4,
+    marginTop: 12,
+    padding: 14,
+    background: 'rgba(10, 132, 255, 0.08)',
+    borderLeft: '3px solid rgba(10, 132, 255, 0.6)',
+    borderRadius: 8,
   },
   newSectionFullContent: {
-    marginTop: 8,
+    marginTop: 10,
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 8,
   },
   newSectionContentHeader: {
     display: 'flex',
@@ -3995,19 +4119,20 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   newSectionTextBox: {
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderRadius: 6,
-    maxHeight: 150,
+    padding: 14,
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: 10,
+    maxHeight: 160,
     overflowY: 'auto',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Mono", Consolas, monospace',
-    fontSize: 11,
-    lineHeight: 1.6,
+    fontFamily: 'SF Mono, Menlo, Consolas, monospace',
+    fontSize: 12,
+    lineHeight: 1.7,
+    border: '1px solid rgba(255,255,255,0.05)',
   },
   analyzeButtons: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 10,
     width: '100%',
   },
 };
