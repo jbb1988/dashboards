@@ -456,12 +456,13 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
         <div className="flex-1 flex overflow-hidden">
           {/* Document Viewer Area - base layer background */}
           <div className="flex-1 overflow-auto bg-[var(--approval-bg-base)]">
-            {/* Document Container - elevated surface with glow */}
+            {/* Document Container - elevated card surface */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
               ref={editorRef}
-              className="max-w-5xl mx-auto my-6 bg-[var(--approval-bg-surface)] rounded-xl border border-white/5 doc-container min-h-[calc(100vh-108px)]"
+              className="max-w-5xl mx-auto mt-8 mb-8 rounded-xl doc-container min-h-[calc(100vh-140px)]"
             >
               {/* Redline Editor - text-based view */}
               <RedlineEditor

@@ -110,9 +110,9 @@ export default function EditorToolbar({
   };
 
   return (
-    <div className="flex items-center gap-1 px-4 py-2.5 bg-[var(--approval-bg-surface)] border-b border-white/5 relative rounded-t-xl">
+    <div className="flex items-center gap-2 px-5 py-3 bg-[var(--approval-bg-surface)] border-b border-white/5 relative rounded-t-xl">
       {/* Zone 1: Review Actions (Primary - colored) */}
-      <div className="flex items-center gap-2 pr-4 border-r border-white/10">
+      <div className="flex items-center gap-2.5 pr-5 border-r border-white/8">
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleMark('approverStrike').run()}
@@ -146,7 +146,7 @@ export default function EditorToolbar({
       </div>
 
       {/* Zone 2: Edit Tools (Secondary - muted until hover) */}
-      <div className="flex items-center gap-1 px-3 opacity-60 hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1.5 px-4 opacity-50 hover:opacity-100 transition-opacity">
         <button
           type="button"
           onClick={() => editor.chain().focus().undo().run()}
@@ -254,23 +254,19 @@ export default function EditorToolbar({
         </div>
       )}
 
-      {/* Legend - more subtle */}
-      <div className="flex items-center gap-3 text-[10px] text-[rgba(255,255,255,0.4)] pl-4 border-l border-white/8">
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[#f87171]/30 border border-[#f87171]/50" />
-          Strike
+      {/* Legend - minimal */}
+      <div className="hidden lg:flex items-center gap-4 text-[9px] text-[rgba(255,255,255,0.35)] pl-5 border-l border-white/5 uppercase tracking-wider">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#f87171]/40" />
+          Remove
         </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[#4ade80]/30 border border-[#4ade80]/50" />
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#4ade80]/40" />
           Add
         </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[#60A5FA]/30 border border-[#60A5FA]/50" />
-          Your Edits
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm bg-[#FACC15]/30 border border-[#FACC15]/50" />
-          Comments
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#60A5FA]/40" />
+          Yours
         </span>
       </div>
 

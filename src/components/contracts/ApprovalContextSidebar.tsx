@@ -199,7 +199,7 @@ export default function ApprovalContextSidebar({
   return (
     <div className="flex h-full">
       {/* Tab Strip */}
-      <div className="w-12 bg-[var(--approval-bg-base)] border-l border-white/6 flex flex-col py-2">
+      <div className="w-12 bg-[var(--approval-bg-base)] border-l border-white/5 flex flex-col py-3">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id && isOpen;
           const hasContent =
@@ -215,21 +215,21 @@ export default function ApprovalContextSidebar({
               onClick={() => handleTabClick(tab.id)}
               title={tab.label}
               className={`
-                relative w-12 h-12 flex items-center justify-center transition-all
+                relative w-12 h-11 flex items-center justify-center transition-all
                 ${isActive
-                  ? 'text-[#58A6FF] bg-[var(--approval-bg-panel)]'
-                  : 'text-[rgba(255,255,255,0.45)] hover:text-[rgba(255,255,255,0.7)] hover:bg-[var(--approval-bg-panel)]/50'
+                  ? 'text-[#58A6FF]'
+                  : 'text-[rgba(255,255,255,0.30)] hover:text-[rgba(255,255,255,0.55)]'
                 }
               `}
             >
               {tab.icon}
-              {/* Active indicator */}
+              {/* Active indicator bar */}
               {isActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-[#58A6FF] rounded-r" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-5 bg-[#58A6FF] rounded-r" />
               )}
-              {/* Badge dot for content */}
+              {/* Badge dot for content - subtle */}
               {hasContent && !isActive && (
-                <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-[#58A6FF] rounded-full" />
+                <div className="absolute top-2.5 right-2.5 w-1 h-1 bg-[#58A6FF]/60 rounded-full" />
               )}
             </button>
           );
@@ -241,7 +241,7 @@ export default function ApprovalContextSidebar({
         {isOpen && activeTab && (
           <motion.div
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 750, opacity: 1 }}
+            animate={{ width: 420, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="glass-panel overflow-hidden flex flex-col"
@@ -263,59 +263,48 @@ export default function ApprovalContextSidebar({
             <div className="flex-1 overflow-y-auto p-5">
               {/* Summary Tab */}
               {activeTab === 'summary' && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {summary.length > 0 ? (
                     summary.map((item, idx) => {
                       // Check if this is a separator line
                       if (item.includes('───')) {
                         return (
-                          <div key={idx} className="border-t border-white/8 my-4" />
+                          <div key={idx} className="border-t border-white/6 my-5" />
                         );
                       }
 
-                      // Determine risk level from keywords
-                      const lowerItem = item.toLowerCase();
-                      const isHighRisk = lowerItem.includes('liability') || lowerItem.includes('indemnif') || lowerItem.includes('terminat') || lowerItem.includes('penalty') || lowerItem.includes('breach');
-                      const isMediumRisk = lowerItem.includes('payment') || lowerItem.includes('deadline') || lowerItem.includes('notice') || lowerItem.includes('change');
                       const isReviewerNote = item.startsWith('📝');
 
                       return (
                         <motion.div
                           key={idx}
-                          initial={{ opacity: 0, x: 10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.03 }}
-                          className={`summary-card p-4 rounded-lg border transition-all cursor-pointer group ${
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.04, ease: 'easeOut' }}
+                          className={`summary-card p-4 rounded-xl border cursor-pointer group ${
                             isReviewerNote
-                              ? 'bg-[#58A6FF]/10 border-[#58A6FF]/20 hover:border-[#58A6FF]/40'
-                              : 'bg-[#1B1F24]/60 border-white/5 hover:border-white/10'
+                              ? 'bg-[#58A6FF]/8 border-[#58A6FF]/15'
+                              : 'bg-[#161B22] border-white/4'
                           }`}
                         >
                           <div className="flex items-start gap-3">
-                            {/* Risk indicator dot */}
-                            {!isReviewerNote && (
-                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                                isHighRisk ? 'bg-[#F85149] risk-indicator-high' :
-                                isMediumRisk ? 'bg-[#D29922]' : 'bg-[#3FB950]'
-                              }`} />
-                            )}
                             <div className="flex-1 min-w-0">
-                              <p className={`text-[13px] leading-relaxed ${
+                              <p className={`text-[13px] leading-[1.7] ${
                                 isReviewerNote
-                                  ? 'text-[#58A6FF] font-medium'
-                                  : 'text-[rgba(255,255,255,0.88)]'
+                                  ? 'text-[#58A6FF]'
+                                  : 'text-[rgba(255,255,255,0.82)]'
                               }`}>
                                 {isReviewerNote ? item.replace('📝 ', '') : item}
                               </p>
                             </div>
-                            {/* Hover arrow indicator */}
-                            <ChevronRight className="w-4 h-4 text-[rgba(255,255,255,0.3)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+                            {/* Subtle hover arrow */}
+                            <ChevronRight className="w-4 h-4 text-[rgba(255,255,255,0.2)] opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0.5 flex-shrink-0 mt-0.5" />
                           </div>
                         </motion.div>
                       );
                     })
                   ) : (
-                    <p className="text-xs text-[rgba(255,255,255,0.45)]">No summary available</p>
+                    <p className="text-xs text-[rgba(255,255,255,0.4)]">No summary available</p>
                   )}
                 </div>
               )}

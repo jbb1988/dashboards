@@ -242,7 +242,7 @@ export default function RedlineEditor({
     editable: !readOnly,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[calc(100vh-180px)] text-[rgba(255,255,255,0.85)] text-[15px] leading-[1.75] tracking-wide whitespace-pre-wrap p-8',
+        class: 'prose prose-invert max-w-none focus:outline-none min-h-[calc(100vh-180px)] text-[rgba(255,255,255,0.88)] text-[15px] leading-[1.85] tracking-[0.01em] whitespace-pre-wrap px-10 py-10',
       },
       // Always apply approverInsert mark to typed text (blue underline)
       handleTextInput: (view, from, to, text) => {

@@ -8,9 +8,9 @@
   --gold: #d4af37;
 
   /* Three-tier elevation system for Approval page */
-  --approval-bg-base: #12161C;      /* Near-black app background */
-  --approval-bg-surface: #1A1F26;   /* Document container */
-  --approval-bg-panel: #242A32;     /* Sidebar/panels with subtle transparency */
+  --approval-bg-base: #0D1117;      /* Darker app background for more contrast */
+  --approval-bg-surface: #161B22;   /* Elevated document surface */
+  --approval-bg-panel: #21262D;     /* Sidebar/panels */
 }
 
 * {
@@ -91,20 +91,44 @@ span[data-approver-comment] {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* Document container with subtle glow effect */
+/* Document container with elevated card effect */
 .doc-container {
-  box-shadow: 0 0 60px rgba(88, 166, 255, 0.03),
-              0 4px 24px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 8px 40px rgba(0, 0, 0, 0.5),
+    0 0 80px -20px rgba(88, 166, 255, 0.06);
+  background: linear-gradient(180deg, #1A2028 0%, #161B22 100%);
 }
 
-/* Summary card hover state */
+/* Summary card - clickable intelligence items */
 .summary-card {
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .summary-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  transform: translateX(2px);
+  border-color: rgba(88, 166, 255, 0.25);
+  background: rgba(27, 31, 36, 0.8);
+  transform: translateX(3px);
+}
+
+.summary-card:active {
+  transform: translateX(1px);
+}
+
+/* Smooth scroll for anchor targets */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Highlight animation when scrolling to clause */
+@keyframes highlight-flash {
+  0% { background-color: rgba(88, 166, 255, 0.3); }
+  100% { background-color: transparent; }
+}
+
+.highlight-flash {
+  animation: highlight-flash 1.5s ease-out;
 }
 
 /* Risk indicator pulse animation */
