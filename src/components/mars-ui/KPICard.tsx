@@ -133,16 +133,17 @@ export function KPICard({
       transition={{ delay, duration: 0.5 }}
       whileHover={{
         y: -2,
-        boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${color}20`,
+        boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 60px ${color}25, inset 0 1px 0 rgba(255,255,255,0.10)`,
       }}
       whileTap={{ scale: 0.995 }}
       onClick={onClick}
       className="relative overflow-hidden cursor-pointer transition-all duration-150"
       style={{
         background: elevation.L1.background,
+        border: `1px solid ${color}20`,
         boxShadow: isActive
-          ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${color}20, inset 0 1px 0 rgba(255,255,255,0.10)`
-          : elevation.L1.shadow,
+          ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${color}30, inset 0 1px 0 rgba(255,255,255,0.10)`
+          : `${elevation.L1.shadow}, 0 0 30px ${color}12`,
         borderRadius: elevation.L1.radius,
         padding: '20px',
       }}
