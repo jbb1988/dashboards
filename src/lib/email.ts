@@ -298,7 +298,7 @@ export async function sendApprovalRequestEmail(
 
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #38BDF8 0%, #0189CB 100%); padding: 32px; text-align: center;">
-      <div style="font-size: 28px; font-weight: bold; color: white; margin-bottom: 24px; letter-spacing: 2px;">MARS</div>
+      <img src="https://mars-dashboards.vercel.app/mars-logo-horizontal.png" alt="MARS Company" width="180" style="display: block; margin: 0 auto 24px; max-width: 180px; height: auto;">
       <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
         Contract Approval Request
       </h1>
@@ -411,6 +411,7 @@ export async function sendCCNotificationEmail(
 
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); padding: 32px; text-align: center;">
+      <img src="https://mars-dashboards.vercel.app/mars-logo-horizontal.png" alt="MARS Company" width="180" style="display: block; margin: 0 auto 24px; max-width: 180px; height: auto;">
       <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
         Contract Review Notification
       </h1>
@@ -543,6 +544,7 @@ export async function sendApprovalDecisionEmail({
 
     <!-- Header -->
     <div style="background: ${headerGradient}; padding: 32px; text-align: center;">
+      <img src="https://mars-dashboards.vercel.app/mars-logo-horizontal.png" alt="MARS Company" width="180" style="display: block; margin: 0 auto 16px; max-width: 180px; height: auto;">
       <div style="font-size: 48px; margin-bottom: 8px;">${statusEmoji}</div>
       <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
         Contract ${statusText}
@@ -675,6 +677,7 @@ export async function sendMentionNotificationEmail({
 
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); padding: 32px; text-align: center;">
+      <img src="https://mars-dashboards.vercel.app/mars-logo-horizontal.png" alt="MARS Company" width="180" style="display: block; margin: 0 auto 16px; max-width: 180px; height: auto;">
       <div style="font-size: 48px; margin-bottom: 8px;">💬</div>
       <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
         You Were Mentioned
@@ -785,6 +788,7 @@ export async function sendApprovalReminderEmail({
 
     <!-- Header -->
     <div style="background: linear-gradient(135deg, ${urgencyColor} 0%, ${urgencyColor}CC 100%); padding: 32px; text-align: center;">
+      <img src="https://mars-dashboards.vercel.app/mars-logo-horizontal.png" alt="MARS Company" width="180" style="display: block; margin: 0 auto 16px; max-width: 180px; height: auto;">
       <div style="font-size: 48px; margin-bottom: 8px;">⏰</div>
       <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
         Approval Reminder
