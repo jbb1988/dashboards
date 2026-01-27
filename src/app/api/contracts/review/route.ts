@@ -461,9 +461,10 @@ async function callOpenRouterAPI(
         return {
           edits: [],
           newSections: [],
-          legacySections: [],
+          sections: [],
           summary: ['AI returned invalid JSON response. Please try again.'],
           error: 'Could not parse AI response',
+          raw: jsonStr.substring(0, 1000),
         };
       }
     }
