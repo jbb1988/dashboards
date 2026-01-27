@@ -396,7 +396,7 @@ export default function SmartProjectsTab({
         <div className="text-center">
           <div
             className="w-10 h-10 border-2 rounded-full animate-spin mx-auto mb-4"
-            style={{ borderColor: `${appleTokens.accentBlue}20`, borderTopColor: appleTokens.accentBlue }}
+            style={{ borderColor: `${appleTokens.accentBlue}30`, borderTopColor: appleTokens.accentBlue }}
           />
           <div style={{ color: appleTokens.textSecondary }}>Loading projects...</div>
         </div>
@@ -416,12 +416,12 @@ export default function SmartProjectsTab({
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            border: `1px solid ${appleTokens.accentBlue}20`,
-            boxShadow: activeView === 'all' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentBlue}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentBlue}12`,
+            border: `1px solid ${appleTokens.accentBlue}30`,
+            boxShadow: activeView === 'all' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentBlue}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentBlue}15`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentBlue} 0%, ${appleTokens.accentBlue}60 100%)`, boxShadow: `0 0 12px ${appleTokens.accentBlue}60` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentBlue} 0%, ${appleTokens.accentBlue}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentBlue}50` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Active Projects</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{data.stats.incomplete}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>In progress</div>
@@ -436,12 +436,12 @@ export default function SmartProjectsTab({
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            border: `1px solid ${appleTokens.accentRed}20`,
-            boxShadow: activeView === 'needs_attention' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentRed}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentRed}12`,
+            border: `1px solid ${appleTokens.accentRed}30`,
+            boxShadow: activeView === 'needs_attention' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentRed}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentRed}15`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentRed} 0%, ${appleTokens.accentRed}60 100%)`, boxShadow: `0 0 12px ${appleTokens.accentRed}60` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentRed} 0%, ${appleTokens.accentRed}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentRed}50` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Needs Attention</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.needsAttention}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Action required</div>
@@ -456,12 +456,12 @@ export default function SmartProjectsTab({
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            border: `1px solid ${appleTokens.accentCyan}20`,
-            boxShadow: activeView === 'this_week' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentCyan}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentCyan}12`,
+            border: `1px solid ${appleTokens.accentCyan}30`,
+            boxShadow: activeView === 'this_week' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentCyan}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentCyan}15`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentCyan} 0%, ${appleTokens.accentCyan}60 100%)`, boxShadow: `0 0 12px ${appleTokens.accentCyan}60` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentCyan} 0%, ${appleTokens.accentCyan}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentCyan}50` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>This Week</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.thisWeek}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Upcoming</div>
@@ -476,12 +476,12 @@ export default function SmartProjectsTab({
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            border: `1px solid ${COLORS.confirmed}20`,
-            boxShadow: activeView === 'confirmed' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${COLORS.confirmed}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${COLORS.confirmed}12`,
+            border: `1px solid ${COLORS.confirmed}30`,
+            boxShadow: activeView === 'confirmed' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${COLORS.confirmed}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${COLORS.confirmed}15`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${COLORS.confirmed} 0%, ${COLORS.confirmed}60 100%)`, boxShadow: `0 0 12px ${COLORS.confirmed}60` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${COLORS.confirmed} 0%, ${COLORS.confirmed}70 100%)`, boxShadow: `0 0 16px ${COLORS.confirmed}50` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Confirmed</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.confirmed}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Ready to go</div>
@@ -496,12 +496,12 @@ export default function SmartProjectsTab({
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            border: `1px solid ${COLORS.placeholder}20`,
-            boxShadow: activeView === 'placeholder' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${COLORS.placeholder}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${COLORS.placeholder}12`,
+            border: `1px solid ${COLORS.placeholder}30`,
+            boxShadow: activeView === 'placeholder' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${COLORS.placeholder}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${COLORS.placeholder}15`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: `linear-gradient(180deg, ${COLORS.placeholder} 0%, ${COLORS.placeholder}60 100%)`, boxShadow: `0 0 12px ${COLORS.placeholder}60` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${COLORS.placeholder} 0%, ${COLORS.placeholder}70 100%)`, boxShadow: `0 0 16px ${COLORS.placeholder}50` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Placeholder</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.placeholder}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Tentative</div>

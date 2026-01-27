@@ -140,20 +140,20 @@ export function KPICard({
       className="relative overflow-hidden cursor-pointer transition-all duration-150"
       style={{
         background: elevation.L1.background,
-        border: `1px solid ${color}20`,
+        border: `1px solid ${color}30`,
         boxShadow: isActive
-          ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${color}30, inset 0 1px 0 rgba(255,255,255,0.10)`
-          : `${elevation.L1.shadow}, 0 0 30px ${color}12`,
+          ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${color}35, inset 0 1px 0 rgba(255,255,255,0.10)`
+          : `${elevation.L1.shadow}, 0 0 30px ${color}15`,
         borderRadius: elevation.L1.radius,
         padding: '20px',
       }}
     >
       {/* Left accent bar with glow */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-[2px]"
+        className="absolute left-0 top-0 bottom-0 w-[3px]"
         style={{
-          background: `linear-gradient(180deg, ${color} 0%, ${color}60 100%)`,
-          boxShadow: `0 0 12px ${color}60`,
+          background: `linear-gradient(180deg, ${color} 0%, ${color}70 100%)`,
+          boxShadow: `0 0 16px ${color}50`,
           borderRadius: `${elevation.L1.radius} 0 0 ${elevation.L1.radius}`,
         }}
       />

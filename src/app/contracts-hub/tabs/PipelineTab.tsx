@@ -152,17 +152,17 @@ export default function PipelineTab() {
             className="p-5 rounded-2xl relative overflow-hidden"
             style={{
               background: appleTokens.surfaceL1,
-              border: `1px solid ${kpi.color}20`,
-              boxShadow: `${appleTokens.shadowL1}, 0 0 30px ${kpi.color}12`,
+              border: `1px solid ${kpi.color}30`,
+              boxShadow: `${appleTokens.shadowL1}, 0 0 30px ${kpi.color}15`,
             }}
             whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 60px ${kpi.color}25, inset 0 1px 0 rgba(255,255,255,0.10)` }}
           >
             {/* Left accent bar */}
             <div
-              className="absolute left-0 top-0 bottom-0 w-[2px]"
+              className="absolute left-0 top-0 bottom-0 w-[3px]"
               style={{
-                background: `linear-gradient(180deg, ${kpi.color} 0%, ${kpi.color}60 100%)`,
-                boxShadow: `0 0 12px ${kpi.color}60`,
+                background: `linear-gradient(180deg, ${kpi.color} 0%, ${kpi.color}70 100%)`,
+                boxShadow: `0 0 16px ${kpi.color}50`,
               }}
             />
             <p style={{ color: appleTokens.textSecondary }} className="text-xs font-semibold mb-2">{kpi.title}</p>
