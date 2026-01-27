@@ -2528,10 +2528,35 @@ export default function App() {
       <FluentProvider theme={webDarkTheme}>
         <div style={styles.container}>
           <div style={styles.loginCard}>
-            <span style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.02em' }}>
-              MARS Contract Review
+            {/* App icon with glow */}
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: 14,
+              background: 'linear-gradient(135deg, #0A84FF 0%, #0066CC 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 32px rgba(10, 132, 255, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+              marginBottom: 8,
+            }}>
+              <Shield24Regular style={{ width: 28, height: 28, color: '#fff' }} />
+            </div>
+            <span style={{
+              fontSize: 20,
+              fontWeight: 700,
+              color: 'rgba(235, 240, 255, 0.95)',
+              letterSpacing: '-0.03em',
+              textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            }}>
+              MARS Contracts
             </span>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.5 }}>
+            <span style={{
+              fontSize: 13,
+              color: 'rgba(235, 240, 255, 0.5)',
+              textAlign: 'center',
+              lineHeight: 1.5,
+            }}>
               Sign in to analyze contracts
             </span>
 
@@ -2540,18 +2565,20 @@ export default function App() {
                 <button
                   onClick={handleLogin}
                   style={{
-                    marginTop: 12,
+                    marginTop: 16,
                     width: '100%',
-                    padding: '12px 16px',
-                    background: 'linear-gradient(180deg, rgba(88, 166, 255, 0.15) 0%, rgba(88, 166, 255, 0.08) 100%)',
+                    padding: '14px 20px',
+                    background: 'linear-gradient(180deg, #0A84FF 0%, #0066CC 100%)',
                     border: 'none',
-                    borderRadius: 8,
-                    color: 'rgba(255,255,255,0.95)',
-                    fontSize: 14,
+                    borderRadius: 12,
+                    color: '#ffffff',
+                    fontSize: 15,
                     fontWeight: 600,
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     letterSpacing: '-0.01em',
+                    boxShadow: '0 4px 20px rgba(10, 132, 255, 0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+                    transition: 'all 0.2s ease',
                   }}
                 >
                   Sign in with Microsoft
@@ -2559,12 +2586,13 @@ export default function App() {
                 <button
                   onClick={() => setShowQuickLogin(true)}
                   style={{
-                    marginTop: 4,
+                    marginTop: 8,
                     background: 'none',
                     border: 'none',
-                    padding: '8px',
-                    color: 'rgba(255,255,255,0.45)',
+                    padding: '10px',
+                    color: 'rgba(235, 240, 255, 0.5)',
                     fontSize: 12,
+                    fontWeight: 500,
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                   }}
@@ -2805,33 +2833,64 @@ export default function App() {
           </div>
         )}
 
-        {/* Tabs - Minimal, text-only */}
-        <TabList
-          selectedValue={activeTab}
-          onTabSelect={handleTabChange}
-          style={styles.tabs}
-        >
-          <Tab
-            value="analyze"
-            style={{
-              color: activeTab === 'analyze' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
-              fontWeight: activeTab === 'analyze' ? 500 : 400,
-              fontSize: 13,
-            }}
-          >
-            Analyze
-          </Tab>
-          <Tab
-            value="clauses"
-            style={{
-              color: activeTab === 'clauses' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
-              fontWeight: activeTab === 'clauses' ? 500 : 400,
-              fontSize: 13,
-            }}
-          >
-            Clauses
-          </Tab>
-        </TabList>
+        {/* Tabs - Apple Native segmented control style */}
+        <div style={{
+          display: 'flex',
+          padding: '8px 12px',
+          background: 'rgba(255,255,255,0.02)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div style={{
+            display: 'flex',
+            background: 'rgba(255,255,255,0.05)',
+            borderRadius: 10,
+            padding: 3,
+            gap: 2,
+          }}>
+            <button
+              onClick={() => setActiveTab('analyze')}
+              style={{
+                padding: '8px 20px',
+                background: activeTab === 'analyze'
+                  ? 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%)'
+                  : 'transparent',
+                border: 'none',
+                borderRadius: 8,
+                color: activeTab === 'analyze' ? 'rgba(235, 240, 255, 0.95)' : 'rgba(235, 240, 255, 0.5)',
+                fontWeight: activeTab === 'analyze' ? 600 : 500,
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                letterSpacing: '-0.01em',
+                boxShadow: activeTab === 'analyze' ? 'inset 0 1px 0 rgba(255,255,255,0.08)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              Analyze
+            </button>
+            <button
+              onClick={() => setActiveTab('clauses')}
+              style={{
+                padding: '8px 20px',
+                background: activeTab === 'clauses'
+                  ? 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.08) 100%)'
+                  : 'transparent',
+                border: 'none',
+                borderRadius: 8,
+                color: activeTab === 'clauses' ? 'rgba(235, 240, 255, 0.95)' : 'rgba(235, 240, 255, 0.5)',
+                fontWeight: activeTab === 'clauses' ? 600 : 500,
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                letterSpacing: '-0.01em',
+                boxShadow: activeTab === 'clauses' ? 'inset 0 1px 0 rgba(255,255,255,0.08)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              Clauses
+            </button>
+          </div>
+        </div>
 
         {/* Content */}
         <div style={styles.content}>
@@ -3017,29 +3076,50 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Insert All Changes - simple link style */}
+                  {/* Insert All Changes - Electric Blue accent */}
                   {(analysisResult.sections?.length ?? 0) > 0 && !allChangesInserted && (
                     <button
                       onClick={insertAllChanges}
                       disabled={isApplyingChange}
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: isApplyingChange ? 'rgba(255,255,255,0.4)' : '#58A6FF',
-                        fontSize: 12,
+                        width: '100%',
+                        padding: '12px 16px',
+                        background: isApplyingChange
+                          ? 'rgba(255,255,255,0.04)'
+                          : 'rgba(10, 132, 255, 0.1)',
+                        border: '1px solid rgba(10, 132, 255, 0.25)',
+                        borderRadius: 10,
+                        color: isApplyingChange ? 'rgba(255,255,255,0.4)' : '#0A84FF',
+                        fontSize: 13,
+                        fontWeight: 500,
                         cursor: isApplyingChange ? 'default' : 'pointer',
-                        padding: '8px 0',
-                        textAlign: 'left',
+                        fontFamily: 'inherit',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        transition: 'all 0.2s ease',
                       }}
                     >
+                      <ArrowSync24Regular style={{ width: 16, height: 16 }} />
                       {isApplyingChange ? 'Inserting changes...' : 'Insert All Changes into Document'}
                     </button>
                   )}
                   {allChangesInserted && (
-                    <span style={{ fontSize: 12, color: '#238636', padding: '8px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
-                      All changes inserted
-                    </span>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '12px 16px',
+                      background: 'rgba(52, 199, 89, 0.1)',
+                      borderRadius: 10,
+                      border: '1px solid rgba(52, 199, 89, 0.2)',
+                    }}>
+                      <CheckmarkCircle24Filled style={{ width: 18, height: 18, color: '#34C759' }} />
+                      <span style={{ fontSize: 13, color: '#34C759', fontWeight: 500 }}>
+                        All changes inserted
+                      </span>
+                    </div>
                   )}
 
                   {/* Save/Submit Actions - Apple Native style */}
