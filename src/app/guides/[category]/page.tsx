@@ -2259,7 +2259,7 @@ const guideContent: Record<string, GuideData> = {
     ],
   },
   operations: {
-    title: 'Operations Command Center Guide',
+    title: 'Operations Center Guide',
     description: 'Monitor Order→Cash visibility, inventory status, and operational KPIs in real-time.',
     icon: (
       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2274,7 +2274,7 @@ const guideContent: Record<string, GuideData> = {
         content: (
           <div className="space-y-4">
             <p className="text-[#8FA3BF]">
-              The Operations Command Center provides real-time visibility into your Order→Cash cycle and inventory status, pulling live data from NetSuite.
+              The Operations Center provides real-time visibility into your Order→Cash cycle and inventory status, pulling live data from NetSuite.
             </p>
             <div className="grid grid-cols-2 gap-4">
               {[

@@ -29,7 +29,7 @@ function OperationsContent() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-[22px] font-bold mb-1 bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-[#8FA3BF]">
-                  Operations Command Center
+                  Operations Center
                 </h1>
                 <p className="text-[11px] text-[#475569]">
                   Order → Cash Visibility & Inventory Status

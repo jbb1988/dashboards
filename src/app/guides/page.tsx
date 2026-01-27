@@ -155,7 +155,7 @@ const guideCategories: GuideCategory[] = [
   },
   {
     id: 'operations',
-    title: 'Operations Command Center',
+    title: 'Operations Center',
     description: 'Monitor Order→Cash visibility, inventory status, and operational KPIs from a single dashboard.',
     icon: (
       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

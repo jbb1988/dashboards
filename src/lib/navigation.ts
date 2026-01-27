@@ -79,7 +79,7 @@ export const departments: Department[] = [
     color: 'from-[#F59E0B] to-[#FBBF24]',
     gradient: { from: '#F59E0B', to: '#FBBF24' },
     dashboards: [
-      { name: 'Command Center', href: '/operations', description: 'Order→Cash visibility & inventory status', badge: 'NetSuite', icon: 'chart' },
+      { name: 'Operations Center', href: '/operations', description: 'Order→Cash visibility & inventory status', badge: 'NetSuite', icon: 'chart' },
     ],
   },
   {
