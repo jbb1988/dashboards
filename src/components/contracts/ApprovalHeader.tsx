@@ -1,18 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-
-interface RiskScores {
-  summary: {
-    high: number;
-    medium: number;
-    low: number;
-  };
-  sections: Array<{
-    sectionTitle: string;
-    riskLevel: 'high' | 'medium' | 'low';
-  }>;
-}
+import { Check, X } from 'lucide-react';
 
 interface ApprovalHeaderProps {
   contractName: string;
@@ -27,7 +17,10 @@ interface ApprovalHeaderProps {
   submitting: boolean;
   hasEdits: boolean;
   readOnly: boolean;
-  riskScores?: RiskScores | null;
+  riskScores?: {
+    summary: { high: number; medium: number; low: number };
+    sections: Array<{ sectionTitle: string; riskLevel: 'high' | 'medium' | 'low' }>;
+  } | null;
 }
 
 function formatDate(dateString: string) {
@@ -51,134 +44,103 @@ export default function ApprovalHeader({
   submitting,
   hasEdits,
   readOnly,
-  riskScores,
 }: ApprovalHeaderProps) {
-  const getStatusBadge = () => {
+
+  // Status chip - muted, not bright
+  const getStatusChip = () => {
+    const baseClass = "px-2 py-0.5 text-[11px] font-medium rounded-md";
     switch (status) {
       case 'approved':
-        return (
-          <span className="px-2.5 py-1 text-xs font-medium rounded-md bg-[#238636]/15 text-[#3FB950] border border-[#238636]/30">
-            Approved
-          </span>
-        );
+        return <span className={`${baseClass} bg-[#3FB950]/10 text-[#3FB950]/80`}>Approved</span>;
       case 'rejected':
-        return (
-          <span className="px-2.5 py-1 text-xs font-medium rounded-md bg-[#F85149]/15 text-[#F85149] border border-[#F85149]/30">
-            Rejected
-          </span>
-        );
+        return <span className={`${baseClass} bg-[#F85149]/10 text-[#F85149]/80`}>Rejected</span>;
       default:
-        return (
-          <span className="px-2.5 py-1 text-xs font-medium rounded-md bg-[#D29922]/15 text-[#D29922] border border-[#D29922]/30">
-            Pending Review
-          </span>
-        );
+        return <span className={`${baseClass} bg-white/[0.06] text-white/60`}>Pending Review</span>;
     }
   };
 
   return (
     <motion.header
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="h-[64px] bg-gradient-to-b from-[var(--approval-bg-panel)] to-[#1F252B] border-b border-white/8 shadow-lg flex items-center px-8 gap-6 sticky top-0 z-40"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      className="h-14 bg-black/35 flex items-center px-6 gap-5 sticky top-0 z-40"
     >
-      {/* Contract Info */}
+      {/* Left cluster: Title + Subtitle + Status */}
       <div className="flex items-center gap-4 min-w-0 flex-1">
         <div className="min-w-0">
-          <h1 className="text-[15px] font-semibold text-[rgba(255,255,255,0.92)] truncate tracking-tight">{contractName}</h1>
-          <p className="text-xs text-[rgba(255,255,255,0.55)] truncate mt-0.5">{provisionName}</p>
+          <h1 className="text-[15px] font-semibold text-white/90 truncate leading-tight">
+            {contractName}
+          </h1>
+          <p className="text-[12px] text-white/50 truncate leading-tight mt-0.5">
+            {provisionName}
+          </p>
         </div>
-        {getStatusBadge()}
+
+        {getStatusChip()}
+
         {hasEdits && !readOnly && (
-          <span className="px-2.5 py-1 text-xs font-medium rounded-md bg-[#58A6FF]/15 text-[#58A6FF] border border-[#58A6FF]/30">
+          <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-[#58A6FF]/10 text-[#58A6FF]/80">
             Edited
           </span>
         )}
-        {/* Risk Score Badges */}
-        {riskScores && (riskScores.summary.high > 0 || riskScores.summary.medium > 0 || riskScores.summary.low > 0) && (
-          <div className="hidden lg:flex items-center gap-2">
-            {riskScores.summary.high > 0 && (
-              <span className="px-2.5 py-1 text-xs font-medium rounded-md bg-[#F85149]/15 text-[#F85149] border border-[#F85149]/30">
-                {riskScores.summary.high} High
-              </span>
-            )}
-            {riskScores.summary.medium > 0 && (
-              <span className="px-2.5 py-1 text-xs font-medium rounded-md bg-[#D29922]/15 text-[#D29922] border border-[#D29922]/30">
-                {riskScores.summary.medium} Med
-              </span>
-            )}
-            {riskScores.summary.low > 0 && (
-              <span className="px-2.5 py-1 text-xs font-medium rounded-md bg-[#3FB950]/15 text-[#3FB950] border border-[#3FB950]/30">
-                {riskScores.summary.low} Low
-              </span>
-            )}
-          </div>
-        )}
+
+        {/* Submitted info - muted */}
+        <div className="hidden lg:flex items-center gap-2 text-[12px] text-white/40 ml-4">
+          <span>by {submittedBy}</span>
+          <span className="text-white/20">·</span>
+          <span>{formatDate(submittedAt)}</span>
+        </div>
       </div>
 
-      {/* Submitted Info */}
-      <div className="hidden md:flex items-center gap-4 text-xs text-[rgba(255,255,255,0.55)] flex-shrink-0">
-        <span>
-          By <span className="text-[rgba(255,255,255,0.85)] font-medium">{submittedBy}</span>
-        </span>
-        <span className="text-[rgba(255,255,255,0.25)]">•</span>
-        <span>{formatDate(submittedAt)}</span>
-      </div>
-
-      {/* Action Section */}
+      {/* Right cluster: Email + Actions */}
       {!readOnly && (
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Email Input */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Email input - pill style */}
           <input
             type="email"
             value={approverEmail}
             onChange={(e) => onApproverEmailChange(e.target.value)}
-            placeholder="Your email"
-            className="w-52 px-3 py-2 text-sm bg-[var(--approval-bg-base)] border border-white/10 rounded-lg text-[rgba(255,255,255,0.88)] placeholder-[rgba(255,255,255,0.35)] focus:outline-none focus:border-[#58A6FF] focus:ring-1 focus:ring-[#58A6FF]/30 transition-all"
+            placeholder="your@email.com"
+            className="w-48 h-8 px-4 text-[13px] input-pill"
           />
 
-          {/* Reject Button */}
+          {/* Reject - neutral surface button */}
           <button
             onClick={onReject}
             disabled={submitting}
-            className="px-5 py-2 text-sm font-medium bg-[#F85149]/10 border border-[#F85149]/40 text-[#F85149] rounded-lg hover:bg-[#F85149]/20 hover:border-[#F85149]/60 transition-all disabled:opacity-50 shadow-sm"
+            className="h-8 px-3 flex items-center gap-1.5 text-[13px] font-medium text-white/70 bg-white/[0.04] hover:bg-white/[0.06] rounded-[10px] transition-all duration-[180ms] disabled:opacity-40"
           >
-            {submitting ? 'Processing...' : 'Reject'}
+            <X className="w-3.5 h-3.5" />
+            <span>Reject</span>
           </button>
 
-          {/* Approve Button */}
+          {/* Approve - neutral surface button (color on confirm step) */}
           <button
             onClick={onApprove}
             disabled={submitting}
-            className="px-5 py-2 text-sm font-semibold bg-[#238636] hover:bg-[#2ea043] text-white rounded-lg transition-all disabled:opacity-50 shadow-md shadow-[#238636]/25"
+            className="h-8 px-3 flex items-center gap-1.5 text-[13px] font-medium text-white/70 bg-white/[0.04] hover:bg-white/[0.06] rounded-[10px] transition-all duration-[180ms] disabled:opacity-40"
           >
-            {submitting ? 'Processing...' : 'Approve'}
+            <Check className="w-3.5 h-3.5" />
+            <span>Approve</span>
           </button>
         </div>
       )}
 
-      {/* Read-only status message */}
+      {/* Read-only status */}
       {readOnly && (
-        <div className="flex items-center gap-2.5 text-sm flex-shrink-0">
+        <div className="flex items-center gap-2 text-[13px] flex-shrink-0">
           {status === 'approved' && (
-            <>
-              <div className="w-6 h-6 rounded-full bg-[#3FB950]/20 flex items-center justify-center">
-                <svg className="w-4 h-4 text-[#3FB950]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-[rgba(255,255,255,0.88)] font-medium">Decision Submitted</span>
-            </>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] bg-[#3FB950]/10">
+              <Check className="w-3.5 h-3.5 text-[#3FB950]/80" />
+              <span className="text-[#3FB950]/80 font-medium">Approved</span>
+            </div>
           )}
           {status === 'rejected' && (
-            <>
-              <div className="w-6 h-6 rounded-full bg-[#F85149]/20 flex items-center justify-center">
-                <svg className="w-4 h-4 text-[#F85149]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <span className="text-[rgba(255,255,255,0.88)] font-medium">Decision Submitted</span>
-            </>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] bg-[#F85149]/10">
+              <X className="w-3.5 h-3.5 text-[#F85149]/80" />
+              <span className="text-[#F85149]/80 font-medium">Rejected</span>
+            </div>
           )}
         </div>
       )}

@@ -15,8 +15,8 @@ import {
   Check,
   X,
   Edit3,
-  Send,
   RefreshCw,
+  Send,
 } from 'lucide-react';
 import { ActivityLogEntry } from './ActivityLog';
 import MentionInput, { highlightMentions } from '@/components/ui/MentionInput';
@@ -68,97 +68,56 @@ function isWordDocument(fileName: string): boolean {
   return lower.endsWith('.docx') || lower.endsWith('.doc');
 }
 
-// Document type tag colors - subtle, no borders
+// Document type tag - muted pill, no border
 function getDocumentTypeStyle(type: string) {
   switch (type) {
     case 'Original Contract':
-      return 'text-[#58A6FF]/90 bg-[#58A6FF]/8';
+      return 'text-[#58A6FF]/70 bg-[#58A6FF]/8';
     case 'Client Response':
-      return 'text-[#A371F7]/90 bg-[#A371F7]/8';
+      return 'text-[#A371F7]/70 bg-[#A371F7]/8';
     case 'MARS Redlines':
-      return 'text-[#D29922]/90 bg-[#D29922]/8';
+      return 'text-[#D29922]/70 bg-[#D29922]/8';
     case 'Final Agreement':
-      return 'text-[#3FB950]/90 bg-[#3FB950]/8';
+      return 'text-[#3FB950]/70 bg-[#3FB950]/8';
     case 'Amendment':
-      return 'text-[#79C0FF]/90 bg-[#79C0FF]/8';
+      return 'text-[#79C0FF]/70 bg-[#79C0FF]/8';
     default:
-      return 'text-[rgba(255,255,255,0.55)] bg-white/5';
+      return 'text-white/50 bg-white/5';
   }
 }
 
 const DOCUMENT_TYPE_ORDER = [
-  'Original Contract',
-  'MARS Redlines',
-  'Final Agreement',
-  'Executed Contract',
-  'Client Response - MARS STD WTC',
-  'Client Response - MARS MCC TC',
-  'Client Response - MARS EULA',
-  'Client Response',
-  'Purchase Order',
-  'Amendment',
-  'Other',
+  'Original Contract', 'MARS Redlines', 'Final Agreement', 'Executed Contract',
+  'Client Response - MARS STD WTC', 'Client Response - MARS MCC TC',
+  'Client Response - MARS EULA', 'Client Response', 'Purchase Order', 'Amendment', 'Other',
 ];
 
 function sortDocumentsByType(documents: Document[]): Document[] {
   return [...documents].sort((a, b) => {
-    const aIndex = DOCUMENT_TYPE_ORDER.findIndex(type =>
-      a.documentType === type || a.documentType.startsWith(type)
-    );
-    const bIndex = DOCUMENT_TYPE_ORDER.findIndex(type =>
-      b.documentType === type || b.documentType.startsWith(type)
-    );
-    const aOrder = aIndex === -1 ? DOCUMENT_TYPE_ORDER.length : aIndex;
-    const bOrder = bIndex === -1 ? DOCUMENT_TYPE_ORDER.length : bIndex;
-    return aOrder - bOrder;
+    const aIndex = DOCUMENT_TYPE_ORDER.findIndex(type => a.documentType === type || a.documentType.startsWith(type));
+    const bIndex = DOCUMENT_TYPE_ORDER.findIndex(type => b.documentType === type || b.documentType.startsWith(type));
+    return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
   });
 }
 
-// Outline icons for activity - no emojis
+// Activity icons - outline style
 function getActionIcon(action: ActivityLogEntry['action']) {
-  const iconClass = 'w-3.5 h-3.5';
+  const cls = 'w-3.5 h-3.5';
   switch (action) {
-    case 'submitted':
-      return <ArrowUpRight className={iconClass} />;
-    case 'viewed':
-      return <Eye className={iconClass} />;
-    case 'edited':
-      return <Edit3 className={iconClass} />;
-    case 'approved':
-      return <Check className={iconClass} />;
-    case 'rejected':
-      return <X className={iconClass} />;
-    case 'resubmitted':
-      return <RefreshCw className={iconClass} />;
-    default:
-      return <FileText className={iconClass} />;
-  }
-}
-
-function getActionAccent(action: ActivityLogEntry['action']) {
-  switch (action) {
-    case 'approved':
-      return 'bg-[#3FB950]';
-    case 'rejected':
-      return 'bg-[#F85149]';
-    case 'edited':
-      return 'bg-[#D29922]';
-    case 'submitted':
-    case 'resubmitted':
-      return 'bg-[#58A6FF]';
-    default:
-      return 'bg-white/20';
+    case 'submitted': return <ArrowUpRight className={cls} />;
+    case 'viewed': return <Eye className={cls} />;
+    case 'edited': return <Edit3 className={cls} />;
+    case 'approved': return <Check className={cls} />;
+    case 'rejected': return <X className={cls} />;
+    case 'resubmitted': return <RefreshCw className={cls} />;
+    default: return <FileText className={cls} />;
   }
 }
 
 function formatDate(dateString: string) {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
   });
 }
 
@@ -198,8 +157,11 @@ export default function ApprovalContextSidebar({
 
   return (
     <div className="flex h-full">
-      {/* Tab Strip - minimal */}
-      <div className="w-11 bg-[var(--approval-bg-base)] border-l border-white/[0.04] flex flex-col py-4">
+      {/* ═══════════════════════════════════════════════════════════════
+          LEFT ICON RAIL - Apple Pro style
+          Width: 52-56px, same icons, hover backplate
+         ═══════════════════════════════════════════════════════════════ */}
+      <div className="w-[52px] flex flex-col py-3">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id && isOpen;
           const hasContent =
@@ -215,84 +177,103 @@ export default function ApprovalContextSidebar({
               onClick={() => handleTabClick(tab.id)}
               title={tab.label}
               className={`
-                relative w-11 h-10 flex items-center justify-center transition-colors
+                relative w-[52px] h-10 flex items-center justify-center
+                transition-all duration-[180ms] ease-out
                 ${isActive
                   ? 'text-white'
-                  : 'text-white/25 hover:text-white/50'
+                  : 'text-white/30 hover:text-white/60'
                 }
               `}
             >
-              {tab.icon}
-              {/* Active indicator - thin accent bar */}
+              {/* Hover/active backplate */}
+              <div className={`
+                absolute inset-x-2 inset-y-0.5 rounded-[10px] transition-all duration-[180ms]
+                ${isActive ? 'bg-white/[0.06]' : 'group-hover:bg-white/[0.04]'}
+              `} />
+
+              {/* Left accent bar - active only */}
               {isActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 bg-[#58A6FF] rounded-r" />
+                <motion.div
+                  layoutId="tab-accent"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 bg-[#58A6FF] rounded-r"
+                  transition={{ duration: 0.18 }}
+                />
               )}
-              {/* Badge dot - very subtle */}
-              {hasContent && !isActive && (
-                <div className="absolute top-2 right-2 w-1 h-1 bg-white/30 rounded-full" />
-              )}
+
+              <span className="relative z-10">{tab.icon}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Panel Content */}
+      {/* ═══════════════════════════════════════════════════════════════
+          RIGHT PANEL - Utility sidebar, no cards
+         ═══════════════════════════════════════════════════════════════ */}
       <AnimatePresence mode="wait">
         {isOpen && activeTab && (
           <motion.div
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 360, opacity: 1 }}
+            animate={{ width: 380, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="bg-[var(--approval-bg-base)] border-l border-white/[0.04] overflow-hidden flex flex-col"
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+            className="overflow-hidden flex flex-col border-l border-white/[0.04]"
           >
-            {/* Panel Header - minimal */}
-            <div className="h-12 px-5 flex items-center justify-between border-b border-white/[0.04] flex-shrink-0">
-              <h3 className="text-[13px] font-medium text-white/80 tracking-tight">
+            {/* Tab header - icon + label, thin accent */}
+            <div className="h-11 px-5 flex items-center gap-3 border-b border-white/[0.04] flex-shrink-0">
+              <span className="text-white/40">
+                {tabs.find((t) => t.id === activeTab)?.icon}
+              </span>
+              <span className="text-[13px] font-medium text-white/80">
                 {tabs.find((t) => t.id === activeTab)?.label}
-              </h3>
+              </span>
               <button
                 onClick={() => onTabChange(null)}
-                className="p-1 rounded text-white/30 hover:text-white/60 transition-colors"
+                className="ml-auto p-1 rounded text-white/30 hover:text-white/60 transition-colors duration-[180ms]"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
 
             {/* Panel Body */}
-            <div className="flex-1 overflow-y-auto px-5 py-5">
+            <div className="flex-1 overflow-y-auto px-5 py-4">
 
-              {/* ═══════════════════════════════════════════════════════════════
-                  SUMMARY TAB - No cards, stacked items with faint dividers
-                 ═══════════════════════════════════════════════════════════════ */}
+              {/* ═══════════════════════════════════════════════════════════
+                  SUMMARY - Row blocks, hover shows Surface A
+                 ═══════════════════════════════════════════════════════════ */}
               {activeTab === 'summary' && (
                 <div className="space-y-0">
                   {summary.length > 0 ? (
                     summary.map((item, idx) => {
                       if (item.includes('───')) {
-                        return <div key={idx} className="border-t border-white/[0.06] my-4" />;
+                        return <div key={idx} className="border-t border-white/[0.05] my-4" />;
                       }
 
                       const isReviewerNote = item.startsWith('📝');
-                      const isLast = idx === summary.length - 1;
 
                       return (
                         <motion.div
                           key={idx}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          transition={{ delay: idx * 0.03 }}
-                          className={`py-3.5 cursor-pointer group transition-colors hover:bg-white/[0.02] -mx-2 px-2 rounded-lg ${
-                            !isLast ? 'border-b border-white/[0.04]' : ''
-                          }`}
+                          transition={{ delay: idx * 0.02 }}
+                          className="group flex items-start gap-3 py-3 -mx-2 px-2 rounded-[10px] cursor-pointer transition-all duration-[180ms] hover:bg-white/[0.04]"
                         >
-                          <p className={`text-[13px] leading-[1.65] ${
-                            isReviewerNote
-                              ? 'text-[#58A6FF]/90'
-                              : 'text-white/70'
-                          }`}>
-                            {isReviewerNote ? item.replace('📝 ', '') : item}
-                          </p>
+                          {/* Severity dot - muted */}
+                          {!isReviewerNote && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-white/20 mt-2 flex-shrink-0" />
+                          )}
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-[13px] leading-[1.6] ${
+                              isReviewerNote ? 'text-[#58A6FF]/80' : 'text-white/70'
+                            }`}>
+                              {isReviewerNote ? item.replace('📝 ', '') : item}
+                            </p>
+                          </div>
+
+                          {/* Chevron on hover */}
+                          <ChevronRight className="w-3.5 h-3.5 text-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-[180ms] flex-shrink-0 mt-1" />
                         </motion.div>
                       );
                     })
@@ -302,101 +283,101 @@ export default function ApprovalContextSidebar({
                 </div>
               )}
 
-              {/* ═══════════════════════════════════════════════════════════════
-                  ACTIVITY TAB - Timeline, outline icons, accent on most recent
-                 ═══════════════════════════════════════════════════════════════ */}
+              {/* ═══════════════════════════════════════════════════════════
+                  ACTIVITY - Vertical timeline, text blocks
+                 ═══════════════════════════════════════════════════════════ */}
               {activeTab === 'activity' && (
-                <div className="space-y-0">
-                  {activityLog.length > 0 ? (
-                    activityLog.map((entry, idx) => {
-                      const isFirst = idx === 0;
-                      const isLast = idx === activityLog.length - 1;
+                <div className="relative">
+                  {/* Timeline line */}
+                  <div className="absolute left-[7px] top-3 bottom-3 w-[2px] bg-white/[0.06] rounded-full" />
 
-                      return (
-                        <motion.div
-                          key={`${entry.action}-${entry.at}-${idx}`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: idx * 0.03 }}
-                          className={`relative py-3 ${!isLast ? 'border-b border-white/[0.04]' : ''}`}
-                        >
-                          {/* Left accent line on most recent only */}
-                          {isFirst && (
-                            <div className={`absolute left-0 top-3 bottom-3 w-[2px] rounded-full ${getActionAccent(entry.action)}`} />
-                          )}
+                  <div className="space-y-0">
+                    {activityLog.length > 0 ? (
+                      activityLog.map((entry, idx) => {
+                        const isFirst = idx === 0;
 
-                          <div className={`${isFirst ? 'pl-3' : ''}`}>
-                            <div className="flex items-center gap-2">
-                              <span className={`${isFirst ? 'text-white/70' : 'text-white/40'}`}>
+                        return (
+                          <motion.div
+                            key={`${entry.action}-${entry.at}-${idx}`}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: idx * 0.02 }}
+                            className={`relative pl-6 py-3 ${
+                              isFirst ? 'rounded-[10px] -mx-2 px-2 pl-8 bg-white/[0.04]' : ''
+                            }`}
+                          >
+                            {/* Timeline dot */}
+                            <div className={`absolute left-0 top-4 w-4 h-4 rounded-full flex items-center justify-center ${
+                              isFirst ? 'bg-[#58A6FF]/20 left-2' : 'bg-white/[0.08]'
+                            }`}>
+                              <span className={isFirst ? 'text-[#58A6FF]' : 'text-white/40'}>
                                 {getActionIcon(entry.action)}
                               </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
                               <span className={`text-[13px] font-medium capitalize ${isFirst ? 'text-white/90' : 'text-white/60'}`}>
                                 {entry.action}
                               </span>
-                              <span className="text-white/20 text-[13px]">·</span>
+                              <span className="text-white/20">·</span>
                               <span className="text-[13px] text-white/40 truncate">{entry.by}</span>
                             </div>
-                            <div className={`text-[11px] mt-1 ${isFirst ? 'text-white/50' : 'text-white/30'}`}>
+                            <div className={`text-[11px] mt-0.5 ${isFirst ? 'text-white/50' : 'text-white/30'}`}>
                               {formatDate(entry.at)}
                             </div>
                             {entry.feedback && (
-                              <p className="text-[12px] text-white/50 mt-2 italic pl-3 border-l border-white/10">
+                              <p className="text-[12px] text-white/50 mt-2 italic">
                                 "{entry.feedback}"
                               </p>
                             )}
-                          </div>
-                        </motion.div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-[13px] text-white/30">No activity recorded yet</p>
-                  )}
+                          </motion.div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-[13px] text-white/30 pl-6">No activity yet</p>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* ═══════════════════════════════════════════════════════════════
-                  DOCUMENTS TAB - Single clickable rows, hover-only actions
-                 ═══════════════════════════════════════════════════════════════ */}
+              {/* ═══════════════════════════════════════════════════════════
+                  DOCUMENTS - Compact rows, hover-only icons
+                 ═══════════════════════════════════════════════════════════ */}
               {activeTab === 'documents' && (
                 <div className="space-y-0">
                   {documents.length > 0 ? (
                     sortDocumentsByType(documents).map((doc, idx) => {
                       const isHovered = hoveredDoc === doc.id;
-                      const isLast = idx === documents.length - 1;
 
                       return (
                         <motion.div
                           key={doc.id}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          transition={{ delay: idx * 0.03 }}
+                          transition={{ delay: idx * 0.02 }}
                           onMouseEnter={() => setHoveredDoc(doc.id)}
                           onMouseLeave={() => setHoveredDoc(null)}
                           onClick={() => onViewDocument(doc)}
-                          className={`flex items-center gap-3 py-3 cursor-pointer group transition-colors hover:bg-white/[0.02] -mx-2 px-2 rounded-lg ${
-                            !isLast ? 'border-b border-white/[0.04]' : ''
-                          }`}
+                          className="flex items-center gap-3 py-2.5 -mx-2 px-2 rounded-[10px] cursor-pointer transition-all duration-[180ms] hover:bg-white/[0.04]"
                         >
                           {/* File icon */}
-                          <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center flex-shrink-0">
-                            <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
+                          <div className="w-7 h-7 rounded-lg bg-white/[0.04] flex items-center justify-center flex-shrink-0">
+                            <Paperclip className="w-3.5 h-3.5 text-white/40" />
                           </div>
 
                           {/* Filename + tag */}
                           <div className="flex-1 min-w-0">
                             <p className="text-[13px] text-white/80 truncate">{doc.fileName}</p>
-                            <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded mt-1 ${getDocumentTypeStyle(doc.documentType)}`}>
+                            <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded mt-0.5 ${getDocumentTypeStyle(doc.documentType)}`}>
                               {doc.documentType}
                             </span>
                           </div>
 
                           {/* Hover-only actions */}
-                          <div className={`flex items-center gap-1 transition-opacity ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+                          <div className={`flex items-center gap-0.5 transition-opacity duration-[180ms] ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
                             <button
                               onClick={(e) => { e.stopPropagation(); onViewDocument(doc); }}
-                              className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                              className="p-1.5 text-white/40 hover:text-white/70 rounded transition-colors"
                               title="View"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -404,7 +385,7 @@ export default function ApprovalContextSidebar({
                             {isWordDocument(doc.fileName) && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); onDownloadDocument(doc); }}
-                                className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                                className="p-1.5 text-white/40 hover:text-white/70 rounded transition-colors"
                                 title="Download"
                               >
                                 <Download className="w-3.5 h-3.5" />
@@ -415,108 +396,110 @@ export default function ApprovalContextSidebar({
                       );
                     })
                   ) : (
-                    <p className="text-[13px] text-white/30">No supporting documents</p>
+                    <p className="text-[13px] text-white/30">No documents</p>
                   )}
                 </div>
               )}
 
-              {/* ═══════════════════════════════════════════════════════════════
-                  ANNOTATIONS TAB
-                 ═══════════════════════════════════════════════════════════════ */}
+              {/* ═══════════════════════════════════════════════════════════
+                  ANNOTATIONS
+                 ═══════════════════════════════════════════════════════════ */}
               {activeTab === 'annotations' && (
                 <div className="space-y-0">
-                  <p className="text-[11px] text-white/40 mb-4 pb-3 border-b border-white/[0.04]">
-                    Highlighted text with notes
-                  </p>
                   {annotations.length > 0 ? (
-                    annotations.map((annotation, idx) => {
-                      const isLast = idx === annotations.length - 1;
-
-                      return (
-                        <motion.div
-                          key={annotation.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: idx * 0.03 }}
-                          onClick={() => onAnnotationClick?.(annotation.id)}
-                          className={`py-3 cursor-pointer group transition-colors hover:bg-white/[0.02] -mx-2 px-2 rounded-lg ${
-                            !isLast ? 'border-b border-white/[0.04]' : ''
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <Highlighter className="w-3 h-3 text-[#D29922]/70" />
-                            <span className="text-[11px] text-[#D29922]/70 font-medium">#{idx + 1}</span>
-                          </div>
-                          <p className="text-[12px] text-white/50 italic truncate mb-1">
-                            "{annotation.highlightedText.slice(0, 60)}{annotation.highlightedText.length > 60 ? '...' : ''}"
-                          </p>
-                          <p className="text-[13px] text-white/70 leading-relaxed">
-                            {annotation.text || <span className="text-white/30 italic">No note</span>}
-                          </p>
-                        </motion.div>
-                      );
-                    })
+                    annotations.map((annotation, idx) => (
+                      <motion.div
+                        key={annotation.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: idx * 0.02 }}
+                        onClick={() => onAnnotationClick?.(annotation.id)}
+                        className="group py-3 -mx-2 px-2 rounded-[10px] cursor-pointer transition-all duration-[180ms] hover:bg-white/[0.04]"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Highlighter className="w-3 h-3 text-[#D29922]/60" />
+                          <span className="text-[11px] text-[#D29922]/60 font-medium">#{idx + 1}</span>
+                        </div>
+                        <p className="text-[12px] text-white/40 italic truncate mb-1">
+                          "{annotation.highlightedText.slice(0, 50)}{annotation.highlightedText.length > 50 ? '...' : ''}"
+                        </p>
+                        <p className="text-[13px] text-white/70 leading-relaxed">
+                          {annotation.text || <span className="text-white/30 italic">No note</span>}
+                        </p>
+                      </motion.div>
+                    ))
                   ) : (
-                    <p className="text-[13px] text-white/30">No annotations yet. Select text in the document to add one.</p>
+                    <p className="text-[13px] text-white/30">No annotations</p>
                   )}
                 </div>
               )}
 
-              {/* ═══════════════════════════════════════════════════════════════
-                  DISCUSSION TAB
-                 ═══════════════════════════════════════════════════════════════ */}
+              {/* ═══════════════════════════════════════════════════════════
+                  DISCUSSION - Pill input with send icon
+                 ═══════════════════════════════════════════════════════════ */}
               {activeTab === 'discussion' && (
                 <div className="flex flex-col h-full">
                   <div className="flex-1 overflow-y-auto space-y-0 mb-4">
                     {discussionComments.length > 0 ? (
-                      discussionComments.map((comment, idx) => {
-                        const isLast = idx === discussionComments.length - 1;
-
-                        return (
-                          <motion.div
-                            key={comment.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: idx * 0.03 }}
-                            className={`py-3.5 ${!isLast ? 'border-b border-white/[0.04]' : ''}`}
-                          >
-                            <div className="flex items-center gap-2.5 mb-2">
-                              <div className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center">
-                                <span className="text-[10px] text-white/60 font-medium">
-                                  {(comment.authorName || comment.authorEmail).charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[12px] text-white/70 truncate">
-                                  {comment.authorName || comment.authorEmail}
-                                </p>
-                              </div>
-                              <span className="text-[10px] text-white/30">
-                                {formatDate(comment.createdAt)}
+                      discussionComments.map((comment, idx) => (
+                        <motion.div
+                          key={comment.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: idx * 0.02 }}
+                          className="py-3"
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center">
+                              <span className="text-[9px] text-white/60 font-medium">
+                                {(comment.authorName || comment.authorEmail).charAt(0).toUpperCase()}
                               </span>
                             </div>
-                            <p className="text-[13px] text-white/60 whitespace-pre-wrap leading-relaxed pl-8">
-                              {highlightMentions(comment.comment)}
-                            </p>
-                          </motion.div>
-                        );
-                      })
+                            <span className="text-[12px] text-white/60 truncate flex-1">
+                              {comment.authorName || comment.authorEmail}
+                            </span>
+                            <span className="text-[10px] text-white/30">
+                              {formatDate(comment.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-[13px] text-white/70 whitespace-pre-wrap leading-relaxed pl-7">
+                            {highlightMentions(comment.comment)}
+                          </p>
+                        </motion.div>
+                      ))
                     ) : (
-                      <p className="text-[13px] text-white/30 text-center py-8">No comments yet</p>
+                      <p className="text-[13px] text-white/30 text-center py-6">No comments yet</p>
                     )}
                   </div>
 
+                  {/* Input - pill + send icon */}
                   {canAddComments && onAddDiscussionComment && (
-                    <div className="border-t border-white/[0.04] pt-4">
-                      <MentionInput
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
                         value={newComment}
-                        onChange={setNewComment}
-                        onSubmit={(text) => {
-                          onAddDiscussionComment(text);
-                          setNewComment('');
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newComment.trim()) {
+                            onAddDiscussionComment(newComment.trim());
+                            setNewComment('');
+                          }
                         }}
                         placeholder="Add a comment..."
+                        className="flex-1 h-9 px-4 text-[13px] input-pill"
                       />
+                      <button
+                        onClick={() => {
+                          if (newComment.trim()) {
+                            onAddDiscussionComment(newComment.trim());
+                            setNewComment('');
+                          }
+                        }}
+                        disabled={!newComment.trim()}
+                        className="w-9 h-9 flex items-center justify-center rounded-full bg-white/[0.04] hover:bg-white/[0.06] text-white/50 hover:text-white/70 transition-all duration-[180ms] disabled:opacity-30"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
                     </div>
                   )}
                 </div>
