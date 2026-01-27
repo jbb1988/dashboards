@@ -411,12 +411,13 @@ export default function SmartProjectsTab({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${appleTokens.accentBlue}20` }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 60px ${appleTokens.accentBlue}25, inset 0 1px 0 rgba(255,255,255,0.10)` }}
           onClick={() => setActiveView('all')}
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            boxShadow: activeView === 'all' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${appleTokens.accentBlue}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            border: `1px solid ${appleTokens.accentBlue}20`,
+            boxShadow: activeView === 'all' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentBlue}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentBlue}12`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
@@ -430,12 +431,13 @@ export default function SmartProjectsTab({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${appleTokens.accentRed}20` }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 60px ${appleTokens.accentRed}25, inset 0 1px 0 rgba(255,255,255,0.10)` }}
           onClick={() => setActiveView('needs_attention')}
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            boxShadow: activeView === 'needs_attention' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${appleTokens.accentRed}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            border: `1px solid ${appleTokens.accentRed}20`,
+            boxShadow: activeView === 'needs_attention' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentRed}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentRed}12`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
@@ -449,12 +451,13 @@ export default function SmartProjectsTab({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${appleTokens.accentCyan}20` }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 60px ${appleTokens.accentCyan}25, inset 0 1px 0 rgba(255,255,255,0.10)` }}
           onClick={() => setActiveView('this_week')}
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            boxShadow: activeView === 'this_week' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${appleTokens.accentCyan}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            border: `1px solid ${appleTokens.accentCyan}20`,
+            boxShadow: activeView === 'this_week' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${appleTokens.accentCyan}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${appleTokens.accentCyan}12`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
@@ -468,12 +471,13 @@ export default function SmartProjectsTab({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${COLORS.confirmed}20` }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 60px ${COLORS.confirmed}25, inset 0 1px 0 rgba(255,255,255,0.10)` }}
           onClick={() => setActiveView('confirmed')}
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            boxShadow: activeView === 'confirmed' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${COLORS.confirmed}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            border: `1px solid ${COLORS.confirmed}20`,
+            boxShadow: activeView === 'confirmed' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${COLORS.confirmed}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${COLORS.confirmed}12`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
@@ -487,12 +491,13 @@ export default function SmartProjectsTab({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 40px ${COLORS.placeholder}20` }}
+          whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 60px ${COLORS.placeholder}25, inset 0 1px 0 rgba(255,255,255,0.10)` }}
           onClick={() => setActiveView('placeholder')}
           className="relative overflow-hidden cursor-pointer transition-all p-5"
           style={{
             background: appleTokens.surfaceL1,
-            boxShadow: activeView === 'placeholder' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 30px ${COLORS.placeholder}20, inset 0 1px 0 rgba(255,255,255,0.10)` : appleTokens.shadowL1,
+            border: `1px solid ${COLORS.placeholder}20`,
+            boxShadow: activeView === 'placeholder' ? `0 30px 90px rgba(0,0,0,0.75), 0 0 40px ${COLORS.placeholder}30, inset 0 1px 0 rgba(255,255,255,0.10)` : `${appleTokens.shadowL1}, 0 0 30px ${COLORS.placeholder}12`,
             borderRadius: appleTokens.radiusL1,
           }}
         >
