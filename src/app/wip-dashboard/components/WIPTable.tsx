@@ -51,12 +51,12 @@ function getStageColor(stage: string | null | undefined): string {
   return 'bg-cyan-500/20 text-cyan-400';
 }
 
-function getDaysIndicator(days: number | null | undefined): { color: string; indicator: string } {
-  if (days === null || days === undefined) return { color: 'text-gray-500', indicator: '' };
-  if (days > 14) return { color: 'text-red-400 font-semibold', indicator: '!!' };
-  if (days > 7) return { color: 'text-red-400', indicator: '!' };
-  if (days > 3) return { color: 'text-amber-400', indicator: '' };
-  return { color: 'text-green-400', indicator: '' };
+function getDaysColor(days: number | null | undefined): string {
+  if (days === null || days === undefined) return 'text-gray-500';
+  if (days > 14) return 'text-red-400 font-semibold';
+  if (days > 7) return 'text-red-400';
+  if (days > 3) return 'text-amber-400';
+  return 'text-green-400';
 }
 
 function getMarginColor(margin: number | null): string {
@@ -134,7 +134,7 @@ export default function WIPTable({ data }: WIPTableProps) {
       {/* Rows */}
       {sortedData.map((wo, index) => {
         const days = wo.days_in_status ?? wo.days_in_current_op;
-        const { color: daysColor, indicator } = getDaysIndicator(days);
+        const daysColor = getDaysColor(days);
         const isStuck = days !== null && days !== undefined && days > 7;
         const shopStatus = wo.shop_status || 'Unknown';
         const isEven = index % 2 === 0;
@@ -186,7 +186,7 @@ export default function WIPTable({ data }: WIPTableProps) {
             {/* Days */}
             <div className="text-center">
               {days !== null && days !== undefined ? (
-                <span className={daysColor}>{indicator}{days}d</span>
+                <span className={daysColor}>{days}d</span>
               ) : (
                 <span className="text-gray-500">-</span>
               )}

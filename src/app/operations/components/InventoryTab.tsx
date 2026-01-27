@@ -28,17 +28,20 @@ interface InventoryTabProps {
 }
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
 }
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
 }
+
+// Grid columns for Low Stock: Item | On Hand | Reorder | Shortage | Value
+const LOW_STOCK_GRID = '1.5fr 100px 100px 100px 100px';
+
+// Grid columns for Backorders: Item | On Hand | Backordered | Available
+const BACKORDER_GRID = '1.5fr 100px 120px 100px';
 
 export default function InventoryTab({
   loading,
@@ -101,9 +104,22 @@ export default function InventoryTab({
               <AlertTriangle className="w-5 h-5 text-red-400" />
               <h2 className="text-lg font-semibold text-white">Low Stock Items</h2>
             </div>
-            <span className="text-sm text-gray-400">Below reorder point</span>
+            <span className="text-sm text-gray-400">{lowStockItems.length} items below reorder point</span>
           </div>
 
+          {/* Header */}
+          <div
+            className="grid gap-4 px-4 py-3 border-b border-white/[0.06] text-xs font-semibold text-gray-500 uppercase tracking-wider"
+            style={{ gridTemplateColumns: LOW_STOCK_GRID }}
+          >
+            <div>Item</div>
+            <div className="text-right">On Hand</div>
+            <div className="text-right">Reorder Pt</div>
+            <div className="text-right">Shortage</div>
+            <div className="text-right">Value</div>
+          </div>
+
+          {/* Rows */}
           {loading ? (
             <div className="p-4 space-y-2">
               {[...Array(5)].map((_, i) => (
@@ -118,70 +134,52 @@ export default function InventoryTab({
               <p className="text-gray-400">All items are above reorder point</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/[0.06]">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Item
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      On Hand
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Reorder Point
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Shortage
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Value
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {lowStockItems.map((item, index) => {
-                    const shortage = (item.reorder_point || 0) - item.quantity_on_hand;
-                    return (
-                      <motion.tr
-                        key={item.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.03 }}
-                        className="hover:bg-white/[0.02] transition-colors"
-                      >
-                        <td className="px-4 py-3">
-                          <div>
-                            <span className="text-sm font-medium text-white">{item.item_id}</span>
-                            <p className="text-xs text-gray-500 truncate max-w-[200px]">{item.display_name}</p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm font-medium text-red-400">
-                            {formatNumber(item.quantity_on_hand)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm text-gray-400">
-                            {formatNumber(item.reorder_point || 0)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm font-medium text-red-400">
-                            -{formatNumber(shortage)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm text-gray-400">
-                            {formatCurrency(item.quantity_on_hand * item.unit_cost)}
-                          </span>
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            lowStockItems.map((item, index) => {
+              const shortage = (item.reorder_point || 0) - item.quantity_on_hand;
+              const isEven = index % 2 === 0;
+              const isCritical = item.quantity_on_hand === 0;
+
+              return (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(index * 0.015, 0.3) }}
+                  className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.02] ${
+                    isCritical ? 'bg-red-500/[0.03]' : isEven ? 'bg-[#151F2E]' : 'bg-[#131B28]'
+                  }`}
+                  style={{ gridTemplateColumns: LOW_STOCK_GRID }}
+                >
+                  {/* Item */}
+                  <div className="min-w-0">
+                    <span className="font-medium text-white truncate block">{item.item_id}</span>
+                    <span className="text-xs text-gray-500 truncate block">{item.display_name}</span>
+                  </div>
+
+                  {/* On Hand */}
+                  <div className="text-right">
+                    <span className={`font-medium ${isCritical ? 'text-red-400' : 'text-amber-400'}`}>
+                      {formatNumber(item.quantity_on_hand)}
+                    </span>
+                  </div>
+
+                  {/* Reorder Point */}
+                  <div className="text-right">
+                    <span className="text-gray-400">{formatNumber(item.reorder_point || 0)}</span>
+                  </div>
+
+                  {/* Shortage */}
+                  <div className="text-right">
+                    <span className="font-medium text-red-400">-{formatNumber(shortage)}</span>
+                  </div>
+
+                  {/* Value */}
+                  <div className="text-right">
+                    <span className="text-gray-300">{formatCurrency(item.quantity_on_hand * item.unit_cost)}</span>
+                  </div>
+                </motion.div>
+              );
+            })
           )}
         </div>
       )}
@@ -194,9 +192,21 @@ export default function InventoryTab({
               <Package className="w-5 h-5 text-amber-400" />
               <h2 className="text-lg font-semibold text-white">Backordered Items</h2>
             </div>
-            <span className="text-sm text-gray-400">Awaiting stock fulfillment</span>
+            <span className="text-sm text-gray-400">{backorderedItems.length} items awaiting stock</span>
           </div>
 
+          {/* Header */}
+          <div
+            className="grid gap-4 px-4 py-3 border-b border-white/[0.06] text-xs font-semibold text-gray-500 uppercase tracking-wider"
+            style={{ gridTemplateColumns: BACKORDER_GRID }}
+          >
+            <div>Item</div>
+            <div className="text-right">On Hand</div>
+            <div className="text-right">Backordered</div>
+            <div className="text-right">Available</div>
+          </div>
+
+          {/* Rows */}
           {loading ? (
             <div className="p-4 space-y-2">
               {[...Array(5)].map((_, i) => (
@@ -211,59 +221,46 @@ export default function InventoryTab({
               <p className="text-gray-400">No backordered items</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/[0.06]">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Item
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      On Hand
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Backordered
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Available
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {backorderedItems.map((item, index) => (
-                    <motion.tr
-                      key={item.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                      className="hover:bg-white/[0.02] transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <div>
-                          <span className="text-sm font-medium text-white">{item.item_id}</span>
-                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{item.display_name}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm text-gray-300">
-                          {formatNumber(item.quantity_on_hand)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-medium text-amber-400">
-                          {formatNumber(item.quantity_backordered)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`text-sm font-medium ${item.quantity_available < 0 ? 'text-red-400' : 'text-gray-300'}`}>
-                          {formatNumber(item.quantity_available)}
-                        </span>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            backorderedItems.map((item, index) => {
+              const isEven = index % 2 === 0;
+              const isNegativeAvailable = item.quantity_available < 0;
+
+              return (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(index * 0.015, 0.3) }}
+                  className={`grid gap-4 px-4 py-3 items-center border-b border-white/[0.04] transition-colors hover:bg-white/[0.02] ${
+                    isNegativeAvailable ? 'bg-red-500/[0.03]' : isEven ? 'bg-[#151F2E]' : 'bg-[#131B28]'
+                  }`}
+                  style={{ gridTemplateColumns: BACKORDER_GRID }}
+                >
+                  {/* Item */}
+                  <div className="min-w-0">
+                    <span className="font-medium text-white truncate block">{item.item_id}</span>
+                    <span className="text-xs text-gray-500 truncate block">{item.display_name}</span>
+                  </div>
+
+                  {/* On Hand */}
+                  <div className="text-right">
+                    <span className="text-gray-300">{formatNumber(item.quantity_on_hand)}</span>
+                  </div>
+
+                  {/* Backordered */}
+                  <div className="text-right">
+                    <span className="font-medium text-amber-400">{formatNumber(item.quantity_backordered)}</span>
+                  </div>
+
+                  {/* Available */}
+                  <div className="text-right">
+                    <span className={`font-medium ${isNegativeAvailable ? 'text-red-400' : 'text-gray-300'}`}>
+                      {formatNumber(item.quantity_available)}
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            })
           )}
         </div>
       )}
@@ -294,7 +291,7 @@ export default function InventoryTab({
                 .sort((a, b) => b[1] - a[1])
                 .map(([type, value], index) => {
                   const percentage = totalValue > 0 ? (value / totalValue) * 100 : 0;
-                  const colors = [
+                  const barColors = [
                     'bg-purple-500',
                     'bg-blue-500',
                     'bg-cyan-500',
@@ -302,7 +299,7 @@ export default function InventoryTab({
                     'bg-amber-500',
                     'bg-orange-500',
                   ];
-                  const color = colors[index % colors.length];
+                  const color = barColors[index % barColors.length];
 
                   return (
                     <motion.div
