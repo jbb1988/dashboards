@@ -199,7 +199,7 @@ export default function ApprovalContextSidebar({
   return (
     <div className="flex h-full">
       {/* Tab Strip */}
-      <div className="w-12 bg-[#1F2328] border-l border-white/8 flex flex-col py-2">
+      <div className="w-12 bg-[var(--approval-bg-base)] border-l border-white/6 flex flex-col py-2">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id && isOpen;
           const hasContent =
@@ -215,10 +215,10 @@ export default function ApprovalContextSidebar({
               onClick={() => handleTabClick(tab.id)}
               title={tab.label}
               className={`
-                relative w-12 h-12 flex items-center justify-center transition-colors
+                relative w-12 h-12 flex items-center justify-center transition-all
                 ${isActive
-                  ? 'text-[#58A6FF] bg-[#242A30]'
-                  : 'text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.7)] hover:bg-[#242A30]/50'
+                  ? 'text-[#58A6FF] bg-[var(--approval-bg-panel)]'
+                  : 'text-[rgba(255,255,255,0.45)] hover:text-[rgba(255,255,255,0.7)] hover:bg-[var(--approval-bg-panel)]/50'
                 }
               `}
             >
@@ -244,41 +244,78 @@ export default function ApprovalContextSidebar({
             animate={{ width: 750, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="bg-[#242A30] border-l border-white/8 overflow-hidden flex flex-col"
+            className="glass-panel overflow-hidden flex flex-col"
           >
             {/* Panel Header */}
-            <div className="h-12 px-4 flex items-center justify-between border-b border-white/8 flex-shrink-0">
-              <h3 className="text-sm font-medium text-[rgba(255,255,255,0.88)]">
+            <div className="h-14 px-5 flex items-center justify-between border-b border-white/6 flex-shrink-0">
+              <h3 className="text-sm font-semibold text-[rgba(255,255,255,0.92)] tracking-tight">
                 {tabs.find((t) => t.id === activeTab)?.label}
               </h3>
               <button
                 onClick={() => onTabChange(null)}
-                className="p-1 text-[rgba(255,255,255,0.5)] hover:text-[rgba(255,255,255,0.88)] transition-colors"
+                className="p-1.5 rounded-md text-[rgba(255,255,255,0.45)] hover:text-[rgba(255,255,255,0.88)] hover:bg-white/5 transition-all"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
 
             {/* Panel Body */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-5">
               {/* Summary Tab */}
               {activeTab === 'summary' && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {summary.length > 0 ? (
-                    summary.map((item, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.03 }}
-                        className="flex items-start gap-2 text-sm"
-                      >
-                        <span className="text-[#58A6FF] mt-0.5 flex-shrink-0">•</span>
-                        <span className="text-[rgba(255,255,255,0.62)]">{item}</span>
-                      </motion.div>
-                    ))
+                    summary.map((item, idx) => {
+                      // Check if this is a separator line
+                      if (item.includes('───')) {
+                        return (
+                          <div key={idx} className="border-t border-white/8 my-4" />
+                        );
+                      }
+
+                      // Determine risk level from keywords
+                      const lowerItem = item.toLowerCase();
+                      const isHighRisk = lowerItem.includes('liability') || lowerItem.includes('indemnif') || lowerItem.includes('terminat') || lowerItem.includes('penalty') || lowerItem.includes('breach');
+                      const isMediumRisk = lowerItem.includes('payment') || lowerItem.includes('deadline') || lowerItem.includes('notice') || lowerItem.includes('change');
+                      const isReviewerNote = item.startsWith('📝');
+
+                      return (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, x: 10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          className={`summary-card p-4 rounded-lg border transition-all cursor-pointer group ${
+                            isReviewerNote
+                              ? 'bg-[#58A6FF]/10 border-[#58A6FF]/20 hover:border-[#58A6FF]/40'
+                              : 'bg-[#1B1F24]/60 border-white/5 hover:border-white/10'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {/* Risk indicator dot */}
+                            {!isReviewerNote && (
+                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                isHighRisk ? 'bg-[#F85149] risk-indicator-high' :
+                                isMediumRisk ? 'bg-[#D29922]' : 'bg-[#3FB950]'
+                              }`} />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-[13px] leading-relaxed ${
+                                isReviewerNote
+                                  ? 'text-[#58A6FF] font-medium'
+                                  : 'text-[rgba(255,255,255,0.88)]'
+                              }`}>
+                                {isReviewerNote ? item.replace('📝 ', '') : item}
+                              </p>
+                            </div>
+                            {/* Hover arrow indicator */}
+                            <ChevronRight className="w-4 h-4 text-[rgba(255,255,255,0.3)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+                          </div>
+                        </motion.div>
+                      );
+                    })
                   ) : (
-                    <p className="text-xs text-[rgba(255,255,255,0.5)]">No summary available</p>
+                    <p className="text-xs text-[rgba(255,255,255,0.45)]">No summary available</p>
                   )}
                 </div>
               )}
@@ -293,31 +330,31 @@ export default function ApprovalContextSidebar({
                         initial={{ opacity: 0, x: 10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.03 }}
-                        className={`p-2 rounded border bg-[#1B1F24]/50 ${getActionColor(entry.action)}`}
+                        className={`p-3 rounded-lg border bg-[#1B1F24]/60 ${getActionColor(entry.action)}`}
                       >
                         <div className="flex items-center gap-2 text-xs">
-                          <span>{getActionIcon(entry.action)}</span>
-                          <span className="text-[rgba(255,255,255,0.88)] font-medium capitalize">{entry.action}</span>
-                          <span className="text-[rgba(255,255,255,0.3)]">•</span>
+                          <span className="text-base">{getActionIcon(entry.action)}</span>
+                          <span className="text-[rgba(255,255,255,0.92)] font-medium capitalize">{entry.action}</span>
+                          <span className="text-[rgba(255,255,255,0.25)]">•</span>
                           <span className="text-[rgba(255,255,255,0.62)] truncate">{entry.by}</span>
                         </div>
-                        <div className="text-[10px] text-[rgba(255,255,255,0.5)] mt-1">{formatDate(entry.at)}</div>
+                        <div className="text-[10px] text-[rgba(255,255,255,0.45)] mt-1.5">{formatDate(entry.at)}</div>
                         {entry.feedback && (
-                          <p className="text-[10px] text-[rgba(255,255,255,0.62)] mt-1 italic border-l-2 border-white/10 pl-2">
+                          <p className="text-[11px] text-[rgba(255,255,255,0.62)] mt-2 italic border-l-2 border-white/10 pl-2">
                             &ldquo;{entry.feedback}&rdquo;
                           </p>
                         )}
                       </motion.div>
                     ))
                   ) : (
-                    <p className="text-xs text-[rgba(255,255,255,0.5)]">No activity recorded yet</p>
+                    <p className="text-xs text-[rgba(255,255,255,0.45)]">No activity recorded yet</p>
                   )}
                 </div>
               )}
 
               {/* Documents Tab */}
               {activeTab === 'documents' && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {documents.length > 0 ? (
                     sortDocumentsByType(documents).map((doc, idx) => (
                       <motion.div
@@ -325,15 +362,17 @@ export default function ApprovalContextSidebar({
                         initial={{ opacity: 0, x: 10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.03 }}
-                        className="p-2 rounded bg-[#1B1F24] border border-white/8 hover:border-white/15 transition-colors"
+                        className="p-3 rounded-lg bg-[#1B1F24]/60 border border-white/5 hover:border-white/12 transition-all"
                       >
-                        <div className="flex items-start gap-2 mb-2">
-                          <svg className="w-4 h-4 text-[rgba(255,255,255,0.62)] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-5 h-5 text-[rgba(255,255,255,0.55)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs text-[rgba(255,255,255,0.88)] truncate">{doc.fileName}</p>
-                            <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded border mt-1 ${getDocumentTypeColor(doc.documentType)}`}>
+                            <p className="text-[13px] text-[rgba(255,255,255,0.92)] truncate font-medium">{doc.fileName}</p>
+                            <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-md border mt-1.5 ${getDocumentTypeColor(doc.documentType)}`}>
                               {doc.documentType}
                             </span>
                           </div>
@@ -341,14 +380,14 @@ export default function ApprovalContextSidebar({
                         <div className="flex gap-2">
                           <button
                             onClick={() => onViewDocument(doc)}
-                            className="flex-1 text-[10px] px-2 py-1 bg-[#58A6FF]/10 text-[#58A6FF] rounded hover:bg-[#58A6FF]/20 transition-colors"
+                            className="flex-1 text-[11px] font-medium px-3 py-1.5 bg-[#58A6FF]/10 text-[#58A6FF] rounded-md hover:bg-[#58A6FF]/20 transition-colors"
                           >
                             View
                           </button>
                           {isWordDocument(doc.fileName) && (
                             <button
                               onClick={() => onDownloadDocument(doc)}
-                              className="flex-1 text-[10px] px-2 py-1 bg-white/5 text-[rgba(255,255,255,0.62)] rounded hover:bg-white/10 transition-colors"
+                              className="flex-1 text-[11px] font-medium px-3 py-1.5 bg-white/5 text-[rgba(255,255,255,0.62)] rounded-md hover:bg-white/10 transition-colors"
                             >
                               Download
                             </button>
@@ -357,15 +396,15 @@ export default function ApprovalContextSidebar({
                       </motion.div>
                     ))
                   ) : (
-                    <p className="text-xs text-[rgba(255,255,255,0.5)]">No supporting documents</p>
+                    <p className="text-xs text-[rgba(255,255,255,0.45)]">No supporting documents</p>
                   )}
                 </div>
               )}
 
               {/* Annotations Tab - Document highlights with notes */}
               {activeTab === 'annotations' && (
-                <div className="space-y-2">
-                  <p className="text-[10px] text-[rgba(255,255,255,0.5)] mb-3 pb-2 border-b border-white/8">
+                <div className="space-y-3">
+                  <p className="text-[11px] text-[rgba(255,255,255,0.45)] mb-4 pb-3 border-b border-white/6">
                     Yellow highlights added to specific text in the document
                   </p>
                   {annotations.length > 0 ? (
@@ -376,22 +415,25 @@ export default function ApprovalContextSidebar({
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.03 }}
                         onClick={() => onAnnotationClick?.(annotation.id)}
-                        className="p-2 rounded bg-[#D29922]/10 border border-[#D29922]/20 cursor-pointer hover:bg-[#D29922]/15 transition-colors"
+                        className="p-3 rounded-lg bg-[#D29922]/10 border border-[#D29922]/20 cursor-pointer hover:bg-[#D29922]/15 hover:border-[#D29922]/30 transition-all group"
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Highlighter className="w-3 h-3 text-[#D29922]" />
-                          <span className="text-[10px] text-[#D29922] font-medium">#{idx + 1}</span>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-md bg-[#D29922]/20 flex items-center justify-center">
+                            <Highlighter className="w-3.5 h-3.5 text-[#D29922]" />
+                          </div>
+                          <span className="text-[11px] text-[#D29922] font-semibold">Annotation #{idx + 1}</span>
+                          <ChevronRight className="w-4 h-4 text-[#D29922]/40 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
-                        <p className="text-[10px] text-[#D29922]/60 italic truncate border-l-2 border-[#D29922]/30 pl-2 mb-1">
-                          &ldquo;{annotation.highlightedText.slice(0, 40)}{annotation.highlightedText.length > 40 ? '...' : ''}&rdquo;
+                        <p className="text-[11px] text-[#D29922]/70 italic truncate border-l-2 border-[#D29922]/30 pl-2 mb-2">
+                          &ldquo;{annotation.highlightedText.slice(0, 50)}{annotation.highlightedText.length > 50 ? '...' : ''}&rdquo;
                         </p>
-                        <p className="text-xs text-[rgba(255,255,255,0.88)]">
-                          {annotation.text || <span className="text-[rgba(255,255,255,0.5)] italic">No note added</span>}
+                        <p className="text-[13px] text-[rgba(255,255,255,0.88)] leading-relaxed">
+                          {annotation.text || <span className="text-[rgba(255,255,255,0.45)] italic">No note added</span>}
                         </p>
                       </motion.div>
                     ))
                   ) : (
-                    <p className="text-xs text-[rgba(255,255,255,0.5)]">No annotations in the document. Select text and click the comment button to add one.</p>
+                    <p className="text-xs text-[rgba(255,255,255,0.45)]">No annotations in the document. Select text and click the comment button to add one.</p>
                   )}
                 </div>
               )}
@@ -399,7 +441,7 @@ export default function ApprovalContextSidebar({
               {/* Discussion Tab - General comments */}
               {activeTab === 'discussion' && (
                 <div className="flex flex-col h-full">
-                  <p className="text-[10px] text-[rgba(255,255,255,0.5)] mb-3 pb-2 border-b border-white/8">
+                  <p className="text-[11px] text-[rgba(255,255,255,0.45)] mb-4 pb-3 border-b border-white/6">
                     General comments and questions about this review
                   </p>
 
@@ -412,36 +454,36 @@ export default function ApprovalContextSidebar({
                           initial={{ opacity: 0, x: 10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: idx * 0.03 }}
-                          className="p-3 rounded bg-[#1B1F24] border border-white/8"
+                          className="p-4 rounded-lg bg-[#1B1F24]/60 border border-white/5"
                         >
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-6 h-6 rounded-full bg-[#58A6FF]/20 flex items-center justify-center">
-                              <span className="text-[10px] text-[#58A6FF] font-medium">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#58A6FF]/30 to-[#58A6FF]/10 flex items-center justify-center">
+                              <span className="text-[11px] text-[#58A6FF] font-semibold">
                                 {(comment.authorName || comment.authorEmail).charAt(0).toUpperCase()}
                               </span>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs text-[rgba(255,255,255,0.88)] font-medium truncate">
+                              <p className="text-[13px] text-[rgba(255,255,255,0.92)] font-medium truncate">
                                 {comment.authorName || comment.authorEmail}
                               </p>
-                              <p className="text-[10px] text-[rgba(255,255,255,0.5)]">
+                              <p className="text-[10px] text-[rgba(255,255,255,0.45)]">
                                 {formatDate(comment.createdAt)}
                               </p>
                             </div>
                           </div>
-                          <p className="text-sm text-[rgba(255,255,255,0.62)] whitespace-pre-wrap">
+                          <p className="text-[13px] text-[rgba(255,255,255,0.70)] whitespace-pre-wrap leading-relaxed">
                             {highlightMentions(comment.comment)}
                           </p>
                         </motion.div>
                       ))
                     ) : (
-                      <p className="text-xs text-[rgba(255,255,255,0.5)] text-center py-4">No comments yet. Start the discussion below.</p>
+                      <p className="text-xs text-[rgba(255,255,255,0.45)] text-center py-6">No comments yet. Start the discussion below.</p>
                     )}
                   </div>
 
                   {/* Add comment input */}
                   {canAddComments && onAddDiscussionComment && (
-                    <div className="border-t border-white/8 pt-3">
+                    <div className="border-t border-white/6 pt-4">
                       <MentionInput
                         value={newComment}
                         onChange={setNewComment}

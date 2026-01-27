@@ -110,9 +110,9 @@ export default function EditorToolbar({
   };
 
   return (
-    <div className="flex items-center gap-1 p-2 bg-[#242A30] border-b border-white/8 relative">
-      {/* Editing tools */}
-      <div className="flex items-center gap-1 pr-2 border-r border-white/10">
+    <div className="flex items-center gap-1 px-4 py-2.5 bg-[var(--approval-bg-surface)] border-b border-white/5 relative rounded-t-xl">
+      {/* Zone 1: Review Actions (Primary - colored) */}
+      <div className="flex items-center gap-2 pr-4 border-r border-white/10">
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleMark('approverStrike').run()}
@@ -145,8 +145,8 @@ export default function EditorToolbar({
         </button>
       </div>
 
-      {/* Undo/Redo */}
-      <div className="flex items-center gap-1 pl-2 pr-2 border-r border-white/10">
+      {/* Zone 2: Edit Tools (Secondary - muted until hover) */}
+      <div className="flex items-center gap-1 px-3 opacity-60 hover:opacity-100 transition-opacity">
         <button
           type="button"
           onClick={() => editor.chain().focus().undo().run()}
@@ -167,9 +167,42 @@ export default function EditorToolbar({
         </button>
       </div>
 
-      {/* Download */}
-      {showDownload && onDownload && (
-        <div className="flex items-center gap-1 pl-2 pr-2 border-r border-white/10">
+      {/* Zone 3: Utility (Tertiary - far right, subtle) */}
+      <div className="ml-auto flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
+        {/* Zoom Controls */}
+        {onZoomChange && (
+          <div className="flex items-center gap-1 pr-3 border-r border-white/10">
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              disabled={zoomLevel <= MIN_ZOOM}
+              className={`${buttonBase} ${inactiveClass} disabled:opacity-30 disabled:cursor-not-allowed`}
+              title="Zoom out"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleZoomReset}
+              className="px-2 py-1 text-xs font-medium text-[rgba(255,255,255,0.55)] hover:text-[rgba(255,255,255,0.88)] transition-colors min-w-[48px] text-center"
+              title="Reset zoom to 100%"
+            >
+              {zoomLevel}%
+            </button>
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              disabled={zoomLevel >= MAX_ZOOM}
+              className={`${buttonBase} ${inactiveClass} disabled:opacity-30 disabled:cursor-not-allowed`}
+              title="Zoom in"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Download */}
+        {showDownload && onDownload && (
           <button
             type="button"
             onClick={onDownload}
@@ -178,44 +211,12 @@ export default function EditorToolbar({
           >
             <Download className="w-4 h-4" />
           </button>
-        </div>
-      )}
-
-      {/* Zoom Controls */}
-      {onZoomChange && (
-        <div className="flex items-center gap-1 pl-2 pr-2 border-r border-white/10">
-          <button
-            type="button"
-            onClick={handleZoomOut}
-            disabled={zoomLevel <= MIN_ZOOM}
-            className={`${buttonBase} ${inactiveClass} disabled:opacity-30 disabled:cursor-not-allowed`}
-            title="Zoom out"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={handleZoomReset}
-            className="px-2 py-1 text-xs font-medium text-[rgba(255,255,255,0.62)] hover:text-[rgba(255,255,255,0.88)] transition-colors min-w-[48px] text-center"
-            title="Reset zoom to 100%"
-          >
-            {zoomLevel}%
-          </button>
-          <button
-            type="button"
-            onClick={handleZoomIn}
-            disabled={zoomLevel >= MAX_ZOOM}
-            className={`${buttonBase} ${inactiveClass} disabled:opacity-30 disabled:cursor-not-allowed`}
-            title="Zoom in"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Word/OneDrive Actions */}
       {onedriveEmbedUrl && (
-        <div className="flex items-center gap-1 pl-2 pr-2 border-r border-white/10">
+        <div className="flex items-center gap-2 pl-3 border-l border-white/10">
           {onRefreshFromWord && (
             <button
               type="button"
@@ -242,7 +243,7 @@ export default function EditorToolbar({
             href={onedriveEmbedUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2B579A] hover:bg-[#1E3F6F] text-white text-xs font-medium rounded transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2B579A] hover:bg-[#1E3F6F] text-white text-xs font-medium rounded-lg transition-colors shadow-sm"
             title="Open and edit in Word Online"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -253,22 +254,22 @@ export default function EditorToolbar({
         </div>
       )}
 
-      {/* Legend */}
-      <div className="ml-auto flex items-center gap-3 text-xs text-[rgba(255,255,255,0.62)]">
+      {/* Legend - more subtle */}
+      <div className="flex items-center gap-3 text-[10px] text-[rgba(255,255,255,0.4)] pl-4 border-l border-white/8">
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-[#f87171]/30 border border-[#f87171]/50" />
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#f87171]/30 border border-[#f87171]/50" />
           Strike
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-[#4ade80]/30 border border-[#4ade80]/50" />
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#4ade80]/30 border border-[#4ade80]/50" />
           Add
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-[#60A5FA]/30 border border-[#60A5FA]/50" />
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#60A5FA]/30 border border-[#60A5FA]/50" />
           Your Edits
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-[#FACC15]/30 border border-[#FACC15]/50" />
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#FACC15]/30 border border-[#FACC15]/50" />
           Comments
         </span>
       </div>

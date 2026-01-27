@@ -6,6 +6,11 @@
   --navy-900: #0a1628;
   --navy-800: #0d1d35;
   --gold: #d4af37;
+
+  /* Three-tier elevation system for Approval page */
+  --approval-bg-base: #12161C;      /* Near-black app background */
+  --approval-bg-surface: #1A1F26;   /* Document container */
+  --approval-bg-panel: #242A32;     /* Sidebar/panels with subtle transparency */
 }
 
 * {
@@ -76,4 +81,38 @@ span[data-approver-comment] {
   padding: 0 2px;
   border-radius: 2px;
   cursor: pointer;
+}
+
+/* Glassmorphism for approval panels */
+.glass-panel {
+  background: rgba(36, 42, 50, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Document container with subtle glow effect */
+.doc-container {
+  box-shadow: 0 0 60px rgba(88, 166, 255, 0.03),
+              0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Summary card hover state */
+.summary-card {
+  transition: all 0.2s ease;
+}
+
+.summary-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateX(2px);
+}
+
+/* Risk indicator pulse animation */
+@keyframes risk-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.risk-indicator-high {
+  animation: risk-pulse 2s ease-in-out infinite;
 }

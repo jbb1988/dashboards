@@ -387,7 +387,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#1B1F24] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--approval-bg-base)] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-[#58A6FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-[rgba(255,255,255,0.62)]">Loading approval request...</p>
@@ -399,8 +399,8 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-[#1B1F24] flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-[#242A30] border border-[#F85149]/30 rounded-lg p-8 text-center">
+      <div className="min-h-screen bg-[var(--approval-bg-base)] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-[var(--approval-bg-panel)] border border-[#F85149]/30 rounded-lg p-8 text-center">
           <svg className="w-16 h-16 text-[#F85149] mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
@@ -418,7 +418,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
   const mainSidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   return (
-    <div className="min-h-screen bg-[#1B1F24]">
+    <div className="min-h-screen bg-[var(--approval-bg-base)]">
       {/* Main Navigation Sidebar (Left) */}
       <Sidebar
         isCollapsed={sidebarCollapsed}
@@ -454,14 +454,14 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
 
         {/* Main Content: Document + Context Sidebar */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Document Viewer Area - aligned left */}
-          <div className="flex-1 overflow-auto bg-[#1B1F24]">
-            {/* Document Container */}
+          {/* Document Viewer Area - base layer background */}
+          <div className="flex-1 overflow-auto bg-[var(--approval-bg-base)]">
+            {/* Document Container - elevated surface with glow */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               ref={editorRef}
-              className="min-h-[calc(100vh-60px)] relative"
+              className="max-w-5xl mx-auto my-6 bg-[var(--approval-bg-surface)] rounded-xl border border-white/5 doc-container min-h-[calc(100vh-108px)]"
             >
               {/* Redline Editor - text-based view */}
               <RedlineEditor
@@ -484,7 +484,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
             onTabChange={handleContextTabChange}
             isOpen={contextSidebarOpen}
             summary={[
-              ...(review.reviewerNotes ? [`📝 REVIEWER NOTES: ${review.reviewerNotes}`] : []),
+              ...(review.reviewerNotes ? [`📝 Reviewer Notes: ${review.reviewerNotes}`] : []),
               ...(review.reviewerNotes && review.summary.length > 0 ? ['───────────────────'] : []),
               ...review.summary
             ]}
@@ -503,17 +503,17 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
 
       {/* Feedback Modal */}
       {showFeedbackModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-6">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-6">
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#242A30] border border-white/8 rounded-lg p-6 max-w-md w-full"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="glass-panel rounded-xl p-6 max-w-md w-full shadow-2xl"
           >
-            <h3 className="text-lg font-semibold text-[rgba(255,255,255,0.88)] mb-4">
+            <h3 className="text-lg font-semibold text-[rgba(255,255,255,0.92)] mb-5">
               {pendingDecision === 'approve' ? 'Approve Contract' : 'Reject Contract'}
             </h3>
 
-            <div className="mb-4">
+            <div className="mb-5">
               <label className="block text-sm font-medium text-[rgba(255,255,255,0.62)] mb-2">
                 Feedback {pendingDecision === 'reject' && <span className="text-[#F85149]">*</span>}
               </label>
@@ -526,7 +526,7 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                     : 'Please explain why you are rejecting this contract...'
                 }
                 rows={4}
-                className="w-full px-3 py-2 bg-[#1B1F24] border border-white/8 rounded-lg text-[rgba(255,255,255,0.88)] text-sm focus:outline-none focus:border-[#58A6FF] resize-none placeholder:text-[rgba(255,255,255,0.4)]"
+                className="w-full px-4 py-3 bg-[var(--approval-bg-base)] border border-white/10 rounded-lg text-[rgba(255,255,255,0.88)] text-sm focus:outline-none focus:border-[#58A6FF] focus:ring-1 focus:ring-[#58A6FF]/30 resize-none placeholder:text-[rgba(255,255,255,0.35)] transition-all"
               />
             </div>
 
@@ -536,17 +536,17 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
                   setShowFeedbackModal(false);
                   setPendingDecision(null);
                 }}
-                className="flex-1 px-4 py-2 text-sm bg-white/5 text-[rgba(255,255,255,0.62)] rounded-lg hover:bg-white/10 transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm font-medium bg-white/5 text-[rgba(255,255,255,0.62)] rounded-lg hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={submitDecision}
                 disabled={submitting || (pendingDecision === 'reject' && !feedback.trim())}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all disabled:opacity-50 ${
                   pendingDecision === 'approve'
-                    ? 'bg-[#238636] hover:bg-[#2ea043] text-white'
-                    : 'bg-[#F85149]/15 border border-[#F85149]/30 text-[#F85149] hover:bg-[#F85149]/25'
+                    ? 'bg-[#238636] hover:bg-[#2ea043] text-white shadow-md shadow-[#238636]/25'
+                    : 'bg-[#F85149]/15 border border-[#F85149]/40 text-[#F85149] hover:bg-[#F85149]/25'
                 }`}
               >
                 {submitting ? 'Submitting...' : pendingDecision === 'approve' ? 'Approve' : 'Reject'}

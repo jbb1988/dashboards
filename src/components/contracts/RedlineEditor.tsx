@@ -242,7 +242,7 @@ export default function RedlineEditor({
     editable: !readOnly,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[calc(100vh-180px)] text-white text-sm font-mono whitespace-pre-wrap leading-relaxed p-6',
+        class: 'prose prose-invert max-w-none focus:outline-none min-h-[calc(100vh-180px)] text-[rgba(255,255,255,0.85)] text-[15px] leading-[1.75] tracking-wide whitespace-pre-wrap p-8',
       },
       // Always apply approverInsert mark to typed text (blue underline)
       handleTextInput: (view, from, to, text) => {
@@ -330,11 +330,11 @@ export default function RedlineEditor({
   return (
     <div
       ref={scrollContainerRef}
-      className="h-[calc(100vh-60px)] overflow-y-auto bg-[#1B1F24]"
+      className="h-[calc(100vh-108px)] overflow-y-auto bg-transparent rounded-xl"
     >
       {/* Sticky toolbar - sticks within the scroll container */}
       {!readOnly && (
-        <div className="sticky top-0 z-20 bg-[#1B1F24]">
+        <div className="sticky top-0 z-20 bg-[var(--approval-bg-surface)] rounded-t-xl">
           <EditorToolbar
             editor={editor}
             onAddComment={handleAddComment}
@@ -352,7 +352,7 @@ export default function RedlineEditor({
 
       {/* Editor content */}
       <div
-        className={`bg-[#1B1F24] ${!readOnly ? 'cursor-text' : ''} overflow-x-auto`}
+        className={`bg-transparent ${!readOnly ? 'cursor-text' : ''} overflow-x-auto`}
         onClick={handleEditorClick}
       >
         <div
@@ -368,14 +368,14 @@ export default function RedlineEditor({
 
       {/* Read-only toolbar with zoom and download */}
       {readOnly && hasContent && (
-        <div className="sticky bottom-0 bg-[#1B1F24] border-t border-white/10 px-4 py-2 flex items-center justify-between">
+        <div className="sticky bottom-0 bg-[var(--approval-bg-surface)] border-t border-white/8 px-6 py-3 flex items-center justify-between rounded-b-xl">
           {/* Zoom Controls */}
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}
               disabled={zoomLevel <= 50}
-              className="p-1.5 rounded bg-white/5 text-[#8FA3BF] hover:bg-white/10 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-md bg-white/5 text-[rgba(255,255,255,0.55)] hover:bg-white/10 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               title="Zoom out"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -385,7 +385,7 @@ export default function RedlineEditor({
             <button
               type="button"
               onClick={() => setZoomLevel(100)}
-              className="px-2 py-1 text-xs font-medium text-[#8FA3BF] hover:text-white transition-colors min-w-[48px] text-center"
+              className="px-2 py-1 text-xs font-medium text-[rgba(255,255,255,0.55)] hover:text-white transition-colors min-w-[48px] text-center"
               title="Reset zoom to 100%"
             >
               {zoomLevel}%
@@ -394,7 +394,7 @@ export default function RedlineEditor({
               type="button"
               onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}
               disabled={zoomLevel >= 200}
-              className="p-1.5 rounded bg-white/5 text-[#8FA3BF] hover:bg-white/10 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-md bg-white/5 text-[rgba(255,255,255,0.55)] hover:bg-white/10 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               title="Zoom in"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -407,7 +407,7 @@ export default function RedlineEditor({
           <button
             type="button"
             onClick={handleDownload}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white/5 text-[#8FA3BF] rounded hover:bg-white/10 hover:text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-white/5 text-[rgba(255,255,255,0.62)] rounded-lg hover:bg-white/10 hover:text-white transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
