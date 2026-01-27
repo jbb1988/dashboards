@@ -29,14 +29,50 @@ interface OrderMetrics {
   fulfillments: any[];
 }
 
+interface BackorderBlastRadius {
+  totalItems: number;
+  ordersImpacted: number;
+  customersImpacted: number;
+  revenueDelayed: number;
+  installsAtRisk30Days: number;
+  topBlockingItems: Array<{
+    item_id: string;
+    display_name: string;
+    orders_blocked: number;
+    revenue_blocked: number;
+    quantity_short: number;
+  }>;
+}
+
+interface ActionItem {
+  id: string;
+  type: 'stale_order' | 'blocking_sku' | 'low_stock_critical' | 'backorder_critical';
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  description: string;
+  metric: string;
+  metric_value: string;
+  owner: string;
+  deadline: string | null;
+  related_orders?: string[];
+  related_items?: string[];
+}
+
 interface InventoryMetrics {
   summary: {
     totalInventoryValue: number;
     totalItemsOnHand: number;
     totalBackorderedItems: number;
     lowStockItemCount: number;
+    // New actionable KPIs
+    revenueBlockedByInventory: number;
+    ordersBlockedByInventory: number;
+    topBlockingDriver: string;
+    topBlockingDriverCount: number;
   };
   valueByType: Record<string, number>;
+  backorderBlastRadius: BackorderBlastRadius;
+  actionItems: ActionItem[];
   lowStockItems: any[];
   backorderedItems: any[];
   allItems: any[];
@@ -109,14 +145,20 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
 
       // Show alert if there are critical issues
       const aging90Plus = orderData.metrics?.aging?.['90+']?.count || 0;
-      const lowStock = inventoryData.metrics?.summary?.lowStockItemCount || 0;
+      const revenueBlocked = inventoryData.metrics?.summary?.revenueBlockedByInventory || 0;
+      const actionCount = inventoryData.metrics?.actionItems?.length || 0;
 
-      if (aging90Plus > 0 || lowStock > 5) {
+      if (aging90Plus > 0 || revenueBlocked > 100000 || actionCount > 0) {
+        const issues = [];
+        if (aging90Plus > 0) issues.push(`${aging90Plus} orders aging 90+ days`);
+        if (revenueBlocked > 100000) issues.push(`${formatCurrency(revenueBlocked)} revenue blocked`);
+        if (actionCount > 0) issues.push(`${actionCount} actions requiring attention`);
+
         setAlert({
           visible: true,
-          type: 'warning',
+          type: revenueBlocked > 500000 || aging90Plus > 5 ? 'error' : 'warning',
           title: 'Attention Required',
-          message: `${aging90Plus > 0 ? `${aging90Plus} orders aging 90+ days` : ''}${aging90Plus > 0 && lowStock > 5 ? ', ' : ''}${lowStock > 5 ? `${lowStock} low stock items` : ''}`,
+          message: issues.join(', '),
         });
       }
     } catch (err) {
@@ -131,7 +173,14 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
     fetchMetrics();
   }, [fetchMetrics]);
 
-  // Tab configuration
+  // Calculate derived metrics for display
+  const revenueBlocked = inventoryMetrics?.summary?.revenueBlockedByInventory || 0;
+  const topDriver = inventoryMetrics?.summary?.topBlockingDriver || 'None';
+  const topDriverCount = inventoryMetrics?.summary?.topBlockingDriverCount || 0;
+  const actionCount = inventoryMetrics?.actionItems?.length || 0;
+  const blastRadius = inventoryMetrics?.backorderBlastRadius;
+
+  // Tab configuration with action count
   const tabs = [
     {
       id: 'orders' as TabId,
@@ -141,7 +190,7 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
     {
       id: 'inventory' as TabId,
       label: 'Inventory',
-      badge: inventoryMetrics?.summary?.lowStockItemCount || 0,
+      badge: actionCount > 0 ? actionCount : (inventoryMetrics?.summary?.lowStockItemCount || 0),
     },
     {
       id: 'wip' as TabId,
@@ -180,7 +229,7 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
         </motion.div>
       )}
 
-      {/* KPI Cards Row */}
+      {/* KPI Cards Row - Enhanced with context */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading ? (
           <>
@@ -191,17 +240,28 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
           </>
         ) : (
           <>
+            {/* Revenue at Risk - Now with context */}
             <KPICard
               title="Revenue at Risk"
               value={formatCurrency(orderMetrics?.summary?.revenueAtRisk || 0)}
-              subtitle={`${orderMetrics?.aging?.['90+']?.count || 0} orders 90+ days`}
+              subtitle={
+                revenueBlocked > 0
+                  ? `${formatCurrency(revenueBlocked)} blocked by inventory`
+                  : `${orderMetrics?.aging?.['90+']?.count || 0} orders 90+ days`
+              }
               icon={KPIIcons.alert}
-              color={colors.accent.amber}
+              color={
+                (orderMetrics?.summary?.revenueAtRisk || 0) > 1000000
+                  ? colors.accent.red
+                  : colors.accent.amber
+              }
               badge={(orderMetrics?.aging?.['90+']?.count || 0) > 0 ? orderMetrics?.aging?.['90+']?.count : undefined}
               delay={0}
               onClick={() => setActiveTab('orders')}
               tooltip="Sum of order values weighted by age. 90+ days = 100%, 61-90 = 70%, 31-60 = 40%, 0-30 = 10%"
             />
+
+            {/* Backlog Value */}
             <KPICard
               title="Backlog Value"
               value={formatCurrency(orderMetrics?.summary?.totalBacklogValue || 0)}
@@ -211,6 +271,8 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
               delay={0.1}
               onClick={() => setActiveTab('orders')}
             />
+
+            {/* On-Time Delivery */}
             <KPICard
               title="On-Time Delivery"
               value={`${(orderMetrics?.summary?.onTimeDeliveryPct || 100).toFixed(1)}%`}
@@ -219,21 +281,28 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
               color={(orderMetrics?.summary?.onTimeDeliveryPct || 100) >= 90 ? colors.accent.green : colors.accent.red}
               delay={0.2}
             />
+
+            {/* Action Items - NEW: Primary actionable KPI */}
             <KPICard
-              title="Low Stock Items"
-              value={<AnimatedCounter value={inventoryMetrics?.summary?.lowStockItemCount || 0} />}
-              subtitle="Below reorder point"
+              title="Action Required"
+              value={<AnimatedCounter value={actionCount} />}
+              subtitle={
+                actionCount > 0
+                  ? `Top: ${topDriver} (${topDriverCount} orders)`
+                  : 'No critical actions'
+              }
               icon={KPIIcons.warning}
-              color={(inventoryMetrics?.summary?.lowStockItemCount || 0) > 0 ? colors.accent.red : colors.accent.green}
-              badge={(inventoryMetrics?.summary?.lowStockItemCount || 0) > 0 ? inventoryMetrics?.summary?.lowStockItemCount : undefined}
+              color={actionCount > 0 ? colors.accent.red : colors.accent.green}
+              badge={actionCount > 0 ? actionCount : undefined}
               delay={0.3}
               onClick={() => setActiveTab('inventory')}
+              tooltip="Prioritized list of inventory issues, stale orders, and blocking items requiring immediate attention"
             />
           </>
         )}
       </div>
 
-      {/* Additional KPI Row */}
+      {/* Additional KPI Row - Enhanced with blast radius context */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {loading ? (
           <>
@@ -243,6 +312,7 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
           </>
         ) : (
           <>
+            {/* Inventory Value */}
             <KPICard
               title="Inventory Value"
               value={formatCurrency(inventoryMetrics?.summary?.totalInventoryValue || 0)}
@@ -252,15 +322,35 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
               delay={0.4}
               onClick={() => setActiveTab('inventory')}
             />
+
+            {/* Backorder Blast Radius - Enhanced */}
             <KPICard
-              title="Backordered Items"
-              value={<AnimatedCounter value={inventoryMetrics?.summary?.totalBackorderedItems || 0} />}
-              subtitle="Awaiting stock"
+              title="Backorder Impact"
+              value={<AnimatedCounter value={blastRadius?.ordersImpacted || 0} />}
+              subtitle={
+                blastRadius && blastRadius.revenueDelayed > 0
+                  ? `${formatCurrency(blastRadius.revenueDelayed)} delayed, ${blastRadius.customersImpacted} customers`
+                  : 'Awaiting stock'
+              }
               icon={KPIIcons.clock}
-              color={(inventoryMetrics?.summary?.totalBackorderedItems || 0) > 0 ? colors.accent.amber : colors.accent.green}
+              color={
+                (blastRadius?.ordersImpacted || 0) > 10
+                  ? colors.accent.red
+                  : (blastRadius?.ordersImpacted || 0) > 0
+                    ? colors.accent.amber
+                    : colors.accent.green
+              }
+              badge={(blastRadius?.installsAtRisk30Days || 0) > 0 ? blastRadius?.installsAtRisk30Days : undefined}
               delay={0.5}
               onClick={() => setActiveTab('inventory')}
+              tooltip={
+                blastRadius
+                  ? `${blastRadius.totalItems} items backordered, ${blastRadius.installsAtRisk30Days} installs at risk in next 30 days`
+                  : 'Items awaiting stock'
+              }
             />
+
+            {/* Orders Aging 31-90d */}
             <KPICard
               title="Orders Aging 31-90d"
               value={<AnimatedCounter value={(orderMetrics?.aging?.['31-60']?.count || 0) + (orderMetrics?.aging?.['61-90']?.count || 0)} />}
@@ -312,6 +402,8 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
             lowStockItems={inventoryMetrics?.lowStockItems || []}
             backorderedItems={inventoryMetrics?.backorderedItems || []}
             valueByType={inventoryMetrics?.valueByType || {}}
+            actionItems={inventoryMetrics?.actionItems || []}
+            backorderBlastRadius={inventoryMetrics?.backorderBlastRadius}
           />
         )}
         {activeTab === 'wip' && (

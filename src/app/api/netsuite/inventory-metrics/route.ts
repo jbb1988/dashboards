@@ -7,9 +7,12 @@ export const dynamic = 'force-dynamic';
  * GET /api/netsuite/inventory-metrics
  *
  * Returns Inventory KPIs including:
- * - Total inventory value (on-hand × cost)
+ * - Total inventory value (on-hand x cost)
  * - Low stock items (below reorder point)
  * - Backordered items
+ * - Orders/Revenue blocked by inventory constraints
+ * - Backorder blast radius (impact analysis)
+ * - Today's action queue (prioritized problems)
  *
  * Query params:
  * - locationId: Filter by location (optional)
@@ -33,12 +36,23 @@ export async function GET(request: Request) {
           totalItemsOnHand: metrics.totalItemsOnHand,
           totalBackorderedItems: metrics.totalBackorderedItems,
           lowStockItemCount: metrics.lowStockItemCount,
+          // New actionable KPIs
+          revenueBlockedByInventory: metrics.revenueBlockedByInventory,
+          ordersBlockedByInventory: metrics.ordersBlockedByInventory,
+          topBlockingDriver: metrics.topBlockingDriver,
+          topBlockingDriverCount: metrics.topBlockingDriverCount,
         },
+
+        // Backorder blast radius - impact analysis
+        backorderBlastRadius: metrics.backorderBlastRadius,
+
+        // Today's action queue
+        actionItems: metrics.actionItems,
 
         // Breakdown
         valueByType: metrics.valueByType,
 
-        // Lists for detail views
+        // Lists for detail views (sorted by revenue blocked DESC)
         lowStockItems: metrics.lowStockItems,
         backorderedItems: metrics.backorderedItems,
         allItems: metrics.allItems.slice(0, 100), // Limit to 100 for performance
