@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 import OperationsCommandCenter from './components/OperationsCommandCenter';
 
-export default function OperationsPage() {
+function OperationsContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') as 'orders' | 'inventory' | 'wip' | null;
@@ -44,5 +44,13 @@ export default function OperationsPage() {
         </main>
       </motion.div>
     </div>
+  );
+}
+
+export default function OperationsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0B1220]" />}>
+      <OperationsContent />
+    </Suspense>
   );
 }
