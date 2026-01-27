@@ -8,6 +8,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
 import ApprovalsQueue from '@/components/contracts/ApprovalsQueue';
+import ReviewResultsSidebar from '@/components/contracts/ReviewResultsSidebar';
+import { ArrowLeft } from 'lucide-react';
 
 interface Contract {
   id: string;
@@ -208,6 +210,10 @@ function ContractReviewPageContent() {
 
   // User session state
   const [userEmail, setUserEmail] = useState<string>('');
+
+  // Results sidebar state for post-analysis view
+  const [resultsSidebarTab, setResultsSidebarTab] = useState<'summary' | 'downloads' | 'approval' | null>('summary');
+  const resultsSidebarOpen = resultsSidebarTab !== null;
 
   // Filter history by search query
   const filteredHistory = history.filter(h =>
@@ -1194,6 +1200,161 @@ function ContractReviewPageContent() {
         {/* Review Tab Content */}
         {mainTab === 'review' && (
           <>
+        {/* Show post-analysis view when there's a result and NOT in compare tab */}
+        {result && activeTab !== 'compare' ? (
+          /* POST-ANALYSIS VIEW: Full-width with right sidebar */
+          <div className="flex h-[calc(100vh-200px)] bg-[#111827] rounded-xl border border-white/[0.04] overflow-hidden">
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {/* Header Bar */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleNewAnalysis}
+                    className="flex items-center gap-2 px-3 py-1.5 text-[#8FA3BF] hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span className="text-sm font-medium">New Analysis</span>
+                  </button>
+                  <div className="h-5 w-px bg-white/10" />
+                  <h2 className="text-white font-medium">
+                    {provisionName || contracts.find(c => c.id === selectedContract)?.name || 'Contract Analysis'}
+                  </h2>
+                </div>
+                {/* Risk Badges */}
+                {result.riskScores && (
+                  <div className="flex items-center gap-2">
+                    {result.riskScores.summary.high > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/20 border border-red-500/30 rounded-full">
+                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                        <span className="text-red-400 text-xs font-medium">{result.riskScores.summary.high} High</span>
+                      </div>
+                    )}
+                    {result.riskScores.summary.medium > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded-full">
+                        <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                        <span className="text-yellow-400 text-xs font-medium">{result.riskScores.summary.medium} Med</span>
+                      </div>
+                    )}
+                    {result.riskScores.summary.low > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span className="text-green-400 text-xs font-medium">{result.riskScores.summary.low} Low</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Main Content - Redlined Text or Diff View */}
+              <div className="flex-1 overflow-y-auto p-6">
+                {showAnalysisComparison && analysisCompareResult ? (
+                  /* Diff View */
+                  <div className="max-w-4xl mx-auto space-y-4">
+                    {/* Back Button */}
+                    <button
+                      onClick={handleBackToSummary}
+                      className="flex items-center gap-2 px-3 py-1.5 text-[#8FA3BF] hover:text-white bg-[#151F2E] hover:bg-[#1E293B] rounded-lg transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                      </svg>
+                      Back to Redlines
+                    </button>
+
+                    {/* Statistics Bar */}
+                    <div className="flex flex-wrap gap-4 p-4 bg-[#0B1220] rounded-lg border border-white/[0.04]">
+                      <div className="text-[#8FA3BF]">
+                        <span className="text-white font-bold text-lg">{analysisCompareResult.stats.totalChanges}</span>
+                        <span className="text-sm ml-1">changes</span>
+                      </div>
+                      <div className="text-red-400">
+                        <span className="font-bold text-lg">{analysisCompareResult.stats.deletions}</span>
+                        <span className="text-sm ml-1">deletions</span>
+                      </div>
+                      <div className="text-green-400">
+                        <span className="font-bold text-lg">{analysisCompareResult.stats.insertions}</span>
+                        <span className="text-sm ml-1">insertions</span>
+                      </div>
+                    </div>
+
+                    {/* Diff Display */}
+                    <div className="bg-[#0B1220] border border-white/[0.04] rounded-lg p-6">
+                      <div className="text-sm font-mono whitespace-pre-wrap leading-relaxed">
+                        {analysisCompareResult.changes.map((change) => (
+                          <span
+                            key={change.id}
+                            className={
+                              change.type === 'delete' ? 'bg-red-500/20 text-red-400 line-through' :
+                              change.type === 'insert' ? 'bg-green-500/20 text-green-400 underline' :
+                              'text-white'
+                            }
+                          >
+                            {change.text}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Redlined Text View */
+                  <div className="max-w-4xl mx-auto">
+                    {/* Large Document Notice */}
+                    {result.redlinedText && !result.redlinedText.includes('[strikethrough]') && !result.redlinedText.includes('[underline]') && result.summary.length > 0 && (
+                      <div className="mb-4 p-3 bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-lg">
+                        <div className="flex items-start gap-2 text-sm text-[#F59E0B]">
+                          <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <div>
+                            <p className="font-medium">Large Document</p>
+                            <p className="text-[#CBD5E1] text-xs mt-1">
+                              Use <strong>Download Both for Word Compare</strong> in the Downloads panel for precise track changes.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Redlined Text */}
+                    <div className="bg-[#0B1220] border border-white/[0.04] rounded-lg p-6">
+                      <div
+                        className="text-white text-sm font-mono whitespace-pre-wrap contract-redlines leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatRedlines(result.redlinedText), { ALLOWED_TAGS: ['del', 'ins', 'span', 'br'] }) }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Results Sidebar */}
+            <ReviewResultsSidebar
+              activeTab={resultsSidebarTab}
+              onTabChange={setResultsSidebarTab}
+              isOpen={resultsSidebarOpen}
+              summary={result.summary}
+              riskScores={result.riskScores}
+              onViewDiff={handleViewAnalysisComparison}
+              isComparingAnalysis={isComparingAnalysis}
+              onDownloadBoth={handleDownloadBothForCompare}
+              onDownloadOriginal={handleDownloadOriginalPlain}
+              onDownloadRevised={handleDownloadRevised}
+              onCopyText={handleCopyRedlines}
+              isGeneratingDocx={isGeneratingDocx}
+              isGeneratingOriginal={isGeneratingOriginal}
+              hasModifiedText={!!result.modifiedText}
+              reviewerNotes={reviewerNotes}
+              onReviewerNotesChange={setReviewerNotes}
+              ccEmails={ccEmails}
+              onCcEmailsChange={setCcEmails}
+              onSendForApproval={handleSendForApproval}
+              isSendingApproval={isSendingApproval}
+              canSendApproval={!!selectedContract && !!provisionName.trim()}
+            />
+          </div>
+        ) : (
+          /* PRE-ANALYSIS or COMPARE TAB: Original two-column layout */
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Input Panel */}
           <motion.div
@@ -2728,6 +2889,7 @@ function ContractReviewPageContent() {
             )}
           </motion.div>
         </div>
+        )}
           </>
         )}
 
