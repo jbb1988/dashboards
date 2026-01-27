@@ -118,3 +118,55 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+/**
+ * DELETE /api/contracts/review/approvals/queue
+ * Delete a pending approval (clears approval fields from the review)
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const reviewId = searchParams.get('reviewId');
+
+    if (!reviewId) {
+      return NextResponse.json(
+        { error: 'Missing required parameter: reviewId' },
+        { status: 400 }
+      );
+    }
+
+    const admin = getSupabaseAdmin();
+
+    // Clear the approval-related fields to "cancel" the approval request
+    // This keeps the review in history but removes it from the approval queue
+    const { error } = await admin
+      .from('contract_reviews')
+      .update({
+        approval_token: null,
+        approval_status: null,
+        submitted_by_email: null,
+        submitted_at: null,
+        approver_email: null,
+        approval_feedback: null,
+        approved_at: null,
+        status: 'draft', // Return to draft status
+      })
+      .eq('id', reviewId);
+
+    if (error) {
+      console.error('Failed to delete approval:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete approval' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting approval:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

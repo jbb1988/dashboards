@@ -41,6 +41,7 @@ interface ContractLeftPanelProps {
   onSelectApproval: (approval: Approval) => void;
   onSelectHistory: (item: ReviewHistory) => void;
   onDeleteHistory: (id: string) => void;
+  onDeleteApproval: (reviewId: string) => void;
 }
 
 // =============================================================================
@@ -95,10 +96,12 @@ function ApprovalItem({
   approval,
   isSelected,
   onSelect,
+  onDelete,
 }: {
   approval: Approval;
   isSelected: boolean;
   onSelect: () => void;
+  onDelete: () => void;
 }) {
   const statusColors = {
     pending: 'bg-[rgba(255,190,90,0.12)] border-[rgba(255,190,90,0.25)]',
@@ -113,10 +116,10 @@ function ApprovalItem({
   };
 
   return (
-    <motion.button
+    <motion.div
       onClick={onSelect}
       className={`
-        w-full text-left px-3 py-2.5 rounded-xl transition-all duration-[180ms]
+        group relative w-full text-left px-3 py-2.5 rounded-xl transition-all duration-[180ms] cursor-pointer
         ${isSelected
           ? 'bg-[rgba(90,130,255,0.12)] border border-[rgba(90,130,255,0.30)]'
           : `${statusColors[approval.approvalStatus]} border hover:bg-[rgba(255,255,255,0.06)]`
@@ -143,8 +146,17 @@ function ApprovalItem({
             {formatRelativeTime(approval.submittedAt)}
           </p>
         </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-[rgba(255,95,95,0.15)] text-[rgba(200,210,235,0.50)] hover:text-[rgba(255,95,95,0.95)] transition-all duration-[180ms]"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
-    </motion.button>
+    </motion.div>
   );
 }
 
@@ -255,6 +267,7 @@ export default function ContractLeftPanel({
   onSelectApproval,
   onSelectHistory,
   onDeleteHistory,
+  onDeleteApproval,
 }: ContractLeftPanelProps) {
   const [expandedSections, setExpandedSections] = useState({
     pending: true,
@@ -394,6 +407,7 @@ export default function ContractLeftPanel({
                             approval={approval}
                             isSelected={selectedItemId === approval.reviewId}
                             onSelect={() => onSelectApproval(approval)}
+                            onDelete={() => onDeleteApproval(approval.reviewId)}
                           />
                         ))
                       ) : (

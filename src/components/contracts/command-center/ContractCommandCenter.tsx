@@ -479,6 +479,32 @@ export default function ContractCommandCenter() {
     }
   }, [selectedItem]);
 
+  const handleDeleteApproval = useCallback(async (reviewId: string) => {
+    if (!confirm('Are you sure you want to cancel this approval request? The review will be returned to draft status.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/contracts/review/approvals/queue?reviewId=${reviewId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Remove from approvals list
+        setApprovals(prev => prev.filter(a => a.reviewId !== reviewId));
+        // Refresh history to show the item back as draft
+        fetchHistory();
+        // Clear selection if this was selected
+        if (selectedItem?.id === reviewId) {
+          setSelectedItem(null);
+          setContentMode('empty');
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting approval:', err);
+    }
+  }, [selectedItem, fetchHistory]);
+
   // ===========================================================================
   // COMPUTED VALUES
   // ===========================================================================
@@ -543,6 +569,7 @@ export default function ContractCommandCenter() {
         onSelectApproval={handleSelectApproval}
         onSelectHistory={handleSelectHistory}
         onDeleteHistory={handleDeleteHistoryItem}
+        onDeleteApproval={handleDeleteApproval}
       />
 
       {/* Center Content */}
