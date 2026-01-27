@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { departments, dataSources, getBadgeColor, type Department } from '@/lib/navigation';
+import { getDepartmentIcon } from '@/lib/navigation-icons';
 
 // Animated background grid
 function GridBackground() {
@@ -55,112 +57,8 @@ function FloatingParticles() {
   );
 }
 
-// Department data
-interface DashboardItem {
-  name: string;
-  href: string;
-  description: string;
-  badge?: string;
-}
-
-interface Department {
-  name: string;
-  icon: React.ReactNode;
-  color: string;
-  dashboards: DashboardItem[];
-}
-
-const departments: Department[] = [
-  {
-    name: 'Contracts',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-    color: 'from-[#0189CB] to-[#38BDF8]',
-    dashboards: [
-      { name: 'Contracts Pipeline', href: '/contracts-dashboard', description: 'Track contract status and pipeline', badge: 'Salesforce' },
-      { name: 'Contract Review', href: '/contracts/review', description: 'AI-powered contract analysis', badge: 'Claude' },
-    ],
-  },
-  {
-    name: 'Project Management',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-      </svg>
-    ),
-    color: 'from-[#E16259] to-[#F87171]',
-    dashboards: [
-      { name: 'Project Tracker', href: '/pm-dashboard', description: 'Monitor milestones and tasks', badge: 'Asana' },
-    ],
-  },
-  {
-    name: 'Finance',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-    color: 'from-[#22C55E] to-[#4ADE80]',
-    dashboards: [
-      { name: 'MCC Profitability', href: '/mcc-dashboard', description: 'Master cost center analysis', badge: 'Excel' },
-      { name: 'Project Profitability', href: '/closeout-dashboard', description: 'Project closeout metrics', badge: 'Excel' },
-    ],
-  },
-  {
-    name: 'Management',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-    color: 'from-[#A855F7] to-[#C084FC]',
-    dashboards: [
-      { name: 'Strategic Initiatives', href: '/management-dashboard', description: '2026 company pillars & objectives', badge: 'Smartsheet' },
-    ],
-  },
-  {
-    name: 'Operations',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-    color: 'from-[#F59E0B] to-[#FBBF24]',
-    dashboards: [
-      { name: 'Command Center', href: '/operations', description: 'Order→Cash visibility & inventory status', badge: 'NetSuite' },
-      { name: 'WIP Operations', href: '/wip-dashboard', description: 'Work order manufacturing operations', badge: 'NetSuite' },
-    ],
-  },
-  {
-    name: 'Sales',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-      </svg>
-    ),
-    color: 'from-[#EC4899] to-[#F472B6]',
-    dashboards: [
-      { name: 'Diversified Products', href: '/diversified-dashboard', description: 'Product class sales by customer', badge: 'NetSuite' },
-    ],
-  },
-];
-
-// Badge color mapping
-function getBadgeColor(badge: string): string {
-  switch (badge) {
-    case 'Salesforce': return 'bg-[#38BDF8]';
-    case 'Asana': return 'bg-[#E16259]';
-    case 'Excel': return 'bg-[#22C55E]';
-    case 'Claude': return 'bg-[#D97706]';
-    case 'NetSuite': return 'bg-[#F97316]';
-    case 'Smartsheet': return 'bg-[#0073EA]';
-    default: return 'bg-[#64748B]';
-  }
-}
+// Filter out Administration from home page display
+const displayDepartments = departments.filter(dept => dept.name !== 'Administration');
 
 // Department card component
 function DepartmentCard({ department, delay }: { department: Department; delay: number }) {
@@ -180,7 +78,7 @@ function DepartmentCard({ department, delay }: { department: Department; delay: 
       <div className="p-5 border-b border-[#1E293B]/50">
         <div className="flex items-center gap-3">
           <div className={`p-2.5 rounded-xl bg-gradient-to-br ${department.color} shadow-lg`}>
-            <span className="text-white">{department.icon}</span>
+            <span className="text-white">{getDepartmentIcon(department.icon)}</span>
           </div>
           <h3 className="text-lg font-semibold text-white">{department.name}</h3>
         </div>
@@ -341,11 +239,9 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="flex flex-wrap items-center justify-center gap-3"
           >
-            <DataSourceBadge name="Salesforce" color="bg-[#38BDF8]" delay={0.5} />
-            <DataSourceBadge name="Asana" color="bg-[#E16259]" delay={0.6} />
-            <DataSourceBadge name="DocuSign" color="bg-[#FFD700]" delay={0.7} />
-            <DataSourceBadge name="NetSuite" color="bg-[#F97316]" delay={0.8} />
-            <DataSourceBadge name="Smartsheet" color="bg-[#0073EA]" delay={0.9} />
+            {dataSources.map((source, idx) => (
+              <DataSourceBadge key={source.name} name={source.name} color={source.color} delay={0.5 + idx * 0.1} />
+            ))}
           </motion.div>
         </div>
 
@@ -363,7 +259,7 @@ export default function Home() {
 
         {/* Department Cards Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 mb-16">
-          {departments.map((dept, idx) => (
+          {displayDepartments.map((dept, idx) => (
             <DepartmentCard key={dept.name} department={dept} delay={0.5 + idx * 0.1} />
           ))}
         </div>

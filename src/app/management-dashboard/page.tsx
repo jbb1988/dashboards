@@ -351,7 +351,13 @@ export default function ManagementDashboard() {
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  // When switching to at-risk tab, clear status filter if it conflicts
+                  if (tab.id === 'at-risk' && (selectedStatus === 'Green' || selectedStatus === 'Gray')) {
+                    setSelectedStatus(null);
+                  }
+                  setActiveTab(tab.id);
+                }}
                 className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-colors flex items-center gap-2 ${
                   activeTab === tab.id
                     ? 'bg-orange-500 text-white'
@@ -480,9 +486,11 @@ export default function ManagementDashboard() {
                   className="space-y-6"
                 >
                   {Object.entries(PILLAR_COLORS).map(([pillarName, color]) => {
+                    // Get all initiatives for this pillar (excluding pillar header rows)
                     const pillarInits = displayedInitiatives.filter(
-                      i => i.parentPillar === pillarName || (i.isPillarRow && i.title === pillarName)
+                      i => !i.isPillarRow && i.parentPillar === pillarName
                     );
+                    // Hide pillar section if no initiatives match the current filters
                     if (pillarInits.length === 0) return null;
 
                     return (
@@ -495,16 +503,16 @@ export default function ManagementDashboard() {
                           <div className="flex-1">
                             <h2 className="text-white font-semibold">{pillarName}</h2>
                             <p className="text-[12px] text-[#64748B]">
-                              {pillarInits.filter(i => !i.isPillarRow).length} initiatives
+                              {pillarInits.length} initiatives
                             </p>
                           </div>
                           <div className="flex items-center gap-4 text-[12px]">
-                            <span className="text-green-400">{data.summary.byPillar[pillarName]?.onTrack || 0} on track</span>
-                            <span className="text-amber-400">{data.summary.byPillar[pillarName]?.atRisk || 0} at risk</span>
+                            <span className="text-green-400">{pillarInits.filter(i => i.status === 'Green').length} on track</span>
+                            <span className="text-amber-400">{pillarInits.filter(i => i.status === 'Yellow' || i.status === 'Red').length} at risk</span>
                           </div>
                         </div>
                         <div className="max-h-[400px] overflow-y-auto">
-                          {pillarInits.filter(i => !i.isPillarRow).map(init => (
+                          {pillarInits.map(init => (
                             <InitiativeRow
                               key={init.id}
                               initiative={init}
