@@ -147,14 +147,24 @@ export default function PipelineTab() {
           { title: 'Due in 30 Days', value: data?.kpis.dueNext30Value || 0, count: data?.kpis.dueNext30Count || 0, color: appleTokens.accentAmber },
           { title: 'Average Value', value: data?.kpis.totalCount ? data.kpis.totalPipeline / data.kpis.totalCount : 0, count: null, color: appleTokens.accentGreen },
         ].map((kpi, idx) => (
-          <div
+          <motion.div
             key={idx}
-            className="p-5 rounded-2xl"
+            className="p-5 rounded-2xl relative overflow-hidden"
             style={{
               background: appleTokens.surfaceL1,
-              boxShadow: appleTokens.shadowL1,
+              border: `1px solid ${kpi.color}20`,
+              boxShadow: `${appleTokens.shadowL1}, 0 0 30px ${kpi.color}12`,
             }}
+            whileHover={{ y: -2, boxShadow: `0 40px 100px rgba(0,0,0,0.8), 0 0 60px ${kpi.color}25, inset 0 1px 0 rgba(255,255,255,0.10)` }}
           >
+            {/* Left accent bar */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[2px]"
+              style={{
+                background: `linear-gradient(180deg, ${kpi.color} 0%, ${kpi.color}60 100%)`,
+                boxShadow: `0 0 12px ${kpi.color}60`,
+              }}
+            />
             <p style={{ color: appleTokens.textSecondary }} className="text-xs font-semibold mb-2">{kpi.title}</p>
             <p style={{ color: kpi.color }} className="text-2xl font-bold tabular-nums">{formatCurrency(kpi.value)}</p>
             {kpi.count !== null && (
@@ -163,7 +173,7 @@ export default function PipelineTab() {
             {kpi.count === null && (
               <p style={{ color: appleTokens.textMuted }} className="text-xs mt-1">per contract</p>
             )}
-          </div>
+          </motion.div>
         ))}
       </div>
 
