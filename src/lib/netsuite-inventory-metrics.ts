@@ -243,7 +243,7 @@ export async function getInventoryBalances(filters?: {
  * Returns the "blast radius" of inventory shortages
  */
 export async function getOrdersBlockedByInventory(): Promise<{
-  byItem: Map<string, { itemName: string; orders: Set<string>; customers: Set<string>; revenue: number; orderDetails: Array<{ id: string; tranid: string; customer: string; amount: number; ship_date: string | null }> }>;
+  byItem: Map<string, { itemNumber: string; itemDescription: string; orders: Set<string>; customers: Set<string>; revenue: number; orderDetails: Array<{ id: string; tranid: string; customer: string; amount: number; ship_date: string | null }> }>;
   totalOrdersBlocked: number;
   totalCustomersImpacted: number;
   totalRevenueBlocked: number;
@@ -252,7 +252,8 @@ export async function getOrdersBlockedByInventory(): Promise<{
   const query = `
     SELECT
       tl.item AS item_id,
-      BUILTIN.DF(tl.item) AS item_name,
+      item.itemid AS item_number,
+      item.displayname AS item_description,
       so.id AS order_id,
       so.tranid AS order_number,
       so.entity AS customer_id,
@@ -265,6 +266,7 @@ export async function getOrdersBlockedByInventory(): Promise<{
       tl.amount AS line_amount
     FROM TransactionLine tl
     INNER JOIN Transaction so ON so.id = tl.transaction
+    INNER JOIN Item item ON item.id = tl.item
     WHERE so.type = 'SalesOrd'
       AND so.status NOT IN ('E', 'F', 'G', 'H', 'Billed', 'Closed', 'Cancelled')
       AND tl.item IS NOT NULL
@@ -287,7 +289,8 @@ export async function getOrdersBlockedByInventory(): Promise<{
     );
 
     const byItem = new Map<string, {
-      itemName: string;
+      itemNumber: string;
+      itemDescription: string;
       orders: Set<string>;
       customers: Set<string>;
       revenue: number;
@@ -299,13 +302,14 @@ export async function getOrdersBlockedByInventory(): Promise<{
 
     for (const row of response.items || []) {
       const itemId = row.item_id?.toString() || '';
-      const itemName = row.item_name || itemId;
+      const itemNumber = row.item_number || itemId;
+      const itemDescription = row.item_description || itemNumber;
       const orderId = row.order_id?.toString() || '';
       const customerId = row.customer_id?.toString() || '';
       const orderTotal = parseFloat(row.order_total) || 0;
 
       if (!byItem.has(itemId)) {
-        byItem.set(itemId, { itemName, orders: new Set(), customers: new Set(), revenue: 0, orderDetails: [] });
+        byItem.set(itemId, { itemNumber, itemDescription, orders: new Set(), customers: new Set(), revenue: 0, orderDetails: [] });
       }
 
       const itemData = byItem.get(itemId)!;
@@ -668,8 +672,8 @@ export async function getInventoryMetrics(filters?: {
   // (Items with 0 inventory won't be in InventoryBalance, so we use blockedOrders directly)
   const blockingItemsFromOrders = Array.from(blockedOrders.byItem.entries())
     .map(([itemId, data]) => ({
-      item_id: data.itemName,
-      display_name: data.itemName,
+      item_id: data.itemNumber,
+      display_name: data.itemDescription || data.itemNumber,
       orders_blocked: data.orders.size,
       revenue_blocked: data.revenue,
       customers_impacted: data.customers.size,
@@ -678,10 +682,11 @@ export async function getInventoryMetrics(filters?: {
 
   // Find top blocking driver
   const topBlocking = blockingItemsFromOrders[0];
-  const topBlockingDriver = topBlocking?.item_id || 'None';
+  const topBlockingDriver = topBlocking?.display_name || 'None';
   const topBlockingDriverCount = topBlocking?.orders_blocked || 0;
 
   // Build backorder blast radius - top 10 items blocking most orders
+  // item_id = item number (subtitle), display_name = description (title)
   const topBlockingItems = blockingItemsFromOrders
     .slice(0, 10)
     .map(i => ({
