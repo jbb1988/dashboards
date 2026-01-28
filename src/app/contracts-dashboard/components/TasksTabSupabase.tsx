@@ -16,6 +16,7 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -252,6 +253,33 @@ function DraggableTaskCard({
         </div>
       </div>
     </motion.div>
+  );
+}
+
+// Droppable column wrapper for Kanban
+function DroppableColumn({
+  id,
+  status,
+  children,
+}: {
+  id: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id,
+    data: { status },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`p-3 space-y-2 min-h-[300px] transition-colors ${
+        isOver ? 'bg-[#38BDF8]/5' : ''
+      }`}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -944,16 +972,18 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
     if (!over) return;
 
     const taskId = active.id as string;
-    const overId = over.id as string;
 
-    // Determine new status from drop target
+    // Determine new status from drop target data
+    // over.data.current contains { status } for columns or { columnStatus } for tasks
     let newStatus: Task['status'] | null = null;
-    if (overId === 'column-pending' || overId.startsWith('task-pending-')) {
-      newStatus = 'pending';
-    } else if (overId === 'column-in_progress' || overId.startsWith('task-in_progress-')) {
-      newStatus = 'in_progress';
-    } else if (overId === 'column-completed' || overId.startsWith('task-completed-')) {
-      newStatus = 'completed';
+    const overData = over.data.current as { status?: Task['status']; columnStatus?: Task['status'] } | undefined;
+
+    if (overData?.status) {
+      // Dropped on a column
+      newStatus = overData.status;
+    } else if (overData?.columnStatus) {
+      // Dropped on a task (use that task's column)
+      newStatus = overData.columnStatus;
     }
 
     if (!newStatus) return;
