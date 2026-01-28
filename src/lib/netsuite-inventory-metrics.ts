@@ -621,14 +621,15 @@ function buildActionQueue(
 export async function getInventoryMetrics(filters?: {
   locationId?: string;
 }): Promise<InventoryMetrics> {
-  // Fetch all data in parallel
-  const [items, backorders, blockedOrders, pendingPOs, staleOrders] = await Promise.all([
-    getInventoryBalances({ locationId: filters?.locationId }),
-    getBackorderedItems(),
-    getOrdersBlockedByInventory(),
-    getPendingPurchaseOrders(),
-    getStaleOrders(),
-  ]);
+  // Fetch data sequentially to avoid NetSuite concurrent request limit (429 errors)
+  // Core data first
+  const items = await getInventoryBalances({ locationId: filters?.locationId });
+  const blockedOrders = await getOrdersBlockedByInventory();
+  const backorders = await getBackorderedItems();
+
+  // Optional enrichment data - these can fail gracefully
+  const pendingPOs = await getPendingPurchaseOrders();
+  const staleOrders = await getStaleOrders();
 
   // Enrich items with blocked order data
   for (const item of items) {
