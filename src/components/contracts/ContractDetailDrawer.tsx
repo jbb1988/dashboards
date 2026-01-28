@@ -207,6 +207,22 @@ export default function ContractDetailDrawer({
   const [reviewsFetched, setReviewsFetched] = useState(false);
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
 
+  // Bundle contracts state
+  const [bundledContracts, setBundledContracts] = useState<Array<{
+    contract_id: string;
+    is_primary: boolean;
+    contracts: {
+      id: string;
+      name: string;
+      salesforce_id?: string;
+      value: number;
+      status: string;
+      contract_type: string[];
+    };
+  }>>([]);
+  const [bundleExpanded, setBundleExpanded] = useState(false);
+  const [bundleLoading, setBundleLoading] = useState(false);
+
   // Reset state when contract changes
   useEffect(() => {
     if (contract) {
@@ -225,8 +241,27 @@ export default function ContractDetailDrawer({
       setReviewsFetched(false);
       setReviews([]);
       setExpandedReviewId(null);
+      // Reset bundle state
+      setBundledContracts([]);
+      setBundleExpanded(false);
     }
   }, [contract?.id]);
+
+  // Fetch bundled contracts when contract has bundle info
+  useEffect(() => {
+    if (contract?.bundleInfo?.bundleId && bundledContracts.length === 0) {
+      setBundleLoading(true);
+      fetch(`/api/bundles?bundleId=${contract.bundleInfo.bundleId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.contracts) {
+            setBundledContracts(data.contracts);
+          }
+        })
+        .catch(err => console.error('Error fetching bundled contracts:', err))
+        .finally(() => setBundleLoading(false));
+    }
+  }, [contract?.bundleInfo?.bundleId, bundledContracts.length]);
 
   // Fetch tasks when drawer opens
   useEffect(() => {
@@ -1064,68 +1099,182 @@ export default function ContractDetailDrawer({
                     </div>
 
                     {/* Bundle */}
-                    <div className="flex items-center justify-between py-2 border-t border-white/[0.04]">
-                      <span className="text-[12px] text-[#64748B]">Bundle</span>
-                      {contract.bundleInfo ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[13px] text-[#8B5CF6]">
-                            {contract.bundleInfo.bundleName.length > 20
-                              ? `${contract.bundleInfo.bundleName.substring(0, 20)}...`
-                              : contract.bundleInfo.bundleName}
-                          </span>
-                          <span className="text-[9px] text-[#64748B] bg-[#8B5CF6]/10 px-1.5 py-0.5 rounded">
-                            {contract.bundleInfo.contractCount}
-                          </span>
-                          {contract.bundleInfo.isPrimary && (
-                            <span className="text-[9px] text-[#8B5CF6]">Primary</span>
-                          )}
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (!confirm('Remove this contract from the bundle?')) return;
-                              try {
-                                const response = await fetch('/api/bundles', {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    bundle_id: contract.bundleInfo?.bundleId,
-                                    remove_contracts: [contract.id],
-                                  }),
-                                });
-                                if (response.ok) {
-                                  // Close drawer and refresh data
-                                  onClose();
-                                  onUpdate?.();
-                                } else {
-                                  const result = await response.json();
-                                  alert(`Failed to remove from bundle: ${result.error || 'Unknown error'}`);
+                    <div className="border-t border-white/[0.04]">
+                      <div className="flex items-center justify-between py-2">
+                        <span className="text-[12px] text-[#64748B]">Bundle</span>
+                        {contract.bundleInfo ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setBundleExpanded(!bundleExpanded)}
+                              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                            >
+                              <span className="text-[13px] text-[#8B5CF6]">
+                                {contract.bundleInfo.bundleName.length > 20
+                                  ? `${contract.bundleInfo.bundleName.substring(0, 20)}...`
+                                  : contract.bundleInfo.bundleName}
+                              </span>
+                              <span className="text-[9px] text-[#64748B] bg-[#8B5CF6]/10 px-1.5 py-0.5 rounded">
+                                {contract.bundleInfo.contractCount}
+                              </span>
+                              {contract.bundleInfo.isPrimary && (
+                                <span className="text-[9px] text-[#8B5CF6]">Primary</span>
+                              )}
+                              <motion.svg
+                                className="w-3.5 h-3.5 text-[#64748B]"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                animate={{ rotate: bundleExpanded ? 180 : 0 }}
+                                transition={{ duration: 0.2 }}
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </motion.svg>
+                            </button>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm('Remove this contract from the bundle?')) return;
+                                try {
+                                  const response = await fetch('/api/bundles', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      bundle_id: contract.bundleInfo?.bundleId,
+                                      remove_contracts: [contract.id],
+                                    }),
+                                  });
+                                  if (response.ok) {
+                                    onClose();
+                                    onUpdate?.();
+                                  } else {
+                                    const result = await response.json();
+                                    alert(`Failed to remove from bundle: ${result.error || 'Unknown error'}`);
+                                  }
+                                } catch (err) {
+                                  console.error('Remove from bundle error:', err);
+                                  alert('Network error removing from bundle');
                                 }
-                              } catch (err) {
-                                console.error('Remove from bundle error:', err);
-                                alert('Network error removing from bundle');
-                              }
-                            }}
-                            className="p-1 text-[#64748B] hover:text-red-400 transition-colors"
-                            title="Remove from bundle"
+                              }}
+                              className="p-1 text-[#64748B] hover:text-red-400 transition-colors"
+                              title="Remove from bundle"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : openBundleModal ? (
+                          <button
+                            onClick={() => openBundleModal(contract, 'create')}
+                            className="text-[12px] text-[#8B5CF6] hover:text-[#A78BFA] transition-colors flex items-center gap-1"
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            Create Bundle
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                             </svg>
                           </button>
-                        </div>
-                      ) : openBundleModal ? (
-                        <button
-                          onClick={() => openBundleModal(contract, 'create')}
-                          className="text-[12px] text-[#8B5CF6] hover:text-[#A78BFA] transition-colors flex items-center gap-1"
-                        >
-                          Create Bundle
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                        </button>
-                      ) : (
-                        <span className="text-[12px] text-[#475569]">-</span>
-                      )}
+                        ) : (
+                          <span className="text-[12px] text-[#475569]">-</span>
+                        )}
+                      </div>
+
+                      {/* Expanded Bundle Contracts List */}
+                      <AnimatePresence>
+                        {bundleExpanded && contract.bundleInfo && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="pb-3 space-y-1.5">
+                              {bundleLoading ? (
+                                <div className="flex items-center justify-center py-3">
+                                  <motion.div
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                    className="w-4 h-4 border-2 border-[#8B5CF6] border-t-transparent rounded-full"
+                                  />
+                                </div>
+                              ) : bundledContracts.length > 0 ? (
+                                bundledContracts.map((bc) => {
+                                  const isCurrentContract = bc.contract_id === contract.id;
+                                  const c = bc.contracts;
+                                  return (
+                                    <motion.div
+                                      key={bc.contract_id}
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${
+                                        isCurrentContract
+                                          ? 'bg-[#8B5CF6]/10 border border-[#8B5CF6]/30'
+                                          : 'bg-[#0B1220] hover:bg-[#1E293B] border border-white/[0.04] cursor-pointer'
+                                      }`}
+                                      onClick={() => {
+                                        if (!isCurrentContract && c?.id) {
+                                          // Could navigate to this contract if needed
+                                          console.log('Navigate to contract:', c.id);
+                                        }
+                                      }}
+                                    >
+                                      {/* Primary indicator */}
+                                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                        bc.is_primary ? 'bg-[#8B5CF6]' : 'bg-[#475569]'
+                                      }`} />
+
+                                      {/* Contract info */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <p className={`text-[12px] font-medium truncate ${
+                                            isCurrentContract ? 'text-[#8B5CF6]' : 'text-white'
+                                          }`}>
+                                            {c?.name || 'Unknown Contract'}
+                                          </p>
+                                          {bc.is_primary && (
+                                            <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded bg-[#8B5CF6]/20 text-[#8B5CF6]">
+                                              PRIMARY
+                                            </span>
+                                          )}
+                                          {isCurrentContract && (
+                                            <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded bg-[#38BDF8]/20 text-[#38BDF8]">
+                                              CURRENT
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                          <span className="text-[10px] text-[#22C55E]">
+                                            {formatCurrency(c?.value || 0)}
+                                          </span>
+                                          <span className="text-[10px] text-[#64748B]">
+                                            {c?.status?.replace(/_/g, ' ') || 'Unknown'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })
+                              ) : (
+                                <p className="text-[11px] text-[#64748B] text-center py-2">
+                                  No contracts found in bundle
+                                </p>
+                              )}
+
+                              {/* Bundle total */}
+                              {bundledContracts.length > 0 && (
+                                <div className="flex items-center justify-between pt-2 mt-2 border-t border-white/[0.04]">
+                                  <span className="text-[10px] text-[#64748B]">Bundle Total</span>
+                                  <span className="text-[12px] font-semibold text-[#22C55E]">
+                                    {formatCurrency(
+                                      bundledContracts.reduce((sum, bc) => sum + (bc.contracts?.value || 0), 0)
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Days in Stage */}
