@@ -399,6 +399,7 @@ function ContractRow({
   onArchive?: (salesforceId: string, contractName: string) => void;
 }) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isPendingArchive, setIsPendingArchive] = useState(false);
   const [showDateTooltip, setShowDateTooltip] = useState(false);
   const [showTaskTooltip, setShowTaskTooltip] = useState(false);
   const [taskTooltipPosition, setTaskTooltipPosition] = useState<{ top: number; left: number } | null>(null);
@@ -408,10 +409,10 @@ function ContractRow({
   const taskIconRef = useRef<HTMLButtonElement>(null);
   const docIconRef = useRef<HTMLDivElement>(null);
 
-  // Use pending status if available (batch mode), or show Archived for archived contracts
-  const effectiveStatus = contract.isArchived ? ARCHIVE_STATUS : (pendingStatus || contract.status);
+  // Use pending status if available (batch mode), or show Archived for archived/pending-archive contracts
+  const effectiveStatus = (contract.isArchived || isPendingArchive) ? ARCHIVE_STATUS : (pendingStatus || contract.status);
   const hasPendingChange = pendingStatus !== undefined && pendingStatus !== contract.status;
-  const statusColor = contract.isArchived ? '#6B7280' : (stageColors[effectiveStatus] || getStatusColor(effectiveStatus));
+  const statusColor = (contract.isArchived || isPendingArchive) ? '#6B7280' : (stageColors[effectiveStatus] || getStatusColor(effectiveStatus));
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—';
@@ -445,6 +446,8 @@ function ContractRow({
     if (newStatus === ARCHIVE_STATUS) {
       const idToUse = contract.salesforceId || contract.id;
       if (onArchive && idToUse) {
+        // Set pending archive state immediately so dropdown shows "Archived"
+        setIsPendingArchive(true);
         onArchive(idToUse, contract.name);
       }
       return;
