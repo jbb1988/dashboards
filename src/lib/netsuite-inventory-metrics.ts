@@ -104,6 +104,13 @@ export interface InventoryMetrics {
 /**
  * Query Inventory Balances with item details
  * Returns on-hand quantities, costs, and reorder point comparison
+ *
+ * Uses InventoryBalance table which contains actual inventory quantities.
+ * The direct Item.quantityonhand field is often not populated in
+ * multi-location NetSuite setups.
+ *
+ * Note: NetSuite SuiteQL has limitations with GROUP BY on InventoryBalance,
+ * so we query per-location data and aggregate in JavaScript if needed.
  */
 export async function getInventoryBalances(filters?: {
   itemType?: string[];
@@ -120,34 +127,35 @@ export async function getInventoryBalances(filters?: {
     typeFilter = ` AND item.itemtype IN (${types})`;
   }
 
-  // Build location filter (uses InventoryBalance.location)
+  // Build location filter
   let locationFilter = '';
   if (filters?.locationId) {
-    locationFilter = ` AND ail.location = '${filters.locationId.replace(/'/g, "''")}'`;
+    locationFilter = ` AND ib.location = '${filters.locationId.replace(/'/g, "''")}'`;
   }
 
-  // Use aggregateItemLocation for inventory quantities (has reorderpoint, quantityonhand, etc.)
-  // Join with Item table for item details
+  // Query from InventoryBalance table which has actual inventory quantities
+  // Note: Cannot use GROUP BY with InventoryBalance in SuiteQL, so we get
+  // per-location data and aggregate in JavaScript
   const query = `
     SELECT
       item.id,
       item.itemid,
       item.displayname,
       item.itemtype AS item_type,
-      COALESCE(ail.quantityonhand, 0) AS quantity_on_hand,
-      COALESCE(ail.quantityavailable, 0) AS quantity_available,
-      COALESCE(ail.quantitybackordered, 0) AS quantity_backordered,
-      COALESCE(ail.averagecostmli, item.averagecost, item.lastpurchaseprice, item.cost, 0) AS unit_cost,
-      ail.reorderpoint,
-      ail.preferredstocklevel,
-      ail.location AS location_id,
-      BUILTIN.DF(ail.location) AS location_name
+      ib.quantityonhand AS quantity_on_hand,
+      ib.quantityavailable AS quantity_available,
+      COALESCE(item.quantitybackordered, 0) AS quantity_backordered,
+      COALESCE(item.averagecost, item.lastpurchaseprice, item.cost, 0) AS unit_cost,
+      item.reorderpoint,
+      item.preferredstocklevel,
+      ib.location AS location_id,
+      BUILTIN.DF(ib.location) AS location_name
     FROM Item item
-    INNER JOIN aggregateItemLocation ail ON item.id = ail.item
+    INNER JOIN InventoryBalance ib ON item.id = ib.item
     WHERE item.isinactive = 'F'
       ${typeFilter}
       ${locationFilter}
-    ORDER BY item.itemid
+    ORDER BY ib.quantityonhand DESC
   `;
 
   try {
@@ -162,37 +170,60 @@ export async function getInventoryBalances(filters?: {
       }
     );
 
-    const records: InventoryItemRecord[] = (response.items || []).map(row => {
-      const qtyOnHand = parseFloat(row.quantity_on_hand) || 0;
-      const reorderPoint = row.reorderpoint !== null ? parseFloat(row.reorderpoint) : null;
-      const isLowStock = reorderPoint !== null && qtyOnHand > 0 && qtyOnHand < reorderPoint;
+    // Aggregate by item ID since we may get multiple rows per item (one per location)
+    const itemMap = new Map<string, InventoryItemRecord>();
 
-      return {
-        id: row.id?.toString() || '',
-        item_id: row.itemid || '',
-        display_name: row.displayname || row.itemid || '',
-        item_type: row.item_type || '',
-        quantity_on_hand: qtyOnHand,
-        quantity_available: parseFloat(row.quantity_available) || 0,
-        quantity_backordered: parseFloat(row.quantity_backordered) || 0,
-        unit_cost: parseFloat(row.unit_cost) || 0,
-        reorder_point: reorderPoint,
-        preferred_stock_level: row.preferredstocklevel !== null ? parseFloat(row.preferredstocklevel) : null,
-        location_id: row.location_id?.toString() || null,
-        location_name: row.location_name || null,
-        is_low_stock: isLowStock,
-        // Initialize actionable fields - will be enriched later
-        orders_blocked: 0,
-        revenue_blocked: 0,
-        customers_impacted: 0,
-        days_until_stockout: null,
-        avg_daily_usage: 0,
-        can_expedite: false,
-        last_receipt_date: null,
-        next_po_date: null,
-        root_cause: 'Unknown',
-      };
+    for (const row of response.items || []) {
+      const id = row.id?.toString() || '';
+      const qtyOnHand = parseFloat(row.quantity_on_hand) || 0;
+      const qtyAvailable = parseFloat(row.quantity_available) || 0;
+
+      if (itemMap.has(id)) {
+        // Aggregate quantities from multiple locations
+        const existing = itemMap.get(id)!;
+        existing.quantity_on_hand += qtyOnHand;
+        existing.quantity_available += qtyAvailable;
+      } else {
+        const reorderPoint = row.reorderpoint !== null ? parseFloat(row.reorderpoint) : null;
+
+        itemMap.set(id, {
+          id,
+          item_id: row.itemid || '',
+          display_name: row.displayname || row.itemid || '',
+          item_type: row.item_type || '',
+          quantity_on_hand: qtyOnHand,
+          quantity_available: qtyAvailable,
+          quantity_backordered: parseFloat(row.quantity_backordered) || 0,
+          unit_cost: parseFloat(row.unit_cost) || 0,
+          reorder_point: reorderPoint,
+          preferred_stock_level: row.preferredstocklevel !== null ? parseFloat(row.preferredstocklevel) : null,
+          location_id: row.location_id?.toString() || null,
+          location_name: row.location_name || null,
+          is_low_stock: false, // Will be recalculated after aggregation
+          // Initialize actionable fields - will be enriched later
+          orders_blocked: 0,
+          revenue_blocked: 0,
+          customers_impacted: 0,
+          days_until_stockout: null,
+          avg_daily_usage: 0,
+          can_expedite: false,
+          last_receipt_date: null,
+          next_po_date: null,
+          root_cause: 'Unknown',
+        });
+      }
+    }
+
+    // Convert to array and recalculate is_low_stock after aggregation
+    const records = Array.from(itemMap.values()).map(item => {
+      item.is_low_stock = item.reorder_point !== null &&
+        item.quantity_on_hand > 0 &&
+        item.quantity_on_hand < item.reorder_point;
+      return item;
     });
+
+    // Sort by quantity on hand descending
+    records.sort((a, b) => b.quantity_on_hand - a.quantity_on_hand);
 
     // Filter for low stock only if requested
     if (filters?.lowStockOnly) {

@@ -52,21 +52,23 @@ async function main() {
     console.log('InventoryBalance table error:', error.message);
   }
 
-  // Check aggregated inventory balance
-  console.log('\n\nChecking aggregated inventory...');
+  // Check inventory using InventoryBalance join (the correct approach)
+  console.log('\n\nChecking inventory with InventoryBalance join...');
   const aggQuery = `
     SELECT
       item.id,
       item.itemid,
       item.displayname,
-      item.quantityonhand AS qty_on_hand,
-      item.quantityavailable AS qty_available,
-      COALESCE(item.averagecost, 0) AS unit_cost
+      ib.quantityonhand AS qty_on_hand,
+      ib.quantityavailable AS qty_available,
+      COALESCE(item.averagecost, 0) AS unit_cost,
+      ib.location
     FROM Item item
+    INNER JOIN InventoryBalance ib ON item.id = ib.item
     WHERE item.isinactive = 'F'
       AND item.itemtype IN ('InvtPart', 'Assembly')
-      AND item.quantityonhand > 0
-    ORDER BY item.quantityonhand DESC
+      AND ib.quantityonhand > 0
+    ORDER BY ib.quantityonhand DESC
   `;
 
   const response = await netsuiteRequest<{ items: any[]; totalResults: number }>(
@@ -78,14 +80,19 @@ async function main() {
     }
   );
 
-  console.log(`Found ${response.totalResults} items with stock\n`);
+  console.log(`Found ${response.totalResults || response.items?.length} items with stock\n`);
 
+  let totalValue = 0;
   if (response.items?.length > 0) {
     console.log('Top items with stock:');
     for (const item of response.items) {
-      const value = (parseFloat(item.qty_on_hand) || 0) * (parseFloat(item.unit_cost) || 0);
-      console.log(`  ${item.itemid}: ${item.qty_on_hand} on hand @ $${item.unit_cost} = $${value.toFixed(2)}`);
+      const qty = parseFloat(item.qty_on_hand) || 0;
+      const cost = parseFloat(item.unit_cost) || 0;
+      const value = qty * cost;
+      totalValue += value;
+      console.log(`  ${item.itemid}: ${qty} on hand @ $${cost.toFixed(2)} = $${value.toFixed(2)}`);
     }
+    console.log(`\nTotal inventory value (top 20): $${totalValue.toFixed(2)}`);
   }
 }
 
