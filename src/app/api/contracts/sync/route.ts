@@ -222,6 +222,10 @@ export async function POST(request: NextRequest) {
 
           updateDetails.push(changes);
         }
+
+        // Preserve existing is_closed status (manual archive action)
+        transformed.is_closed = existing.is_closed ?? false;
+        transformed.is_won = existing.is_won ?? false;
       } else {
         newCount++;
       }
