@@ -424,12 +424,17 @@ export async function GET(request: NextRequest) {
     // SEARCH NETSUITE WORK ORDERS
     // =============================================================================
     if (scope === 'all' || scope === 'netsuite') {
+      // Search wo_number, tranid, and other fields
       const { data: workOrders, error, count } = await admin
         .from('netsuite_work_orders')
         .select('*', { count: 'exact' })
-        .or(`wo_number.ilike.${searchTerm},memo.ilike.${searchTerm},customer_name.ilike.${searchTerm},created_from_so_number.ilike.${searchTerm}`)
+        .or(`wo_number.ilike.${searchTerm},tranid.ilike.${searchTerm},memo.ilike.${searchTerm},customer_name.ilike.${searchTerm},created_from_so_number.ilike.${searchTerm}`)
         .order('wo_date', { ascending: false })
         .range(offset, offset + limit - 1);
+
+      if (error) {
+        console.error('[SEARCH] Error searching work orders:', error);
+      }
 
       if (!error && workOrders) {
         totals.workOrders = count || workOrders.length;
@@ -464,19 +469,28 @@ export async function GET(request: NextRequest) {
     // SEARCH NETSUITE SALES ORDERS
     // =============================================================================
     if (scope === 'all' || scope === 'netsuite') {
+      // Search both so_number and tranid fields (some records use tranid for the SO number)
       const { data: salesOrders, error, count } = await admin
         .from('netsuite_sales_orders')
         .select('*', { count: 'exact' })
-        .or(`so_number.ilike.${searchTerm},memo.ilike.${searchTerm},customer_name.ilike.${searchTerm},sales_rep_name.ilike.${searchTerm}`)
+        .or(`so_number.ilike.${searchTerm},tranid.ilike.${searchTerm},memo.ilike.${searchTerm},customer_name.ilike.${searchTerm},sales_rep_name.ilike.${searchTerm}`)
         .order('so_date', { ascending: false })
         .range(offset, offset + limit - 1);
+
+      if (error) {
+        console.error('[SEARCH] Error searching sales orders:', error);
+      }
 
       if (!error && salesOrders) {
         totals.salesOrders = count || salesOrders.length;
 
         results.salesOrders = salesOrders.map(so => {
+          // Use tranid if so_number is missing
+          const displayNumber = so.so_number || so.tranid || 'Unknown';
+
           const matchInfo = getMatchInfo(so, query, {
             so_number: 'soNumber',
+            tranid: 'tranId',
             memo: 'memo',
             customer_name: 'customer',
             sales_rep_name: 'salesRep',
@@ -485,16 +499,16 @@ export async function GET(request: NextRequest) {
           return {
             id: so.id,
             type: 'sales_order' as const,
-            title: so.so_number,
+            title: displayNumber,
             subtitle: so.customer_name || 'Unknown Customer',
             status: so.status,
             customerName: so.customer_name,
             soDate: so.so_date,
             totalAmount: so.total_amount,
-            url: `/project-profitability?so=${so.so_number}`,
+            url: `/project-profitability?so=${displayNumber}`,
             matchedField: matchInfo.field,
             matchedText: matchInfo.text,
-            relevanceScore: calculateRelevance(so, query, 'so_number', ['customer_name', 'memo'], 'total_amount'),
+            relevanceScore: calculateRelevance(so, query, 'so_number', ['tranid', 'customer_name', 'memo'], 'total_amount'),
           };
         });
       }

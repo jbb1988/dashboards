@@ -276,24 +276,39 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
 
     setIsSearching(true);
     try {
-      const response = await fetch(`/api/contracts/search?q=${encodeURIComponent(searchQuery)}&limit=10`);
+      const response = await fetch(`/api/contracts/search?q=${encodeURIComponent(searchQuery)}&limit=15`);
       if (response.ok) {
         const data = await response.json();
-        const combined: SearchResult[] = [
+
+        // Log what we got back for debugging
+        console.log('[HelpDrawer] Search results:', {
+          contracts: data.results.contracts?.length || 0,
+          documents: data.results.documents?.length || 0,
+          tasks: data.results.tasks?.length || 0,
+          workOrders: data.results.workOrders?.length || 0,
+          salesOrders: data.results.salesOrders?.length || 0,
+          asanaTasks: data.results.asanaTasks?.length || 0,
+        });
+
+        // Combine all results
+        const combined: (SearchResult & { relevanceScore?: number })[] = [
           // Contracts
-          ...(data.results.contracts || []).map((c: SearchResult) => ({ ...c, type: 'contract' as const })),
+          ...(data.results.contracts || []).map((c: SearchResult & { relevanceScore?: number }) => ({ ...c, type: 'contract' as const })),
           // Documents
-          ...(data.results.documents || []).map((d: SearchResult) => ({ ...d, type: 'document' as const })),
+          ...(data.results.documents || []).map((d: SearchResult & { relevanceScore?: number }) => ({ ...d, type: 'document' as const })),
           // Tasks
-          ...(data.results.tasks || []).map((t: SearchResult) => ({ ...t, type: 'task' as const })),
+          ...(data.results.tasks || []).map((t: SearchResult & { relevanceScore?: number }) => ({ ...t, type: 'task' as const })),
           // NetSuite Work Orders
-          ...(data.results.workOrders || []).map((wo: SearchResult) => ({ ...wo, type: 'work_order' as const })),
+          ...(data.results.workOrders || []).map((wo: SearchResult & { relevanceScore?: number }) => ({ ...wo, type: 'work_order' as const })),
           // NetSuite Sales Orders
-          ...(data.results.salesOrders || []).map((so: SearchResult) => ({ ...so, type: 'sales_order' as const })),
+          ...(data.results.salesOrders || []).map((so: SearchResult & { relevanceScore?: number }) => ({ ...so, type: 'sales_order' as const })),
           // Asana Tasks
-          ...(data.results.asanaTasks || []).map((at: SearchResult) => ({ ...at, type: 'asana_task' as const })),
-        ].slice(0, 8);
-        setDataResults(combined);
+          ...(data.results.asanaTasks || []).map((at: SearchResult & { relevanceScore?: number }) => ({ ...at, type: 'asana_task' as const })),
+        ];
+
+        // Sort by relevance score (highest first) and take top 10
+        combined.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+        setDataResults(combined.slice(0, 10) as SearchResult[]);
       }
     } catch (error) {
       console.error('Search error:', error);
