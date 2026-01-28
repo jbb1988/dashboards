@@ -421,7 +421,7 @@ export default function SmartProjectsTab({
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentBlue} 0%, ${appleTokens.accentBlue}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentBlue}50` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentBlue} 0%, ${appleTokens.accentBlue}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentBlue}50`, borderRadius: `${appleTokens.radiusL1} 0 0 ${appleTokens.radiusL1}` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Active Projects</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{data.stats.incomplete}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>In progress</div>
@@ -441,7 +441,7 @@ export default function SmartProjectsTab({
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentRed} 0%, ${appleTokens.accentRed}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentRed}50` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentRed} 0%, ${appleTokens.accentRed}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentRed}50`, borderRadius: `${appleTokens.radiusL1} 0 0 ${appleTokens.radiusL1}` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Needs Attention</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.needsAttention}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Action required</div>
@@ -461,7 +461,7 @@ export default function SmartProjectsTab({
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentCyan} 0%, ${appleTokens.accentCyan}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentCyan}50` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${appleTokens.accentCyan} 0%, ${appleTokens.accentCyan}70 100%)`, boxShadow: `0 0 16px ${appleTokens.accentCyan}50`, borderRadius: `${appleTokens.radiusL1} 0 0 ${appleTokens.radiusL1}` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>This Week</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.thisWeek}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Upcoming</div>
@@ -481,7 +481,7 @@ export default function SmartProjectsTab({
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${COLORS.confirmed} 0%, ${COLORS.confirmed}70 100%)`, boxShadow: `0 0 16px ${COLORS.confirmed}50` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${COLORS.confirmed} 0%, ${COLORS.confirmed}70 100%)`, boxShadow: `0 0 16px ${COLORS.confirmed}50`, borderRadius: `${appleTokens.radiusL1} 0 0 ${appleTokens.radiusL1}` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Confirmed</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.confirmed}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Ready to go</div>
@@ -501,7 +501,7 @@ export default function SmartProjectsTab({
             borderRadius: appleTokens.radiusL1,
           }}
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${COLORS.placeholder} 0%, ${COLORS.placeholder}70 100%)`, boxShadow: `0 0 16px ${COLORS.placeholder}50` }} />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: `linear-gradient(180deg, ${COLORS.placeholder} 0%, ${COLORS.placeholder}70 100%)`, boxShadow: `0 0 16px ${COLORS.placeholder}50`, borderRadius: `${appleTokens.radiusL1} 0 0 ${appleTokens.radiusL1}` }} />
           <div className="text-[11px] font-semibold uppercase tracking-[0.05em] mb-2" style={{ color: appleTokens.textMuted }}>Placeholder</div>
           <div className="text-[28px] font-semibold" style={{ color: appleTokens.textPrimary }}>{stats.placeholder}</div>
           <div className="text-[12px] mt-1" style={{ color: appleTokens.textSecondary }}>Tentative</div>
