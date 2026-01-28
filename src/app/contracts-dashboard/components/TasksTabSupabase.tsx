@@ -1996,7 +1996,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
                     strategy={verticalListSortingStrategy}
                     id={`sortable-${column.key}`}
                   >
-                    <div className="p-3 space-y-2 min-h-[300px]">
+                    <DroppableColumn id={`column-${column.key}`} status={column.status}>
                       {column.tasks.map((task, idx) => (
                         <DraggableTaskCard
                           key={task.id}
@@ -2011,14 +2011,11 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
                         />
                       ))}
                       {column.tasks.length === 0 && (
-                        <div
-                          id={`column-${column.key}`}
-                          className="text-center py-8 text-[#475569] text-xs border-2 border-dashed border-white/[0.04] rounded-lg"
-                        >
+                        <div className="text-center py-8 text-[#475569] text-xs border-2 border-dashed border-white/[0.04] rounded-lg">
                           Drop tasks here
                         </div>
                       )}
-                    </div>
+                    </DroppableColumn>
                   </SortableContext>
                 </div>
               ))}
