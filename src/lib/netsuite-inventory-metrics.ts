@@ -665,14 +665,18 @@ export async function getInventoryMetrics(filters?: {
     .sort((a, b) => b.revenue_blocked - a.revenue_blocked);
   const valueByType = calculateValueByType(items);
 
+  // Find items blocking orders (can be any item with orders_blocked > 0, not just low stock)
+  const itemsBlockingOrders = items
+    .filter(i => i.orders_blocked > 0)
+    .sort((a, b) => b.revenue_blocked - a.revenue_blocked);
+
   // Find top blocking driver
-  const topBlocking = lowStockItems[0];
+  const topBlocking = itemsBlockingOrders[0];
   const topBlockingDriver = topBlocking?.item_id || 'None';
   const topBlockingDriverCount = topBlocking?.orders_blocked || 0;
 
-  // Build backorder blast radius
-  const topBlockingItems = lowStockItems
-    .filter(i => i.orders_blocked > 0)
+  // Build backorder blast radius - use items that are actually blocking orders
+  const topBlockingItems = itemsBlockingOrders
     .slice(0, 10)
     .map(i => ({
       item_id: i.item_id,
