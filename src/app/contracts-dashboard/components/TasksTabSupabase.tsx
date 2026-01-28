@@ -452,18 +452,18 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
       due.setHours(0, 0, 0, 0);
       return due < today;
     }).length;
-    const dueSoon = tasks.filter(t => {
+    const dueToday = tasks.filter(t => {
       if (t.status === 'completed' || t.status === 'cancelled' || !t.due_date) return false;
       // Use local date parsing for consistent timezone handling
       const due = new Date(t.due_date + 'T00:00:00');
       due.setHours(0, 0, 0, 0);
-      return due >= today && due <= tomorrow;
+      return due.getTime() === today.getTime();
     }).length;
     const completed = tasks.filter(t => t.status === 'completed').length;
     const total = tasks.length;
     const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    return { totalActive, overdue, dueSoon, completed, progressPercent, total };
+    return { totalActive, overdue, dueToday, completed, progressPercent, total };
   }, [tasks]);
 
   // Group tasks by contract
@@ -1268,7 +1268,7 @@ export default function TasksTabSupabase({ contracts, onOpenContractDetail, focu
         />
         <KPICard
           title="Due Today"
-          value={taskKpis.dueSoon}
+          value={taskKpis.dueToday}
           subtitle="Requires attention"
           icon={KPIIcons.clock}
           color="#F59E0B"
