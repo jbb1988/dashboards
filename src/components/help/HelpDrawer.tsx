@@ -98,10 +98,28 @@ const TYPE_CONFIG: Record<string, { color: string; glow: string; bgColor: string
     bgColor: 'rgba(74,222,128,0.15)',
     label: 'Task',
   },
-  guide: {
+  work_order: {
     color: visionPro.accent.orange,
     glow: visionPro.glow.orange,
     bgColor: 'rgba(251,146,60,0.15)',
+    label: 'Work Order',
+  },
+  sales_order: {
+    color: visionPro.accent.orange,
+    glow: visionPro.glow.orange,
+    bgColor: 'rgba(251,146,60,0.15)',
+    label: 'Sales Order',
+  },
+  asana_task: {
+    color: visionPro.accent.coral,
+    glow: visionPro.glow.coral,
+    bgColor: 'rgba(240,106,106,0.15)',
+    label: 'Asana',
+  },
+  guide: {
+    color: visionPro.accent.pink,
+    glow: visionPro.glow.white,
+    bgColor: 'rgba(244,114,182,0.15)',
     label: 'Guide',
   },
 };
@@ -112,7 +130,7 @@ const TYPE_CONFIG: Record<string, { color: string; glow: string; bgColor: string
 
 interface SearchResult {
   id: string;
-  type: 'contract' | 'document' | 'task';
+  type: 'contract' | 'document' | 'task' | 'work_order' | 'sales_order' | 'asana_task';
   title: string;
   subtitle?: string;
   url: string;
@@ -179,12 +197,31 @@ const icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
     </svg>
   ),
+  workOrder: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  salesOrder: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ),
+  asana: (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M18.78 12.653c-2.478 0-4.487 2.009-4.487 4.487s2.009 4.487 4.487 4.487 4.487-2.009 4.487-4.487-2.009-4.487-4.487-4.487zm-13.56 0c-2.478 0-4.487 2.009-4.487 4.487s2.009 4.487 4.487 4.487 4.487-2.009 4.487-4.487-2.009-4.487-4.487-4.487zm6.78-10.28c-2.478 0-4.487 2.009-4.487 4.487s2.009 4.487 4.487 4.487 4.487-2.009 4.487-4.487-2.009-4.487-4.487-4.487z"/>
+    </svg>
+  ),
 };
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   document: icons.document,
   contract: icons.contract,
   task: icons.task,
+  work_order: icons.workOrder,
+  sales_order: icons.salesOrder,
+  asana_task: icons.asana,
   guide: icons.guide,
 };
 
@@ -239,14 +276,23 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
 
     setIsSearching(true);
     try {
-      const response = await fetch(`/api/contracts/search?q=${encodeURIComponent(searchQuery)}&limit=6`);
+      const response = await fetch(`/api/contracts/search?q=${encodeURIComponent(searchQuery)}&limit=10`);
       if (response.ok) {
         const data = await response.json();
         const combined: SearchResult[] = [
-          ...data.results.documents.map((d: SearchResult) => ({ ...d, type: 'document' as const })),
-          ...data.results.contracts.map((c: SearchResult) => ({ ...c, type: 'contract' as const })),
-          ...data.results.tasks.map((t: SearchResult) => ({ ...t, type: 'task' as const })),
-        ].slice(0, 6);
+          // Contracts
+          ...(data.results.contracts || []).map((c: SearchResult) => ({ ...c, type: 'contract' as const })),
+          // Documents
+          ...(data.results.documents || []).map((d: SearchResult) => ({ ...d, type: 'document' as const })),
+          // Tasks
+          ...(data.results.tasks || []).map((t: SearchResult) => ({ ...t, type: 'task' as const })),
+          // NetSuite Work Orders
+          ...(data.results.workOrders || []).map((wo: SearchResult) => ({ ...wo, type: 'work_order' as const })),
+          // NetSuite Sales Orders
+          ...(data.results.salesOrders || []).map((so: SearchResult) => ({ ...so, type: 'sales_order' as const })),
+          // Asana Tasks
+          ...(data.results.asanaTasks || []).map((at: SearchResult) => ({ ...at, type: 'asana_task' as const })),
+        ].slice(0, 8);
         setDataResults(combined);
       }
     } catch (error) {
