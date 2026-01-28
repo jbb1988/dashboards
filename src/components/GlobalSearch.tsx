@@ -23,7 +23,6 @@ interface SearchResult {
   matchedText?: string;
   relevanceScore?: number;
   isArchived?: boolean;
-  // Type-specific fields
   documentType?: string;
   uploadedAt?: string;
   dueDate?: string;
@@ -71,100 +70,159 @@ interface SearchFilters {
 }
 
 // =============================================================================
-// CONSTANTS & DESIGN TOKENS
+// APPLE VISION PRO DESIGN SYSTEM
 // =============================================================================
 
-const SEARCH_HISTORY_KEY = 'mars-search-history';
-const MAX_HISTORY_ITEMS = 10;
+const visionPro = {
+  // Glass materials - layered translucency
+  glass: {
+    ultra: 'rgba(255,255,255,0.02)',
+    thin: 'rgba(255,255,255,0.04)',
+    regular: 'rgba(255,255,255,0.06)',
+    thick: 'rgba(255,255,255,0.08)',
+    chrome: 'rgba(255,255,255,0.12)',
+  },
 
-// Apple Pro Design Tokens
-const design = {
-  // L2 Modal surface
-  modalBg: 'linear-gradient(180deg, rgba(36,46,66,0.95), rgba(22,30,44,0.98))',
-  modalShadow: '0 30px 90px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.10)',
-  // L1 Result surface
-  resultBg: 'linear-gradient(180deg, rgba(28,36,52,0.88), rgba(18,24,36,0.96))',
-  resultShadow: '0 10px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)',
+  // Depths - for layered surfaces
+  depth: {
+    backdrop: 'rgba(0,0,0,0.85)',
+    surface1: 'rgba(18,18,24,0.95)',
+    surface2: 'rgba(28,28,36,0.90)',
+    surface3: 'rgba(38,38,48,0.85)',
+    elevated: 'rgba(48,48,58,0.80)',
+  },
+
+  // Luminance - glowing elements
+  glow: {
+    white: '0 0 30px rgba(255,255,255,0.15), 0 0 60px rgba(255,255,255,0.05)',
+    blue: '0 0 20px rgba(88,166,255,0.4), 0 0 40px rgba(88,166,255,0.2), 0 0 80px rgba(88,166,255,0.1)',
+    purple: '0 0 20px rgba(167,139,250,0.4), 0 0 40px rgba(167,139,250,0.2)',
+    cyan: '0 0 20px rgba(56,189,248,0.4), 0 0 40px rgba(56,189,248,0.2)',
+    green: '0 0 20px rgba(74,222,128,0.4), 0 0 40px rgba(74,222,128,0.2)',
+    orange: '0 0 20px rgba(251,146,60,0.4), 0 0 40px rgba(251,146,60,0.2)',
+    coral: '0 0 20px rgba(240,106,106,0.4), 0 0 40px rgba(240,106,106,0.2)',
+  },
+
+  // Premium shadows
+  shadow: {
+    modal: '0 50px 100px -20px rgba(0,0,0,0.8), 0 30px 60px -30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.2)',
+    card: '0 20px 40px -15px rgba(0,0,0,0.5), 0 10px 20px -10px rgba(0,0,0,0.3)',
+    float: '0 25px 50px -12px rgba(0,0,0,0.6)',
+    inner: 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.1)',
+  },
+
+  // Accent colors - vibrant and luminous
+  accent: {
+    blue: '#58A6FF',
+    purple: '#A78BFA',
+    cyan: '#38BDF8',
+    green: '#4ADE80',
+    orange: '#FB923C',
+    coral: '#F06A6A',
+    pink: '#F472B6',
+  },
+
+  // Text colors - refined hierarchy
+  text: {
+    primary: 'rgba(255,255,255,0.95)',
+    secondary: 'rgba(255,255,255,0.70)',
+    tertiary: 'rgba(255,255,255,0.50)',
+    quaternary: 'rgba(255,255,255,0.30)',
+  },
+
+  // Borders - subtle definition
+  border: {
+    subtle: 'rgba(255,255,255,0.04)',
+    light: 'rgba(255,255,255,0.08)',
+    medium: 'rgba(255,255,255,0.12)',
+    strong: 'rgba(255,255,255,0.20)',
+  },
 };
 
-// Data source colors
+// Data source configurations with Vision Pro styling
 const TYPE_CONFIG: Record<ResultType, {
   color: string;
-  bgOpacity: string;
+  glow: string;
   label: string;
   icon: React.ReactNode;
 }> = {
   contract: {
-    color: '#38BDF8',
-    bgOpacity: '10',
+    color: visionPro.accent.cyan,
+    glow: visionPro.glow.cyan,
     label: 'Contract',
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
       </svg>
     ),
   },
   document: {
-    color: '#8B5CF6',
-    bgOpacity: '10',
+    color: visionPro.accent.purple,
+    glow: visionPro.glow.purple,
     label: 'Document',
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
       </svg>
     ),
   },
   task: {
-    color: '#50D28C',
-    bgOpacity: '10',
+    color: visionPro.accent.green,
+    glow: visionPro.glow.green,
     label: 'Task',
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
   work_order: {
-    color: '#F97316',
-    bgOpacity: '10',
+    color: visionPro.accent.orange,
+    glow: visionPro.glow.orange,
     label: 'Work Order',
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
       </svg>
     ),
   },
   sales_order: {
-    color: '#F97316',
-    bgOpacity: '10',
+    color: visionPro.accent.orange,
+    glow: visionPro.glow.orange,
     label: 'Sales Order',
     icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
       </svg>
     ),
   },
   asana_task: {
-    color: '#F06A6A',
-    bgOpacity: '10',
+    color: visionPro.accent.coral,
+    glow: visionPro.glow.coral,
     label: 'Asana',
     icon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+      <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
         <path d="M18.782 12.625c-1.854 0-3.357 1.503-3.357 3.357s1.503 3.357 3.357 3.357 3.357-1.503 3.357-3.357-1.503-3.357-3.357-3.357zM5.218 12.625c-1.854 0-3.357 1.503-3.357 3.357s1.503 3.357 3.357 3.357 3.357-1.503 3.357-3.357-1.503-3.357-3.357-3.357zM12 4.661c-1.854 0-3.357 1.503-3.357 3.357S10.146 11.375 12 11.375s3.357-1.503 3.357-3.357S13.854 4.661 12 4.661z"/>
       </svg>
     ),
   },
 };
 
-const SCOPE_CONFIG: Record<ScopeType, { label: string; color: string }> = {
-  all: { label: 'All', color: '#5A82FF' },
-  contracts: { label: 'Contracts', color: '#38BDF8' },
-  documents: { label: 'Docs', color: '#8B5CF6' },
-  tasks: { label: 'Tasks', color: '#50D28C' },
-  netsuite: { label: 'NetSuite', color: '#F97316' },
-  asana: { label: 'Asana', color: '#F06A6A' },
+const SCOPE_CONFIG: Record<ScopeType, { label: string; color: string; glow: string }> = {
+  all: { label: 'All', color: visionPro.accent.blue, glow: visionPro.glow.blue },
+  contracts: { label: 'Contracts', color: visionPro.accent.cyan, glow: visionPro.glow.cyan },
+  documents: { label: 'Docs', color: visionPro.accent.purple, glow: visionPro.glow.purple },
+  tasks: { label: 'Tasks', color: visionPro.accent.green, glow: visionPro.glow.green },
+  netsuite: { label: 'NetSuite', color: visionPro.accent.orange, glow: visionPro.glow.orange },
+  asana: { label: 'Asana', color: visionPro.accent.coral, glow: visionPro.glow.coral },
 };
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const SEARCH_HISTORY_KEY = 'mars-search-history';
+const MAX_HISTORY_ITEMS = 10;
 
 // =============================================================================
 // HELPERS
@@ -194,7 +252,7 @@ function saveSearchHistory(query: string): void {
     const updated = [query, ...filtered].slice(0, MAX_HISTORY_ITEMS);
     localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(updated));
   } catch {
-    // Ignore localStorage errors
+    // Ignore
   }
 }
 
@@ -215,12 +273,8 @@ export default function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults>({
-    contracts: [],
-    documents: [],
-    tasks: [],
-    workOrders: [],
-    salesOrders: [],
-    asanaTasks: [],
+    contracts: [], documents: [], tasks: [],
+    workOrders: [], salesOrders: [], asanaTasks: [],
   });
   const [totals, setTotals] = useState<SearchTotals>({
     contracts: 0, documents: 0, tasks: 0,
@@ -244,10 +298,6 @@ export default function GlobalSearch() {
   const resultsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // =============================================================================
-  // COMPUTED VALUES
-  // =============================================================================
-
   // Flatten results based on active scope
   const allResults = (() => {
     if (activeScope === 'contracts') return results.contracts;
@@ -256,16 +306,11 @@ export default function GlobalSearch() {
     if (activeScope === 'netsuite') return [...results.workOrders, ...results.salesOrders];
     if (activeScope === 'asana') return results.asanaTasks;
     return [
-      ...results.contracts,
-      ...results.documents,
-      ...results.tasks,
-      ...results.workOrders,
-      ...results.salesOrders,
-      ...results.asanaTasks,
+      ...results.contracts, ...results.documents, ...results.tasks,
+      ...results.workOrders, ...results.salesOrders, ...results.asanaTasks,
     ];
   })();
 
-  // Group results by type for display
   const groupedResults = {
     contracts: activeScope === 'all' || activeScope === 'contracts' ? results.contracts : [],
     documents: activeScope === 'all' || activeScope === 'documents' ? results.documents : [],
@@ -275,7 +320,6 @@ export default function GlobalSearch() {
     asanaTasks: activeScope === 'all' || activeScope === 'asana' ? results.asanaTasks : [],
   };
 
-  // Scope tabs with counts
   const scopeTabs = [
     { id: 'all' as ScopeType, label: 'All', count: totals.total },
     { id: 'contracts' as ScopeType, label: 'Contracts', count: totals.contracts },
@@ -285,36 +329,24 @@ export default function GlobalSearch() {
     { id: 'asana' as ScopeType, label: 'Asana', count: totals.asanaTasks },
   ];
 
-  // =============================================================================
-  // EFFECTS
-  // =============================================================================
-
-  // Load search history on mount
+  // Effects
   useEffect(() => {
     setSearchHistory(getSearchHistory());
   }, []);
 
-  // Focus input when opened
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100);
       setSearchHistory(getSearchHistory());
     } else {
       setQuery('');
-      setResults({
-        contracts: [], documents: [], tasks: [],
-        workOrders: [], salesOrders: [], asanaTasks: [],
-      });
-      setTotals({
-        contracts: 0, documents: 0, tasks: 0,
-        workOrders: 0, salesOrders: 0, asanaTasks: 0, total: 0,
-      });
+      setResults({ contracts: [], documents: [], tasks: [], workOrders: [], salesOrders: [], asanaTasks: [] });
+      setTotals({ contracts: 0, documents: 0, tasks: 0, workOrders: 0, salesOrders: 0, asanaTasks: 0, total: 0 });
       setSelectedIndex(0);
       setPagination({ page: 1, limit: 20, totalPages: 0, hasMore: false });
     }
   }, [isOpen]);
 
-  // Global keyboard shortcut (Cmd+K or Ctrl+K)
   useEffect(() => {
     function handleGlobalKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -329,17 +361,10 @@ export default function GlobalSearch() {
     return () => document.removeEventListener('keydown', handleGlobalKeyDown);
   }, [isOpen]);
 
-  // Search with debounce
   useEffect(() => {
     if (!query || query.length < 2) {
-      setResults({
-        contracts: [], documents: [], tasks: [],
-        workOrders: [], salesOrders: [], asanaTasks: [],
-      });
-      setTotals({
-        contracts: 0, documents: 0, tasks: 0,
-        workOrders: 0, salesOrders: 0, asanaTasks: 0, total: 0,
-      });
+      setResults({ contracts: [], documents: [], tasks: [], workOrders: [], salesOrders: [], asanaTasks: [] });
+      setTotals({ contracts: 0, documents: 0, tasks: 0, workOrders: 0, salesOrders: 0, asanaTasks: 0, total: 0 });
       return;
     }
 
@@ -347,12 +372,10 @@ export default function GlobalSearch() {
       setLoading(true);
       try {
         const params = new URLSearchParams({
-          q: query,
-          scope: activeScope,
+          q: query, scope: activeScope,
           includeArchived: filters.includeArchived.toString(),
           includeHistorical: filters.includeHistorical.toString(),
-          page: '1',
-          limit: '20',
+          page: '1', limit: '20',
         });
         if (filters.status) params.set('status', filters.status);
 
@@ -374,60 +397,40 @@ export default function GlobalSearch() {
     return () => clearTimeout(timer);
   }, [query, activeScope, filters]);
 
-  // =============================================================================
-  // HANDLERS
-  // =============================================================================
-
+  // Handlers
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(i => Math.min(i + 1, allResults.length - 1));
-      // Scroll selected item into view
       setTimeout(() => {
-        const selected = resultsRef.current?.querySelector('[data-selected="true"]');
-        selected?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        resultsRef.current?.querySelector('[data-selected="true"]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }, 0);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(i => Math.max(i - 1, 0));
       setTimeout(() => {
-        const selected = resultsRef.current?.querySelector('[data-selected="true"]');
-        selected?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        resultsRef.current?.querySelector('[data-selected="true"]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }, 0);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (allResults[selectedIndex]) {
-        handleSelect(allResults[selectedIndex], e.metaKey || e.ctrlKey);
-      }
+      if (allResults[selectedIndex]) handleSelect(allResults[selectedIndex], e.metaKey || e.ctrlKey);
     } else if (e.key === 'Tab') {
       e.preventDefault();
       const scopes: ScopeType[] = ['all', 'contracts', 'documents', 'tasks', 'netsuite', 'asana'];
       const currentIdx = scopes.indexOf(activeScope);
-      const nextIdx = e.shiftKey
-        ? (currentIdx - 1 + scopes.length) % scopes.length
-        : (currentIdx + 1) % scopes.length;
+      const nextIdx = e.shiftKey ? (currentIdx - 1 + scopes.length) % scopes.length : (currentIdx + 1) % scopes.length;
       setActiveScope(scopes[nextIdx]);
       setSelectedIndex(0);
     }
   }, [allResults, selectedIndex, activeScope]);
 
   const handleSelect = (result: SearchResult, newTab = false) => {
-    // Save to history
-    if (query.trim()) {
-      saveSearchHistory(query);
-    }
-
+    if (query.trim()) saveSearchHistory(query);
     setIsOpen(false);
-
     if (result.url) {
       if (result.url.startsWith('/')) {
-        if (newTab) {
-          window.open(result.url, '_blank');
-        } else {
-          router.push(result.url);
-        }
+        newTab ? window.open(result.url, '_blank') : router.push(result.url);
       } else {
-        // External URL (like Asana) - always open in new tab
         window.open(result.url, '_blank');
       }
     }
@@ -435,22 +438,17 @@ export default function GlobalSearch() {
 
   const handleLoadMore = async () => {
     if (!pagination.hasMore || loadingMore) return;
-
     setLoadingMore(true);
     try {
       const params = new URLSearchParams({
-        q: query,
-        scope: activeScope,
+        q: query, scope: activeScope,
         includeArchived: filters.includeArchived.toString(),
         includeHistorical: filters.includeHistorical.toString(),
-        page: (pagination.page + 1).toString(),
-        limit: '20',
+        page: (pagination.page + 1).toString(), limit: '20',
       });
-
       const response = await fetch(`/api/contracts/search?${params}`);
       if (response.ok) {
         const data = await response.json();
-        // Append new results
         setResults(prev => ({
           contracts: [...prev.contracts, ...data.results.contracts],
           documents: [...prev.documents, ...data.results.documents],
@@ -468,176 +466,233 @@ export default function GlobalSearch() {
     }
   };
 
-  const handleHistorySelect = (historyQuery: string) => {
-    setQuery(historyQuery);
-    inputRef.current?.focus();
-  };
-
-  const handleClearHistory = () => {
-    clearSearchHistory();
-    setSearchHistory([]);
-  };
-
   // =============================================================================
   // RENDER
   // =============================================================================
 
   return (
     <>
-      {/* Trigger Button */}
-      <button
+      {/* Trigger Button - Vision Pro Glass Style */}
+      <motion.button
         onClick={() => setIsOpen(true)}
-        title="Search (Cmd+K)"
-        className="flex items-center gap-2.5 px-4 py-2 bg-[#0B1220]/80 border border-white/[0.06] rounded-xl text-[#64748B] hover:text-white hover:border-white/[0.12] hover:bg-[#111827] transition-all group"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className="relative flex items-center gap-3 px-4 py-2.5 rounded-2xl overflow-hidden group"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+          boxShadow: `${visionPro.shadow.inner}, 0 4px 20px rgba(0,0,0,0.3)`,
+          border: `1px solid ${visionPro.border.light}`,
+        }}
       >
-        <svg className="w-4 h-4 text-[#64748B] group-hover:text-[#5A82FF] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <svg className="w-4 h-4 text-white/60 group-hover:text-white/90 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
-        <span className="text-sm">Search...</span>
-        <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium text-[#64748B] bg-white/[0.04] rounded border border-white/[0.06]">
-          <span className="mr-0.5">&#8984;</span>K
-        </kbd>
-      </button>
+        <span className="text-sm text-white/60 group-hover:text-white/90 transition-colors font-medium">Search</span>
+        <div className="flex items-center gap-1 ml-2">
+          <kbd className="px-1.5 py-0.5 text-[10px] font-semibold text-white/40 bg-white/[0.06] rounded-md border border-white/[0.08]">
+            &#8984;
+          </kbd>
+          <kbd className="px-1.5 py-0.5 text-[10px] font-semibold text-white/40 bg-white/[0.06] rounded-md border border-white/[0.08]">
+            K
+          </kbd>
+        </div>
+      </motion.button>
 
       {/* Modal */}
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Backdrop */}
+            {/* Backdrop with blur */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.3 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-[#0B1220]/90 z-50"
+              className="fixed inset-0 z-50"
+              style={{
+                background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.85) 100%)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              }}
             />
 
             {/* Search Panel */}
-            <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4 pointer-events-none">
+            <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] px-4 pointer-events-none">
               <motion.div
-                initial={{ opacity: 0, scale: 0.96, y: -10 }}
+                initial={{ opacity: 0, scale: 0.9, y: -20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: -10 }}
-                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-                className="w-full max-w-2xl pointer-events-auto"
+                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+                className="w-full max-w-[680px] pointer-events-auto"
               >
+                {/* Main Container - Layered Glass */}
                 <div
-                  className="rounded-[18px] overflow-hidden border border-white/[0.08]"
+                  className="relative rounded-[28px] overflow-hidden"
                   style={{
-                    background: design.modalBg,
-                    boxShadow: design.modalShadow,
+                    background: `linear-gradient(180deg, ${visionPro.depth.surface2} 0%, ${visionPro.depth.surface1} 100%)`,
+                    boxShadow: visionPro.shadow.modal,
+                    border: `1px solid ${visionPro.border.light}`,
                   }}
                 >
-                  {/* Search Input */}
-                  <div className="relative">
-                    <div className="flex items-center gap-4 px-6 py-5">
-                      <div className="relative">
+                  {/* Top highlight line */}
+                  <div
+                    className="absolute top-0 left-8 right-8 h-[1px]"
+                    style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)' }}
+                  />
+
+                  {/* Search Input Section */}
+                  <div className="relative px-6 py-5">
+                    <div className="flex items-center gap-4">
+                      {/* Search Icon / Loader */}
+                      <div className="relative w-7 h-7 flex items-center justify-center">
                         {loading ? (
                           <motion.div
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                            className="w-6 h-6 border-2 border-[#5A82FF] border-t-transparent rounded-full"
+                            className="w-5 h-5 rounded-full"
+                            style={{
+                              border: '2px solid transparent',
+                              borderTopColor: visionPro.accent.blue,
+                              borderRightColor: visionPro.accent.blue,
+                            }}
                           />
                         ) : (
-                          <svg className="w-6 h-6 text-[#5A82FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
+                          <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            style={{ color: visionPro.accent.blue }}
+                          >
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                          </motion.div>
                         )}
                       </div>
+
+                      {/* Input */}
                       <input
                         ref={inputRef}
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Search contracts, documents, NetSuite, Asana..."
-                        className="flex-1 bg-transparent text-white placeholder-[#64748B] focus:outline-none text-lg font-light"
+                        placeholder="Search everything..."
+                        className="flex-1 bg-transparent text-xl font-light tracking-tight focus:outline-none"
                         style={{
-                          caretColor: '#5A82FF',
+                          color: visionPro.text.primary,
+                          caretColor: visionPro.accent.blue,
                         }}
                       />
-                      {query && (
-                        <button
-                          onClick={() => setQuery('')}
-                          className="p-1.5 rounded-lg text-[#64748B] hover:text-white hover:bg-white/[0.06] transition-all"
+
+                      {/* Clear Button */}
+                      <AnimatePresence>
+                        {query && (
+                          <motion.button
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            onClick={() => setQuery('')}
+                            className="p-2 rounded-xl transition-colors"
+                            style={{ background: visionPro.glass.regular }}
+                          >
+                            <svg className="w-4 h-4" style={{ color: visionPro.text.tertiary }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </motion.button>
+                        )}
+                      </AnimatePresence>
+
+                      {/* ESC Key */}
+                      <div className="pl-3 border-l" style={{ borderColor: visionPro.border.subtle }}>
+                        <kbd
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg"
+                          style={{
+                            color: visionPro.text.quaternary,
+                            background: visionPro.glass.thin,
+                            border: `1px solid ${visionPro.border.subtle}`,
+                          }}
                         >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                      <div className="flex items-center gap-1.5 pl-4 border-l border-white/[0.06]">
-                        <kbd className="px-2 py-1 text-xs font-medium text-[#64748B] bg-[#0B1220] rounded-md border border-white/[0.08]">
                           ESC
                         </kbd>
                       </div>
                     </div>
-                    <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+
+                    {/* Subtle divider */}
+                    <div
+                      className="absolute bottom-0 left-6 right-6 h-[1px]"
+                      style={{ background: `linear-gradient(90deg, transparent, ${visionPro.border.light}, transparent)` }}
+                    />
                   </div>
 
                   {/* Scope Tabs */}
                   {query.length >= 2 && (
-                    <div className="flex items-center gap-2 px-6 py-3 border-b border-white/[0.04] overflow-x-auto">
-                      {scopeTabs.map((scope) => {
+                    <div className="px-6 py-3 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                      {scopeTabs.map((scope, i) => {
                         const isActive = activeScope === scope.id;
-                        const color = SCOPE_CONFIG[scope.id].color;
+                        const config = SCOPE_CONFIG[scope.id];
                         return (
-                          <button
+                          <motion.button
                             key={scope.id}
-                            onClick={() => {
-                              setActiveScope(scope.id);
-                              setSelectedIndex(0);
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.03 }}
+                            onClick={() => { setActiveScope(scope.id); setSelectedIndex(0); }}
+                            className="relative px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200"
+                            style={{
+                              color: isActive ? '#fff' : visionPro.text.tertiary,
+                              background: isActive ? config.color : visionPro.glass.thin,
+                              boxShadow: isActive ? config.glow : 'none',
+                              border: `1px solid ${isActive ? 'transparent' : visionPro.border.subtle}`,
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                              isActive
-                                ? 'text-white'
-                                : 'text-[#64748B] hover:text-white hover:bg-white/[0.04]'
-                            }`}
-                            style={isActive ? {
-                              backgroundColor: color,
-                              boxShadow: `0 4px 12px ${color}40`,
-                            } : undefined}
                           >
                             {scope.label}
                             {scope.count > 0 && !isActive && (
-                              <span className="ml-1.5 px-1.5 py-0.5 bg-white/[0.1] rounded text-xs">
-                                {scope.count}
+                              <span
+                                className="ml-2 px-1.5 py-0.5 text-[10px] rounded-md font-semibold"
+                                style={{ background: visionPro.glass.regular, color: visionPro.text.quaternary }}
+                              >
+                                {scope.count > 999 ? '999+' : scope.count}
                               </span>
                             )}
-                          </button>
+                          </motion.button>
                         );
                       })}
                     </div>
                   )}
 
-                  {/* Filters (Collapsible) */}
+                  {/* Filters Toggle */}
                   {query.length >= 2 && (
-                    <div className="border-b border-white/[0.04]">
+                    <div style={{ borderTop: `1px solid ${visionPro.border.subtle}` }}>
                       <button
                         onClick={() => setShowFilters(!showFilters)}
-                        className="w-full flex items-center justify-between px-6 py-2 text-xs text-[#64748B] hover:text-white transition-colors"
+                        className="w-full flex items-center justify-between px-6 py-2.5 transition-colors"
+                        style={{ color: visionPro.text.tertiary }}
                       >
-                        <span className="flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        <span className="flex items-center gap-2 text-xs font-medium">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
                           </svg>
                           Filters
                           {(filters.includeArchived || filters.includeHistorical) && (
-                            <span className="px-1.5 py-0.5 bg-[#5A82FF]/20 text-[#5A82FF] rounded text-[10px] font-medium">
+                            <span
+                              className="px-1.5 py-0.5 text-[10px] font-semibold rounded-md"
+                              style={{ background: `${visionPro.accent.blue}30`, color: visionPro.accent.blue }}
+                            >
                               Active
                             </span>
                           )}
                         </span>
-                        <svg
-                          className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
+                        <motion.svg
+                          animate={{ rotate: showFilters ? 180 : 0 }}
+                          className="w-4 h-4"
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </motion.svg>
                       </button>
+
                       <AnimatePresence>
                         {showFilters && (
                           <motion.div
@@ -647,25 +702,48 @@ export default function GlobalSearch() {
                             transition={{ duration: 0.2 }}
                             className="overflow-hidden"
                           >
-                            <div className="px-6 pb-3 flex flex-wrap gap-4">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={filters.includeArchived}
-                                  onChange={(e) => setFilters(f => ({ ...f, includeArchived: e.target.checked }))}
-                                  className="w-4 h-4 rounded border-white/[0.2] bg-transparent text-[#5A82FF] focus:ring-[#5A82FF] focus:ring-offset-0"
-                                />
-                                <span className="text-sm text-[#8FA3BF]">Include archived</span>
-                              </label>
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={filters.includeHistorical}
-                                  onChange={(e) => setFilters(f => ({ ...f, includeHistorical: e.target.checked }))}
-                                  className="w-4 h-4 rounded border-white/[0.2] bg-transparent text-[#5A82FF] focus:ring-[#5A82FF] focus:ring-offset-0"
-                                />
-                                <span className="text-sm text-[#8FA3BF]">Include pre-2025</span>
-                              </label>
+                            <div className="px-6 pb-4 flex flex-wrap gap-4">
+                              {[
+                                { key: 'includeArchived', label: 'Include archived' },
+                                { key: 'includeHistorical', label: 'Include pre-2025' },
+                              ].map((filter) => (
+                                <label key={filter.key} className="flex items-center gap-2.5 cursor-pointer group">
+                                  <div
+                                    className="relative w-5 h-5 rounded-md flex items-center justify-center transition-all"
+                                    style={{
+                                      background: filters[filter.key as keyof SearchFilters] ? visionPro.accent.blue : visionPro.glass.regular,
+                                      border: `1.5px solid ${filters[filter.key as keyof SearchFilters] ? visionPro.accent.blue : visionPro.border.medium}`,
+                                      boxShadow: filters[filter.key as keyof SearchFilters] ? visionPro.glow.blue : 'none',
+                                    }}
+                                  >
+                                    {filters[filter.key as keyof SearchFilters] && (
+                                      <motion.svg
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        className="w-3 h-3 text-white"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={3}
+                                      >
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                      </motion.svg>
+                                    )}
+                                  </div>
+                                  <input
+                                    type="checkbox"
+                                    className="sr-only"
+                                    checked={filters[filter.key as keyof SearchFilters] as boolean}
+                                    onChange={(e) => setFilters(f => ({ ...f, [filter.key]: e.target.checked }))}
+                                  />
+                                  <span
+                                    className="text-sm font-medium transition-colors"
+                                    style={{ color: visionPro.text.secondary }}
+                                  >
+                                    {filter.label}
+                                  </span>
+                                </label>
+                              ))}
                             </div>
                           </motion.div>
                         )}
@@ -673,168 +751,288 @@ export default function GlobalSearch() {
                     </div>
                   )}
 
-                  {/* Results */}
-                  <div ref={resultsRef} className="max-h-[420px] overflow-y-auto">
+                  {/* Results Area */}
+                  <div
+                    ref={resultsRef}
+                    className="max-h-[400px] overflow-y-auto scrollbar-thin"
+                    style={{
+                      scrollbarColor: `${visionPro.glass.chrome} transparent`,
+                    }}
+                  >
                     {query.length < 2 ? (
-                      // Show search history or empty state
-                      <div className="px-6 py-8">
+                      // Empty state / History
+                      <div className="px-6 py-10">
                         {searchHistory.length > 0 ? (
                           <div>
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                                Recent Searches
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: visionPro.text.quaternary }}>
+                                Recent
                               </span>
                               <button
-                                onClick={handleClearHistory}
-                                className="text-xs text-[#64748B] hover:text-white transition-colors"
+                                onClick={() => { clearSearchHistory(); setSearchHistory([]); }}
+                                className="text-xs font-medium transition-colors hover:opacity-80"
+                                style={{ color: visionPro.text.tertiary }}
                               >
-                                Clear
+                                Clear all
                               </button>
                             </div>
                             <div className="space-y-1">
-                              {searchHistory.map((historyQuery, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => handleHistorySelect(historyQuery)}
-                                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-[#8FA3BF] hover:text-white hover:bg-white/[0.04] transition-all"
+                              {searchHistory.map((h, i) => (
+                                <motion.button
+                                  key={i}
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: i * 0.03 }}
+                                  onClick={() => { setQuery(h); inputRef.current?.focus(); }}
+                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all group"
+                                  style={{ background: 'transparent' }}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = visionPro.glass.thin}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                                 >
-                                  <svg className="w-4 h-4 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  <svg className="w-4 h-4" style={{ color: visionPro.text.quaternary }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                  <span className="truncate">{historyQuery}</span>
-                                </button>
+                                  <span className="truncate" style={{ color: visionPro.text.secondary }}>{h}</span>
+                                </motion.button>
                               ))}
                             </div>
                           </div>
                         ) : (
-                          <div className="text-center">
-                            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#5A82FF]/10 flex items-center justify-center">
-                              <svg className="w-8 h-8 text-[#5A82FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          <div className="text-center py-8">
+                            <motion.div
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="w-20 h-20 mx-auto mb-5 rounded-3xl flex items-center justify-center"
+                              style={{
+                                background: `linear-gradient(135deg, ${visionPro.accent.blue}20, ${visionPro.accent.purple}20)`,
+                                boxShadow: `0 0 60px ${visionPro.accent.blue}20`,
+                              }}
+                            >
+                              <svg className="w-10 h-10" style={{ color: visionPro.accent.blue }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                               </svg>
-                            </div>
-                            <p className="text-[#8FA3BF] text-lg font-light mb-2">Search MARS</p>
-                            <p className="text-[#64748B] text-sm">Contracts, documents, NetSuite orders, Asana tasks</p>
+                            </motion.div>
+                            <p className="text-lg font-medium mb-2" style={{ color: visionPro.text.primary }}>
+                              Search MARS
+                            </p>
+                            <p className="text-sm" style={{ color: visionPro.text.tertiary }}>
+                              Contracts, documents, NetSuite, Asana
+                            </p>
                           </div>
                         )}
                       </div>
                     ) : allResults.length === 0 && !loading ? (
-                      <div className="px-6 py-12 text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/[0.04] flex items-center justify-center">
-                          <svg className="w-8 h-8 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      // No results
+                      <div className="px-6 py-16 text-center">
+                        <div
+                          className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+                          style={{ background: visionPro.glass.regular }}
+                        >
+                          <svg className="w-8 h-8" style={{ color: visionPro.text.quaternary }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 16.318A4.486 4.486 0 0012.016 15a4.486 4.486 0 00-3.198 1.318M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
                           </svg>
                         </div>
-                        <p className="text-[#8FA3BF] text-lg font-light mb-2">No results found</p>
-                        <p className="text-[#64748B] text-sm">Try different keywords or adjust filters</p>
+                        <p className="text-lg font-medium mb-1" style={{ color: visionPro.text.secondary }}>No results</p>
+                        <p className="text-sm" style={{ color: visionPro.text.quaternary }}>Try different keywords</p>
                       </div>
                     ) : (
-                      <div className="py-3">
-                        {/* Contracts */}
-                        {groupedResults.contracts.length > 0 && (
-                          <ResultSection
-                            title="Contracts"
-                            type="contract"
-                            results={groupedResults.contracts}
-                            selectedIndex={selectedIndex}
-                            offset={0}
-                            onSelect={handleSelect}
-                            onHover={setSelectedIndex}
-                            totals={totals}
-                          />
-                        )}
+                      // Results
+                      <div className="py-2">
+                        {Object.entries(groupedResults).map(([key, items]) => {
+                          if (items.length === 0) return null;
+                          const type = key === 'workOrders' ? 'work_order' :
+                                       key === 'salesOrders' ? 'sales_order' :
+                                       key === 'asanaTasks' ? 'asana_task' :
+                                       key.slice(0, -1) as ResultType;
+                          const config = TYPE_CONFIG[type];
+                          const title = key === 'workOrders' ? 'Work Orders' :
+                                       key === 'salesOrders' ? 'Sales Orders' :
+                                       key === 'asanaTasks' ? 'Asana Tasks' :
+                                       key.charAt(0).toUpperCase() + key.slice(1);
 
-                        {/* Documents */}
-                        {groupedResults.documents.length > 0 && (
-                          <ResultSection
-                            title="Documents"
-                            type="document"
-                            results={groupedResults.documents}
-                            selectedIndex={selectedIndex}
-                            offset={groupedResults.contracts.length}
-                            onSelect={handleSelect}
-                            onHover={setSelectedIndex}
-                            totals={totals}
-                          />
-                        )}
+                          // Calculate offset for selection
+                          let offset = 0;
+                          const order = ['contracts', 'documents', 'tasks', 'workOrders', 'salesOrders', 'asanaTasks'];
+                          for (const k of order) {
+                            if (k === key) break;
+                            offset += groupedResults[k as keyof typeof groupedResults].length;
+                          }
 
-                        {/* Tasks */}
-                        {groupedResults.tasks.length > 0 && (
-                          <ResultSection
-                            title="Tasks"
-                            type="task"
-                            results={groupedResults.tasks}
-                            selectedIndex={selectedIndex}
-                            offset={groupedResults.contracts.length + groupedResults.documents.length}
-                            onSelect={handleSelect}
-                            onHover={setSelectedIndex}
-                            totals={totals}
-                          />
-                        )}
+                          return (
+                            <div key={key} className="mb-4">
+                              {/* Section Header */}
+                              <div className="px-6 py-2 flex items-center gap-2">
+                                <span style={{ color: config.color }}>{config.icon}</span>
+                                <span
+                                  className="text-xs font-semibold uppercase tracking-wider"
+                                  style={{ color: visionPro.text.quaternary }}
+                                >
+                                  {title}
+                                </span>
+                                <span
+                                  className="text-xs"
+                                  style={{ color: visionPro.text.quaternary }}
+                                >
+                                  ({items.length})
+                                </span>
+                              </div>
 
-                        {/* Work Orders */}
-                        {groupedResults.workOrders.length > 0 && (
-                          <ResultSection
-                            title="Work Orders"
-                            type="work_order"
-                            results={groupedResults.workOrders}
-                            selectedIndex={selectedIndex}
-                            offset={groupedResults.contracts.length + groupedResults.documents.length + groupedResults.tasks.length}
-                            onSelect={handleSelect}
-                            onHover={setSelectedIndex}
-                            totals={totals}
-                          />
-                        )}
+                              {/* Results */}
+                              <div className="px-3">
+                                {items.map((result, idx) => {
+                                  const globalIndex = offset + idx;
+                                  const isSelected = selectedIndex === globalIndex;
 
-                        {/* Sales Orders */}
-                        {groupedResults.salesOrders.length > 0 && (
-                          <ResultSection
-                            title="Sales Orders"
-                            type="sales_order"
-                            results={groupedResults.salesOrders}
-                            selectedIndex={selectedIndex}
-                            offset={groupedResults.contracts.length + groupedResults.documents.length + groupedResults.tasks.length + groupedResults.workOrders.length}
-                            onSelect={handleSelect}
-                            onHover={setSelectedIndex}
-                            totals={totals}
-                          />
-                        )}
+                                  return (
+                                    <motion.button
+                                      key={result.id}
+                                      initial={{ opacity: 0, y: 5 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{ delay: idx * 0.02 }}
+                                      onClick={(e) => handleSelect(result, e.metaKey || e.ctrlKey)}
+                                      onMouseEnter={() => setSelectedIndex(globalIndex)}
+                                      data-selected={isSelected}
+                                      className="w-full flex items-center gap-4 px-4 py-3.5 mx-0 rounded-2xl text-left transition-all duration-150 relative group"
+                                      style={{
+                                        background: isSelected ? visionPro.glass.regular : 'transparent',
+                                        boxShadow: isSelected ? `inset 0 0 0 1px ${config.color}40, ${config.glow}` : 'none',
+                                      }}
+                                    >
+                                      {/* Glow bar */}
+                                      <motion.div
+                                        initial={false}
+                                        animate={{
+                                          opacity: isSelected ? 1 : 0,
+                                          scaleY: isSelected ? 1 : 0.5,
+                                        }}
+                                        className="absolute left-1 top-3 bottom-3 w-[3px] rounded-full"
+                                        style={{
+                                          background: config.color,
+                                          boxShadow: config.glow,
+                                        }}
+                                      />
 
-                        {/* Asana Tasks */}
-                        {groupedResults.asanaTasks.length > 0 && (
-                          <ResultSection
-                            title="Asana Tasks"
-                            type="asana_task"
-                            results={groupedResults.asanaTasks}
-                            selectedIndex={selectedIndex}
-                            offset={groupedResults.contracts.length + groupedResults.documents.length + groupedResults.tasks.length + groupedResults.workOrders.length + groupedResults.salesOrders.length}
-                            onSelect={handleSelect}
-                            onHover={setSelectedIndex}
-                            totals={totals}
-                          />
-                        )}
+                                      {/* Icon */}
+                                      <div
+                                        className="w-11 h-11 rounded-[14px] flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                                        style={{
+                                          background: `linear-gradient(135deg, ${config.color}20, ${config.color}10)`,
+                                          color: config.color,
+                                          boxShadow: isSelected ? `0 0 20px ${config.color}30` : 'none',
+                                        }}
+                                      >
+                                        {config.icon}
+                                      </div>
+
+                                      {/* Content */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <p
+                                            className="font-medium truncate"
+                                            style={{ color: isSelected ? visionPro.text.primary : visionPro.text.secondary }}
+                                          >
+                                            {result.title}
+                                          </p>
+                                          {result.isArchived && (
+                                            <span
+                                              className="px-1.5 py-0.5 text-[10px] font-semibold rounded-md"
+                                              style={{ background: visionPro.glass.regular, color: visionPro.text.quaternary }}
+                                            >
+                                              Archived
+                                            </span>
+                                          )}
+                                          {result.completed && (
+                                            <span
+                                              className="px-1.5 py-0.5 text-[10px] font-semibold rounded-md"
+                                              style={{ background: `${visionPro.accent.green}20`, color: visionPro.accent.green }}
+                                            >
+                                              Done
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                          {result.subtitle && (
+                                            <p
+                                              className="text-sm truncate"
+                                              style={{ color: visionPro.text.tertiary }}
+                                            >
+                                              {result.subtitle}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Right side */}
+                                      <div className="flex-shrink-0 text-right">
+                                        {(result.value !== undefined && result.value > 0) && (
+                                          <p className="text-sm font-semibold" style={{ color: visionPro.accent.green }}>
+                                            {formatCurrency(result.value)}
+                                          </p>
+                                        )}
+                                        {(result.totalAmount !== undefined && result.totalAmount > 0) && (
+                                          <p className="text-sm font-semibold" style={{ color: visionPro.accent.green }}>
+                                            {formatCurrency(result.totalAmount)}
+                                          </p>
+                                        )}
+                                        {result.status && (
+                                          <p className="text-xs capitalize" style={{ color: visionPro.text.quaternary }}>
+                                            {result.status.replace(/_/g, ' ')}
+                                          </p>
+                                        )}
+                                        {result.documentType && (
+                                          <p className="text-xs font-medium" style={{ color: visionPro.accent.purple }}>
+                                            {result.documentType}
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      {/* Arrow */}
+                                      <motion.div
+                                        initial={false}
+                                        animate={{ opacity: isSelected ? 1 : 0, x: isSelected ? 0 : -5 }}
+                                        style={{ color: config.color }}
+                                      >
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                        </svg>
+                                      </motion.div>
+                                    </motion.button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
 
                         {/* Load More */}
                         {pagination.hasMore && (
-                          <div className="px-4 py-3">
-                            <button
+                          <div className="px-6 py-4">
+                            <motion.button
+                              whileHover={{ scale: 1.01 }}
+                              whileTap={{ scale: 0.99 }}
                               onClick={handleLoadMore}
                               disabled={loadingMore}
-                              className="w-full py-2 rounded-lg text-sm text-[#5A82FF] hover:bg-[#5A82FF]/10 transition-all disabled:opacity-50"
+                              className="w-full py-3 rounded-2xl text-sm font-medium transition-all disabled:opacity-50"
+                              style={{
+                                background: visionPro.glass.regular,
+                                color: visionPro.accent.blue,
+                                border: `1px solid ${visionPro.border.subtle}`,
+                              }}
                             >
                               {loadingMore ? (
                                 <span className="flex items-center justify-center gap-2">
                                   <motion.div
                                     animate={{ rotate: 360 }}
                                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                    className="w-4 h-4 border-2 border-[#5A82FF] border-t-transparent rounded-full"
+                                    className="w-4 h-4 rounded-full"
+                                    style={{ border: '2px solid transparent', borderTopColor: visionPro.accent.blue }}
                                   />
                                   Loading...
                                 </span>
                               ) : (
-                                `Load more results`
+                                'Load more results'
                               )}
-                            </button>
+                            </motion.button>
                           </div>
                         )}
                       </div>
@@ -842,31 +1040,37 @@ export default function GlobalSearch() {
                   </div>
 
                   {/* Footer */}
-                  <div className="px-6 py-3 border-t border-white/[0.04] bg-[#0B1220]/30">
-                    <div className="flex items-center justify-between text-xs text-[#64748B]">
-                      <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1.5">
-                          <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">&#8593;</kbd>
-                          <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">&#8595;</kbd>
-                          <span className="ml-1">Navigate</span>
+                  <div
+                    className="px-6 py-3.5 flex items-center justify-between"
+                    style={{
+                      borderTop: `1px solid ${visionPro.border.subtle}`,
+                      background: visionPro.glass.ultra,
+                    }}
+                  >
+                    <div className="flex items-center gap-5 text-xs" style={{ color: visionPro.text.quaternary }}>
+                      {[
+                        { keys: ['↑', '↓'], label: 'Navigate' },
+                        { keys: ['↵'], label: 'Open' },
+                        { keys: ['Tab'], label: 'Switch' },
+                        { keys: ['⌘', '↵'], label: 'New tab' },
+                      ].map((shortcut, i) => (
+                        <span key={i} className="hidden sm:flex items-center gap-1.5">
+                          {shortcut.keys.map((key, j) => (
+                            <kbd
+                              key={j}
+                              className="px-1.5 py-0.5 text-[10px] font-semibold rounded-md"
+                              style={{ background: visionPro.glass.regular, border: `1px solid ${visionPro.border.subtle}` }}
+                            >
+                              {key}
+                            </kbd>
+                          ))}
+                          <span className="ml-1">{shortcut.label}</span>
                         </span>
-                        <span className="flex items-center gap-1.5">
-                          <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">&#8629;</kbd>
-                          <span className="ml-1">Open</span>
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">Tab</kbd>
-                          <span className="ml-1">Switch</span>
-                        </span>
-                        <span className="hidden sm:flex items-center gap-1.5">
-                          <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded font-medium">&#8984;&#8629;</kbd>
-                          <span className="ml-1">New tab</span>
-                        </span>
-                      </div>
-                      <span className="text-[#64748B]">
-                        {totals.total} result{totals.total !== 1 ? 's' : ''}
-                      </span>
+                      ))}
                     </div>
+                    <span style={{ color: visionPro.text.quaternary }} className="text-xs font-medium">
+                      {totals.total.toLocaleString()} result{totals.total !== 1 ? 's' : ''}
+                    </span>
                   </div>
                 </div>
               </motion.div>
@@ -875,145 +1079,5 @@ export default function GlobalSearch() {
         )}
       </AnimatePresence>
     </>
-  );
-}
-
-// =============================================================================
-// RESULT SECTION COMPONENT
-// =============================================================================
-
-function ResultSection({
-  title,
-  type,
-  results,
-  selectedIndex,
-  offset,
-  onSelect,
-  onHover,
-  totals,
-}: {
-  title: string;
-  type: ResultType;
-  results: SearchResult[];
-  selectedIndex: number;
-  offset: number;
-  onSelect: (result: SearchResult, newTab?: boolean) => void;
-  onHover: (index: number) => void;
-  totals: SearchTotals;
-}) {
-  const config = TYPE_CONFIG[type];
-
-  return (
-    <div className="px-4 mb-3">
-      <div className="flex items-center gap-2 px-2 mb-2">
-        <span style={{ color: config.color }}>{config.icon}</span>
-        <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-          {title}
-        </span>
-        <span className="text-xs text-[#64748B]">({results.length})</span>
-      </div>
-      <div className="space-y-1">
-        {results.map((result, idx) => {
-          const globalIndex = offset + idx;
-          const isSelected = selectedIndex === globalIndex;
-
-          return (
-            <button
-              key={result.id}
-              onClick={(e) => onSelect(result, e.metaKey || e.ctrlKey)}
-              onMouseEnter={() => onHover(globalIndex)}
-              data-selected={isSelected}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-left transition-all relative overflow-hidden ${
-                isSelected
-                  ? 'bg-white/[0.06]'
-                  : 'hover:bg-white/[0.03]'
-              }`}
-              style={isSelected ? {
-                boxShadow: `inset 0 0 0 1px ${config.color}30`,
-              } : undefined}
-            >
-              {/* Left accent bar */}
-              {isSelected && (
-                <div
-                  className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
-                  style={{
-                    backgroundColor: config.color,
-                    boxShadow: `0 0 8px ${config.color}`,
-                  }}
-                />
-              )}
-
-              {/* Icon */}
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{
-                  backgroundColor: `${config.color}${config.bgOpacity}`,
-                  color: config.color,
-                }}
-              >
-                {config.icon}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className={`font-medium truncate ${isSelected ? 'text-white' : 'text-[#E2E8F0]'}`}>
-                    {result.title}
-                  </p>
-                  {result.isArchived && (
-                    <span className="px-1.5 py-0.5 bg-[#64748B]/20 text-[#64748B] rounded text-[10px] font-medium">
-                      Archived
-                    </span>
-                  )}
-                  {result.completed && (
-                    <span className="px-1.5 py-0.5 bg-[#50D28C]/20 text-[#50D28C] rounded text-[10px] font-medium">
-                      Done
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {result.subtitle && (
-                    <p className="text-[#64748B] text-sm truncate">{result.subtitle}</p>
-                  )}
-                  {result.matchedField && result.matchedField !== 'unknown' && (
-                    <span className="text-[10px] text-[#64748B] bg-white/[0.04] px-1.5 py-0.5 rounded">
-                      Matched: {result.matchedField}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Right side info */}
-              <div className="flex-shrink-0 text-right">
-                {result.value !== undefined && result.value > 0 && (
-                  <p className="text-[#50D28C] text-sm font-semibold">{formatCurrency(result.value)}</p>
-                )}
-                {result.totalAmount !== undefined && result.totalAmount > 0 && (
-                  <p className="text-[#50D28C] text-sm font-semibold">{formatCurrency(result.totalAmount)}</p>
-                )}
-                {result.status && (
-                  <p className="text-[#64748B] text-xs capitalize">{result.status.replace(/_/g, ' ')}</p>
-                )}
-                {result.documentType && (
-                  <p className="text-[#8B5CF6] text-xs font-medium">{result.documentType}</p>
-                )}
-                {result.projectName && type === 'asana_task' && (
-                  <p className="text-[#F06A6A] text-xs truncate max-w-[120px]">{result.projectName}</p>
-                )}
-              </div>
-
-              {/* Arrow indicator */}
-              {isSelected && (
-                <div className="flex-shrink-0" style={{ color: config.color }}>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
   );
 }
