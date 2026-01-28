@@ -74,29 +74,30 @@ export const colors = {
 
   // TEXT - Apple Pro off-white hierarchy
   text: {
-    primary: 'rgba(235,240,255,0.92)',    // Main text
-    secondary: 'rgba(200,210,235,0.75)',  // Section headers
-    muted: 'rgba(200,210,235,0.50)',      // De-emphasized
-    accent: 'rgba(90,130,255,0.95)',      // Links, active states
+    primary: '#EBF0FFE8',    // Main text (92% opacity)
+    secondary: '#C8D2EBBF',  // Section headers (75% opacity)
+    muted: '#C8D2EB80',      // De-emphasized (50% opacity)
+    accent: '#5A82FF',       // Links, active states
   },
 
   // ACCENT COLORS - Required, not optional
+  // All colors in hex format to support opacity suffix (e.g. ${color}30)
   accent: {
-    blue: 'rgba(90,130,255,0.95)',        // Primary actions, active state, focus glow
-    cyan: '#38BDF8',                       // Analytics, stages (legacy)
-    green: 'rgba(80,210,140,0.95)',       // Success, complete
-    amber: 'rgba(255,190,90,0.95)',       // Warning, attention (text only)
-    red: 'rgba(255,95,95,0.95)',          // Danger, errors (text only)
+    blue: '#5A82FF',                       // Primary actions, active state, focus glow
+    cyan: '#38BDF8',                       // Analytics, stages
+    green: '#50D28C',                      // Success, complete
+    amber: '#FFBE5A',                      // Warning, attention
+    red: '#FF5F5F',                        // Danger, errors
     purple: '#8B5CF6',                     // Analysis, special
     orange: '#F97316',                     // Revenue, costs
   },
 
-  // Glow variants for accents
+  // Glow variants for accents (hex with alpha)
   glow: {
-    blue: 'rgba(90,130,255,0.25)',
-    green: 'rgba(80,210,140,0.25)',
-    amber: 'rgba(255,190,90,0.25)',
-    red: 'rgba(255,95,95,0.25)',
+    blue: '#5A82FF40',
+    green: '#50D28C40',
+    amber: '#FFBE5A40',
+    red: '#FF5F5F40',
   },
 } as const;
 
