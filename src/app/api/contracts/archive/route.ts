@@ -8,46 +8,70 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 interface ArchiveRequest {
-  salesforceId: string;
+  salesforceId?: string;
+  contractId?: string;
 }
 
 // POST: Archive a contract
 export async function POST(request: NextRequest) {
   try {
     const body: ArchiveRequest = await request.json();
-    const { salesforceId } = body;
+    const { salesforceId, contractId } = body;
 
-    if (!salesforceId) {
+    if (!salesforceId && !contractId) {
       return NextResponse.json(
-        { error: 'salesforceId is required' },
+        { error: 'Either salesforceId or contractId is required' },
         { status: 400 }
       );
     }
 
     const admin = getSupabaseAdmin();
 
-    // Get current contract data to return for undo
-    const { data: contract, error: fetchError } = await admin
-      .from('contracts')
-      .select('id, salesforce_id, opportunity_name, status, is_closed')
-      .eq('salesforce_id', salesforceId)
-      .single();
+    // Get current contract data - try salesforce_id first, then id
+    let contract = null;
 
-    if (fetchError || !contract) {
+    if (salesforceId) {
+      const { data, error } = await admin
+        .from('contracts')
+        .select('id, salesforce_id, opportunity_name, status, is_closed')
+        .eq('salesforce_id', salesforceId)
+        .single();
+
+      if (!error && data) {
+        contract = data;
+      }
+    }
+
+    // Fallback to id lookup if salesforce_id lookup failed or wasn't provided
+    if (!contract && (contractId || salesforceId)) {
+      const lookupValue = contractId || salesforceId;
+
+      const { data, error } = await admin
+        .from('contracts')
+        .select('id, salesforce_id, opportunity_name, status, is_closed')
+        .eq('id', lookupValue)
+        .single();
+
+      if (!error && data) {
+        contract = data;
+      }
+    }
+
+    if (!contract) {
       return NextResponse.json(
         { error: 'Contract not found' },
         { status: 404 }
       );
     }
 
-    // Archive the contract
+    // Archive the contract using the field we found it with
     const { error: updateError } = await admin
       .from('contracts')
       .update({
         is_closed: true,
         updated_at: new Date().toISOString(),
       })
-      .eq('salesforce_id', salesforceId);
+      .eq('id', contract.id);
 
     if (updateError) {
       console.error('Error archiving contract:', updateError);
@@ -80,15 +104,52 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const salesforceId = searchParams.get('salesforceId');
+    const contractId = searchParams.get('contractId');
 
-    if (!salesforceId) {
+    if (!salesforceId && !contractId) {
       return NextResponse.json(
-        { error: 'salesforceId query parameter is required' },
+        { error: 'Either salesforceId or contractId query parameter is required' },
         { status: 400 }
       );
     }
 
     const admin = getSupabaseAdmin();
+
+    // Find the contract - try salesforce_id first, then id
+    let contract = null;
+
+    if (salesforceId) {
+      const { data, error } = await admin
+        .from('contracts')
+        .select('id, salesforce_id')
+        .eq('salesforce_id', salesforceId)
+        .single();
+
+      if (!error && data) {
+        contract = data;
+      }
+    }
+
+    // Fallback to id lookup
+    if (!contract && (contractId || salesforceId)) {
+      const lookupValue = contractId || salesforceId;
+      const { data, error } = await admin
+        .from('contracts')
+        .select('id, salesforce_id')
+        .eq('id', lookupValue)
+        .single();
+
+      if (!error && data) {
+        contract = data;
+      }
+    }
+
+    if (!contract) {
+      return NextResponse.json(
+        { error: 'Contract not found' },
+        { status: 404 }
+      );
+    }
 
     // Unarchive the contract
     const { error: updateError } = await admin
@@ -97,7 +158,7 @@ export async function DELETE(request: NextRequest) {
         is_closed: false,
         updated_at: new Date().toISOString(),
       })
-      .eq('salesforce_id', salesforceId);
+      .eq('id', contract.id);
 
     if (updateError) {
       console.error('Error unarchiving contract:', updateError);
@@ -110,7 +171,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({
       success: true,
       archived: false,
-      salesforceId,
+      contractId: contract.id,
+      salesforceId: contract.salesforce_id,
     });
   } catch (error) {
     console.error('Unarchive error:', error);
