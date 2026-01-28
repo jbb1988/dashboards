@@ -105,12 +105,10 @@ export interface InventoryMetrics {
  * Query Inventory Balances with item details
  * Returns on-hand quantities, costs, and reorder point comparison
  *
- * Uses InventoryBalance table which contains actual inventory quantities.
- * The direct Item.quantityonhand field is often not populated in
- * multi-location NetSuite setups.
- *
- * Note: NetSuite SuiteQL has limitations with GROUP BY on InventoryBalance,
- * so we query per-location data and aggregate in JavaScript if needed.
+ * Uses aggregateItemLocation table which contains:
+ * - Inventory quantities (on hand, available, backordered)
+ * - Reorder points and preferred stock levels (location-specific)
+ * - Average cost at location level
  */
 export async function getInventoryBalances(filters?: {
   itemType?: string[];
@@ -130,32 +128,30 @@ export async function getInventoryBalances(filters?: {
   // Build location filter
   let locationFilter = '';
   if (filters?.locationId) {
-    locationFilter = ` AND ib.location = '${filters.locationId.replace(/'/g, "''")}'`;
+    locationFilter = ` AND ail.location = '${filters.locationId.replace(/'/g, "''")}'`;
   }
 
-  // Query from InventoryBalance table which has actual inventory quantities
-  // Note: Cannot use GROUP BY with InventoryBalance in SuiteQL, so we get
-  // per-location data and aggregate in JavaScript
+  // Query from aggregateItemLocation which has inventory AND reorder point data
   const query = `
     SELECT
       item.id,
       item.itemid,
       item.displayname,
       item.itemtype AS item_type,
-      ib.quantityonhand AS quantity_on_hand,
-      ib.quantityavailable AS quantity_available,
-      COALESCE(item.quantitybackordered, 0) AS quantity_backordered,
-      COALESCE(item.averagecost, item.lastpurchaseprice, item.cost, 0) AS unit_cost,
-      item.reorderpoint,
-      item.preferredstocklevel,
-      ib.location AS location_id,
-      BUILTIN.DF(ib.location) AS location_name
+      COALESCE(ail.quantityonhand, 0) AS quantity_on_hand,
+      COALESCE(ail.quantityavailable, 0) AS quantity_available,
+      COALESCE(ail.quantitybackordered, 0) AS quantity_backordered,
+      COALESCE(ail.averagecostmli, item.averagecost, item.lastpurchaseprice, item.cost, 0) AS unit_cost,
+      ail.reorderpoint,
+      ail.preferredstocklevel,
+      ail.location AS location_id,
+      BUILTIN.DF(ail.location) AS location_name
     FROM Item item
-    INNER JOIN InventoryBalance ib ON item.id = ib.item
+    INNER JOIN aggregateItemLocation ail ON item.id = ail.item
     WHERE item.isinactive = 'F'
       ${typeFilter}
       ${locationFilter}
-    ORDER BY ib.quantityonhand DESC
+    ORDER BY ail.quantityonhand DESC
   `;
 
   try {
