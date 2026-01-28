@@ -44,7 +44,7 @@ function OperationsContent() {
         </header>
 
         <main className="max-w-[1600px] mx-auto px-8 py-6">
-          <OperationsCommandCenter initialTab={initialTab || 'orders'} />
+          <OperationsCommandCenter initialTab={initialTab || 'wip'} />
         </main>
       </motion.div>
     </div>

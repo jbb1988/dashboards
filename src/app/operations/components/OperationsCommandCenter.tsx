@@ -102,7 +102,7 @@ interface OperationsCommandCenterProps {
   initialTab?: TabId;
 }
 
-export default function OperationsCommandCenter({ initialTab = 'orders' }: OperationsCommandCenterProps) {
+export default function OperationsCommandCenter({ initialTab = 'wip' }: OperationsCommandCenterProps) {
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null);
   const [inventoryMetrics, setInventoryMetrics] = useState<InventoryMetrics | null>(null);
@@ -180,8 +180,13 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
   const actionCount = inventoryMetrics?.actionItems?.length || 0;
   const blastRadius = inventoryMetrics?.backorderBlastRadius;
 
-  // Tab configuration with action count
+  // Tab configuration with action count - WIP first as default
   const tabs = [
+    {
+      id: 'wip' as TabId,
+      label: 'WIP Operations',
+      badge: 0,
+    },
     {
       id: 'orders' as TabId,
       label: 'Orders',
@@ -191,11 +196,6 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
       id: 'inventory' as TabId,
       label: 'Inventory',
       badge: actionCount > 0 ? actionCount : (inventoryMetrics?.summary?.lowStockItemCount || 0),
-    },
-    {
-      id: 'wip' as TabId,
-      label: 'WIP Operations',
-      badge: 0,
     },
   ];
 
@@ -229,140 +229,95 @@ export default function OperationsCommandCenter({ initialTab = 'orders' }: Opera
         </motion.div>
       )}
 
-      {/* KPI Cards Row - Enhanced with context */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {loading ? (
-          <>
-            <KPICardSkeleton />
-            <KPICardSkeleton />
-            <KPICardSkeleton />
-            <KPICardSkeleton />
-          </>
-        ) : (
-          <>
-            {/* Revenue at Risk - Now with context */}
-            <KPICard
-              title="Revenue at Risk"
-              value={formatCurrency(orderMetrics?.summary?.revenueAtRisk || 0)}
-              subtitle={
-                revenueBlocked > 0
-                  ? `${formatCurrency(revenueBlocked)} blocked by inventory`
-                  : `${orderMetrics?.aging?.['90+']?.count || 0} orders 90+ days`
-              }
-              icon={KPIIcons.alert}
-              color={
-                (orderMetrics?.summary?.revenueAtRisk || 0) > 1000000
-                  ? colors.accent.red
-                  : colors.accent.amber
-              }
-              badge={(orderMetrics?.aging?.['90+']?.count || 0) > 0 ? orderMetrics?.aging?.['90+']?.count : undefined}
-              delay={0}
-              onClick={() => setActiveTab('orders')}
-              tooltip="Sum of order values weighted by age. 90+ days = 100%, 61-90 = 70%, 31-60 = 40%, 0-30 = 10%"
-            />
-
-            {/* Backlog Value */}
-            <KPICard
-              title="Backlog Value"
-              value={formatCurrency(orderMetrics?.summary?.totalBacklogValue || 0)}
-              subtitle={`${orderMetrics?.summary?.totalOpenOrders || 0} open orders`}
-              icon={KPIIcons.dollar}
-              color={colors.accent.blue}
-              delay={0.1}
-              onClick={() => setActiveTab('orders')}
-            />
-
-            {/* On-Time Delivery */}
-            <KPICard
-              title="On-Time Delivery"
-              value={`${(orderMetrics?.summary?.onTimeDeliveryPct || 100).toFixed(1)}%`}
-              subtitle="Last 90 days"
-              icon={KPIIcons.checkCircle}
-              color={(orderMetrics?.summary?.onTimeDeliveryPct || 100) >= 90 ? colors.accent.green : colors.accent.red}
-              delay={0.2}
-            />
-
-            {/* Action Items - NEW: Primary actionable KPI */}
-            <KPICard
-              title="Action Required"
-              value={<AnimatedCounter value={actionCount} />}
-              subtitle={
-                actionCount > 0
-                  ? `Top: ${topDriver} (${topDriverCount} orders)`
-                  : 'No critical actions'
-              }
-              icon={KPIIcons.warning}
-              color={actionCount > 0 ? colors.accent.red : colors.accent.green}
-              badge={actionCount > 0 ? actionCount : undefined}
-              delay={0.3}
-              onClick={() => setActiveTab('inventory')}
-              tooltip="Prioritized list of inventory issues, stale orders, and blocking items requiring immediate attention"
-            />
-          </>
-        )}
-      </div>
-
-      {/* Additional KPI Row - Enhanced with blast radius context */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {loading ? (
-          <>
-            <KPICardSkeleton />
-            <KPICardSkeleton />
-            <KPICardSkeleton />
-          </>
-        ) : (
-          <>
-            {/* Inventory Value */}
-            <KPICard
-              title="Inventory Value"
-              value={formatCurrency(inventoryMetrics?.summary?.totalInventoryValue || 0)}
-              subtitle={`${inventoryMetrics?.summary?.totalItemsOnHand || 0} items on hand`}
-              icon={KPIIcons.folder}
-              color={colors.accent.purple}
-              delay={0.4}
-              onClick={() => setActiveTab('inventory')}
-            />
-
-            {/* Backorder Blast Radius - Enhanced */}
-            <KPICard
-              title="Backorder Impact"
-              value={<AnimatedCounter value={blastRadius?.ordersImpacted || 0} />}
-              subtitle={
-                blastRadius && blastRadius.revenueDelayed > 0
-                  ? `${formatCurrency(blastRadius.revenueDelayed)} delayed, ${blastRadius.customersImpacted} customers`
-                  : 'Awaiting stock'
-              }
-              icon={KPIIcons.clock}
-              color={
-                (blastRadius?.ordersImpacted || 0) > 10
-                  ? colors.accent.red
-                  : (blastRadius?.ordersImpacted || 0) > 0
-                    ? colors.accent.amber
-                    : colors.accent.green
-              }
-              badge={(blastRadius?.installsAtRisk30Days || 0) > 0 ? blastRadius?.installsAtRisk30Days : undefined}
-              delay={0.5}
-              onClick={() => setActiveTab('inventory')}
-              tooltip={
-                blastRadius
-                  ? `${blastRadius.totalItems} items backordered, ${blastRadius.installsAtRisk30Days} installs at risk in next 30 days`
-                  : 'Items awaiting stock'
-              }
-            />
-
-            {/* Orders Aging 31-90d */}
-            <KPICard
-              title="Orders Aging 31-90d"
-              value={<AnimatedCounter value={(orderMetrics?.aging?.['31-60']?.count || 0) + (orderMetrics?.aging?.['61-90']?.count || 0)} />}
-              subtitle={formatCurrency((orderMetrics?.aging?.['31-60']?.value || 0) + (orderMetrics?.aging?.['61-90']?.value || 0))}
-              icon={KPIIcons.calendar}
-              color={colors.accent.orange}
-              delay={0.6}
-              onClick={() => setActiveTab('orders')}
-            />
-          </>
-        )}
-      </div>
+      {/* KPI Cards Row - Dynamic based on active tab */}
+      {activeTab !== 'wip' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {loading ? (
+            <>
+              <KPICardSkeleton />
+              <KPICardSkeleton />
+              <KPICardSkeleton />
+            </>
+          ) : activeTab === 'orders' ? (
+            <>
+              {/* Orders Tab KPIs */}
+              <KPICard
+                title="Revenue at Risk"
+                value={formatCurrency(orderMetrics?.summary?.revenueAtRisk || 0)}
+                subtitle={`${orderMetrics?.aging?.['90+']?.count || 0} orders 90+ days`}
+                icon={KPIIcons.alert}
+                color={
+                  (orderMetrics?.summary?.revenueAtRisk || 0) > 1000000
+                    ? colors.accent.red
+                    : colors.accent.amber
+                }
+                badge={(orderMetrics?.aging?.['90+']?.count || 0) > 0 ? orderMetrics?.aging?.['90+']?.count : undefined}
+                delay={0}
+                tooltip="Sum of order values weighted by age. 90+ days = 100%, 61-90 = 70%, 31-60 = 40%, 0-30 = 10%"
+              />
+              <KPICard
+                title="Backlog Value"
+                value={formatCurrency(orderMetrics?.summary?.totalBacklogValue || 0)}
+                subtitle={`${orderMetrics?.summary?.totalOpenOrders || 0} open orders`}
+                icon={KPIIcons.dollar}
+                color={colors.accent.blue}
+                delay={0.1}
+              />
+              <KPICard
+                title="On-Time Delivery"
+                value={`${(orderMetrics?.summary?.onTimeDeliveryPct || 100).toFixed(1)}%`}
+                subtitle="Last 90 days"
+                icon={KPIIcons.checkCircle}
+                color={(orderMetrics?.summary?.onTimeDeliveryPct || 100) >= 90 ? colors.accent.green : colors.accent.red}
+                delay={0.2}
+              />
+            </>
+          ) : (
+            <>
+              {/* Inventory Tab KPIs */}
+              <KPICard
+                title="Revenue Blocked"
+                value={formatCurrency(revenueBlocked)}
+                subtitle={`${inventoryMetrics?.summary?.ordersBlockedByInventory || 0} orders waiting`}
+                icon={KPIIcons.alert}
+                color={revenueBlocked > 100000 ? colors.accent.red : colors.accent.amber}
+                delay={0}
+              />
+              <KPICard
+                title="Inventory Value"
+                value={formatCurrency(inventoryMetrics?.summary?.totalInventoryValue || 0)}
+                subtitle={`${inventoryMetrics?.summary?.totalItemsOnHand || 0} items on hand`}
+                icon={KPIIcons.folder}
+                color={colors.accent.purple}
+                delay={0.1}
+              />
+              <KPICard
+                title="Backorder Impact"
+                value={<AnimatedCounter value={blastRadius?.ordersImpacted || 0} />}
+                subtitle={
+                  blastRadius && blastRadius.revenueDelayed > 0
+                    ? `${formatCurrency(blastRadius.revenueDelayed)} delayed`
+                    : 'Awaiting stock'
+                }
+                icon={KPIIcons.clock}
+                color={
+                  (blastRadius?.ordersImpacted || 0) > 10
+                    ? colors.accent.red
+                    : (blastRadius?.ordersImpacted || 0) > 0
+                      ? colors.accent.amber
+                      : colors.accent.green
+                }
+                delay={0.2}
+                tooltip={
+                  blastRadius
+                    ? `${blastRadius.totalItems} items backordered, ${blastRadius.installsAtRisk30Days} installs at risk`
+                    : 'Items awaiting stock'
+                }
+              />
+            </>
+          )}
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex gap-2 border-b border-white/[0.06] pb-0">
