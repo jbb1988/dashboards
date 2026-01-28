@@ -60,6 +60,11 @@ export async function GET(request: Request) {
       );
     }
 
+    // Exclude test customers
+    filteredWOs = filteredWOs.filter(wo =>
+      !wo.customer_name?.toLowerCase().includes('mars company test')
+    );
+
     // Revenue, cost, and margin now come directly from the SO join in the main query
     // (using foreigntotal, totalcostestimate, and estgrossprofitpercent)
     // No need to fetch separate WIP data
