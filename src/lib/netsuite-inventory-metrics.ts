@@ -247,7 +247,7 @@ export async function getInventoryBalances(filters?: {
  * Returns the "blast radius" of inventory shortages
  */
 export async function getOrdersBlockedByInventory(): Promise<{
-  byItem: Map<string, { orders: Set<string>; customers: Set<string>; revenue: number; orderDetails: Array<{ id: string; tranid: string; customer: string; amount: number; ship_date: string | null }> }>;
+  byItem: Map<string, { itemName: string; orders: Set<string>; customers: Set<string>; revenue: number; orderDetails: Array<{ id: string; tranid: string; customer: string; amount: number; ship_date: string | null }> }>;
   totalOrdersBlocked: number;
   totalCustomersImpacted: number;
   totalRevenueBlocked: number;
@@ -291,6 +291,7 @@ export async function getOrdersBlockedByInventory(): Promise<{
     );
 
     const byItem = new Map<string, {
+      itemName: string;
       orders: Set<string>;
       customers: Set<string>;
       revenue: number;
@@ -302,12 +303,13 @@ export async function getOrdersBlockedByInventory(): Promise<{
 
     for (const row of response.items || []) {
       const itemId = row.item_id?.toString() || '';
+      const itemName = row.item_name || itemId;
       const orderId = row.order_id?.toString() || '';
       const customerId = row.customer_id?.toString() || '';
       const orderTotal = parseFloat(row.order_total) || 0;
 
       if (!byItem.has(itemId)) {
-        byItem.set(itemId, { orders: new Set(), customers: new Set(), revenue: 0, orderDetails: [] });
+        byItem.set(itemId, { itemName, orders: new Set(), customers: new Set(), revenue: 0, orderDetails: [] });
       }
 
       const itemData = byItem.get(itemId)!;
@@ -665,25 +667,32 @@ export async function getInventoryMetrics(filters?: {
     .sort((a, b) => b.revenue_blocked - a.revenue_blocked);
   const valueByType = calculateValueByType(items);
 
-  // Find items blocking orders (can be any item with orders_blocked > 0, not just low stock)
-  const itemsBlockingOrders = items
-    .filter(i => i.orders_blocked > 0)
-    .sort((a, b) => b.revenue_blocked - a.revenue_blocked);
+  // Build top blocking items directly from blocked orders data
+  // (Items with 0 inventory won't be in InventoryBalance, so we use blockedOrders directly)
+  const blockingItemsFromOrders = Array.from(blockedOrders.byItem.entries())
+    .map(([itemId, data]) => ({
+      item_id: data.itemName,
+      display_name: data.itemName,
+      orders_blocked: data.orders.size,
+      revenue_blocked: data.revenue,
+      customers_impacted: data.customers.size,
+    }))
+    .sort((a, b) => b.orders_blocked - a.orders_blocked);
 
   // Find top blocking driver
-  const topBlocking = itemsBlockingOrders[0];
+  const topBlocking = blockingItemsFromOrders[0];
   const topBlockingDriver = topBlocking?.item_id || 'None';
   const topBlockingDriverCount = topBlocking?.orders_blocked || 0;
 
-  // Build backorder blast radius - use items that are actually blocking orders
-  const topBlockingItems = itemsBlockingOrders
+  // Build backorder blast radius - top 10 items blocking most orders
+  const topBlockingItems = blockingItemsFromOrders
     .slice(0, 10)
     .map(i => ({
       item_id: i.item_id,
       display_name: i.display_name,
       orders_blocked: i.orders_blocked,
       revenue_blocked: i.revenue_blocked,
-      quantity_short: Math.max(0, (i.reorder_point || 0) - i.quantity_on_hand),
+      quantity_short: 0, // Unknown for items not in inventory
     }));
 
   // Calculate installs at risk (orders with ship date in next 30 days that are blocked)
