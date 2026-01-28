@@ -164,36 +164,6 @@ export default function WIPOperationsDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Attention Required Banner */}
-      {!loading && stuckWOs.length > 0 && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-          <div className="flex items-start gap-4">
-            <div className="p-2 bg-red-500/20 rounded-lg">
-              <AlertTriangle className="w-6 h-6 text-red-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-red-400">
-                Attention Required
-              </h3>
-              <p className="text-red-400/80 mt-1">
-                <span className="font-semibold">{stuckWOs.length} work orders</span> stuck for more than 7 days,
-                representing <span className="font-semibold">{formatCurrency(kpis?.revenueAtRisk || 0)}</span> revenue at risk
-              </p>
-              <button
-                onClick={() => setShowStuckOnly(!showStuckOnly)}
-                className="mt-3 px-4 py-1.5 text-sm bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
-              >
-                {showStuckOnly ? 'Show All WOs' : 'View Stuck WOs Only'}
-              </button>
-            </div>
-            <div className="text-right">
-              <div className="text-3xl font-bold text-red-400">{stuckWOs.length}</div>
-              <div className="text-sm text-red-400/60">stuck WOs</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Filters Row */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
