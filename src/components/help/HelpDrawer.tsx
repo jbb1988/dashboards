@@ -8,6 +8,108 @@ import { searchGuides, getGuidesForPage, getContextForPage, type GuideEntry } fr
 import { trackDrawerOpen, trackDrawerClose, trackGuideView } from '@/lib/help/analytics';
 import ArticleFeedback from './ArticleFeedback';
 
+// =============================================================================
+// APPLE VISION PRO DESIGN SYSTEM
+// =============================================================================
+
+const visionPro = {
+  // Glass materials - layered translucency
+  glass: {
+    ultra: 'rgba(255,255,255,0.02)',
+    thin: 'rgba(255,255,255,0.04)',
+    regular: 'rgba(255,255,255,0.06)',
+    thick: 'rgba(255,255,255,0.08)',
+    chrome: 'rgba(255,255,255,0.12)',
+  },
+
+  // Depths - for layered surfaces
+  depth: {
+    backdrop: 'rgba(0,0,0,0.85)',
+    surface1: 'rgba(18,18,24,0.98)',
+    surface2: 'rgba(28,28,36,0.95)',
+    surface3: 'rgba(38,38,48,0.90)',
+    elevated: 'rgba(48,48,58,0.85)',
+  },
+
+  // Luminance - glowing elements
+  glow: {
+    white: '0 0 30px rgba(255,255,255,0.15), 0 0 60px rgba(255,255,255,0.05)',
+    blue: '0 0 20px rgba(88,166,255,0.4), 0 0 40px rgba(88,166,255,0.2), 0 0 80px rgba(88,166,255,0.1)',
+    purple: '0 0 20px rgba(167,139,250,0.4), 0 0 40px rgba(167,139,250,0.2)',
+    cyan: '0 0 20px rgba(56,189,248,0.4), 0 0 40px rgba(56,189,248,0.2)',
+    green: '0 0 20px rgba(74,222,128,0.4), 0 0 40px rgba(74,222,128,0.2)',
+    orange: '0 0 20px rgba(251,146,60,0.4), 0 0 40px rgba(251,146,60,0.2)',
+    coral: '0 0 20px rgba(240,106,106,0.4), 0 0 40px rgba(240,106,106,0.2)',
+  },
+
+  // Premium shadows
+  shadow: {
+    drawer: '0 0 80px rgba(0,0,0,0.8), -20px 0 60px rgba(0,0,0,0.4), inset 1px 0 0 rgba(255,255,255,0.05)',
+    card: '0 20px 40px -15px rgba(0,0,0,0.5), 0 10px 20px -10px rgba(0,0,0,0.3)',
+    float: '0 25px 50px -12px rgba(0,0,0,0.6)',
+    inner: 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.1)',
+  },
+
+  // Accent colors - vibrant and luminous
+  accent: {
+    blue: '#58A6FF',
+    purple: '#A78BFA',
+    cyan: '#38BDF8',
+    green: '#4ADE80',
+    orange: '#FB923C',
+    coral: '#F06A6A',
+    pink: '#F472B6',
+  },
+
+  // Text colors - refined hierarchy
+  text: {
+    primary: 'rgba(255,255,255,0.95)',
+    secondary: 'rgba(255,255,255,0.70)',
+    tertiary: 'rgba(255,255,255,0.50)',
+    quaternary: 'rgba(255,255,255,0.30)',
+  },
+
+  // Borders - subtle definition
+  border: {
+    subtle: 'rgba(255,255,255,0.04)',
+    light: 'rgba(255,255,255,0.08)',
+    medium: 'rgba(255,255,255,0.12)',
+    strong: 'rgba(255,255,255,0.20)',
+  },
+};
+
+// Type configurations for search results
+const TYPE_CONFIG: Record<string, { color: string; glow: string; bgColor: string; label: string }> = {
+  document: {
+    color: visionPro.accent.purple,
+    glow: visionPro.glow.purple,
+    bgColor: 'rgba(167,139,250,0.15)',
+    label: 'Document',
+  },
+  contract: {
+    color: visionPro.accent.cyan,
+    glow: visionPro.glow.cyan,
+    bgColor: 'rgba(56,189,248,0.15)',
+    label: 'Contract',
+  },
+  task: {
+    color: visionPro.accent.green,
+    glow: visionPro.glow.green,
+    bgColor: 'rgba(74,222,128,0.15)',
+    label: 'Task',
+  },
+  guide: {
+    color: visionPro.accent.orange,
+    glow: visionPro.glow.orange,
+    bgColor: 'rgba(251,146,60,0.15)',
+    label: 'Guide',
+  },
+};
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
 interface SearchResult {
   id: string;
   type: 'contract' | 'document' | 'task';
@@ -27,6 +129,69 @@ interface Message {
   content: string;
 }
 
+// =============================================================================
+// ICONS
+// =============================================================================
+
+const icons = {
+  search: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  ),
+  close: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  ),
+  send: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+    </svg>
+  ),
+  document: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  ),
+  contract: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+  ),
+  task: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
+  ),
+  guide: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  ),
+  sparkle: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+    </svg>
+  ),
+  arrow: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+  ),
+};
+
+const TYPE_ICONS: Record<string, React.ReactNode> = {
+  document: icons.document,
+  contract: icons.contract,
+  task: icons.task,
+  guide: icons.guide,
+};
+
+// =============================================================================
+// COMPONENT
+// =============================================================================
+
 export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -35,6 +200,7 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
   const [dataResults, setDataResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [relevantGuides, setRelevantGuides] = useState<GuideEntry[]>([]);
+  const [inputFocused, setInputFocused] = useState(false);
   const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -50,7 +216,6 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
     } else if (openTimeRef.current) {
       trackDrawerClose(Date.now() - openTimeRef.current);
       openTimeRef.current = null;
-      // Reset state when closed
       setQuery('');
       setMessages([]);
       setGuideResults([]);
@@ -78,9 +243,9 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
       if (response.ok) {
         const data = await response.json();
         const combined: SearchResult[] = [
-          ...data.results.documents.map((d: any) => ({ ...d, type: 'document' as const })),
-          ...data.results.contracts.map((c: any) => ({ ...c, type: 'contract' as const })),
-          ...data.results.tasks.map((t: any) => ({ ...t, type: 'task' as const })),
+          ...data.results.documents.map((d: SearchResult) => ({ ...d, type: 'document' as const })),
+          ...data.results.contracts.map((c: SearchResult) => ({ ...c, type: 'contract' as const })),
+          ...data.results.tasks.map((t: SearchResult) => ({ ...t, type: 'task' as const })),
         ].slice(0, 6);
         setDataResults(combined);
       }
@@ -92,7 +257,6 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
   }, []);
 
   useEffect(() => {
-    // Search guides immediately (local)
     if (query.trim().length >= 2) {
       const results = searchGuides(query);
       setGuideResults(results.slice(0, 3));
@@ -101,7 +265,6 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
       setDataResults([]);
     }
 
-    // Debounce database search
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
@@ -119,12 +282,10 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
     };
   }, [query, searchData]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Close on Escape key
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape' && isOpen) {
@@ -148,6 +309,7 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
     setMessages(prev => [...prev, userMessage]);
     setQuery('');
     setGuideResults([]);
+    setDataResults([]);
     setIsLoading(true);
 
     try {
@@ -198,40 +360,6 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
     onClose();
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'document':
-        return (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        );
-      case 'contract':
-        return (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        );
-      case 'task':
-        return (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'document': return 'text-blue-400';
-      case 'contract': return 'text-emerald-400';
-      case 'task': return 'text-amber-400';
-      default: return 'text-gray-400';
-    }
-  };
-
   const suggestedQuestions = [
     'How do I create a contract bundle?',
     'What are the pipeline stages?',
@@ -242,109 +370,269 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Vision Pro Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
             onClick={onClose}
-            className="fixed inset-0 bg-[#0B1220]/80 z-[60]"
+            className="fixed inset-0 z-[60]"
+            style={{
+              background: visionPro.depth.backdrop,
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            }}
           />
 
-          {/* Drawer */}
+          {/* Vision Pro Drawer */}
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-[420px] max-w-full bg-[#111827] border-l border-white/[0.06] shadow-xl z-[60] flex flex-col"
+            initial={{ x: '100%', opacity: 0.8 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0.8 }}
+            transition={{
+              type: 'spring',
+              stiffness: 400,
+              damping: 35,
+              mass: 0.8,
+            }}
+            className="fixed right-0 top-0 bottom-0 w-[440px] max-w-full z-[60] flex flex-col"
+            style={{
+              background: `linear-gradient(180deg, ${visionPro.depth.surface1}, ${visionPro.depth.surface2})`,
+              borderLeft: `1px solid ${visionPro.border.light}`,
+              boxShadow: visionPro.shadow.drawer,
+            }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-              <div className="flex items-center gap-3">
-                <Image
-                  src="/drop-white.png"
-                  alt="MARS"
-                  width={32}
-                  height={32}
-                  className="drop-shadow-lg"
-                />
-                <h2 className="text-lg font-semibold text-white">MARS Assistant</h2>
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: `1px solid ${visionPro.border.subtle}`,
+                background: visionPro.glass.ultra,
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1, type: 'spring', stiffness: 300 }}
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '14px',
+                      background: `linear-gradient(135deg, ${visionPro.glass.regular}, ${visionPro.glass.thin})`,
+                      border: `1px solid ${visionPro.border.light}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: visionPro.glow.blue,
+                    }}
+                  >
+                    <Image
+                      src="/drop-white.png"
+                      alt="MARS"
+                      width={28}
+                      height={28}
+                      style={{ filter: 'drop-shadow(0 0 10px rgba(88,166,255,0.5))' }}
+                    />
+                  </motion.div>
+                  <div>
+                    <h2 style={{ color: visionPro.text.primary, fontSize: '18px', fontWeight: 600, letterSpacing: '-0.02em' }}>
+                      MARS Assistant
+                    </h2>
+                    <p style={{ color: visionPro.text.quaternary, fontSize: '12px', marginTop: '2px' }}>
+                      Search & AI Help
+                    </p>
+                  </div>
+                </div>
+                <motion.button
+                  onClick={onClose}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '12px',
+                    background: visionPro.glass.thin,
+                    border: `1px solid ${visionPro.border.subtle}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: visionPro.text.tertiary,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {icons.close}
+                </motion.button>
               </div>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-lg hover:bg-white/[0.06] flex items-center justify-center text-[#64748B] hover:text-white transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto" style={{ padding: '20px' }}>
               {messages.length === 0 ? (
                 // Initial state - show suggestions and relevant guides
-                <div className="space-y-6">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   {/* Quick suggestions */}
-                  <div>
-                    <p className="text-[#8FA3BF] text-sm mb-3">Ask me anything about MARS:</p>
-                    <div className="space-y-2">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    <p style={{ color: visionPro.text.secondary, fontSize: '14px', marginBottom: '12px' }}>
+                      Ask me anything about MARS:
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {suggestedQuestions.map((question, idx) => (
-                        <button
+                        <motion.button
                           key={idx}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.15 + idx * 0.05 }}
                           onClick={() => setQuery(question)}
-                          className="w-full text-left p-3 rounded-xl bg-[#0B1220] hover:bg-[#1E293B] border border-white/[0.04] hover:border-white/[0.08] transition-all text-sm text-[#8FA3BF] hover:text-white"
+                          whileHover={{ x: 4 }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            background: visionPro.glass.thin,
+                            border: `1px solid ${visionPro.border.subtle}`,
+                            color: visionPro.text.secondary,
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
                         >
-                          {question}
-                        </button>
+                          <span>{question}</span>
+                          <span style={{ color: visionPro.text.quaternary }}>{icons.arrow}</span>
+                        </motion.button>
                       ))}
                     </div>
-                  </div>
+                  </motion.div>
 
                   {/* Relevant for this page */}
                   {relevantGuides.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-[#64748B] uppercase tracking-wider mb-3">
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      <p style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: TYPE_CONFIG.guide.color,
+                        marginBottom: '12px',
+                      }}>
                         Guides for this page
                       </p>
-                      <div className="space-y-2">
-                        {relevantGuides.slice(0, 3).map((guide) => (
-                          <button
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {relevantGuides.slice(0, 3).map((guide, idx) => (
+                          <motion.button
                             key={guide.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.35 + idx * 0.05 }}
                             onClick={() => handleGuideClick(guide)}
-                            className="w-full text-left p-3 rounded-xl bg-[#0B1220] hover:bg-[#1E293B] border border-white/[0.04] hover:border-white/[0.08] transition-all group"
+                            whileHover={{ x: 4 }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              background: TYPE_CONFIG.guide.bgColor,
+                              border: `1px solid ${TYPE_CONFIG.guide.color}20`,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                            }}
                           >
-                            <p className="text-white text-sm font-medium truncate group-hover:text-[#38BDF8] transition-colors">
-                              {guide.title}
-                            </p>
-                            <p className="text-[#64748B] text-xs capitalize mt-0.5">
-                              {guide.category} Guide
-                            </p>
-                          </button>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '10px',
+                              background: TYPE_CONFIG.guide.bgColor,
+                              border: `1px solid ${TYPE_CONFIG.guide.color}30`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: TYPE_CONFIG.guide.color,
+                              flexShrink: 0,
+                            }}>
+                              {icons.guide}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{
+                                color: visionPro.text.primary,
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {guide.title}
+                              </p>
+                              <p style={{
+                                color: visionPro.text.quaternary,
+                                fontSize: '12px',
+                                textTransform: 'capitalize',
+                                marginTop: '2px',
+                              }}>
+                                {guide.category} Guide
+                              </p>
+                            </div>
+                          </motion.button>
                         ))}
                       </div>
-                    </div>
+                    </motion.div>
                   )}
                 </div>
               ) : (
                 // Chat messages
-                <div className="space-y-4">
-                  {messages.map((message) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {messages.map((message, idx) => (
                     <motion.div
                       key={message.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                      style={{
+                        display: 'flex',
+                        justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                      }}
                     >
                       <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                          message.role === 'user'
-                            ? 'bg-[#38BDF8] text-white'
-                            : 'bg-[#0B1220] border border-white/[0.06] text-[#8FA3BF]'
-                        }`}
+                        style={{
+                          maxWidth: '85%',
+                          borderRadius: message.role === 'user' ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
+                          padding: '14px 18px',
+                          background: message.role === 'user'
+                            ? `linear-gradient(135deg, ${visionPro.accent.blue}, ${visionPro.accent.cyan})`
+                            : visionPro.glass.regular,
+                          border: message.role === 'user'
+                            ? 'none'
+                            : `1px solid ${visionPro.border.light}`,
+                          boxShadow: message.role === 'user'
+                            ? visionPro.glow.blue
+                            : visionPro.shadow.inner,
+                        }}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p style={{
+                          fontSize: '14px',
+                          lineHeight: 1.5,
+                          color: message.role === 'user' ? '#fff' : visionPro.text.secondary,
+                          whiteSpace: 'pre-wrap',
+                        }}>
+                          {message.content}
+                        </p>
                       </div>
                     </motion.div>
                   ))}
@@ -356,27 +644,33 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
 
                   {isLoading && (
                     <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex justify-start"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      style={{ display: 'flex', justifyContent: 'flex-start' }}
                     >
-                      <div className="bg-[#0B1220] border border-white/[0.06] rounded-2xl px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <motion.div
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
-                            className="w-2 h-2 rounded-full bg-[#38BDF8]"
-                          />
-                          <motion.div
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
-                            className="w-2 h-2 rounded-full bg-[#38BDF8]"
-                          />
-                          <motion.div
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
-                            className="w-2 h-2 rounded-full bg-[#38BDF8]"
-                          />
+                      <div
+                        style={{
+                          borderRadius: '20px 20px 20px 6px',
+                          padding: '14px 18px',
+                          background: visionPro.glass.regular,
+                          border: `1px solid ${visionPro.border.light}`,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {[0, 1, 2].map((i) => (
+                            <motion.div
+                              key={i}
+                              animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                              transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
+                              style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: visionPro.accent.blue,
+                                boxShadow: visionPro.glow.blue,
+                              }}
+                            />
+                          ))}
                         </div>
                       </div>
                     </motion.div>
@@ -388,67 +682,206 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 border-t border-white/[0.06]">
+            <div
+              style={{
+                padding: '16px 20px 20px',
+                borderTop: `1px solid ${visionPro.border.subtle}`,
+                background: visionPro.glass.ultra,
+              }}
+            >
               {/* Search results dropdown */}
               <AnimatePresence>
                 {(guideResults.length > 0 || dataResults.length > 0 || isSearching) && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="mb-3 p-2 bg-[#0B1220] rounded-xl border border-white/[0.06] max-h-64 overflow-y-auto"
+                    initial={{ opacity: 0, y: 10, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: 10, height: 0 }}
+                    style={{
+                      marginBottom: '12px',
+                      padding: '8px',
+                      background: visionPro.depth.surface3,
+                      borderRadius: '16px',
+                      border: `1px solid ${visionPro.border.light}`,
+                      maxHeight: '240px',
+                      overflowY: 'auto',
+                    }}
                   >
-                    {/* Data results (documents, contracts, tasks) */}
+                    {/* Data results */}
                     {dataResults.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-[10px] text-[#64748B] uppercase tracking-wider px-2 mb-1">Results</p>
-                        {dataResults.map((result) => (
-                          <button
-                            key={`${result.type}-${result.id}`}
-                            onClick={() => handleDataClick(result)}
-                            className="w-full text-left px-2 py-2 rounded-lg hover:bg-white/[0.04] transition-colors flex items-center gap-2"
-                          >
-                            <span className={getTypeColor(result.type)}>
-                              {getTypeIcon(result.type)}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white truncate">{result.title}</p>
-                              {result.subtitle && (
-                                <p className="text-xs text-[#64748B] truncate">{result.subtitle}</p>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-[#64748B] uppercase">{result.type}</span>
-                          </button>
-                        ))}
+                      <div style={{ marginBottom: guideResults.length > 0 ? '8px' : 0 }}>
+                        <p style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: visionPro.text.quaternary,
+                          padding: '4px 8px',
+                          marginBottom: '4px',
+                        }}>
+                          Results
+                        </p>
+                        {dataResults.map((result, idx) => {
+                          const config = TYPE_CONFIG[result.type] || TYPE_CONFIG.document;
+                          return (
+                            <motion.button
+                              key={`${result.type}-${result.id}`}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: idx * 0.03 }}
+                              onClick={() => handleDataClick(result)}
+                              whileHover={{ x: 4 }}
+                              style={{
+                                width: '100%',
+                                textAlign: 'left',
+                                padding: '10px 12px',
+                                borderRadius: '12px',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                background: config.bgColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: config.color,
+                                flexShrink: 0,
+                              }}>
+                                {TYPE_ICONS[result.type]}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{
+                                  fontSize: '13px',
+                                  fontWeight: 500,
+                                  color: visionPro.text.primary,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}>
+                                  {result.title}
+                                </p>
+                                {result.subtitle && (
+                                  <p style={{
+                                    fontSize: '11px',
+                                    color: visionPro.text.quaternary,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}>
+                                    {result.subtitle}
+                                  </p>
+                                )}
+                              </div>
+                              <span style={{
+                                fontSize: '9px',
+                                fontWeight: 600,
+                                textTransform: 'uppercase',
+                                color: config.color,
+                                padding: '3px 6px',
+                                borderRadius: '4px',
+                                background: config.bgColor,
+                              }}>
+                                {config.label}
+                              </span>
+                            </motion.button>
+                          );
+                        })}
                       </div>
                     )}
 
                     {/* Guide results */}
                     {guideResults.length > 0 && (
                       <div>
-                        <p className="text-[10px] text-[#64748B] uppercase tracking-wider px-2 mb-1">Guides</p>
-                        {guideResults.map((guide) => (
-                          <button
+                        <p style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: visionPro.text.quaternary,
+                          padding: '4px 8px',
+                          marginBottom: '4px',
+                        }}>
+                          Guides
+                        </p>
+                        {guideResults.map((guide, idx) => (
+                          <motion.button
                             key={guide.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: dataResults.length * 0.03 + idx * 0.03 }}
                             onClick={() => handleGuideClick(guide)}
-                            className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/[0.04] transition-colors flex items-center gap-2"
+                            whileHover={{ x: 4 }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              padding: '10px 12px',
+                              borderRadius: '12px',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              transition: 'all 0.2s ease',
+                            }}
                           >
-                            <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                            </svg>
-                            <p className="text-sm text-white truncate flex-1">{guide.title}</p>
-                          </button>
+                            <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '8px',
+                              background: TYPE_CONFIG.guide.bgColor,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: TYPE_CONFIG.guide.color,
+                              flexShrink: 0,
+                            }}>
+                              {icons.guide}
+                            </div>
+                            <p style={{
+                              flex: 1,
+                              fontSize: '13px',
+                              fontWeight: 500,
+                              color: visionPro.text.primary,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {guide.title}
+                            </p>
+                          </motion.button>
                         ))}
                       </div>
                     )}
 
-                    {/* Loading indicator */}
+                    {/* Loading */}
                     {isSearching && dataResults.length === 0 && (
-                      <div className="flex items-center gap-2 px-2 py-2 text-[#64748B] text-sm">
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '12px',
+                        color: visionPro.text.tertiary,
+                        fontSize: '13px',
+                      }}>
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                          className="w-4 h-4 border-2 border-[#64748B] border-t-transparent rounded-full"
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            border: `2px solid ${visionPro.accent.blue}`,
+                            borderTopColor: 'transparent',
+                            borderRadius: '50%',
+                          }}
                         />
                         Searching...
                       </div>
@@ -457,35 +890,85 @@ export default function HelpDrawer({ isOpen, onClose }: HelpDrawerProps) {
                 )}
               </AnimatePresence>
 
-              <form onSubmit={handleSubmit} className="flex items-center gap-2">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search or ask a question..."
-                  className="flex-1 px-4 py-3 bg-[#0B1220] border border-white/[0.06] rounded-xl text-white placeholder-[#64748B] focus:outline-none focus:border-[#38BDF8]/50 focus:ring-1 focus:ring-[#38BDF8]/50 transition-all"
-                />
-                <button
+              <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    flex: 1,
+                    position: 'relative',
+                    borderRadius: '16px',
+                    background: visionPro.glass.thin,
+                    border: `1px solid ${inputFocused ? `${visionPro.accent.blue}40` : visionPro.border.subtle}`,
+                    boxShadow: inputFocused ? visionPro.glow.blue : 'none',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onFocus={() => setInputFocused(true)}
+                    onBlur={() => setInputFocused(false)}
+                    placeholder="Search or ask a question..."
+                    style={{
+                      width: '100%',
+                      padding: '14px 18px',
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: visionPro.text.primary,
+                      fontSize: '15px',
+                      fontWeight: 400,
+                    }}
+                  />
+                </div>
+                <motion.button
                   type="submit"
                   disabled={!query.trim() || isLoading}
-                  className="w-11 h-11 rounded-xl bg-[#38BDF8] hover:bg-[#0EA5E9] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors flex-shrink-0"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '14px',
+                    background: query.trim() && !isLoading
+                      ? `linear-gradient(135deg, ${visionPro.accent.blue}, ${visionPro.accent.cyan})`
+                      : visionPro.glass.thin,
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: query.trim() && !isLoading ? '#fff' : visionPro.text.quaternary,
+                    cursor: query.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                    boxShadow: query.trim() && !isLoading ? visionPro.glow.blue : 'none',
+                    transition: 'all 0.3s ease',
+                    flexShrink: 0,
+                  }}
                 >
                   {isLoading ? (
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        border: '2px solid #fff',
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                      }}
                     />
                   ) : (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
+                    icons.send
                   )}
-                </button>
+                </motion.button>
               </form>
-              <p className="text-[#64748B] text-xs text-center mt-2">
-                Search everything or press Enter to ask AI · <a href="mailto:support@marswater.com" className="text-[#38BDF8] hover:underline">Contact support</a>
+              <p style={{
+                textAlign: 'center',
+                marginTop: '10px',
+                fontSize: '11px',
+                color: visionPro.text.quaternary,
+              }}>
+                Search everything or press Enter to ask AI
               </p>
             </div>
           </motion.div>
