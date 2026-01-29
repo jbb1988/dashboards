@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import DashboardAccessModal from './DashboardAccessModal';
 import { DashboardOption } from './DashboardCheckboxes';
+import { getDashboardIcon } from '@/lib/navigation-icons';
 
 interface Role {
   id: string;
@@ -96,8 +97,8 @@ export default function DashboardsTab({
                   {/* Dashboard Header */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-[#38BDF8]/10 text-[#38BDF8]">
-                        {dashboard.icon || dashboard.name.charAt(0).toUpperCase()}
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#38BDF8]/10 text-[#38BDF8]">
+                        {getDashboardIcon(dashboard.icon || dashboard.name.charAt(0).toLowerCase())}
                       </div>
                       <div>
                         <h3 className="text-white font-semibold">{dashboard.name}</h3>
