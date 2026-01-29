@@ -398,7 +398,7 @@ export default function ContractContextPanel({
                                   .split('\n')
                                   .map(line => line.trim())
                                   .filter(line => line.length > 0);
-                                onUpdateSummary(newSummary);
+                                onUpdateSummary?.(newSummary);
                                 setIsEditingSummary(false);
                               }}
                               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-medium transition-colors"
