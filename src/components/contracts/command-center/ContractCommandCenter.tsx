@@ -496,6 +496,76 @@ export default function ContractCommandCenter() {
     }
   }, [currentResult, selectedContract, customContractName, provisionName, lastReviewId, contracts, userEmail, reviewerNotes, ccEmails, fetchApprovals, fetchHistory]);
 
+  const handlePreviewApproval = useCallback(async () => {
+    const hasContractIdentifier = selectedContract || customContractName.trim();
+    if (!currentResult || !hasContractIdentifier || !provisionName.trim()) {
+      alert('Please select a contract (or enter a custom name), enter a provision name, and complete analysis first');
+      return;
+    }
+
+    setIsSendingApproval(true); // Reuse the loading state
+    try {
+      let reviewId = lastReviewId;
+
+      // Get contract info - either from selected contract or custom name
+      const contractData = selectedContract ? contracts.find(c => c.id === selectedContract) : null;
+      const effectiveContractName = contractData?.name || customContractName.trim() || 'Contract';
+
+      // Create the review if it doesn't exist
+      if (!reviewId) {
+        const createResponse = await fetch('/api/contracts/review/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contract_id: selectedContract || null,
+            contract_name: effectiveContractName,
+            provision_name: provisionName,
+            original_text: currentResult.originalText,
+            redlined_text: currentResult.redlinedText,
+            modified_text: currentResult.modifiedText || '',
+            summary: currentResult.summary,
+            risk_scores: currentResult.riskScores || null,
+            status: 'draft',
+          }),
+        });
+
+        if (!createResponse.ok) {
+          throw new Error('Failed to save review');
+        }
+
+        const createData = await createResponse.json();
+        reviewId = createData.id;
+        setLastReviewId(reviewId);
+      }
+
+      // Create preview token (without sending emails)
+      const response = await fetch('/api/contracts/review/preview-approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewId,
+          contractName: effectiveContractName,
+          submittedBy: userEmail,
+          reviewerNotes: reviewerNotes.trim() || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.previewToken) {
+        // Open preview in new tab
+        window.open(`/contracts/review/approve/${data.previewToken}?preview=true`, '_blank');
+      } else {
+        alert(data.error || 'Failed to create preview');
+      }
+    } catch (err) {
+      console.error('Error creating preview:', err);
+      alert('Failed to create preview');
+    } finally {
+      setIsSendingApproval(false);
+    }
+  }, [currentResult, selectedContract, customContractName, provisionName, lastReviewId, contracts, userEmail, reviewerNotes]);
+
   const handleDeleteHistoryItem = useCallback(async (reviewId: string) => {
     if (!confirm('Are you sure you want to delete this review from history?')) {
       return;
@@ -664,6 +734,7 @@ export default function ContractCommandCenter() {
         ccEmails={ccEmails}
         onCcEmailsChange={setCcEmails}
         onSendForApproval={handleSendForApproval}
+        onPreviewApproval={handlePreviewApproval}
         isSendingApproval={isSendingApproval}
         canSendApproval={!!(currentResult && (selectedContract || customContractName.trim()) && provisionName.trim())}
         customContractName={customContractName}

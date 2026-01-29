@@ -42,6 +42,7 @@ interface ContractContextPanelProps {
   ccEmails: string;
   onCcEmailsChange: (emails: string) => void;
   onSendForApproval: () => void;
+  onPreviewApproval?: () => void;
   isSendingApproval: boolean;
   canSendApproval: boolean;
   // Custom contract name (when no contract is linked)
@@ -227,6 +228,7 @@ export default function ContractContextPanel({
   ccEmails,
   onCcEmailsChange,
   onSendForApproval,
+  onPreviewApproval,
   isSendingApproval,
   canSendApproval,
   customContractName = '',
@@ -619,28 +621,50 @@ export default function ContractContextPanel({
                         </p>
                       </div>
 
-                      <button
-                        onClick={onSendForApproval}
-                        disabled={isSendingApproval || !canSendApproval}
-                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-[13px] transition-all duration-[180ms] disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{
-                          background: 'linear-gradient(180deg, rgba(80,210,140,0.35), rgba(80,210,140,0.20))',
-                          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 4px 20px rgba(80,210,140,0.25)',
-                          color: 'rgba(235,240,255,0.98)',
-                        }}
-                      >
-                        {isSendingApproval ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4" />
-                            Send for Approval
-                          </>
+                      {/* Preview and Send buttons */}
+                      <div className="flex gap-2">
+                        {/* Preview Button */}
+                        {onPreviewApproval && (
+                          <button
+                            onClick={onPreviewApproval}
+                            disabled={isSendingApproval || !canSendApproval}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-[13px] transition-all duration-[180ms] disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                              background: 'linear-gradient(180deg, rgba(90,130,255,0.25), rgba(90,130,255,0.12))',
+                              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+                              color: 'rgba(235,240,255,0.90)',
+                              border: '1px solid rgba(90,130,255,0.30)',
+                            }}
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Preview
+                          </button>
                         )}
-                      </button>
+
+                        {/* Send for Approval Button */}
+                        <button
+                          onClick={onSendForApproval}
+                          disabled={isSendingApproval || !canSendApproval}
+                          className={`${onPreviewApproval ? 'flex-1' : 'w-full'} flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-[13px] transition-all duration-[180ms] disabled:opacity-50 disabled:cursor-not-allowed`}
+                          style={{
+                            background: 'linear-gradient(180deg, rgba(80,210,140,0.35), rgba(80,210,140,0.20))',
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 4px 20px rgba(80,210,140,0.25)',
+                            color: 'rgba(235,240,255,0.98)',
+                          }}
+                        >
+                          {isSendingApproval ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4" />
+                              Send
+                            </>
+                          )}
+                        </button>
+                      </div>
 
                       {!canSendApproval && (
                         <div

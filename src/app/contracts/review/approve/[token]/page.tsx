@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
@@ -93,6 +94,8 @@ interface DiscussionComment {
 
 export default function ApprovalPage({ params }: { params: Promise<{ token: string }> }) {
   const resolvedParams = use(params);
+  const searchParams = useSearchParams();
+  const isPreviewMode = searchParams.get('preview') === 'true';
   const [review, setReview] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -431,6 +434,30 @@ export default function ApprovalPage({ params }: { params: Promise<{ token: stri
         transition={{ duration: 0.2 }}
         className="min-h-screen flex flex-col relative z-10"
       >
+        {/* Preview Mode Banner */}
+        {isPreviewMode && (
+          <div className="bg-gradient-to-r from-[#58A6FF]/20 to-[#58A6FF]/10 border-b border-[#58A6FF]/30 px-6 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#58A6FF]/20 flex items-center justify-center">
+                <svg className="w-4 h-4 text-[#58A6FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-[#58A6FF] font-semibold text-sm">Preview Mode</p>
+                <p className="text-[rgba(255,255,255,0.62)] text-xs">This is a preview of what the approver will see. No emails have been sent.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => window.close()}
+              className="px-4 py-2 rounded-lg bg-[#58A6FF]/20 text-[#58A6FF] text-sm font-medium hover:bg-[#58A6FF]/30 transition-colors"
+            >
+              Close Preview
+            </button>
+          </div>
+        )}
+
         {/* Header Bar */}
         <ApprovalHeader
           contractName={review.contractName}
