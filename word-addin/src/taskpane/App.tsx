@@ -839,6 +839,7 @@ export default function App() {
   // Submit for Approval state
   const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
   const [submittedForApproval, setSubmittedForApproval] = useState(false);
+  const [customDocumentName, setCustomDocumentName] = useState<string>('');
 
   // Preview and match selection state
   const [previewState, setPreviewState] = useState<PreviewState | null>(null);
@@ -1134,9 +1135,10 @@ export default function App() {
         getDocumentAsBase64(), // Get actual .docx file for OneDrive upload
       ]);
 
-      // Get linked contract info
+      // Get linked contract info - use custom name if provided, fallback to document name
       const selectedContractData = contracts.find(c => c.id === selectedContract);
-      const historyProvisionName = selectedContractData?.name || documentName;
+      const effectiveName = customDocumentName || documentName;
+      const historyProvisionName = selectedContractData?.name || effectiveName;
 
       // Generate a simple diff summary based on what sections were applied
       const appliedSummary = analysisResult.sections
@@ -1157,7 +1159,7 @@ export default function App() {
         },
         body: JSON.stringify({
           contractId: selectedContract || undefined,
-          contractName: selectedContractData?.name || documentName, // Use filename if no contract selected
+          contractName: selectedContractData?.name || effectiveName, // Use custom name if no contract selected
           provisionName: historyProvisionName,
           originalText: originalDocumentText, // The document BEFORE any changes
           redlinedText: currentDocumentText,  // The document AFTER user's changes (we'll use this as the "modified" view)
@@ -1209,10 +1211,11 @@ export default function App() {
     setError(null);
 
     try {
-      // Get contract name for the approval request
+      // Get contract name for the approval request - use custom name if provided
       const documentName = await getDocumentName();
       const selectedContractData = contracts.find(c => c.id === selectedContract);
-      const contractName = selectedContractData?.name || documentName;
+      const effectiveName = customDocumentName || documentName;
+      const contractName = selectedContractData?.name || effectiveName;
 
       // Generate summary preview from applied changes
       const summaryPreview = analysisResult.sections
@@ -1275,9 +1278,10 @@ export default function App() {
         getDocumentAsBase64(),
       ]);
 
-      // Get linked contract info
+      // Get linked contract info - use custom name if provided
       const selectedContractData = contracts.find(c => c.id === selectedContract);
-      const historyProvisionName = selectedContractData?.name || documentName;
+      const effectiveName = customDocumentName || documentName;
+      const historyProvisionName = selectedContractData?.name || effectiveName;
 
       // Generate a simple diff summary based on what sections were applied
       const appliedSummary = analysisResult.sections
@@ -1299,7 +1303,7 @@ export default function App() {
         },
         body: JSON.stringify({
           contractId: selectedContract || undefined,
-          contractName: selectedContractData?.name || documentName, // Use filename if no contract selected
+          contractName: selectedContractData?.name || effectiveName, // Use custom name if no contract selected
           provisionName: historyProvisionName,
           originalText: originalDocumentText,
           redlinedText: currentDocumentText,
@@ -1342,7 +1346,7 @@ export default function App() {
         },
         body: JSON.stringify({
           reviewId: reviewId,
-          contractName: selectedContractData?.name || documentName,
+          contractName: selectedContractData?.name || effectiveName,
           submittedBy: user.email,
           summaryPreview: summaryPreview,
         }),
@@ -1389,6 +1393,11 @@ export default function App() {
         getDocumentText(),
         getDocumentName(),
       ]);
+
+      // Initialize custom document name with actual filename (user can edit before saving)
+      if (!customDocumentName) {
+        setCustomDocumentName(documentName);
+      }
 
       if (!documentText || documentText.trim().length < 100) {
         setError('Document appears to be empty or too short to analyze');
@@ -3123,6 +3132,30 @@ export default function App() {
                   {/* Save/Submit Actions - Always visible when analysis exists */}
                   {analysisResult && !savedToHistory && !submittedForApproval && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, padding: 16, background: 'rgba(52, 199, 89, 0.06)', borderRadius: 14, border: '1px solid rgba(52, 199, 89, 0.12)' }}>
+                      {/* Document Name Input */}
+                      <div style={{ marginBottom: 4 }}>
+                        <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>
+                          Document Name
+                        </label>
+                        <input
+                          type="text"
+                          value={customDocumentName}
+                          onChange={(e) => setCustomDocumentName(e.target.value)}
+                          placeholder="Enter document name..."
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            background: 'rgba(255,255,255,0.06)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: 8,
+                            color: 'rgba(255,255,255,0.9)',
+                            fontSize: 13,
+                            fontFamily: 'inherit',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
                       {/* Primary: Submit for Approval - Apple Green */}
                       <button
                         onClick={saveAndSubmitForApproval}
