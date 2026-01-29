@@ -19,6 +19,8 @@ import {
   ArrowRight,
   RotateCcw,
   ExternalLink,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import { elevation, colors } from '@/components/mars-ui/tokens';
 
@@ -92,6 +94,7 @@ interface ContractCenterContentProps {
   // Actions
   onAnalyze: () => void;
   onNewReview: () => void;
+  onUpdateHistoryItem?: (reviewId: string, updates: { provisionName?: string; contractName?: string; summary?: string[] }) => Promise<void>;
   // Stats for empty state
   pendingCount: number;
   inProgressCount: number;
@@ -391,6 +394,7 @@ export default function ContractCenterContent({
   onPlaybookContentChange,
   onAnalyze,
   onNewReview,
+  onUpdateHistoryItem,
   pendingCount,
   inProgressCount,
   totalReviewsThisMonth,
@@ -398,6 +402,10 @@ export default function ContractCenterContent({
   const [contractDropdownOpen, setContractDropdownOpen] = useState(false);
   const [contractSearch, setContractSearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Editing state for history items
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
 
   // Compare Documents state
   const [compareOriginalFile, setCompareOriginalFile] = useState<File | null>(null);
@@ -1035,10 +1043,67 @@ export default function ContractCenterContent({
             style={{ background: elevation.L2.background }}
           >
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-[16px] font-semibold text-[rgba(235,240,255,0.92)]">
-                  {provisionName || 'Contract Review'}
-                </h2>
+              <div className="flex-1 min-w-0 mr-4">
+                {/* Editable Title */}
+                {isEditingTitle ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && onUpdateHistoryItem && selectedItem?.type === 'history') {
+                          onUpdateHistoryItem(selectedItem.id, { provisionName: editedTitle });
+                          onProvisionNameChange(editedTitle);
+                          setIsEditingTitle(false);
+                        } else if (e.key === 'Escape') {
+                          setIsEditingTitle(false);
+                          setEditedTitle(provisionName);
+                        }
+                      }}
+                      className="flex-1 px-2 py-1 text-[16px] font-semibold bg-[rgba(255,255,255,0.08)] border border-[rgba(90,130,255,0.50)] rounded-lg text-[rgba(235,240,255,0.92)] focus:outline-none focus:border-[rgba(90,130,255,0.80)]"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => {
+                        if (onUpdateHistoryItem && selectedItem?.type === 'history') {
+                          onUpdateHistoryItem(selectedItem.id, { provisionName: editedTitle });
+                          onProvisionNameChange(editedTitle);
+                        }
+                        setIsEditingTitle(false);
+                      }}
+                      className="p-1.5 rounded-lg bg-[rgba(80,210,140,0.20)] text-[rgba(80,210,140,0.95)] hover:bg-[rgba(80,210,140,0.30)] transition-colors"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingTitle(false);
+                        setEditedTitle(provisionName);
+                      }}
+                      className="p-1.5 rounded-lg bg-[rgba(255,255,255,0.06)] text-[rgba(200,210,235,0.60)] hover:bg-[rgba(255,255,255,0.10)] transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className="group flex items-center gap-2 cursor-pointer"
+                    onClick={() => {
+                      if (mode === 'viewing-history' && onUpdateHistoryItem) {
+                        setEditedTitle(provisionName || 'Contract Review');
+                        setIsEditingTitle(true);
+                      }
+                    }}
+                  >
+                    <h2 className="text-[16px] font-semibold text-[rgba(235,240,255,0.92)] truncate">
+                      {provisionName || 'Contract Review'}
+                    </h2>
+                    {mode === 'viewing-history' && onUpdateHistoryItem && (
+                      <Pencil className="w-3.5 h-3.5 text-[rgba(200,210,235,0.40)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </div>
+                )}
                 <p className="text-[12px] text-[rgba(200,210,235,0.50)] mt-0.5">
                   {contracts.find(c => c.id === selectedContract)?.name || 'Standalone Review'}
                 </p>

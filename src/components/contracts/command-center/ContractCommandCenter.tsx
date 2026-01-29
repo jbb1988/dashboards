@@ -591,6 +591,40 @@ export default function ContractCommandCenter() {
     }
   }, [selectedItem]);
 
+  const handleUpdateHistoryItem = useCallback(async (
+    reviewId: string,
+    updates: { provisionName?: string; contractName?: string; summary?: string[] }
+  ) => {
+    try {
+      const response = await fetch('/api/contracts/review/history/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewId, ...updates }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setHistory(prev => prev.map(item =>
+          item.id === reviewId
+            ? {
+                ...item,
+                provisionName: updates.provisionName ?? item.provisionName,
+                contractName: updates.contractName ?? item.contractName,
+                summary: updates.summary ?? item.summary,
+              }
+            : item
+        ));
+
+        // Update current result if viewing this item
+        if (selectedItem?.id === reviewId && updates.summary) {
+          setCurrentResult(prev => prev ? { ...prev, summary: updates.summary! } : prev);
+        }
+      }
+    } catch (err) {
+      console.error('Error updating history item:', err);
+    }
+  }, [selectedItem]);
+
   const handleDeleteApproval = useCallback(async (reviewId: string) => {
     if (!confirm('Are you sure you want to cancel this approval request? The review will be returned to draft status.')) {
       return;
@@ -715,6 +749,7 @@ export default function ContractCommandCenter() {
         // Actions
         onAnalyze={handleAnalyze}
         onNewReview={handleNewReview}
+        onUpdateHistoryItem={handleUpdateHistoryItem}
         // Stats for empty state
         pendingCount={approvalCounts.pending}
         inProgressCount={inProgressReviews.length}
@@ -742,6 +777,7 @@ export default function ContractCommandCenter() {
         canSendApproval={!!(currentResult && (selectedContract || customContractName.trim()) && provisionName.trim())}
         customContractName={customContractName}
         onCustomContractNameChange={setCustomContractName}
+        onUpdateSummary={selectedItem?.type === 'history' ? (summary) => handleUpdateHistoryItem(selectedItem.id, { summary }) : undefined}
         // Download props
         onDownloadOriginal={() => {/* TODO */}}
         onDownloadRevised={() => {/* TODO */}}

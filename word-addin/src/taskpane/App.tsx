@@ -1047,15 +1047,28 @@ export default function App() {
     });
   }, []);
 
-  // Get document name from Word
+  // Get document name from Word - clean up template names
   const getDocumentName = useCallback(async (): Promise<string> => {
     return new Promise((resolve) => {
       Word.run(async (context) => {
         const properties = context.document.properties;
         properties.load('title');
         await context.sync();
-        // Use title if available, otherwise default
-        resolve(properties.title || 'Untitled Document');
+
+        let title = properties.title || '';
+
+        // Check if title looks like a template GUID (e.g., "Template_14cc8e19-06e1-4b2f...")
+        // These typically start with "Template_" or contain multiple segments of hex/underscore
+        const isTemplateGuid = /^Template_[a-f0-9-]+/i.test(title) ||
+                               /^[a-f0-9]{8}[-_][a-f0-9]{4}/i.test(title) ||
+                               (title.includes('_') && /[a-f0-9]{8,}/i.test(title));
+
+        if (!title || isTemplateGuid) {
+          // Default to a friendly name for template-based documents
+          resolve('Contract Document');
+        } else {
+          resolve(title);
+        }
       }).catch(() => {
         resolve('Word Document');
       });

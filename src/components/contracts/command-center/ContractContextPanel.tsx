@@ -16,6 +16,11 @@ import {
   AlertTriangle,
   MessageCircle,
   ExternalLink,
+  Pencil,
+  Check,
+  X,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { elevation, colors } from '@/components/mars-ui/tokens';
 import type {
@@ -48,6 +53,8 @@ interface ContractContextPanelProps {
   // Custom contract name (when no contract is linked)
   customContractName?: string;
   onCustomContractNameChange?: (name: string) => void;
+  // Edit summary
+  onUpdateSummary?: (summary: string[]) => void;
   // Download actions
   onDownloadOriginal: () => void;
   onDownloadRevised: () => void;
@@ -233,6 +240,7 @@ export default function ContractContextPanel({
   canSendApproval,
   customContractName = '',
   onCustomContractNameChange,
+  onUpdateSummary,
   onDownloadOriginal,
   onDownloadRevised,
   onCopyText,
@@ -241,6 +249,11 @@ export default function ContractContextPanel({
 }: ContractContextPanelProps) {
   const isOpen = activeTab !== null;
   const panelWidth = isOpen ? 380 : 56;
+
+  // Summary editing state
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+  const [editedSummary, setEditedSummary] = useState<string[]>([]);
+  const [newSummaryItem, setNewSummaryItem] = useState('');
 
   const tabs: { id: ContextPanelTab; icon: React.ElementType; label: string; badge?: number }[] = [
     { id: 'summary', icon: FileText, label: 'Summary', badge: currentResult?.summary?.length },
@@ -337,26 +350,124 @@ export default function ContractContextPanel({
                         <RiskCard riskScores={currentResult.riskScores} />
                       )}
 
-                      {/* Changes Count */}
-                      <div className="flex items-center gap-2 text-[13px] text-[rgba(200,210,235,0.60)]">
-                        <span className="font-semibold text-[rgba(235,240,255,0.92)]">
-                          {currentResult.summary.length}
-                        </span>
-                        <span>changes identified</span>
+                      {/* Changes Count with Edit Button */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[13px] text-[rgba(200,210,235,0.60)]">
+                          <span className="font-semibold text-[rgba(235,240,255,0.92)]">
+                            {isEditingSummary ? editedSummary.length : currentResult.summary.length}
+                          </span>
+                          <span>changes identified</span>
+                        </div>
+                        {onUpdateSummary && selectedItem?.type === 'history' && (
+                          <button
+                            onClick={() => {
+                              if (isEditingSummary) {
+                                onUpdateSummary(editedSummary);
+                                setIsEditingSummary(false);
+                              } else {
+                                setEditedSummary([...currentResult.summary]);
+                                setIsEditingSummary(true);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium transition-colors"
+                            style={{
+                              background: isEditingSummary ? 'rgba(80,210,140,0.20)' : 'rgba(255,255,255,0.06)',
+                              color: isEditingSummary ? 'rgba(80,210,140,0.95)' : 'rgba(200,210,235,0.60)',
+                            }}
+                          >
+                            {isEditingSummary ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                Save
+                              </>
+                            ) : (
+                              <>
+                                <Pencil className="w-3 h-3" />
+                                Edit
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
 
-                      {/* Summary Items */}
-                      <div className="space-y-2">
-                        {currentResult.summary.map((item, idx) => (
-                          <SummaryItem
-                            key={idx}
-                            text={item}
-                            riskLevel={getRiskLevel(item)}
-                          />
-                        ))}
-                      </div>
+                      {/* Summary Items - Editable or Read-only */}
+                      {isEditingSummary ? (
+                        <div className="space-y-2">
+                          {editedSummary.map((item, idx) => (
+                            <div key={idx} className="flex items-start gap-2 group">
+                              <textarea
+                                value={item}
+                                onChange={(e) => {
+                                  const newSummary = [...editedSummary];
+                                  newSummary[idx] = e.target.value;
+                                  setEditedSummary(newSummary);
+                                }}
+                                className="flex-1 px-3 py-2 text-[12px] rounded-lg bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.08)] text-[rgba(235,240,255,0.92)] focus:outline-none focus:border-[rgba(90,130,255,0.50)] resize-none"
+                                rows={2}
+                              />
+                              <button
+                                onClick={() => {
+                                  setEditedSummary(editedSummary.filter((_, i) => i !== idx));
+                                }}
+                                className="p-1.5 rounded-lg text-[rgba(255,100,100,0.60)] hover:bg-[rgba(255,100,100,0.10)] hover:text-[rgba(255,100,100,0.90)] transition-colors opacity-0 group-hover:opacity-100"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          {/* Add new item */}
+                          <div className="flex items-start gap-2 mt-3">
+                            <input
+                              type="text"
+                              value={newSummaryItem}
+                              onChange={(e) => setNewSummaryItem(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newSummaryItem.trim()) {
+                                  setEditedSummary([...editedSummary, newSummaryItem.trim()]);
+                                  setNewSummaryItem('');
+                                }
+                              }}
+                              placeholder="Add new item..."
+                              className="flex-1 px-3 py-2 text-[12px] rounded-lg bg-[rgba(255,255,255,0.04)] border border-dashed border-[rgba(255,255,255,0.15)] text-[rgba(235,240,255,0.92)] placeholder-[rgba(200,210,235,0.40)] focus:outline-none focus:border-[rgba(90,130,255,0.50)]"
+                            />
+                            <button
+                              onClick={() => {
+                                if (newSummaryItem.trim()) {
+                                  setEditedSummary([...editedSummary, newSummaryItem.trim()]);
+                                  setNewSummaryItem('');
+                                }
+                              }}
+                              disabled={!newSummaryItem.trim()}
+                              className="p-2 rounded-lg bg-[rgba(90,130,255,0.15)] text-[rgba(90,130,255,0.90)] hover:bg-[rgba(90,130,255,0.25)] transition-colors disabled:opacity-40"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                          {/* Cancel button */}
+                          <button
+                            onClick={() => {
+                              setIsEditingSummary(false);
+                              setEditedSummary([]);
+                              setNewSummaryItem('');
+                            }}
+                            className="w-full mt-2 py-2 text-[12px] text-[rgba(200,210,235,0.60)] hover:text-[rgba(235,240,255,0.90)] transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {currentResult.summary.map((item, idx) => (
+                            <SummaryItem
+                              key={idx}
+                              text={item}
+                              riskLevel={getRiskLevel(item)}
+                            />
+                          ))}
+                        </div>
+                      )}
 
-                      {currentResult.summary.length === 0 && (
+                      {currentResult.summary.length === 0 && !isEditingSummary && (
                         <div className="text-center py-8">
                           <CheckCircle className="w-10 h-10 text-[rgba(80,210,140,0.60)] mx-auto mb-3" />
                           <p className="text-[13px] text-[rgba(200,210,235,0.60)]">
