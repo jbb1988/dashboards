@@ -25,6 +25,7 @@ interface Change {
 interface SectionEdit {
   section_heading: string;  // Short section heading (e.g., "INDEMNIFICATION")
   operation: 'modify';
+  risk_level?: 'high' | 'medium' | 'low';  // Severity of the issue
   changes: Change[];        // Array of small find/replace pairs
   rationale: string;
 }
@@ -32,6 +33,7 @@ interface SectionEdit {
 // New section to insert
 interface NewSection {
   operation: 'insert_new';
+  risk_level?: 'high' | 'medium' | 'low';  // Severity of missing this section
   title: string;            // Title for the new section
   insert_after: string;     // Section heading after which to insert
   content: string;          // Complete new section text
@@ -485,12 +487,13 @@ async function callOpenRouterAPI(
   for (const edit of edits) {
     // For the new format, we store the changes array in a way the frontend can use
     // The frontend will handle the individual find/replace pairs
+    const editRiskLevel = edit.risk_level || 'high'; // Use AI-provided risk level, default to high
     legacySections.push({
       sectionTitle: edit.section_heading,
       originalText: '', // Will be populated by finding section in document
       revisedText: '', // Will be computed from changes
-      riskLevel: 'high',
-      materiality: 'high',
+      riskLevel: editRiskLevel,
+      materiality: editRiskLevel,
       rationale: edit.rationale,
       // Store changes in a custom property for the frontend
       changes: edit.changes,
@@ -499,12 +502,13 @@ async function callOpenRouterAPI(
 
   // Add new sections as separate entries
   for (const newSection of newSections) {
+    const newSectionRiskLevel = newSection.risk_level || 'high'; // Use AI-provided risk level, default to high
     legacySections.push({
       sectionTitle: newSection.title,
       originalText: '', // New section has no original
       revisedText: newSection.content,
-      riskLevel: 'high',
-      materiality: 'high',
+      riskLevel: newSectionRiskLevel,
+      materiality: newSectionRiskLevel,
       rationale: newSection.rationale,
       isNewSection: true,
       insertAfter: newSection.insert_after,
@@ -647,6 +651,7 @@ JSON SCHEMA:
     {
       "section_heading": "EXACT section heading from contract (e.g., INDEMNIFICATION)",
       "operation": "modify",
+      "risk_level": "high|medium|low (based on severity of the issue)",
       "changes": [
         {
           "find": "exact text to find (MUST be < 200 chars, unique in section)",
@@ -660,6 +665,7 @@ JSON SCHEMA:
   "new_sections": [
     {
       "operation": "insert_new",
+      "risk_level": "high|medium|low (based on severity of missing this section)",
       "title": "NEW SECTION TITLE",
       "insert_after": "EXISTING SECTION HEADING (where to insert after)",
       "content": "Complete new section text including heading",
@@ -686,6 +692,11 @@ HARD RULES FOR FIND/REPLACE:
 WHEN TO USE insert_new:
 - Use ONLY for adding entirely new sections that don't exist (e.g., adding LIMITATION OF LIABILITY)
 - Do NOT use for modifying existing sections - use "modify" with changes array instead
+
+RISK LEVEL CLASSIFICATION (REQUIRED for each edit and new_section):
+- "high": Material issues - unlimited liability, broad indemnification, IP rights grabs, missing critical protections
+- "medium": Unfavorable but not critical - suboptimal terms that should be improved but won't sink the deal
+- "low": Minor deviations - style preferences, non-material differences from MARS standards
 
 MARS NEGOTIATING POSITIONS (apply these to edits):
 - Liability: Cap at contract value, exclude consequential/indirect damages
