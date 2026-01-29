@@ -3,6 +3,10 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { sendApprovalRequestEmail, sendCCNotificationEmail } from '@/lib/email';
 import { randomUUID } from 'crypto';
 
+// Configurable approver and CC emails via environment variables
+const APPROVER_EMAIL = process.env.APPROVER_EMAIL || null;
+const DEFAULT_CC_EMAIL = process.env.DEFAULT_CC_EMAIL || null;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -54,11 +58,18 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate CC emails
     const validCCEmails: string[] = [];
+
+    // Add default CC email if configured (always CC this email on all approvals)
+    if (DEFAULT_CC_EMAIL) {
+      validCCEmails.push(DEFAULT_CC_EMAIL.toLowerCase());
+      console.log('Adding default CC email:', DEFAULT_CC_EMAIL);
+    }
+
     if (ccEmails && typeof ccEmails === 'string') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const emails = ccEmails.split(',').map((e: string) => e.trim()).filter((e: string) => e);
       for (const email of emails) {
-        if (emailRegex.test(email)) {
+        if (emailRegex.test(email) && !validCCEmails.includes(email.toLowerCase())) {
           validCCEmails.push(email.toLowerCase());
         }
       }
@@ -90,25 +101,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch all admin users
-    const { data: adminUsers, error: adminError } = await admin
-      .from('user_roles')
-      .select('email')
-      .eq('role', 'admin');
+    // Determine approver emails
+    // Priority: 1. Environment variable APPROVER_EMAIL, 2. Admin users from database
+    let approverEmails: string[] = [];
 
-    if (adminError) {
-      console.error('Failed to fetch admin users:', adminError);
-      return NextResponse.json(
-        { error: 'Failed to fetch admin users' },
-        { status: 500 }
-      );
-    }
+    if (APPROVER_EMAIL) {
+      // Use configured approver email
+      approverEmails = [APPROVER_EMAIL];
+      console.log('Using configured APPROVER_EMAIL:', APPROVER_EMAIL);
+    } else {
+      // Fallback to fetching admin users from database
+      const { data: adminUsers, error: adminError } = await admin
+        .from('user_roles')
+        .select('email')
+        .eq('role', 'admin');
 
-    if (!adminUsers || adminUsers.length === 0) {
-      return NextResponse.json(
-        { error: 'No admin users found to send approval request' },
-        { status: 404 }
-      );
+      if (adminError) {
+        console.error('Failed to fetch admin users:', adminError);
+        return NextResponse.json(
+          { error: 'Failed to fetch admin users' },
+          { status: 500 }
+        );
+      }
+
+      if (!adminUsers || adminUsers.length === 0) {
+        return NextResponse.json(
+          { error: 'No admin users found to send approval request. Configure APPROVER_EMAIL in environment variables.' },
+          { status: 404 }
+        );
+      }
+
+      approverEmails = adminUsers.map(u => u.email);
     }
 
     // Use provided summary preview or fallback to review summary
@@ -116,11 +139,11 @@ export async function POST(request: NextRequest) {
       ? summaryPreview
       : (review.summary || []).slice(0, 5);
 
-    // Send email to each admin
+    // Send email to each approver
     const emailResults = await Promise.allSettled(
-      adminUsers.map(user =>
+      approverEmails.map(email =>
         sendApprovalRequestEmail(
-          user.email,
+          email,
           contractName,
           submittedBy,
           summary,
@@ -137,7 +160,7 @@ export async function POST(request: NextRequest) {
     // Log email failures
     const failures = emailResults
       .map((result, idx) => ({
-        email: adminUsers[idx].email,
+        email: approverEmails[idx],
         result
       }))
       .filter(({ result }) =>
