@@ -255,6 +255,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Debug: Log OneDrive configuration status
+    console.log('=== OneDrive Configuration Debug ===');
+    console.log('documentFile received:', !!documentFile);
+    console.log('documentFile length:', documentFile?.length || 0);
+    console.log('isGraphConfigured function available:', !!isGraphConfigured);
+    console.log('isGraphConfigured() returns:', isGraphConfigured ? isGraphConfigured() : 'N/A');
+    console.log('uploadToOneDrive function available:', !!uploadToOneDrive);
+
     // Handle OneDrive upload if document file is provided
     let onedriveInfo: { fileId: string; webUrl: string; embedUrl: string } | null = null;
 
@@ -269,8 +277,9 @@ export async function POST(request: NextRequest) {
         const fileBuffer = Buffer.from(documentFile, 'base64');
 
         // Upload to OneDrive
+        console.log('Attempting OneDrive upload with filename:', fileName, 'buffer size:', fileBuffer.length);
         onedriveInfo = await uploadToOneDrive(fileName, fileBuffer);
-        console.log('Document uploaded to OneDrive:', onedriveInfo.fileId);
+        console.log('OneDrive upload SUCCESS:', JSON.stringify(onedriveInfo, null, 2));
       } catch (uploadError) {
         // Log the error but continue - OneDrive upload is optional
         console.error('OneDrive upload failed (continuing without it):', uploadError);
