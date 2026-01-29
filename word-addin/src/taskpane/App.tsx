@@ -828,6 +828,7 @@ export default function App() {
   const [selectedClauseCategory, setSelectedClauseCategory] = useState<string>('');
   const [clauseSearch, setClauseSearch] = useState('');
   const [expandedClauseId, setExpandedClauseId] = useState<string | null>(null);
+  const [fullViewClause, setFullViewClause] = useState<{ clauseId: string; position: 'primary' | 'fallback' | 'lastresort' } | null>(null);
 
   // Save to History state
   const [originalDocumentText, setOriginalDocumentText] = useState<string>('');
@@ -3520,7 +3521,14 @@ export default function App() {
                       {/* Clause header with expand/collapse */}
                       <div
                         style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-                        onClick={() => setExpandedClauseId(expandedClauseId === clause.id ? null : clause.id)}
+                        onClick={() => {
+                          const newExpandedId = expandedClauseId === clause.id ? null : clause.id;
+                          setExpandedClauseId(newExpandedId);
+                          // Reset full view when collapsing or switching clauses
+                          if (!newExpandedId || newExpandedId !== clause.id) {
+                            setFullViewClause(null);
+                          }
+                        }}
                       >
                         <span style={{
                           fontSize: 11,
@@ -3648,14 +3656,36 @@ export default function App() {
                               >
                                 Insert
                               </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFullViewClause(
+                                    fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'primary'
+                                      ? null
+                                      : { clauseId: clause.id, position: 'primary' }
+                                  );
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: '1px solid rgba(255,255,255,0.1)',
+                                  borderRadius: 4,
+                                  color: 'rgba(255,255,255,0.6)',
+                                  fontSize: 11,
+                                  cursor: 'pointer',
+                                  padding: '2px 8px',
+                                }}
+                              >
+                                {fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'primary' ? 'Collapse' : 'View Full'}
+                              </button>
                             </div>
                             <div style={{
                               ...styles.clauseText,
                               backgroundColor: '#242A30',
                               padding: 8,
                               borderRadius: 4,
-                              maxHeight: 120,
-                              overflowY: 'auto',
+                              ...(fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'primary'
+                                ? { maxHeight: 'none' }
+                                : { maxHeight: 120, overflowY: 'auto' as const }),
                             }}>
                               {clause.primary_text}
                             </div>
@@ -3680,14 +3710,36 @@ export default function App() {
                                 >
                                   Insert
                                 </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFullViewClause(
+                                      fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'fallback'
+                                        ? null
+                                        : { clauseId: clause.id, position: 'fallback' }
+                                    );
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: 4,
+                                    color: 'rgba(255,255,255,0.6)',
+                                    fontSize: 11,
+                                    cursor: 'pointer',
+                                    padding: '2px 8px',
+                                  }}
+                                >
+                                  {fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'fallback' ? 'Collapse' : 'View Full'}
+                                </button>
                               </div>
                               <div style={{
                                 ...styles.clauseText,
                                 backgroundColor: '#242A30',
                                 padding: 8,
                                 borderRadius: 4,
-                                maxHeight: 120,
-                                overflowY: 'auto',
+                                ...(fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'fallback'
+                                  ? { maxHeight: 'none' }
+                                  : { maxHeight: 120, overflowY: 'auto' as const }),
                               }}>
                                 {clause.fallback_text}
                               </div>
@@ -3713,14 +3765,36 @@ export default function App() {
                                 >
                                   Insert
                                 </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFullViewClause(
+                                      fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'lastresort'
+                                        ? null
+                                        : { clauseId: clause.id, position: 'lastresort' }
+                                    );
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: 4,
+                                    color: 'rgba(255,255,255,0.6)',
+                                    fontSize: 11,
+                                    cursor: 'pointer',
+                                    padding: '2px 8px',
+                                  }}
+                                >
+                                  {fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'lastresort' ? 'Collapse' : 'View Full'}
+                                </button>
                               </div>
                               <div style={{
                                 ...styles.clauseText,
                                 backgroundColor: '#242A30',
                                 padding: 8,
                                 borderRadius: 4,
-                                maxHeight: 120,
-                                overflowY: 'auto',
+                                ...(fullViewClause?.clauseId === clause.id && fullViewClause?.position === 'lastresort'
+                                  ? { maxHeight: 'none' }
+                                  : { maxHeight: 120, overflowY: 'auto' as const }),
                               }}>
                                 {clause.last_resort_text}
                               </div>
