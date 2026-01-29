@@ -1141,6 +1141,14 @@ export default function App() {
         getDocumentAsBase64(), // Get actual .docx file for OneDrive upload
       ]);
 
+      // Debug logging
+      console.log('=== Save to History Debug ===');
+      console.log('Document text length:', currentDocumentText?.length);
+      console.log('Document name:', documentName);
+      console.log('Document file (base64) length:', documentFile?.length);
+      console.log('Has analysis result:', !!analysisResult);
+      console.log('Original document text length:', originalDocumentText?.length);
+
       // Get linked contract info - use custom name if provided, fallback to document name
       const selectedContractData = contracts.find(c => c.id === selectedContract);
       const effectiveName = customDocumentName || documentName;
