@@ -1157,7 +1157,7 @@ export default function App() {
         },
         body: JSON.stringify({
           contractId: selectedContract || undefined,
-          contractName: selectedContractData?.name || undefined,
+          contractName: selectedContractData?.name || documentName, // Use filename if no contract selected
           provisionName: historyProvisionName,
           originalText: originalDocumentText, // The document BEFORE any changes
           redlinedText: currentDocumentText,  // The document AFTER user's changes (we'll use this as the "modified" view)
@@ -1299,7 +1299,7 @@ export default function App() {
         },
         body: JSON.stringify({
           contractId: selectedContract || undefined,
-          contractName: selectedContractData?.name || undefined,
+          contractName: selectedContractData?.name || documentName, // Use filename if no contract selected
           provisionName: historyProvisionName,
           originalText: originalDocumentText,
           redlinedText: currentDocumentText,
