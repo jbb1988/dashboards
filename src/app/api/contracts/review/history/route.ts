@@ -236,6 +236,9 @@ export async function GET(request: NextRequest) {
       redlinedText: review.redlined_text,
       modifiedText: review.modified_text,
       summary: review.summary,
+      // OneDrive integration
+      onedriveWebUrl: review.onedrive_web_url || null,
+      onedriveEmbedUrl: review.onedrive_embed_url || null,
     }));
 
     return NextResponse.json({ history });

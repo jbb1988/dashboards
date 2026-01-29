@@ -18,6 +18,7 @@ import {
   FileCheck,
   ArrowRight,
   RotateCcw,
+  ExternalLink,
 } from 'lucide-react';
 import { elevation, colors } from '@/components/mars-ui/tokens';
 
@@ -1042,13 +1043,34 @@ export default function ContractCenterContent({
                   {contracts.find(c => c.id === selectedContract)?.name || 'Standalone Review'}
                 </p>
               </div>
-              <button
-                onClick={onNewReview}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium text-[rgba(200,210,235,0.75)] hover:text-[rgba(235,240,255,0.92)] hover:bg-[rgba(255,255,255,0.06)] transition-all duration-[180ms]"
-              >
-                <Plus className="w-4 h-4" />
-                New Review
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Edit in Word button - show if OneDrive URL exists */}
+                {mode === 'viewing-history' && selectedItem?.type === 'history' && (selectedItem.data as ReviewHistory).onedriveWebUrl && (
+                  <a
+                    href={(selectedItem.data as ReviewHistory).onedriveWebUrl!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium text-[rgba(235,240,255,0.92)] transition-all duration-[180ms]"
+                    style={{
+                      background: 'linear-gradient(180deg, rgba(0,120,212,0.30), rgba(0,120,212,0.15))',
+                      border: '1px solid rgba(0,120,212,0.40)',
+                    }}
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M21.17 3.25l-7.17 7.17 7.17 7.17L24 14.76V6.08l-2.83-2.83zM12.5 5.5L2.25 8.33l-.25.5v6.34l.25.5 10.25 2.83V5.5zM8.85 15.4L3.5 14.28V9.72l5.35-1.12v6.8z"/>
+                    </svg>
+                    Edit in Word
+                    <ExternalLink className="w-3 h-3 opacity-60" />
+                  </a>
+                )}
+                <button
+                  onClick={onNewReview}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium text-[rgba(200,210,235,0.75)] hover:text-[rgba(235,240,255,0.92)] hover:bg-[rgba(255,255,255,0.06)] transition-all duration-[180ms]"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Review
+                </button>
+              </div>
             </div>
           </div>
 

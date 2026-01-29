@@ -53,6 +53,9 @@ export interface ReviewHistory {
   redlinedText?: string;
   modifiedText?: string;
   summary?: string[];
+  // OneDrive integration
+  onedriveWebUrl?: string | null;
+  onedriveEmbedUrl?: string | null;
 }
 
 export interface Approval {

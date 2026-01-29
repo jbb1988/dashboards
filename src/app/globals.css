@@ -213,6 +213,31 @@ body::before {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   PROSEMIRROR/TIPTAP EDITOR - PARAGRAPH SPACING
+   ═══════════════════════════════════════════════════════════════ */
+.doc-surface .ProseMirror p,
+.doc-surface .ProseMirror div {
+  margin-bottom: 1em;
+}
+
+/* Section headings (all caps text) get extra spacing above */
+.doc-surface .ProseMirror p:has(strong:first-child),
+.doc-surface .ProseMirror p:has(b:first-child) {
+  margin-top: 1.5em;
+}
+
+/* Preserve inline paragraph margin styles */
+.doc-surface .ProseMirror p[style*="margin"] {
+  margin-bottom: inherit;
+}
+
+/* Ensure proper spacing for redline content */
+.doc-surface .ProseMirror span[data-ai-strike],
+.doc-surface .ProseMirror span[data-ai-insert] {
+  display: inline;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    TOOLBAR - GLASS-LIT MATERIAL
    ═══════════════════════════════════════════════════════════════ */
 .toolbar-glass {
