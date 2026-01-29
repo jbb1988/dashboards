@@ -3120,8 +3120,8 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Save/Submit Actions - Apple Native style */}
-                  {appliedSections.size > 0 && !savedToHistory && !submittedForApproval && (
+                  {/* Save/Submit Actions - Always visible when analysis exists */}
+                  {analysisResult && !savedToHistory && !submittedForApproval && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, padding: 16, background: 'rgba(52, 199, 89, 0.06)', borderRadius: 14, border: '1px solid rgba(52, 199, 89, 0.12)' }}>
                       {/* Primary: Submit for Approval - Apple Green */}
                       <button
