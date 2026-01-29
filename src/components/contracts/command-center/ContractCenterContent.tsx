@@ -1161,7 +1161,7 @@ export default function ContractCenterContent({
           >
             <div className="flex items-center gap-3">
               <div
-                className={`w-3 h-3 rounded-full ${
+                className={`w-3 h-3 rounded-full flex-shrink-0 ${
                   (selectedItem.data as Approval).approvalStatus === 'pending'
                     ? 'bg-[rgba(255,190,90,0.95)]'
                     : (selectedItem.data as Approval).approvalStatus === 'approved'
@@ -1169,12 +1169,62 @@ export default function ContractCenterContent({
                     : 'bg-[rgba(255,95,95,0.95)]'
                 }`}
               />
-              <div>
-                <h2 className="text-[16px] font-semibold text-[rgba(235,240,255,0.92)]">
-                  {(selectedItem.data as Approval).contractName}
-                </h2>
+              <div className="flex-1 min-w-0">
+                {isEditingTitle ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && onUpdateHistoryItem) {
+                          onUpdateHistoryItem((selectedItem.data as Approval).reviewId, { provisionName: editedTitle });
+                          setIsEditingTitle(false);
+                        } else if (e.key === 'Escape') {
+                          setIsEditingTitle(false);
+                        }
+                      }}
+                      className="flex-1 px-2 py-1 text-[16px] font-semibold bg-[rgba(255,255,255,0.08)] border border-[rgba(90,130,255,0.50)] rounded-lg text-[rgba(235,240,255,0.92)] focus:outline-none focus:border-[rgba(90,130,255,0.80)]"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => {
+                        if (onUpdateHistoryItem) {
+                          onUpdateHistoryItem((selectedItem.data as Approval).reviewId, { provisionName: editedTitle });
+                        }
+                        setIsEditingTitle(false);
+                      }}
+                      className="p-1.5 rounded-lg bg-[rgba(80,210,140,0.20)] text-[rgba(80,210,140,0.95)] hover:bg-[rgba(80,210,140,0.30)] transition-colors"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setIsEditingTitle(false)}
+                      className="p-1.5 rounded-lg bg-[rgba(255,255,255,0.06)] text-[rgba(200,210,235,0.60)] hover:bg-[rgba(255,255,255,0.10)] transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className="group flex items-center gap-2 cursor-pointer"
+                    onClick={() => {
+                      if (onUpdateHistoryItem) {
+                        setEditedTitle((selectedItem.data as Approval).provisionName || (selectedItem.data as Approval).contractName);
+                        setIsEditingTitle(true);
+                      }
+                    }}
+                  >
+                    <h2 className="text-[16px] font-semibold text-[rgba(235,240,255,0.92)] truncate">
+                      {(selectedItem.data as Approval).provisionName || (selectedItem.data as Approval).contractName}
+                    </h2>
+                    {onUpdateHistoryItem && (
+                      <Pencil className="w-3.5 h-3.5 text-[rgba(200,210,235,0.40)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                    )}
+                  </div>
+                )}
                 <p className="text-[12px] text-[rgba(200,210,235,0.50)] mt-0.5">
-                  {(selectedItem.data as Approval).provisionName || 'Approval Request'} · Submitted {new Date((selectedItem.data as Approval).submittedAt).toLocaleDateString()} by {(selectedItem.data as Approval).submittedBy}
+                  Submitted {new Date((selectedItem.data as Approval).submittedAt).toLocaleDateString()} by {(selectedItem.data as Approval).submittedBy}
                 </p>
               </div>
             </div>

@@ -135,13 +135,8 @@ function ApprovalItem({
         <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${urgencyDot[approval.urgency]}`} />
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)] truncate">
-            {approval.contractName}
+            {approval.provisionName || approval.contractName}
           </p>
-          {approval.provisionName && (
-            <p className="text-[11px] text-[rgba(200,210,235,0.50)] truncate mt-0.5">
-              {approval.provisionName}
-            </p>
-          )}
           <p className="text-[10px] text-[rgba(200,210,235,0.50)] mt-1">
             {formatRelativeTime(approval.submittedAt)}
           </p>

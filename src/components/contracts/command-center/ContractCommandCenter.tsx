@@ -615,6 +615,18 @@ export default function ContractCommandCenter() {
             : item
         ));
 
+        // Also update approvals if this review is a pending approval
+        setApprovals(prev => prev.map(item =>
+          item.reviewId === reviewId
+            ? {
+                ...item,
+                provisionName: updates.provisionName ?? item.provisionName,
+                contractName: updates.contractName ?? item.contractName,
+                summary: updates.summary ?? item.summary,
+              }
+            : item
+        ));
+
         // Update current result if viewing this item
         if (selectedItem?.id === reviewId && updates.summary) {
           setCurrentResult(prev => prev ? { ...prev, summary: updates.summary! } : prev);
