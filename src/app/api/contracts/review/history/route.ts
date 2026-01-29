@@ -71,16 +71,30 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Extract text content from Word XML runs (<w:r> elements containing <w:t> text)
+ * Extract text content from Word XML runs
+ * @param xml - The XML content to extract text from
+ * @param forDeletion - If true, looks for <w:delText> tags (Word uses this for deleted text)
  */
-function extractTextFromRuns(xml: string): string {
-  const textMatches = xml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
-  return textMatches
-    .map(match => {
-      const textMatch = match.match(/<w:t[^>]*>([^<]*)<\/w:t>/);
-      return textMatch ? textMatch[1] : '';
-    })
-    .join('');
+function extractTextFromRuns(xml: string, forDeletion: boolean = false): string {
+  if (forDeletion) {
+    // For deletions, Word uses <w:delText> tags
+    const delTextMatches = xml.match(/<w:delText[^>]*>([^<]*)<\/w:delText>/g) || [];
+    return delTextMatches
+      .map(match => {
+        const textMatch = match.match(/<w:delText[^>]*>([^<]*)<\/w:delText>/);
+        return textMatch ? textMatch[1] : '';
+      })
+      .join('');
+  } else {
+    // For normal text and insertions, Word uses <w:t> tags
+    const textMatches = xml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+    return textMatches
+      .map(match => {
+        const textMatch = match.match(/<w:t[^>]*>([^<]*)<\/w:t>/);
+        return textMatch ? textMatch[1] : '';
+      })
+      .join('');
+  }
 }
 
 /**
@@ -98,7 +112,8 @@ function processParagraphWithTrackedChanges(paraXml: string): string {
   while ((match = regex.exec(paraXml)) !== null) {
     if (match[0].startsWith('<w:del')) {
       // Deletion - wrap in <del> tag
-      const deletedText = extractTextFromRuns(match[1]);
+      // Pass true to look for <w:delText> tags (Word uses this for deleted text)
+      const deletedText = extractTextFromRuns(match[1], true);
       if (deletedText) {
         result += `<del>${escapeHtml(deletedText)}</del>`;
       }
