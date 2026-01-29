@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     // Build query based on status filter
     let query = admin
       .from('contract_reviews')
-      .select('id, contract_id, contract_name, provision_name, summary, approval_status, approval_token, approver_email, approval_feedback, approved_at, submitted_by_email, submitted_at')
+      .select('id, contract_id, contract_name, provision_name, summary, approval_status, approval_token, approver_email, approval_feedback, approved_at, submitted_by_email, submitted_at, created_at')
       .not('approval_token', 'is', null); // Only reviews that have been submitted for approval
 
     // Apply status filter
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         contractName: review.contract_name || review.provision_name || 'Unnamed Contract',
         provisionName: review.provision_name,
         submittedBy: review.submitted_by_email,
-        submittedAt: review.submitted_at,
+        submittedAt: review.submitted_at || review.created_at,
         approvalStatus: review.approval_status,
         approver: review.approver_email,
         approvedAt: review.approved_at,
