@@ -1130,11 +1130,6 @@ export default function App() {
       return;
     }
 
-    if (!analysisResult) {
-      setError('No analysis to save');
-      return;
-    }
-
     setIsSavingToHistory(true);
     setError(null);
 
@@ -1178,12 +1173,12 @@ export default function App() {
           contractId: selectedContract || undefined,
           contractName: selectedContractData?.name || effectiveName, // Use custom name if no contract selected
           provisionName: historyProvisionName,
-          originalText: originalDocumentText, // The document BEFORE any changes
-          redlinedText: currentDocumentText,  // The document AFTER user's changes (we'll use this as the "modified" view)
-          modifiedText: currentDocumentText,  // Current state of the document
+          originalText: originalDocumentText || currentDocumentText, // Use current if no analysis was run
+          redlinedText: currentDocumentText,
+          modifiedText: currentDocumentText,
           summary: summary,
           status: 'draft',
-          documentFile: documentFile || undefined, // Include document file for OneDrive upload
+          documentFile: documentFile || undefined,
         }),
       });
 
@@ -1279,11 +1274,6 @@ export default function App() {
       return;
     }
 
-    if (!analysisResult) {
-      setError('No analysis to save');
-      return;
-    }
-
     setIsSavingToHistory(true);
     setError(null);
 
@@ -1327,7 +1317,7 @@ export default function App() {
           contractId: selectedContract || undefined,
           contractName: selectedContractData?.name || effectiveName, // Use custom name if no contract selected
           provisionName: historyProvisionName,
-          originalText: originalDocumentText,
+          originalText: originalDocumentText || currentDocumentText, // Use current if no analysis was run
           redlinedText: currentDocumentText,
           modifiedText: currentDocumentText,
           summary: summary,
