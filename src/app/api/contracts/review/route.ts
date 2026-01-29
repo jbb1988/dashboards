@@ -781,8 +781,20 @@ MANDATORY SECTIONS TO REVIEW (you MUST check each one - do not skip):
 THOROUGHNESS REQUIREMENT:
 - Read the ENTIRE contract, not just obvious sections
 - Check for risky language buried in seemingly standard clauses
-- Look for broad language like "any and all", "however caused", "unlimited", "irrevocable"
 - If you would flag an issue in a focused clause review, flag it here too
+
+GENERAL RISK DETECTION - Flag ANY provision where:
+- Client has rights/control that Vendor doesn't (asymmetric terms)
+- Vendor bears cost without corresponding control
+- Client has "sole discretion", "absolute authority", or unilateral decision power
+- Scope is overly broad ("any and all", "related in any way", "arising from")
+- No caps, limits, or reasonableness standards on Vendor's obligations
+- Vendor can't settle, terminate, or make decisions without Client approval
+- Liability/risk is allocated disproportionately to Vendor
+- Language that could trap Vendor in unfavorable situations
+
+RED FLAG PHRASES (always investigate):
+"sole discretion" | "absolute authority" | "however caused" | "any and all" | "irrevocable" | "unlimited" | "related in any way" | "arising from or related to" | "at Vendor's cost" | "without limitation"
 
 CRITICAL INSTRUCTIONS:
 1. Use "edits" array with "modify" operation for EXISTING sections - provide targeted find/replace pairs
@@ -838,6 +850,15 @@ ASYMMETRIC PROVISIONS - FLAG AS HIGH RISK:
 - "Sole discretion" or "absolute authority" language favoring Client
 - Unilateral amendment or termination rights
 - One-sided approval/consent requirements
+
+GENERAL PRINCIPLE: Flag ANY provision that is unfavorable to MARS/Vendor:
+- Cost without control
+- Obligation without limit
+- Liability without cap
+- Commitment without exit
+- Discretion that only benefits Client
+
+RED FLAG PHRASES (always flag): "sole discretion" | "absolute authority" | "however caused" | "any and all" | "irrevocable" | "unlimited" | "at Vendor's cost" | "without limitation"
 
 Analyze this clause and output ALL recommended changes:
 `;
