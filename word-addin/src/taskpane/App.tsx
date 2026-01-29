@@ -1047,9 +1047,38 @@ export default function App() {
     });
   }, []);
 
-  // Get document name from Word - clean up template names
+  // Get document name from Word - try filename first, then title, clean up template names
   const getDocumentName = useCallback(async (): Promise<string> => {
     return new Promise((resolve) => {
+      // First try to get the filename from the document URL
+      try {
+        const docUrl = Office.context.document.url;
+        if (docUrl) {
+          // Extract filename from URL/path (works for local files and SharePoint)
+          const urlParts = docUrl.split(/[/\\]/);
+          const fileNameWithExt = urlParts[urlParts.length - 1];
+          if (fileNameWithExt) {
+            // Remove .docx extension and decode URL encoding
+            const fileName = decodeURIComponent(fileNameWithExt)
+              .replace(/\.docx?$/i, '')
+              .trim();
+
+            // Check if filename looks like a template GUID
+            const isTemplateGuid = /^Template_[a-f0-9-]+/i.test(fileName) ||
+                                   /^[a-f0-9]{8}[-_][a-f0-9]{4}/i.test(fileName) ||
+                                   (fileName.includes('_') && /[a-f0-9]{8,}/i.test(fileName));
+
+            if (fileName && !isTemplateGuid) {
+              resolve(fileName);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.log('Could not get document URL:', e);
+      }
+
+      // Fallback to document title property
       Word.run(async (context) => {
         const properties = context.document.properties;
         properties.load('title');
@@ -1057,20 +1086,18 @@ export default function App() {
 
         let title = properties.title || '';
 
-        // Check if title looks like a template GUID (e.g., "Template_14cc8e19-06e1-4b2f...")
-        // These typically start with "Template_" or contain multiple segments of hex/underscore
+        // Check if title looks like a template GUID
         const isTemplateGuid = /^Template_[a-f0-9-]+/i.test(title) ||
                                /^[a-f0-9]{8}[-_][a-f0-9]{4}/i.test(title) ||
                                (title.includes('_') && /[a-f0-9]{8,}/i.test(title));
 
         if (!title || isTemplateGuid) {
-          // Default to a friendly name for template-based documents
           resolve('Contract Document');
         } else {
           resolve(title);
         }
       }).catch(() => {
-        resolve('Word Document');
+        resolve('Contract Document');
       });
     });
   }, []);
