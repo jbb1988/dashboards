@@ -333,7 +333,8 @@ interface AIResult {
 async function callOpenRouterAPI(
   systemPrompt: string,
   userContent: string,
-  model: string
+  model: string,
+  temperature: number = 0.1 // Default low for deterministic output, higher for aggressive analysis
 ): Promise<AIResult> {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -356,7 +357,7 @@ async function callOpenRouterAPI(
         },
       ],
       max_tokens: 8000,
-      temperature: 0.1, // Lower temperature for more deterministic output
+      temperature: temperature,
       stream: true,
     }),
   });
@@ -1021,9 +1022,12 @@ Check each mandatory section: Indemnification, IP/Work Product, Limitation of Li
     let retryAttempted = false;
 
     // PASS 1: Initial AI call
+    // Use higher temperature for focused analysis to be more aggressive about finding issues
+    const analysisTemperature = isFocusedAnalysis ? 0.3 : 0.1;
     try {
       console.log('=== PASS 1: Initial AI Analysis (Anchor-Based) ===');
-      result = await callOpenRouterAPI(systemPrompt, userPrompt, openRouterModel);
+      console.log(`Using temperature: ${analysisTemperature} (${isFocusedAnalysis ? 'focused' : 'full document'})`);
+      result = await callOpenRouterAPI(systemPrompt, userPrompt, openRouterModel, analysisTemperature);
       console.log(`Pass 1 completed in ${(Date.now() - startTime) / 1000}s`);
       console.log(`Pass 1 edits: ${result.edits.length}`);
 
@@ -1054,7 +1058,7 @@ Check each mandatory section: Indemnification, IP/Work Product, Limitation of Li
 
           try {
             const retryStartTime = Date.now();
-            result = await callOpenRouterAPI(systemPrompt, retryUserPrompt, openRouterModel);
+            result = await callOpenRouterAPI(systemPrompt, retryUserPrompt, openRouterModel, analysisTemperature);
             console.log(`Pass 2 completed in ${(Date.now() - retryStartTime) / 1000}s`);
             console.log(`Pass 2 edits: ${result.edits.length}`);
 
