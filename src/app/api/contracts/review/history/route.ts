@@ -185,12 +185,16 @@ async function extractWithTrackedChanges(buffer: Buffer): Promise<{
   for (const para of paragraphs) {
     const paraHtml = processParagraphWithTrackedChanges(para);
     if (paraHtml.trim()) {
-      html += paraHtml + '<br>';
+      // Wrap each paragraph in <p> tags for proper spacing
+      html += `<p style="margin-bottom: 1em;">${paraHtml}</p>`;
+    } else {
+      // Empty paragraph = paragraph break (add spacing)
+      html += '<p style="margin-bottom: 0.5em;">&nbsp;</p>';
     }
   }
 
-  // Clean up consecutive <br> tags
-  html = html.replace(/(<br>)+/g, '<br>').replace(/<br>$/, '');
+  // Clean up excessive empty paragraphs (more than 2 consecutive)
+  html = html.replace(/(<p style="margin-bottom: 0\.5em;">&nbsp;<\/p>){3,}/g, '<p style="margin-bottom: 0.5em;">&nbsp;</p><p style="margin-bottom: 0.5em;">&nbsp;</p>');
 
   return { html, hasTrackedChanges };
 }

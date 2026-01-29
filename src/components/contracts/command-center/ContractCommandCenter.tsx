@@ -117,6 +117,7 @@ export default function ContractCommandCenter() {
 
   // ----- Review Form State -----
   const [selectedContract, setSelectedContract] = useState<string>('');
+  const [customContractName, setCustomContractName] = useState<string>('');
   const [provisionName, setProvisionName] = useState('');
   const [inputText, setInputText] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -324,6 +325,14 @@ export default function ContractCommandCenter() {
       setProvisionName(item.provisionName);
       if (item.contractId) {
         setSelectedContract(item.contractId);
+        setCustomContractName(''); // Clear custom name when linked contract exists
+      } else if (item.contractName) {
+        // Use contract name as custom name when no contract is linked
+        setCustomContractName(item.contractName);
+        setSelectedContract('');
+      } else {
+        setSelectedContract('');
+        setCustomContractName('');
       }
       setLastReviewId(item.id);
     }
@@ -416,8 +425,9 @@ export default function ContractCommandCenter() {
   }, [activeInputTab, inputText, extractedText, selectedContract, provisionName, playbookContent, contracts, fetchHistory]);
 
   const handleSendForApproval = useCallback(async () => {
-    if (!currentResult || !selectedContract || !provisionName.trim()) {
-      alert('Please select a contract, enter a provision name, and complete analysis first');
+    const hasContractIdentifier = selectedContract || customContractName.trim();
+    if (!currentResult || !hasContractIdentifier || !provisionName.trim()) {
+      alert('Please select a contract (or enter a custom name), enter a provision name, and complete analysis first');
       return;
     }
 
@@ -425,14 +435,17 @@ export default function ContractCommandCenter() {
     try {
       let reviewId = lastReviewId;
 
+      // Get contract info - either from selected contract or custom name
+      const contractData = selectedContract ? contracts.find(c => c.id === selectedContract) : null;
+      const effectiveContractName = contractData?.name || customContractName.trim() || 'Contract';
+
       if (!reviewId) {
-        const contractData = contracts.find(c => c.id === selectedContract);
         const createResponse = await fetch('/api/contracts/review/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contract_id: selectedContract,
-            contract_name: contractData?.name || '',
+            contract_id: selectedContract || null,
+            contract_name: effectiveContractName,
             provision_name: provisionName,
             original_text: currentResult.originalText,
             redlined_text: currentResult.redlinedText,
@@ -457,7 +470,7 @@ export default function ContractCommandCenter() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reviewId,
-          contractName: contracts.find(c => c.id === selectedContract)?.name || 'Contract',
+          contractName: effectiveContractName,
           submittedBy: userEmail,
           summaryPreview: currentResult.summary.slice(0, 5),
           reviewerNotes: reviewerNotes.trim() || null,
@@ -481,7 +494,7 @@ export default function ContractCommandCenter() {
     } finally {
       setIsSendingApproval(false);
     }
-  }, [currentResult, selectedContract, provisionName, lastReviewId, contracts, userEmail, reviewerNotes, ccEmails, fetchApprovals, fetchHistory]);
+  }, [currentResult, selectedContract, customContractName, provisionName, lastReviewId, contracts, userEmail, reviewerNotes, ccEmails, fetchApprovals, fetchHistory]);
 
   const handleDeleteHistoryItem = useCallback(async (reviewId: string) => {
     if (!confirm('Are you sure you want to delete this review from history?')) {
@@ -652,7 +665,9 @@ export default function ContractCommandCenter() {
         onCcEmailsChange={setCcEmails}
         onSendForApproval={handleSendForApproval}
         isSendingApproval={isSendingApproval}
-        canSendApproval={!!(currentResult && selectedContract && provisionName.trim())}
+        canSendApproval={!!(currentResult && (selectedContract || customContractName.trim()) && provisionName.trim())}
+        customContractName={customContractName}
+        onCustomContractNameChange={setCustomContractName}
         // Download props
         onDownloadOriginal={() => {/* TODO */}}
         onDownloadRevised={() => {/* TODO */}}

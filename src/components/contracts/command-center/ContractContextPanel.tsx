@@ -44,6 +44,9 @@ interface ContractContextPanelProps {
   onSendForApproval: () => void;
   isSendingApproval: boolean;
   canSendApproval: boolean;
+  // Custom contract name (when no contract is linked)
+  customContractName?: string;
+  onCustomContractNameChange?: (name: string) => void;
   // Download actions
   onDownloadOriginal: () => void;
   onDownloadRevised: () => void;
@@ -226,6 +229,8 @@ export default function ContractContextPanel({
   onSendForApproval,
   isSendingApproval,
   canSendApproval,
+  customContractName = '',
+  onCustomContractNameChange,
   onDownloadOriginal,
   onDownloadRevised,
   onCopyText,
@@ -617,18 +622,36 @@ export default function ContractContextPanel({
                         )}
                       </button>
 
-                      {!canSendApproval && (
-                        <div
-                          className="flex items-start gap-2 p-3 rounded-xl"
-                          style={{
-                            background: 'rgba(255,190,90,0.08)',
-                            border: '1px solid rgba(255,190,90,0.20)',
-                          }}
-                        >
-                          <AlertTriangle className="w-4 h-4 text-[rgba(255,190,90,0.95)] flex-shrink-0 mt-0.5" />
-                          <p className="text-[12px] text-[rgba(255,190,90,0.95)]">
-                            Select a contract and enter a provision name to enable approval workflow
-                          </p>
+                      {!canSendApproval && onCustomContractNameChange && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="flex items-center gap-2 text-[rgba(255,190,90,0.95)] text-[12px] font-semibold mb-2">
+                              <FileText className="w-4 h-4" />
+                              Contract Name (Required)
+                            </label>
+                            <input
+                              type="text"
+                              value={customContractName}
+                              onChange={(e) => onCustomContractNameChange(e.target.value)}
+                              placeholder="Enter contract name..."
+                              className="w-full px-3 py-2.5 text-[13px] rounded-xl bg-[rgba(10,14,20,0.60)] border border-[rgba(255,190,90,0.30)] text-[rgba(235,240,255,0.92)] placeholder-[rgba(200,210,235,0.40)] focus:outline-none focus:border-[rgba(255,190,90,0.60)] transition-colors duration-[180ms]"
+                            />
+                            <p className="text-[10px] text-[rgba(200,210,235,0.40)] mt-1">
+                              Enter a name if no contract is linked, or select one from the dropdown
+                            </p>
+                          </div>
+                          <div
+                            className="flex items-start gap-2 p-3 rounded-xl"
+                            style={{
+                              background: 'rgba(255,190,90,0.08)',
+                              border: '1px solid rgba(255,190,90,0.20)',
+                            }}
+                          >
+                            <AlertTriangle className="w-4 h-4 text-[rgba(255,190,90,0.95)] flex-shrink-0 mt-0.5" />
+                            <p className="text-[12px] text-[rgba(255,190,90,0.95)]">
+                              Enter a contract name and provision name to enable approval workflow
+                            </p>
+                          </div>
                         </div>
                       )}
                     </>
