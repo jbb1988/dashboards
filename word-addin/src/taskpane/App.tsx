@@ -3082,6 +3082,127 @@ export default function App() {
                 </button>
               </div>
 
+              {/* Save/Submit Actions - Always visible (can submit without analysis) */}
+              {!savedToHistory && !submittedForApproval && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, padding: 16, background: 'rgba(52, 199, 89, 0.06)', borderRadius: 14, border: '1px solid rgba(52, 199, 89, 0.12)' }}>
+                  {/* Document Name Input */}
+                  <div style={{ marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>
+                      Document Name
+                    </label>
+                    <input
+                      type="text"
+                      value={customDocumentName}
+                      onChange={(e) => setCustomDocumentName(e.target.value)}
+                      placeholder="Enter document name..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 8,
+                        color: 'rgba(255,255,255,0.9)',
+                        fontSize: 13,
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  {/* Primary: Submit for Approval - Apple Green */}
+                  <button
+                    onClick={saveAndSubmitForApproval}
+                    disabled={isSavingToHistory || isSubmittingApproval}
+                    style={{
+                      width: '100%',
+                      padding: '14px 20px',
+                      background: (isSavingToHistory || isSubmittingApproval)
+                        ? 'rgba(255,255,255,0.04)'
+                        : 'linear-gradient(180deg, #34C759 0%, #28A745 100%)',
+                      border: 'none',
+                      borderRadius: 12,
+                      color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.35)' : '#ffffff',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: (isSavingToHistory || isSubmittingApproval) ? 'default' : 'pointer',
+                      fontFamily: 'inherit',
+                      letterSpacing: '-0.01em',
+                      boxShadow: (isSavingToHistory || isSubmittingApproval)
+                        ? 'none'
+                        : '0 4px 16px rgba(52, 199, 89, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <Send24Regular style={{ width: 16, height: 16 }} />
+                    {isSavingToHistory ? 'Saving...' : isSubmittingApproval ? 'Submitting...' : 'Submit for Approval'}
+                  </button>
+                  {/* Secondary: Save to History */}
+                  <button
+                    onClick={saveToHistory}
+                    disabled={isSavingToHistory || isSubmittingApproval}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 10,
+                      color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.3)' : 'rgba(235, 240, 255, 0.7)',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: (isSavingToHistory || isSubmittingApproval) ? 'default' : 'pointer',
+                      fontFamily: 'inherit',
+                      textAlign: 'center',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {isSavingToHistory ? 'Saving...' : 'Save to History Only'}
+                  </button>
+                </div>
+              )}
+
+              {/* After saved to history but not yet submitted */}
+              {savedToHistory && !submittedForApproval && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                  <span style={{ fontSize: 12, color: 'rgba(35, 134, 54, 0.85)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
+                    Saved to history
+                  </span>
+                  <button
+                    onClick={() => submitForApproval()}
+                    disabled={isSubmittingApproval}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      background: isSubmittingApproval
+                        ? 'rgba(255,255,255,0.04)'
+                        : 'linear-gradient(180deg, rgba(35, 134, 54, 0.25) 0%, rgba(35, 134, 54, 0.15) 100%)',
+                      border: 'none',
+                      borderRadius: 8,
+                      color: isSubmittingApproval ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: isSubmittingApproval ? 'default' : 'pointer',
+                      fontFamily: 'inherit',
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    {isSubmittingApproval ? 'Submitting...' : 'Submit for Approval'}
+                  </button>
+                </div>
+              )}
+
+              {/* After submitted for approval */}
+              {submittedForApproval && (
+                <span style={{ fontSize: 12, color: 'rgba(35, 134, 54, 0.85)', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
+                  Submitted for approval
+                </span>
+              )}
+
               {/* Analysis Results - Dashboard Style */}
               {analysisResult && (
                 <div style={styles.results}>
@@ -3149,127 +3270,6 @@ export default function App() {
                         All changes inserted
                       </span>
                     </div>
-                  )}
-
-                  {/* Save/Submit Actions - Always visible (can submit without analysis) */}
-                  {!savedToHistory && !submittedForApproval && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, padding: 16, background: 'rgba(52, 199, 89, 0.06)', borderRadius: 14, border: '1px solid rgba(52, 199, 89, 0.12)' }}>
-                      {/* Document Name Input */}
-                      <div style={{ marginBottom: 4 }}>
-                        <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>
-                          Document Name
-                        </label>
-                        <input
-                          type="text"
-                          value={customDocumentName}
-                          onChange={(e) => setCustomDocumentName(e.target.value)}
-                          placeholder="Enter document name..."
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            background: 'rgba(255,255,255,0.06)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: 8,
-                            color: 'rgba(255,255,255,0.9)',
-                            fontSize: 13,
-                            fontFamily: 'inherit',
-                            outline: 'none',
-                            boxSizing: 'border-box',
-                          }}
-                        />
-                      </div>
-                      {/* Primary: Submit for Approval - Apple Green */}
-                      <button
-                        onClick={saveAndSubmitForApproval}
-                        disabled={isSavingToHistory || isSubmittingApproval}
-                        style={{
-                          width: '100%',
-                          padding: '14px 20px',
-                          background: (isSavingToHistory || isSubmittingApproval)
-                            ? 'rgba(255,255,255,0.04)'
-                            : 'linear-gradient(180deg, #34C759 0%, #28A745 100%)',
-                          border: 'none',
-                          borderRadius: 12,
-                          color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.35)' : '#ffffff',
-                          fontSize: 14,
-                          fontWeight: 600,
-                          cursor: (isSavingToHistory || isSubmittingApproval) ? 'default' : 'pointer',
-                          fontFamily: 'inherit',
-                          letterSpacing: '-0.01em',
-                          boxShadow: (isSavingToHistory || isSubmittingApproval)
-                            ? 'none'
-                            : '0 4px 16px rgba(52, 199, 89, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
-                          transition: 'all 0.2s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 8,
-                        }}
-                      >
-                        <Send24Regular style={{ width: 16, height: 16 }} />
-                        {isSavingToHistory ? 'Saving...' : isSubmittingApproval ? 'Submitting...' : 'Submit for Approval'}
-                      </button>
-                      {/* Secondary: Save to History */}
-                      <button
-                        onClick={saveToHistory}
-                        disabled={isSavingToHistory || isSubmittingApproval}
-                        style={{
-                          width: '100%',
-                          padding: '10px 16px',
-                          background: 'rgba(255,255,255,0.04)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: 10,
-                          color: (isSavingToHistory || isSubmittingApproval) ? 'rgba(255,255,255,0.3)' : 'rgba(235, 240, 255, 0.7)',
-                          fontSize: 13,
-                          fontWeight: 500,
-                          cursor: (isSavingToHistory || isSubmittingApproval) ? 'default' : 'pointer',
-                          fontFamily: 'inherit',
-                          textAlign: 'center',
-                          transition: 'all 0.2s ease',
-                        }}
-                      >
-                        {isSavingToHistory ? 'Saving...' : 'Save to History Only'}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* After saved to history but not yet submitted */}
-                  {savedToHistory && !submittedForApproval && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-                      <span style={{ fontSize: 12, color: 'rgba(35, 134, 54, 0.85)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
-                        Saved to history
-                      </span>
-                      <button
-                        onClick={() => submitForApproval()}
-                        disabled={isSubmittingApproval}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          background: isSubmittingApproval
-                            ? 'rgba(255,255,255,0.04)'
-                            : 'linear-gradient(180deg, rgba(35, 134, 54, 0.25) 0%, rgba(35, 134, 54, 0.15) 100%)',
-                          border: 'none',
-                          borderRadius: 8,
-                          color: isSubmittingApproval ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: isSubmittingApproval ? 'default' : 'pointer',
-                          fontFamily: 'inherit',
-                          letterSpacing: '-0.01em',
-                        }}
-                      >
-                        {isSubmittingApproval ? 'Submitting...' : 'Submit for Approval'}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* After submitted for approval */}
-                  {submittedForApproval && (
-                    <span style={{ fontSize: 12, color: 'rgba(35, 134, 54, 0.85)', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <CheckmarkCircle24Filled style={{ width: 14, height: 14 }} />
-                      Submitted for approval
-                    </span>
                   )}
 
                   {/* Modifications - Flat editorial blocks */}
