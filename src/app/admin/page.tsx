@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Sidebar, { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/components/Sidebar';
 import { DashboardBackground, backgroundPresets } from '@/components/mars-ui';
-import { UsersTab, RolesTab, DashboardOption } from '@/components/admin';
+import { UsersTab, RolesTab, DashboardsTab, DashboardOption } from '@/components/admin';
 
 interface UserOverride {
   dashboardId: string;
@@ -31,7 +31,7 @@ interface Role {
   userCount: number;
 }
 
-type Tab = 'users' | 'roles';
+type Tab = 'users' | 'roles' | 'dashboards';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('users');
@@ -92,6 +92,7 @@ export default function AdminPage() {
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'users', label: 'Users', count: users.length },
     { id: 'roles', label: 'Roles', count: roles.length },
+    { id: 'dashboards', label: 'Dashboards', count: dashboards.length },
   ];
 
   return (
@@ -195,6 +196,13 @@ export default function AdminPage() {
               )}
               {activeTab === 'roles' && (
                 <RolesTab
+                  roles={roles}
+                  dashboards={dashboards}
+                  onRefresh={fetchData}
+                />
+              )}
+              {activeTab === 'dashboards' && (
+                <DashboardsTab
                   roles={roles}
                   dashboards={dashboards}
                   onRefresh={fetchData}

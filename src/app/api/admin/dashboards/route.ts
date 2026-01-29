@@ -2,12 +2,13 @@
  * Dashboards API - List available dashboards for permission management
  *
  * GET - List all dashboards grouped by category
+ * PATCH - Update role access for a dashboard
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { getAllDashboards, getDashboardsByCategory, getUserRoleName } from '@/lib/permissions';
+import { getAllDashboards, getDashboardsByCategory, getUserRoleName, setDashboardRoleAccess } from '@/lib/permissions';
 
 // Helper to check if user is admin
 async function isAdmin(request: NextRequest): Promise<boolean> {
@@ -67,6 +68,41 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching dashboards:', error);
     return NextResponse.json(
       { error: 'Failed to fetch dashboards' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH - Update role access for a dashboard
+export async function PATCH(request: NextRequest) {
+  if (!(await isAdmin(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { dashboardId, roleIds } = await request.json();
+
+    if (!dashboardId || !Array.isArray(roleIds)) {
+      return NextResponse.json(
+        { error: 'dashboardId and roleIds[] are required' },
+        { status: 400 }
+      );
+    }
+
+    const success = await setDashboardRoleAccess(dashboardId, roleIds);
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Failed to update dashboard access' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, dashboardId, roleIds });
+  } catch (error) {
+    console.error('Error updating dashboard access:', error);
+    return NextResponse.json(
+      { error: 'Failed to update dashboard access' },
       { status: 500 }
     );
   }

@@ -310,6 +310,40 @@ export async function setRoleDashboardAccess(
   return true;
 }
 
+/**
+ * Set role access for a dashboard (replaces all existing)
+ * Inverse of setRoleDashboardAccess: given a dashboard, set which roles can access it
+ */
+export async function setDashboardRoleAccess(
+  dashboardId: string,
+  roleIds: string[]
+): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+
+  // Delete existing access for this dashboard
+  await admin
+    .from('role_dashboard_access')
+    .delete()
+    .eq('dashboard_id', dashboardId);
+
+  // Insert new access
+  if (roleIds.length > 0) {
+    const { error } = await admin
+      .from('role_dashboard_access')
+      .insert(roleIds.map(roleId => ({
+        role_id: roleId,
+        dashboard_id: dashboardId,
+      })));
+
+    if (error) {
+      console.error('Error setting dashboard role access:', error);
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // ============================================
 // USER DASHBOARD OVERRIDE FUNCTIONS
 // ============================================
