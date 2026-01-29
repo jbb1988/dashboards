@@ -758,7 +758,7 @@ If you cannot comply with any rule, output:
 // User prompt template for contract analysis - risk level placeholder will be replaced dynamically
 const MARS_USER_PROMPT_TEMPLATE = `Analyze this contract for MARS Company (the Contractor/Vendor). Identify {{RISK_SCOPE}} and output redline edits.
 
-MANDATORY SECTIONS TO REVIEW (flag if problematic):
+MANDATORY SECTIONS TO REVIEW (you MUST check each one - do not skip):
 1. INDEMNIFICATION - Limit to negligence ("to the extent caused by"), add liability cap, remove "however caused"
 2. INTELLECTUAL PROPERTY / WORK PRODUCT - Simple rule: custom work = theirs, everything else = ours
    - Remove "irrevocably" and "any and all works"
@@ -767,6 +767,12 @@ MANDATORY SECTIONS TO REVIEW (flag if problematic):
 4. TERMINATION - Ensure payment for work performed if terminated without cause
 5. SCOPE OF WORK / SERVICES - Flag if scope is too broad or open-ended
 6. CONTRACT TERM / DURATION - Flag unreasonable auto-renewal or excessive terms
+
+THOROUGHNESS REQUIREMENT:
+- Read the ENTIRE contract, not just obvious sections
+- Check for risky language buried in seemingly standard clauses
+- Look for broad language like "any and all", "however caused", "unlimited", "irrevocable"
+- If you would flag an issue in a focused clause review, flag it here too
 
 CRITICAL INSTRUCTIONS:
 1. Use "edits" array with "modify" operation for EXISTING sections - provide targeted find/replace pairs
@@ -906,7 +912,8 @@ Include ALL deviations from MARS standard positions:
 - MEDIUM RISK: Unfavorable but not critical terms - suboptimal clauses that could be improved
 - LOW RISK: Minor deviations from MARS standards - style, preference, or non-material differences
 
-Be thorough. Find EVERY issue, even minor ones. Users want a complete review.
+IMPORTANT: Review EVERY section of the contract thoroughly. Do not skip sections.
+Be aggressive in finding issues. If a clause could be improved for MARS, flag it.
 `;
       } else if (analysisRiskLevel === 'medium') {
         riskLevelInstructions = `
@@ -915,18 +922,22 @@ Include HIGH and MEDIUM risk issues:
 - HIGH RISK: Material issues that significantly affect MARS's interests or liability
 - MEDIUM RISK: Unfavorable but not critical terms - suboptimal clauses that could be improved
 
-Skip low-risk items that are merely preferences or style differences. Be sure to include BOTH high AND medium risk items in your analysis.
+IMPORTANT: Review EVERY section of the contract. Do not skip sections just because the document is long.
+If a clause is unfavorable to MARS or could be improved, flag it. When in doubt, include it.
 `;
       } else {
         // Default: high only
         riskLevelInstructions = `
 ANALYSIS DEPTH: FOCUSED (High Risk Only)
-Focus ONLY on HIGH RISK issues:
-- Material issues that significantly affect MARS's interests or liability
-- Terms that could cause substantial financial or legal exposure
-- Provisions that fundamentally conflict with MARS's standard positions
+Focus on HIGH RISK issues but do NOT skip reviewing any section:
+- Unlimited or uncapped liability exposure
+- Broad indemnification without fault limitation
+- IP rights grabs (assignments of pre-existing IP, tools, methodologies)
+- Missing critical protections (no limitation of liability section)
+- Unfavorable termination terms (no payment for work performed)
 
-Skip medium and low-risk items. Only flag material, high-impact issues.
+IMPORTANT: Still review EVERY section of the contract. A section that looks standard may contain buried high-risk language.
+Check each mandatory section: Indemnification, IP/Work Product, Limitation of Liability, Termination, Scope.
 `;
       }
       userPrompt = riskLevelInstructions + '\n' + userPrompt;
