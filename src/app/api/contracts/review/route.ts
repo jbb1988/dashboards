@@ -767,6 +767,16 @@ MANDATORY SECTIONS TO REVIEW (you MUST check each one - do not skip):
 4. TERMINATION - Ensure payment for work performed if terminated without cause
 5. SCOPE OF WORK / SERVICES - Flag if scope is too broad or open-ended
 6. CONTRACT TERM / DURATION - Flag unreasonable auto-renewal or excessive terms
+7. DEFENSE/CONTROL OF CLAIMS - Flag if:
+   - Vendor pays but Client controls defense (cost without control = HIGH RISK)
+   - Client can veto settlements ("sole discretion", "absolute authority")
+   - Broad scope ("related in any way") without fault limitation
+   - No cost cap on defense, no reasonableness standard
+   - MARS POSITION: If we pay, we control. Defense costs capped. Mutual settlement rights.
+8. ASYMMETRIC PROVISIONS - Flag any one-sided terms favoring Client:
+   - Unilateral rights (sole discretion, absolute authority)
+   - One-sided approval requirements
+   - Rights Client has that Vendor doesn't
 
 THOROUGHNESS REQUIREMENT:
 - Read the ENTIRE contract, not just obvious sections
@@ -802,7 +812,7 @@ const MARS_CONTRACT_PROMPT = REDLINE_SYSTEM_PROMPT;
 const FOCUSED_CLAUSE_PROMPT = `You are analyzing a SPECIFIC clause that the user wants reviewed more thoroughly.
 
 This clause may have been previously analyzed but the user wants a DEEPER, MORE AGGRESSIVE review.
-Be thorough. Find EVERY issue. Suggest STRONG protections for MARS (the Contractor).
+Be thorough. Find EVERY issue. Suggest STRONG protections for MARS (the Contractor/Vendor).
 
 OUTPUT FORMAT: Same JSON schema as full contract analysis.
 Each "find" text MUST be < 200 characters.
@@ -812,6 +822,22 @@ MARS POSITION: Protect Contractor's interests aggressively.
 - IP: Custom work = Client's, everything else = Contractor's (tools, templates, pre-existing IP)
 - Liability: Cap at contract value, exclude consequential damages
 - Termination: Payment for work performed
+
+DEFENSE/CONTROL OF CLAIMS - FLAG THESE AS HIGH RISK:
+- Vendor pays for defense but Client controls it (cost without control)
+- Client can veto/reject settlements (settlement paralysis)
+- Client has "sole discretion" or "absolute authority" over defense decisions
+- Broad scope like "related in any way" or "arising from" without fault limitation
+- No cost cap on defense expenses
+- Client can participate/interfere even when Vendor is defending
+- No "reasonableness" standard on Client's decisions
+MARS POSITION: If we pay, we control. Defense costs should be capped. Settlement rights should be mutual.
+
+ASYMMETRIC PROVISIONS - FLAG AS HIGH RISK:
+- One party has rights the other doesn't
+- "Sole discretion" or "absolute authority" language favoring Client
+- Unilateral amendment or termination rights
+- One-sided approval/consent requirements
 
 Analyze this clause and output ALL recommended changes:
 `;
