@@ -744,8 +744,8 @@ Instead of one massive replacement, use multiple targeted changes:
 If you cannot comply with any rule, output:
 { "edits": [], "new_sections": [], "error": "reason" }`;
 
-// User prompt template for contract analysis
-const MARS_USER_PROMPT_TEMPLATE = `Analyze this contract for MARS Company (the Contractor/Vendor). Identify material risks and output redline edits.
+// User prompt template for contract analysis - risk level placeholder will be replaced dynamically
+const MARS_USER_PROMPT_TEMPLATE = `Analyze this contract for MARS Company (the Contractor/Vendor). Identify {{RISK_SCOPE}} and output redline edits.
 
 MANDATORY SECTIONS TO REVIEW (flag if problematic):
 1. INDEMNIFICATION - Limit to negligence ("to the extent caused by"), add liability cap, remove "however caused"
@@ -868,7 +868,17 @@ export async function POST(request: NextRequest) {
       console.log(`Focused analysis on: ${focusedClause.name} (${normalizedClauseText.length} chars)`);
     } else {
       // Full contract analysis
-      userPrompt = MARS_USER_PROMPT_TEMPLATE + normalizedInput;
+      // Determine risk scope text for template based on analysisRiskLevel
+      let riskScopeText = 'material risks'; // default for high only
+      if (analysisRiskLevel === 'all') {
+        riskScopeText = 'all risks and deviations (high, medium, and low)';
+      } else if (analysisRiskLevel === 'medium') {
+        riskScopeText = 'high and medium risk issues';
+      }
+
+      // Replace placeholder in template with appropriate risk scope
+      const templateWithRiskScope = MARS_USER_PROMPT_TEMPLATE.replace('{{RISK_SCOPE}}', riskScopeText);
+      userPrompt = templateWithRiskScope + normalizedInput;
 
       // Add RAG clause context if available
       if (clauseContext) {
@@ -894,7 +904,7 @@ Include HIGH and MEDIUM risk issues:
 - HIGH RISK: Material issues that significantly affect MARS's interests or liability
 - MEDIUM RISK: Unfavorable but not critical terms - suboptimal clauses that could be improved
 
-Skip low-risk items that are merely preferences or style differences.
+Skip low-risk items that are merely preferences or style differences. Be sure to include BOTH high AND medium risk items in your analysis.
 `;
       } else {
         // Default: high only
