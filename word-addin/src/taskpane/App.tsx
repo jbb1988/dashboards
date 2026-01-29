@@ -874,6 +874,17 @@ export default function App() {
     });
   }, []);
 
+  // Load document name when Office is ready (for save/submit without analysis)
+  useEffect(() => {
+    if (isOfficeReady && !customDocumentName) {
+      getDocumentName().then(name => {
+        if (name && !customDocumentName) {
+          setCustomDocumentName(name);
+        }
+      }).catch(err => console.error('Failed to get document name:', err));
+    }
+  }, [isOfficeReady]);
+
   // Check authentication status
   const checkAuthStatus = async () => {
     try {
@@ -1141,14 +1152,20 @@ export default function App() {
       const historyProvisionName = selectedContractData?.name || effectiveName;
 
       // Generate a simple diff summary based on what sections were applied
-      const appliedSummary = analysisResult.sections
-        .filter(s => appliedSections.has(s.sectionTitle))
-        .map(s => `[${s.sectionTitle}] ${s.rationale || 'Modified'}`);
+      // Generate summary - handle case where no analysis was run
+      const appliedSummary = analysisResult?.sections
+        ?.filter(s => appliedSections.has(s.sectionTitle))
+        ?.map(s => `[${s.sectionTitle}] ${s.rationale || 'Modified'}`) || [];
 
-      // If no changes were applied, note that
-      const summary = appliedSummary.length > 0
-        ? appliedSummary
-        : ['No changes applied - document reviewed but unchanged'];
+      // Determine appropriate summary message
+      let summary: string[];
+      if (!analysisResult) {
+        summary = ['Document submitted without AI analysis'];
+      } else if (appliedSummary.length > 0) {
+        summary = appliedSummary;
+      } else {
+        summary = ['No changes applied - document reviewed but unchanged'];
+      }
 
       const token = localStorage.getItem('mars_token');
       const response = await fetch(`${API_BASE}/api/contracts/review/history`, {
@@ -1217,11 +1234,11 @@ export default function App() {
       const effectiveName = customDocumentName || documentName;
       const contractName = selectedContractData?.name || effectiveName;
 
-      // Generate summary preview from applied changes
-      const summaryPreview = analysisResult.sections
-        .filter(s => appliedSections.has(s.sectionTitle))
-        .map(s => `[${s.riskLevel?.toUpperCase()}] ${s.sectionTitle}: ${s.rationale || 'Modified'}`)
-        .slice(0, 5);
+      // Generate summary preview from applied changes (handle no analysis case)
+      const summaryPreview = analysisResult?.sections
+        ?.filter(s => appliedSections.has(s.sectionTitle))
+        ?.map(s => `[${s.riskLevel?.toUpperCase()}] ${s.sectionTitle}: ${s.rationale || 'Modified'}`)
+        ?.slice(0, 5) || ['Document submitted without AI analysis'];
 
       const token = localStorage.getItem('mars_token');
       const response = await fetch(`${API_BASE}/api/contracts/review/request-approval`, {
@@ -1283,14 +1300,19 @@ export default function App() {
       const effectiveName = customDocumentName || documentName;
       const historyProvisionName = selectedContractData?.name || effectiveName;
 
-      // Generate a simple diff summary based on what sections were applied
-      const appliedSummary = analysisResult.sections
-        .filter(s => appliedSections.has(s.sectionTitle))
-        .map(s => `[${s.sectionTitle}] ${s.rationale || 'Modified'}`);
+      // Generate summary - handle case where no analysis was run
+      const appliedSummary = analysisResult?.sections
+        ?.filter(s => appliedSections.has(s.sectionTitle))
+        ?.map(s => `[${s.sectionTitle}] ${s.rationale || 'Modified'}`) || [];
 
-      const summary = appliedSummary.length > 0
-        ? appliedSummary
-        : ['No changes applied - document reviewed but unchanged'];
+      let summary: string[];
+      if (!analysisResult) {
+        summary = ['Document submitted without AI analysis'];
+      } else if (appliedSummary.length > 0) {
+        summary = appliedSummary;
+      } else {
+        summary = ['No changes applied - document reviewed but unchanged'];
+      }
 
       const token = localStorage.getItem('mars_token');
 
@@ -1333,10 +1355,10 @@ export default function App() {
       setIsSavingToHistory(false);
       setIsSubmittingApproval(true);
 
-      const summaryPreview = analysisResult.sections
-        .filter(s => appliedSections.has(s.sectionTitle))
-        .map(s => `[${s.riskLevel?.toUpperCase()}] ${s.sectionTitle}: ${s.rationale || 'Modified'}`)
-        .slice(0, 5);
+      const summaryPreview = analysisResult?.sections
+        ?.filter(s => appliedSections.has(s.sectionTitle))
+        ?.map(s => `[${s.riskLevel?.toUpperCase()}] ${s.sectionTitle}: ${s.rationale || 'Modified'}`)
+        ?.slice(0, 5) || ['Document submitted without AI analysis'];
 
       const approvalResponse = await fetch(`${API_BASE}/api/contracts/review/request-approval`, {
         method: 'POST',
@@ -3129,8 +3151,8 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Save/Submit Actions - Always visible when analysis exists */}
-                  {analysisResult && !savedToHistory && !submittedForApproval && (
+                  {/* Save/Submit Actions - Always visible (can submit without analysis) */}
+                  {!savedToHistory && !submittedForApproval && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16, padding: 16, background: 'rgba(52, 199, 89, 0.06)', borderRadius: 14, border: '1px solid rgba(52, 199, 89, 0.12)' }}>
                       {/* Document Name Input */}
                       <div style={{ marginBottom: 4 }}>
