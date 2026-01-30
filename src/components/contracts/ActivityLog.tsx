@@ -91,7 +91,15 @@ function formatDate(dateString: string) {
 }
 
 export default function ActivityLog({ entries }: ActivityLogProps) {
+  console.log('[ActivityLog] Received entries:', {
+    entries,
+    entriesLength: entries?.length,
+    entriesType: typeof entries,
+    isArray: Array.isArray(entries)
+  });
+
   if (!entries || entries.length === 0) {
+    console.log('[ActivityLog] Showing "No activity" message');
     return (
       <div className="bg-[#151F2E] border border-white/10 rounded-lg p-4">
         <h4 className="text-sm font-medium text-white mb-2">Activity Log</h4>
@@ -99,6 +107,8 @@ export default function ActivityLog({ entries }: ActivityLogProps) {
       </div>
     );
   }
+
+  console.log('[ActivityLog] Rendering', entries.length, 'entries');
 
   return (
     <div className="bg-[#151F2E] border border-white/10 rounded-lg p-4">

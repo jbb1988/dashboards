@@ -467,7 +467,18 @@ export default function ContractContextPanel({
               {activeTab === 'activity' && (
                 <div className="space-y-4">
                   {selectedItem?.type === 'approval' ? (
-                    <ActivityLog entries={(selectedItem.data as Approval).activityLog || []} />
+                    <>
+                      {(() => {
+                        const activityLog = (selectedItem.data as Approval).activityLog || [];
+                        console.log('[ContractContextPanel] Activity Log Data:', {
+                          hasActivityLog: !!(selectedItem.data as Approval).activityLog,
+                          activityLogLength: activityLog.length,
+                          activityLog: activityLog,
+                          selectedItem: selectedItem.data
+                        });
+                        return <ActivityLog entries={activityLog} />;
+                      })()}
+                    </>
                   ) : (
                     <div className="text-center py-8">
                       <Clock className="w-10 h-10 text-[rgba(200,210,235,0.30)] mx-auto mb-3" />
