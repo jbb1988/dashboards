@@ -23,6 +23,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { elevation, colors } from '@/components/mars-ui/tokens';
+import ActivityLog from '@/components/contracts/ActivityLog';
 import type {
   ReviewResult,
   RiskScores,
@@ -466,50 +467,7 @@ export default function ContractContextPanel({
               {activeTab === 'activity' && (
                 <div className="space-y-4">
                   {selectedItem?.type === 'approval' ? (
-                    <>
-                      <div className="flex gap-3 relative">
-                        <div className="absolute left-[11px] top-6 bottom-0 w-[2px] bg-gradient-to-b from-[rgba(90,130,255,0.40)] via-[rgba(255,255,255,0.06)] to-transparent" />
-
-                        {/* Submitted Event */}
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 z-10 bg-[rgba(90,130,255,0.15)] border border-[rgba(90,130,255,0.30)]">
-                          <Send className="w-3 h-3 text-[rgba(90,130,255,0.95)]" />
-                        </div>
-                        <div className="flex-1 pb-4">
-                          <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">
-                            Submitted for approval
-                          </p>
-                          <p className="text-[11px] text-[rgba(200,210,235,0.50)] mt-0.5">
-                            {(selectedItem.data as Approval).submittedBy} · {formatRelativeTime((selectedItem.data as Approval).submittedAt)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {(selectedItem.data as Approval).approvalStatus !== 'pending' && (
-                        <div className="flex gap-3">
-                          <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                              (selectedItem.data as Approval).approvalStatus === 'approved'
-                                ? 'bg-[rgba(80,210,140,0.15)] border border-[rgba(80,210,140,0.30)]'
-                                : 'bg-[rgba(255,95,95,0.15)] border border-[rgba(255,95,95,0.30)]'
-                            }`}
-                          >
-                            {(selectedItem.data as Approval).approvalStatus === 'approved' ? (
-                              <CheckCircle className="w-3 h-3 text-[rgba(80,210,140,0.95)]" />
-                            ) : (
-                              <XCircle className="w-3 h-3 text-[rgba(255,95,95,0.95)]" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-[13px] font-medium text-[rgba(235,240,255,0.92)]">
-                              {(selectedItem.data as Approval).approvalStatus === 'approved' ? 'Approved' : 'Rejected'}
-                            </p>
-                            <p className="text-[11px] text-[rgba(200,210,235,0.50)] mt-0.5">
-                              {(selectedItem.data as Approval).approver} · {(selectedItem.data as Approval).approvedAt ? formatRelativeTime((selectedItem.data as Approval).approvedAt!) : ''}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </>
+                    <ActivityLog entries={(selectedItem.data as Approval).activityLog || []} />
                   ) : (
                     <div className="text-center py-8">
                       <Clock className="w-10 h-10 text-[rgba(200,210,235,0.30)] mx-auto mb-3" />

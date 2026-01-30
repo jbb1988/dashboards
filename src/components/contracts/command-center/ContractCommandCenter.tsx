@@ -73,6 +73,13 @@ export interface Approval {
   summary: string[];
   urgency: 'critical' | 'high' | 'normal';
   approvalToken?: string;
+  activityLog?: Array<{
+    action: 'submitted' | 'viewed' | 'edited' | 'approved' | 'rejected' | 'resubmitted';
+    by: string;
+    at: string;
+    note?: string;
+    feedback?: string;
+  }>;
 }
 
 export interface PlaybookOption {
