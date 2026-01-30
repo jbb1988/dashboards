@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createBrowserClient } from '@supabase/ssr';
 import ContractLeftPanel from './ContractLeftPanel';
 import ContractCenterContent from './ContractCenterContent';
 import ContractContextPanel from './ContractContextPanel';
 import { elevation, colors, radius } from '@/components/mars-ui/tokens';
+import { useInboxFiltering } from './useInboxFiltering';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -48,6 +50,7 @@ export interface ReviewHistory {
   contractName: string;
   provisionName: string;
   createdAt: string;
+  createdBy?: string; // Email of user who created the review
   status: 'draft' | 'sent_to_boss' | 'sent_to_client' | 'approved';
   originalText?: string;
   redlinedText?: string;
@@ -132,6 +135,7 @@ export default function ContractCommandCenter() {
   const [contextPanelTab, setContextPanelTab] = useState<ContextPanelTab>('summary');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useLocalStorage<'inbox' | 'archive'>('contract-cc-view-mode', 'inbox');
 
   // ----- Review Form State -----
   const [selectedContract, setSelectedContract] = useState<string>('');
@@ -682,6 +686,9 @@ export default function ContractCommandCenter() {
   // COMPUTED VALUES
   // ===========================================================================
 
+  // Compute inbox items using the hook
+  const inboxItems = useInboxFiltering(approvals, history, userEmail);
+
   // Get review IDs that are pending approval to exclude from other sections
   const pendingApprovalReviewIds = new Set(
     approvals.filter(a => a.approvalStatus === 'pending').map(a => a.reviewId)
@@ -730,11 +737,15 @@ export default function ContractCommandCenter() {
         onToggleCollapse={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        inboxItems={inboxItems}
         pendingApprovals={filteredApprovals}
         pendingCount={approvalCounts.pending}
         inProgressReviews={inProgressReviews}
         recentHistory={recentHistory}
         allHistory={filteredHistory}
+        allApprovals={approvals}
         isLoadingApprovals={isLoadingApprovals}
         isLoadingHistory={isLoadingHistory}
         selectedItemId={selectedItem?.id || null}

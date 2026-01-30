@@ -19,6 +19,10 @@ import {
 } from 'lucide-react';
 import { elevation, colors, radius } from '@/components/mars-ui/tokens';
 import type { Approval, ReviewHistory } from './ContractCommandCenter';
+import ViewSwitcher from './ViewSwitcher';
+import InboxList from './InboxList';
+import ArchiveList from './ArchiveList';
+import type { InboxItem } from './useInboxFiltering';
 
 // =============================================================================
 // TYPES
@@ -29,11 +33,15 @@ interface ContractLeftPanelProps {
   onToggleCollapse: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  viewMode: 'inbox' | 'archive';
+  onViewModeChange: (mode: 'inbox' | 'archive') => void;
+  inboxItems: InboxItem[];
   pendingApprovals: Approval[];
   pendingCount: number;
   inProgressReviews: ReviewHistory[];
   recentHistory: ReviewHistory[];
   allHistory: ReviewHistory[];
+  allApprovals: Approval[];
   isLoadingApprovals: boolean;
   isLoadingHistory: boolean;
   selectedItemId: string | null;
@@ -250,11 +258,15 @@ export default function ContractLeftPanel({
   onToggleCollapse,
   searchQuery,
   onSearchChange,
+  viewMode,
+  onViewModeChange,
+  inboxItems,
   pendingApprovals,
   pendingCount,
   inProgressReviews,
   recentHistory,
   allHistory,
+  allApprovals,
   isLoadingApprovals,
   isLoadingHistory,
   selectedItemId,
@@ -276,6 +288,9 @@ export default function ContractLeftPanel({
   };
 
   const panelWidth = collapsed ? 56 : 280;
+
+  // Calculate archive count (all items)
+  const archiveCount = allHistory.length + allApprovals.length;
 
   return (
     <motion.aside
@@ -348,8 +363,18 @@ export default function ContractLeftPanel({
             </button>
           </div>
 
+          {/* View Switcher */}
+          <div className="flex-shrink-0 px-3 pb-3">
+            <ViewSwitcher
+              activeView={viewMode}
+              inboxCount={inboxItems.length}
+              archiveCount={archiveCount}
+              onViewChange={onViewModeChange}
+            />
+          </div>
+
           {/* Search */}
-          <div className="flex-shrink-0 p-3">
+          <div className="flex-shrink-0 px-3 pb-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[rgba(200,210,235,0.50)]" />
               <input
@@ -370,7 +395,38 @@ export default function ContractLeftPanel({
             </div>
           </div>
 
-          {/* Scrollable Content */}
+          {/* Scrollable Content - Conditional Render */}
+          {viewMode === 'inbox' ? (
+            <div className="flex-1 overflow-y-auto">
+              {isLoadingApprovals || isLoadingHistory ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-6 h-6 border-2 border-[rgba(90,130,255,0.95)] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <InboxList
+                  items={inboxItems}
+                  selectedItemId={selectedItemId}
+                  onSelectApproval={onSelectApproval}
+                  onSelectHistory={onSelectHistory}
+                  onDeleteHistory={onDeleteHistory}
+                  onDeleteApproval={onDeleteApproval}
+                />
+              )}
+            </div>
+          ) : (
+            <ArchiveList
+              approvals={allApprovals}
+              history={allHistory}
+              selectedItemId={selectedItemId}
+              onSelectApproval={onSelectApproval}
+              onSelectHistory={onSelectHistory}
+              onDeleteHistory={onDeleteHistory}
+              onDeleteApproval={onDeleteApproval}
+            />
+          )}
+
+          {/* OLD SECTIONS - Hidden but kept for reference */}
+          {false && (
           <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
             {/* Pending Approvals Section */}
             <div>
@@ -544,6 +600,7 @@ export default function ContractLeftPanel({
               </AnimatePresence>
             </div>
           </div>
+          )}
         </>
       )}
     </motion.aside>

@@ -2455,6 +2455,7 @@ export interface ContractReview {
   status: 'draft' | 'sent_to_boss' | 'sent_to_client' | 'approved';
   created_at?: string;
   updated_at?: string;
+  created_by?: string; // Email of user who created the review
   // Approval workflow fields
   approval_status?: 'pending' | 'approved' | 'rejected' | 'expired';
   approval_token?: string;
@@ -2464,6 +2465,7 @@ export interface ContractReview {
   token_expires_at?: string;
   submitted_by_email?: string;
   submitted_at?: string;
+  archived_at?: string; // Timestamp when item was archived (optional for Phase 4)
   reviewer_notes?: string;
   cc_emails?: string[];
   cc_token?: string;
