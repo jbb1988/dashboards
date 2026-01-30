@@ -239,6 +239,8 @@ export async function GET(request: NextRequest) {
       // OneDrive integration
       onedriveWebUrl: review.onedrive_web_url || null,
       onedriveEmbedUrl: review.onedrive_embed_url || null,
+      // Activity log
+      activityLog: review.activity_log || [],
     }));
 
     return NextResponse.json({ history });

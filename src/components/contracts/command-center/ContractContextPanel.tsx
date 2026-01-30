@@ -466,12 +466,17 @@ export default function ContractContextPanel({
               {/* Activity Tab */}
               {activeTab === 'activity' && (
                 <div className="space-y-4">
-                  {selectedItem?.type === 'approval' ? (
+                  {(selectedItem?.type === 'approval' || selectedItem?.type === 'history') ? (
                     <>
                       {(() => {
-                        const activityLog = (selectedItem.data as Approval).activityLog || [];
+                        const activityLog = selectedItem.type === 'approval'
+                          ? (selectedItem.data as Approval).activityLog || []
+                          : (selectedItem.data as ReviewHistory).activityLog || [];
                         console.log('[ContractContextPanel] Activity Log Data:', {
-                          hasActivityLog: !!(selectedItem.data as Approval).activityLog,
+                          itemType: selectedItem.type,
+                          hasActivityLog: !!(selectedItem.type === 'approval'
+                            ? (selectedItem.data as Approval).activityLog
+                            : (selectedItem.data as ReviewHistory).activityLog),
                           activityLogLength: activityLog.length,
                           activityLog: activityLog,
                           selectedItem: selectedItem.data

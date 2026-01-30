@@ -56,6 +56,14 @@ export interface ReviewHistory {
   // OneDrive integration
   onedriveWebUrl?: string | null;
   onedriveEmbedUrl?: string | null;
+  // Activity log
+  activityLog?: Array<{
+    action: 'submitted' | 'viewed' | 'edited' | 'approved' | 'rejected' | 'resubmitted';
+    by: string;
+    at: string;
+    note?: string;
+    feedback?: string;
+  }>;
 }
 
 export interface Approval {
