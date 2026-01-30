@@ -15,6 +15,8 @@ const protectedRoutes = [
 // Routes accessible to everyone (including unauthenticated)
 const publicRoutes = [
   '/guides',
+  '/contracts/review/approve/',
+  '/contracts/review/cc/',
 ];
 
 export async function middleware(request: NextRequest) {
