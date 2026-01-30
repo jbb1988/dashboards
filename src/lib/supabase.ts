@@ -2464,6 +2464,18 @@ export interface ContractReview {
   token_expires_at?: string;
   submitted_by_email?: string;
   submitted_at?: string;
+  reviewer_notes?: string;
+  cc_emails?: string[];
+  cc_token?: string;
+  approver_edited_text?: string;
+  activity_log?: Array<{
+    action: 'submitted' | 'viewed' | 'edited' | 'approved' | 'rejected' | 'resubmitted' | 'cc_sent';
+    by: string;
+    at: string;
+    note?: string;
+    feedback?: string;
+    recipients?: string[];
+  }>;
   // OneDrive integration fields
   onedrive_file_id?: string;
   onedrive_web_url?: string;
